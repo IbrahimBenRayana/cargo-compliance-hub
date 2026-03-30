@@ -2,10 +2,11 @@ import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { mockShipments, mockActivity, mockWeeklyFilings, mockComplianceScore } from '@/data/mock-data';
-import { Ship, Clock, Send, AlertTriangle, ArrowUpRight, AlertCircle, CheckCircle2, Plus, TrendingUp, TrendingDown } from 'lucide-react';
+import { Ship, Clock, Send, AlertTriangle, ArrowUpRight, AlertCircle, CheckCircle2, Plus, TrendingUp, TrendingDown, Eye, Pencil, ExternalLink } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, RadialBarChart, RadialBar, ResponsiveContainer } from 'recharts';
 
 // --- Animated Counter Hook ---
@@ -17,7 +18,7 @@ function useAnimatedCounter(target: number, duration = 1200) {
     const step = (now: number) => {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
       setValue(Math.round(eased * target));
       if (progress < 1) ref.current = requestAnimationFrame(step);
     };
@@ -86,7 +87,7 @@ function KpiCard({ kpi, index }: { kpi: typeof kpis[0]; index: number }) {
   const Icon = kpi.icon;
   return (
     <Card
-      className="overflow-hidden opacity-0 animate-fade-in-up"
+      className="overflow-hidden opacity-0 animate-fade-in-up group hover:shadow-md hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-0.5"
       style={{ animationDelay: `${index * 100}ms` }}
     >
       <CardContent className="p-5">
@@ -106,7 +107,7 @@ function KpiCard({ kpi, index }: { kpi: typeof kpis[0]; index: number }) {
               <span className="text-muted-foreground">vs last week</span>
             </div>
           </div>
-          <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${kpi.gradient} flex items-center justify-center`}>
+          <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${kpi.gradient} flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}>
             <Icon className="h-6 w-6 text-foreground/70" />
           </div>
         </div>
@@ -163,25 +164,11 @@ export default function Dashboard() {
             }} className="mx-auto aspect-square max-h-[260px]">
               <PieChart>
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Pie
-                  data={statusData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={60}
-                  outerRadius={100}
-                  strokeWidth={2}
-                  stroke="hsl(var(--background))"
-                >
-                  {statusData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
+                <Pie data={statusData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} strokeWidth={2} stroke="hsl(var(--background))">
+                  {statusData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Pie>
-                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="fill-foreground text-2xl font-bold">
-                  {mockShipments.length}
-                </text>
-                <text x="50%" y="58%" textAnchor="middle" dominantBaseline="central" className="fill-muted-foreground text-xs">
-                  Total
-                </text>
+                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="fill-foreground text-2xl font-bold">{mockShipments.length}</text>
+                <text x="50%" y="58%" textAnchor="middle" dominantBaseline="central" className="fill-muted-foreground text-xs">Total</text>
               </PieChart>
             </ChartContainer>
             <div className="flex justify-center gap-4 mt-2">
@@ -236,18 +223,8 @@ export default function Dashboard() {
             }} className="mx-auto aspect-square max-h-[260px]">
               <PieChart>
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Pie
-                  data={countryData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={60}
-                  outerRadius={100}
-                  strokeWidth={2}
-                  stroke="hsl(var(--background))"
-                >
-                  {countryData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
+                <Pie data={countryData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} strokeWidth={2} stroke="hsl(var(--background))">
+                  {countryData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Pie>
               </PieChart>
             </ChartContainer>
@@ -270,21 +247,8 @@ export default function Dashboard() {
           <CardContent className="flex flex-col items-center justify-center">
             <div className="relative h-[220px] w-[220px]">
               <ResponsiveContainer width="100%" height="100%">
-                <RadialBarChart
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="70%"
-                  outerRadius="90%"
-                  startAngle={90}
-                  endAngle={-270}
-                  data={complianceData}
-                  barSize={14}
-                >
-                  <RadialBar
-                    dataKey="value"
-                    cornerRadius={10}
-                    background={{ fill: 'hsl(var(--muted))' }}
-                  />
+                <RadialBarChart cx="50%" cy="50%" innerRadius="70%" outerRadius="90%" startAngle={90} endAngle={-270} data={complianceData} barSize={14}>
+                  <RadialBar dataKey="value" cornerRadius={10} background={{ fill: 'hsl(var(--muted))' }} />
                 </RadialBarChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -310,9 +274,86 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* Recent Shipments Table */}
+      <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '750ms' }}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-medium">Recent Shipments</CardTitle>
+            <Link to="/shipments">
+              <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground">
+                View All <ExternalLink className="h-3 w-3" />
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-hidden rounded-b-lg">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 h-10">Bill of Lading</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 h-10">Importer</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 h-10">Product</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 h-10">Status</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 h-10">Departure</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 h-10 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mockShipments.map((s, i) => (
+                  <TableRow
+                    key={s.id}
+                    className="group/row opacity-0 animate-fade-in-up hover:bg-muted/40 transition-colors duration-200"
+                    style={{ animationDelay: `${800 + i * 60}ms` }}
+                  >
+                    <TableCell className="py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0">
+                          <Ship className="h-3.5 w-3.5 text-primary" />
+                        </div>
+                        <div>
+                          <Link to={`/shipments/${s.id}`} className="font-semibold text-sm hover:text-primary transition-colors">
+                            {s.shipmentInfo.billOfLading}
+                          </Link>
+                          <p className="text-[11px] text-muted-foreground">{s.id}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3.5">
+                      <span className="text-sm">{s.importerName}</span>
+                    </TableCell>
+                    <TableCell className="py-3.5">
+                      <span className="text-sm text-muted-foreground">{s.productInfo.description}</span>
+                    </TableCell>
+                    <TableCell className="py-3.5">
+                      <StatusBadge status={s.status} />
+                    </TableCell>
+                    <TableCell className="py-3.5">
+                      <span className="text-sm tabular-nums">{new Date(s.departureDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    </TableCell>
+                    <TableCell className="py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity duration-200">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" asChild>
+                          <Link to={`/shipments/${s.id}`}><Eye className="h-3.5 w-3.5" /></Link>
+                        </Button>
+                        {s.status === 'draft' && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" asChild>
+                            <Link to={`/shipments/${s.id}/edit`}><Pencil className="h-3.5 w-3.5" /></Link>
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Activity + Deadlines */}
       <div className="grid gap-6 lg:grid-cols-5">
-        <Card className="lg:col-span-3 opacity-0 animate-fade-in-up" style={{ animationDelay: '800ms' }}>
+        <Card className="lg:col-span-3 opacity-0 animate-fade-in-up" style={{ animationDelay: '900ms' }}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium">Recent Activity</CardTitle>
           </CardHeader>
@@ -322,8 +363,8 @@ export default function Dashboard() {
               return (
                 <div
                   key={item.id}
-                  className={`flex items-start gap-3 text-sm p-3 rounded-lg border-l-[3px] transition-colors ${activityColors[item.type]} opacity-0 animate-fade-in-up`}
-                  style={{ animationDelay: `${850 + i * 80}ms` }}
+                  className={`flex items-start gap-3 text-sm p-3 rounded-lg border-l-[3px] transition-all duration-200 hover:translate-x-0.5 ${activityColors[item.type]} opacity-0 animate-fade-in-up`}
+                  style={{ animationDelay: `${950 + i * 80}ms` }}
                 >
                   <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${item.type === 'error' ? 'text-destructive' : item.type === 'alert' ? 'text-[hsl(var(--status-warning))]' : 'text-[hsl(var(--status-accepted))]'}`} />
                   <div className="flex-1 min-w-0">
@@ -341,7 +382,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2 opacity-0 animate-fade-in-up" style={{ animationDelay: '900ms' }}>
+        <Card className="lg:col-span-2 opacity-0 animate-fade-in-up" style={{ animationDelay: '1000ms' }}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium">Upcoming Deadlines</CardTitle>
           </CardHeader>
