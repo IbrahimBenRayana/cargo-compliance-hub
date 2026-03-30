@@ -107,3 +107,16 @@ export const mockActivity: ActivityItem[] = [
   { id: 'ACT-4', type: 'alert', message: 'ISF-2026-003 — Filing deadline in 15 days', timestamp: '2026-03-30T08:00:00Z', shipmentId: 'ISF-2026-003' },
   { id: 'ACT-5', type: 'alert', message: 'ISF-2026-005 — Missing vessel information', timestamp: '2026-03-30T07:00:00Z', shipmentId: 'ISF-2026-005' },
 ];
+
+export const mockWeeklyFilings = [
+  { week: 'W8', filings: 3 },
+  { week: 'W9', filings: 5 },
+  { week: 'W10', filings: 2 },
+  { week: 'W11', filings: 7 },
+  { week: 'W12', filings: 4 },
+  { week: 'W13', filings: 6 },
+  { week: 'W14', filings: 8 },
+  { week: 'W15', filings: 5 },
+];
+
+export const mockComplianceScore = 78;
