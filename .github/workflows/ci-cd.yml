@@ -148,32 +148,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ─── Option A: Deploy via SSH to a VPS ───────────────
-      # Uncomment and configure for your server:
-      #
-      # - name: Deploy via SSH
-      #   uses: appleboy/ssh-action@v1
-      #   with:
-      #     host: ${{ secrets.DEPLOY_HOST }}
-      #     username: ${{ secrets.DEPLOY_USER }}
-      #     key: ${{ secrets.DEPLOY_SSH_KEY }}
-      #     script: |
-      #       cd /opt/mycargolens
-      #       docker compose pull
-      #       docker compose up -d
-      #       docker compose exec server npx prisma migrate deploy
-      #       echo "✅ Deployed successfully"
+      - name: Deploy via SSH
+        if: ${{ vars.DEPLOY_METHOD == 'ssh' }}
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /opt/mycargolens
+            docker compose -f docker-compose.prod.yml pull server
+            docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f
+            echo "✅ Deployed successfully"
+            docker compose -f docker-compose.prod.yml ps
 
-      # ─── Option B: Deploy to Azure App Service ──────────
-      # Uncomment for Azure:
-      #
-      # - uses: azure/webapps-deploy@v3
-      #   with:
-      #     app-name: mycargolens
-      #     images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-
-      - name: Deployment placeholder
+      - name: Deployment info
+        if: ${{ vars.DEPLOY_METHOD != 'ssh' }}
         run: |
           echo "🚀 Docker image pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          echo "Configure deployment target in this step."
-          echo "Options: SSH to VPS, Azure App Service, Railway, Fly.io, AWS ECS"
+          echo ""
+          echo "To enable auto-deploy via SSH:"
+          echo "  1. Set repository variable:  DEPLOY_METHOD = ssh"
+          echo "  2. Set repository secrets:"
+          echo "     - DEPLOY_HOST     (your server IP)"
+          echo "     - DEPLOY_USER     (ssh username, e.g., root)"
+          echo "     - DEPLOY_SSH_KEY  (private SSH key)"
+          echo ""
+          echo "Manual deploy: ssh user@server '/opt/mycargolens/update.sh'"
