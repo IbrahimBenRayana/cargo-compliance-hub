@@ -6,11 +6,19 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.dev-logs/
 
 node_modules
 dist
 dist-ssr
 *.local
+
+# Environment files
+.env
+server/.env
+
+# Uploaded files
+server/uploads/
 
 # Editor directories and files
 .vscode/*

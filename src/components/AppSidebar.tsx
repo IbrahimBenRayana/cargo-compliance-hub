@@ -1,4 +1,4 @@
-import { LayoutDashboard, Ship, Shield, Plug, Settings, FileText, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Ship, Shield, Plug, Settings, FileText, ChevronRight, Users } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -24,6 +24,10 @@ const mainNav = [
 const integrationsNav = [
   { title: 'API Settings', url: '/integrations/api', icon: Plug },
   { title: 'Submission Logs', url: '/integrations/logs', icon: FileText },
+];
+
+const managementNav = [
+  { title: 'Team', url: '/team', icon: Users },
 ];
 
 export function AppSidebar() {
@@ -89,6 +93,34 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {integrationsNav.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    className="group/btn relative rounded-lg transition-all duration-200 hover:bg-sidebar-accent/80 data-[active=true]:bg-gradient-to-r data-[active=true]:from-primary/15 data-[active=true]:to-primary/5 data-[active=true]:text-primary data-[active=true]:shadow-sm data-[active=true]:border data-[active=true]:border-primary/10"
+                  >
+                    <NavLink to={item.url}>
+                      <item.icon className="h-4 w-4 transition-transform duration-200 group-hover/btn:scale-110" />
+                      {!collapsed && (
+                        <>
+                          <span className="font-medium text-[13px]">{item.title}</span>
+                          {isActive(item.url) && <ChevronRight className="ml-auto h-3.5 w-3.5 text-primary/60" />}
+                        </>
+                      )}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Management */}
+        <SidebarGroup>
+          {!collapsed && <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1 px-3">Management</SidebarGroupLabel>}
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {managementNav.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild

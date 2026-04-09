@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { mockShipments } from '@/data/mock-data';
+import { Link, useNavigate } from 'react-router-dom';
+import { useFilings, useSubmitFiling, useTemplates, useApplyTemplate, useBulkSubmit, useBulkDelete, useExportCsv, useExportSummaryPdf } from '@/hooks/useFilings';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,14 +11,20 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
 import {
   Plus, Search, Eye, Pencil, Filter, X, Ship, CalendarIcon,
-  ArrowUpDown, ArrowUp, ArrowDown, Package, Globe, FileText, Clock
+  ArrowUpDown, ArrowUp, ArrowDown, Package, Globe, FileText, Clock, Loader2, Send, Bookmark, ChevronDown,
+  Trash2, CheckCheck, Download,
 } from 'lucide-react';
-import { ShipmentStatus } from '@/types/shipment';
-import { format } from 'date-fns';
+import { ShipmentStatus, Filing, getPartyName, getFirstCommodity } from '@/types/shipment';
+import { format, formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 
-type SortField = 'bol' | 'importer' | 'status' | 'departure' | 'deadline' | 'origin';
+type SortField = 'bol' | 'importer' | 'status' | 'departure' | 'deadline' | 'origin' | 'created';
 type SortDir = 'asc' | 'desc';
 
 const countries = [
@@ -37,8 +43,107 @@ export default function ShipmentsList() {
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
-  const [sortField, setSortField] = useState<SortField>('deadline');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [sortField, setSortField] = useState<SortField>('created');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const submitFiling = useSubmitFiling();
+  const navigate = useNavigate();
+  const { data: templatesData } = useTemplates();
+  const applyTemplate = useApplyTemplate();
+  const bulkSubmit = useBulkSubmit();
+  const bulkDelete = useBulkDelete();
+  const exportCsv = useExportCsv();
+  const exportPdf = useExportSummaryPdf();
+  const templates = templatesData?.data ?? [];
+
+  const handleApplyTemplate = async (templateId: string) => {
+    try {
+      const newFiling = await applyTemplate.mutateAsync(templateId);
+      toast.success('Filing created from template — opening editor');
+      navigate(`/shipments/${newFiling.id}/edit`);
+    } catch (err: any) {
+      toast.error(err.body?.error || 'Failed to apply template');
+    }
+  };
+
+  const handleSubmitFiling = async (id: string) => {
+    setSubmittingId(id);
+    try {
+      await submitFiling.mutateAsync(id);
+      toast.success('Filing submitted to CBP via CustomsCity!');
+    } catch (err: any) {
+      const body = err.body || err;
+      if (body?.validationErrors) {
+        const msgs = body.validationErrors.map((e: any) => `${e.field}: ${e.message}`).join('\n');
+        toast.error(`Submission failed:\n${msgs}`, { duration: 8000 });
+      } else {
+        toast.error(body?.error || 'Submission failed');
+      }
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(f => f.id)));
+    }
+  };
+
+  const handleBulkSubmit = async () => {
+    if (selectedDraftIds.length === 0) {
+      toast.error('No draft filings selected');
+      return;
+    }
+    try {
+      const result = await bulkSubmit.mutateAsync(selectedDraftIds);
+      setSelectedIds(new Set());
+      if (result.submitted > 0) {
+        toast.success(`${result.submitted} filing(s) submitted successfully${result.failed > 0 ? `, ${result.failed} failed` : ''}`);
+      } else {
+        toast.error(`All ${result.failed} submission(s) failed`);
+      }
+    } catch (err: any) {
+      toast.error('Bulk submission failed');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedDraftIds.length === 0) {
+      toast.error('No draft filings selected');
+      return;
+    }
+    try {
+      const result = await bulkDelete.mutateAsync(selectedDraftIds);
+      setSelectedIds(new Set());
+      toast.success(`${result.deleted} draft filing(s) deleted`);
+    } catch (err: any) {
+      toast.error('Bulk delete failed');
+    }
+  };
+
+  // Fetch filings from backend
+  const { data: filingsResponse, isLoading, isError } = useFilings({
+    search: search || undefined,
+    status: selectedStatuses.length === 1 ? selectedStatuses[0] : undefined,
+    sortBy: sortField === 'deadline' ? 'filingDeadline' : sortField === 'departure' ? 'estimatedDeparture' : 'createdAt',
+    sortOrder: sortDir,
+    limit: 100,
+  });
+
+  const filings: Filing[] = filingsResponse?.data ?? [];
+  const totalCount = filingsResponse?.pagination?.total ?? 0;
 
   const toggleStatus = (s: ShipmentStatus) =>
     setSelectedStatuses(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
@@ -69,37 +174,42 @@ export default function ShipmentsList() {
   };
 
   const filtered = useMemo(() => {
-    let result = mockShipments.filter(s => {
-      const matchSearch = !search ||
-        s.shipmentInfo.billOfLading.toLowerCase().includes(search.toLowerCase()) ||
-        s.importerName.toLowerCase().includes(search.toLowerCase()) ||
-        s.productInfo.description.toLowerCase().includes(search.toLowerCase()) ||
-        s.id.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = selectedStatuses.length === 0 || selectedStatuses.includes(s.status);
-      const matchCountry = selectedCountries.length === 0 || selectedCountries.includes(s.productInfo.countryOfOrigin);
-      const dep = new Date(s.departureDate);
-      const matchDateFrom = !dateFrom || dep >= dateFrom;
-      const matchDateTo = !dateTo || dep <= dateTo;
-      return matchSearch && matchStatus && matchCountry && matchDateFrom && matchDateTo;
+    let result = filings.filter(f => {
+      const matchStatus = selectedStatuses.length === 0 || selectedStatuses.includes(f.status as ShipmentStatus);
+      const commodity = getFirstCommodity(f);
+      const matchCountry = selectedCountries.length === 0 || selectedCountries.includes(commodity.countryOfOrigin);
+      const dep = f.estimatedDeparture ? new Date(f.estimatedDeparture) : null;
+      const matchDateFrom = !dateFrom || (dep && dep >= dateFrom);
+      const matchDateTo = !dateTo || (dep && dep <= dateTo);
+      return matchStatus && matchCountry && matchDateFrom && matchDateTo;
     });
 
     result.sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
-        case 'bol': cmp = a.shipmentInfo.billOfLading.localeCompare(b.shipmentInfo.billOfLading); break;
-        case 'importer': cmp = a.importerName.localeCompare(b.importerName); break;
+        case 'bol': cmp = (a.masterBol ?? '').localeCompare(b.masterBol ?? ''); break;
+        case 'importer': cmp = (a.importerName ?? '').localeCompare(b.importerName ?? ''); break;
         case 'status': cmp = a.status.localeCompare(b.status); break;
-        case 'departure': cmp = new Date(a.departureDate).getTime() - new Date(b.departureDate).getTime(); break;
-        case 'deadline': cmp = new Date(a.filingDeadline).getTime() - new Date(b.filingDeadline).getTime(); break;
-        case 'origin': cmp = a.productInfo.countryOfOrigin.localeCompare(b.productInfo.countryOfOrigin); break;
+        case 'departure': cmp = new Date(a.estimatedDeparture ?? 0).getTime() - new Date(b.estimatedDeparture ?? 0).getTime(); break;
+        case 'deadline': cmp = new Date(a.filingDeadline ?? 0).getTime() - new Date(b.filingDeadline ?? 0).getTime(); break;
+        case 'created': cmp = new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime(); break;
+        case 'origin': {
+          const ca = getFirstCommodity(a); const cb = getFirstCommodity(b);
+          cmp = ca.countryOfOrigin.localeCompare(cb.countryOfOrigin); break;
+        }
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
 
     return result;
-  }, [search, selectedStatuses, selectedCountries, dateFrom, dateTo, sortField, sortDir]);
+  }, [filings, selectedStatuses, selectedCountries, dateFrom, dateTo, sortField, sortDir]);
 
-  const countByStatus = (s: ShipmentStatus) => mockShipments.filter(x => x.status === s).length;
+  const selectedDraftIds = useMemo(() =>
+    Array.from(selectedIds).filter(id => filtered.find(f => f.id === id && f.status === 'draft')),
+    [selectedIds, filtered]
+  );
+
+  const countByStatus = (s: ShipmentStatus) => filings.filter(x => x.status === s).length;
 
   const getDeadlineUrgency = (deadline: string) => {
     const days = Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -120,12 +230,69 @@ export default function ShipmentsList() {
               <Ship className="h-5 w-5 text-primary" />
             </div>
             Shipments
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">Manage and track your ISF filings</p>
         </div>
-        <Button asChild className="shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
-          <Link to="/shipments/new"><Plus className="h-4 w-4 mr-1" /> Create New ISF</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild className="shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+            <Link to="/shipments/new"><Plus className="h-4 w-4 mr-1" /> Create New ISF</Link>
+          </Button>
+          {templates.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-1.5 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+                  <Bookmark className="h-4 w-4" /> From Template <ChevronDown className="h-3 w-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Saved Templates</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {templates.map((t: any) => (
+                  <DropdownMenuItem key={t.id} onClick={() => handleApplyTemplate(t.id)} className="flex items-center justify-between">
+                    <span className="truncate">{t.name}</span>
+                    <Badge variant="outline" className="text-[10px] ml-2 shrink-0">{t.filingType}</Badge>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="shadow-md" title="Export">
+                <Download className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Export Data</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={exportCsv.isPending}
+                onClick={() => {
+                  exportCsv.mutate(undefined, {
+                    onSuccess: () => toast.success('CSV downloaded'),
+                    onError: () => toast.error('CSV export failed'),
+                  });
+                }}
+              >
+                <FileText className="h-3.5 w-3.5 mr-2" />
+                {exportCsv.isPending ? 'Exporting...' : 'Export CSV'}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={exportPdf.isPending}
+                onClick={() => {
+                  exportPdf.mutate(undefined, {
+                    onSuccess: () => toast.success('PDF downloaded'),
+                    onError: () => toast.error('PDF export failed'),
+                  });
+                }}
+              >
+                <FileText className="h-3.5 w-3.5 mr-2" />
+                {exportPdf.isPending ? 'Generating...' : 'Export Summary PDF'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Quick Status Cards */}
@@ -133,13 +300,13 @@ export default function ShipmentsList() {
         {statusOptions.map((status, i) => {
           const count = countByStatus(status);
           const isActive = selectedStatuses.includes(status);
-          const colors: Record<ShipmentStatus, string> = {
+          const colors: Record<string, string> = {
             draft: 'border-muted-foreground/20 hover:border-muted-foreground/40',
             submitted: 'border-primary/20 hover:border-primary/40',
             accepted: 'border-[hsl(var(--status-accepted))]/20 hover:border-[hsl(var(--status-accepted))]/40',
             rejected: 'border-destructive/20 hover:border-destructive/40',
           };
-          const activeBg: Record<ShipmentStatus, string> = {
+          const activeBg: Record<string, string> = {
             draft: 'bg-muted-foreground/5 border-muted-foreground/40',
             submitted: 'bg-primary/5 border-primary/40',
             accepted: 'bg-[hsl(var(--status-accepted))]/5 border-[hsl(var(--status-accepted))]/40',
@@ -262,12 +429,34 @@ export default function ShipmentsList() {
         </CardContent>
       </Card>
 
-      {/* Results count */}
+      {/* Results count + Bulk Action Bar */}
       <div className="flex items-center justify-between text-sm animate-fade-in-up" style={{ animationDelay: '300ms' }}>
         <p className="text-muted-foreground">
           Showing <span className="font-medium text-foreground">{filtered.length}</span> of{' '}
-          <span className="font-medium text-foreground">{mockShipments.length}</span> shipments
+          <span className="font-medium text-foreground">{totalCount}</span> shipments
         </p>
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-1.5 animate-fade-in-up">
+            <Badge variant="secondary" className="text-xs">{selectedIds.size} selected</Badge>
+            {selectedDraftIds.length > 0 && (
+              <>
+                <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/30"
+                  onClick={handleBulkSubmit} disabled={bulkSubmit.isPending}>
+                  {bulkSubmit.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                  Submit {selectedDraftIds.length}
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-red-300 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
+                  onClick={handleBulkDelete} disabled={bulkDelete.isPending}>
+                  {bulkDelete.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                  Delete {selectedDraftIds.length}
+                </Button>
+              </>
+            )}
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -276,10 +465,23 @@ export default function ShipmentsList() {
           <Table>
             <TableHeader>
               <TableRow className="bg-secondary/50 hover:bg-secondary/50">
+                <TableHead className="w-10 px-3">
+                  <Checkbox
+                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead className="cursor-pointer select-none" onClick={() => handleSort('bol')}>
                   <div className="flex items-center text-xs uppercase tracking-wider font-semibold">
                     <FileText className="h-3 w-3 mr-1.5 text-muted-foreground" />
                     Bill of Lading <SortIcon field="bol" />
+                  </div>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('created')}>
+                  <div className="flex items-center text-xs uppercase tracking-wider font-semibold">
+                    <CalendarIcon className="h-3 w-3 mr-1.5 text-muted-foreground" />
+                    Created <SortIcon field="created" />
                   </div>
                 </TableHead>
                 <TableHead className="cursor-pointer select-none" onClick={() => handleSort('importer')}>
@@ -322,60 +524,87 @@ export default function ShipmentsList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((s, i) => (
+              {filtered.map((f, i) => {
+                const commodity = getFirstCommodity(f);
+                return (
                 <TableRow
-                  key={s.id}
-                  className="group transition-all duration-200 hover:bg-primary/[0.03] animate-fade-in-up"
+                  key={f.id}
+                  className={`group transition-all duration-200 hover:bg-primary/[0.03] animate-fade-in-up ${selectedIds.has(f.id) ? 'bg-primary/[0.05]' : ''}`}
                   style={{ animationDelay: `${400 + i * 60}ms` }}
                 >
+                  <TableCell className="px-3">
+                    <Checkbox
+                      checked={selectedIds.has(f.id)}
+                      onCheckedChange={() => toggleSelect(f.id)}
+                      aria-label={`Select ${f.masterBol || f.houseBol || f.id.slice(0, 8)}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2.5">
                       <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors duration-200">
                         <FileText className="h-3.5 w-3.5 text-primary" />
                       </div>
                       <div>
-                        <p className="font-semibold text-sm">{s.shipmentInfo.billOfLading}</p>
-                        <p className="text-[11px] text-muted-foreground">{s.id}</p>
+                        <p className="font-semibold text-sm">{f.masterBol || f.houseBol || '—'}</p>
+                        <p className="text-[11px] text-muted-foreground">{f.id.slice(0, 8)}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">{s.importerName}</span>
+                    <div>
+                      <p className="text-sm tabular-nums">{f.createdAt ? new Date(f.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</p>
+                      <p className="text-[11px] text-muted-foreground">{f.createdAt ? formatDistanceToNow(new Date(f.createdAt), { addSuffix: true }) : ''}</p>
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-muted-foreground">{s.productInfo.description}</span>
+                    <span className="text-sm">{f.importerName || '—'}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">{getCountryFlag(s.productInfo.countryOfOrigin)} {s.productInfo.countryOfOrigin}</span>
+                    <span className="text-sm text-muted-foreground">{commodity.description || '—'}</span>
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={s.status} />
+                    <span className="text-sm">{getCountryFlag(commodity.countryOfOrigin)} {commodity.countryOfOrigin || '—'}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm tabular-nums">{new Date(s.departureDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    <StatusBadge status={f.status as ShipmentStatus} />
                   </TableCell>
                   <TableCell>
-                    <span className={`text-sm tabular-nums font-medium ${getDeadlineUrgency(s.filingDeadline)}`}>
-                      {new Date(s.filingDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    <span className="text-sm tabular-nums">{f.estimatedDeparture ? new Date(f.estimatedDeparture).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`text-sm tabular-nums font-medium ${f.filingDeadline ? getDeadlineUrgency(f.filingDeadline) : 'text-muted-foreground'}`}>
+                      {f.filingDeadline ? new Date(f.filingDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                       <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors" asChild>
-                        <Link to={`/shipments/${s.id}`}><Eye className="h-4 w-4" /></Link>
+                        <Link to={`/shipments/${f.id}`}><Eye className="h-4 w-4" /></Link>
                       </Button>
-                      {s.status === 'draft' && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors" asChild>
-                          <Link to={`/shipments/${s.id}/edit`}><Pencil className="h-4 w-4" /></Link>
-                        </Button>
+                      {f.status === 'draft' && (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors" asChild>
+                            <Link to={`/shipments/${f.id}/edit`}><Pencil className="h-4 w-4" /></Link>
+                          </Button>
+                          <Button
+                            variant="ghost" size="icon"
+                            className="h-8 w-8 hover:bg-green-500/10 hover:text-green-600 transition-colors"
+                            onClick={() => handleSubmitFiling(f.id)}
+                            disabled={submittingId === f.id}
+                            title="Submit to CBP"
+                          >
+                            {submittingId === f.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          </Button>
+                        </>
                       )}
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-16">
+                  <TableCell colSpan={10} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center">
                         <Search className="h-5 w-5 text-muted-foreground" />

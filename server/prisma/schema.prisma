@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Organizations ─────────────────────────────────────────
+model Organization {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String   @db.VarChar(255)
+  slug          String?  @unique @db.VarChar(100) // URL-friendly org identifier
+  iorNumber     String?  @map("ior_number") @db.VarChar(100)
+  einNumber     String?  @map("ein_number") @db.VarChar(20) // Encrypted
+  address       Json?
+  phone         String?  @db.VarChar(30)
+  website       String?  @db.VarChar(255)
+  logoUrl       String?  @map("logo_url") @db.VarChar(500)
+  ccApiKeyEnc   String?  @map("cc_api_key_enc") // Encrypted CustomsCity API key
+  ccEnvironment String   @default("sandbox") @map("cc_environment") @db.VarChar(20)
+  maxUsers      Int      @default(10) @map("max_users") // Seat limit
+  onboardingCompleted Boolean @default(false) @map("onboarding_completed")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  users          User[]
+  filings        Filing[]
+  submissionLogs SubmissionLog[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+  filingTemplates FilingTemplate[]
+  invitations    OrgInvitation[]
+
+  @@map("organizations")
+}
+
+// ─── Users ─────────────────────────────────────────────────
+model User {
+  id             String    @id @default(uuid()) @db.Uuid
+  orgId          String    @map("org_id") @db.Uuid
+  email          String    @unique @db.VarChar(255)
+  passwordHash   String    @map("password_hash") @db.VarChar(255)
+  firstName      String?   @map("first_name") @db.VarChar(100)
+  lastName       String?   @map("last_name") @db.VarChar(100)
+  role           String    @default("operator") @db.VarChar(20)
+  isActive       Boolean   @default(true) @map("is_active")
+  emailVerified  Boolean   @default(false) @map("email_verified")
+  lastLoginAt    DateTime? @map("last_login_at") @db.Timestamptz()
+  failedAttempts Int       @default(0) @map("failed_attempts")
+  lockedUntil    DateTime? @map("locked_until") @db.Timestamptz()
+  refreshToken   String?   @map("refresh_token")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization    Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  filings         Filing[]         @relation("FilingCreator")
+  statusChanges   FilingStatusHistory[] @relation("StatusChanger")
+  submissionLogs  SubmissionLog[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+  filingTemplates FilingTemplate[]
+  invitations     OrgInvitation[]  @relation("InvitationCreator")
+  uploadedDocs    FilingDocument[] @relation("DocumentUploader")
+
+  @@index([orgId])
+  @@index([email])
+  @@map("users")
+}
+
+// ─── ISF Filings ───────────────────────────────────────────
+model Filing {
+  id                String    @id @default(uuid()) @db.Uuid
+  orgId             String    @map("org_id") @db.Uuid
+  createdById       String    @map("created_by") @db.Uuid
+  filingType        String    @map("filing_type") @db.VarChar(10) // ISF-10 | ISF-5
+  status            String    @default("draft") @db.VarChar(30)
+  ccFilingId        String?   @map("cc_filing_id") @db.VarChar(100)
+  cbpTransactionId  String?   @map("cbp_transaction_id") @db.VarChar(100)
+
+  // Importer of Record
+  importerName      String?   @map("importer_name") @db.VarChar(255)
+  importerNumber    String?   @map("importer_number") @db.VarChar(100)
+
+  // Consignee
+  consigneeName     String?   @map("consignee_name") @db.VarChar(255)
+  consigneeNumber   String?   @map("consignee_number") @db.VarChar(100)
+  consigneeAddress  Json?     @map("consignee_address")
+
+  // Parties (JSONB for flexibility)
+  manufacturer      Json?     // { name, address: { street, city, state, zip, country } }
+  seller            Json?
+  buyer             Json?
+  shipToParty       Json?     @map("ship_to_party")
+  containerStuffingLocation Json? @map("container_stuffing_location")
+  consolidator      Json?
+
+  // Shipment Details
+  masterBol         String?   @map("master_bol") @db.VarChar(100)
+  houseBol          String?   @map("house_bol") @db.VarChar(100)
+  scacCode          String?   @map("scac_code") @db.VarChar(10)
+  vesselName        String?   @map("vessel_name") @db.VarChar(255)
+  voyageNumber      String?   @map("voyage_number") @db.VarChar(100)
+  foreignPortOfUnlading String? @map("foreign_port_of_unlading") @db.VarChar(10)
+  placeOfDelivery   String?   @map("place_of_delivery") @db.VarChar(10)
+  estimatedDeparture DateTime? @map("estimated_departure") @db.Timestamptz()
+  estimatedArrival  DateTime?  @map("estimated_arrival") @db.Timestamptz()
+  filingDeadline    DateTime?  @map("filing_deadline") @db.Timestamptz()
+
+  // Bond Info
+  bondType          String?   @map("bond_type") @db.VarChar(50)
+  bondSuretyCode    String?   @map("bond_surety_code") @db.VarChar(10)
+
+  // ISF-5 specific data (JSONB — booking party, ISF filer, etc.)
+  isf5Data          Json?     @map("isf5_data")
+
+  // Commodities & Containers (JSONB arrays)
+  commodities       Json      @default("[]")
+  containers        Json      @default("[]")
+
+  // Status timestamps
+  submittedAt       DateTime? @map("submitted_at") @db.Timestamptz()
+  acceptedAt        DateTime? @map("accepted_at") @db.Timestamptz()
+  rejectedAt        DateTime? @map("rejected_at") @db.Timestamptz()
+  rejectionReason   String?   @map("rejection_reason")
+  amendedAt         DateTime? @map("amended_at") @db.Timestamptz()
+  cancelledAt       DateTime? @map("cancelled_at") @db.Timestamptz()
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization      Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy         User                @relation("FilingCreator", fields: [createdById], references: [id])
+  statusHistory     FilingStatusHistory[]
+  submissionLogs    SubmissionLog[]
+  notifications     Notification[]
+  documents         FilingDocument[]
+
+  @@index([orgId])
+  @@index([status])
+  @@index([createdById])
+  @@index([filingDeadline])
+  @@index([masterBol])
+  @@map("filings")
+}
+
+// ─── Filing Status History ─────────────────────────────────
+model FilingStatusHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  filingId   String   @map("filing_id") @db.Uuid
+  status     String   @db.VarChar(30)
+  message    String?
+  ccResponse Json?    @map("cc_response")
+  changedById String? @map("changed_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  filing    Filing @relation(fields: [filingId], references: [id], onDelete: Cascade)
+  changedBy User?  @relation("StatusChanger", fields: [changedById], references: [id])
+
+  @@index([filingId])
+  @@map("filing_status_history")
+}
+
+// ─── Submission Logs (API call audit trail) ────────────────
+model SubmissionLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  orgId           String   @map("org_id") @db.Uuid
+  filingId        String?  @map("filing_id") @db.Uuid
+  userId          String?  @map("user_id") @db.Uuid
+  correlationId   String?  @map("correlation_id") @db.VarChar(100)
+  method          String   @db.VarChar(10)
+  url             String
+  requestPayload  Json?    @map("request_payload")
+  responseStatus  Int?     @map("response_status")
+  responseBody    Json?    @map("response_body")
+  latencyMs       Int?     @map("latency_ms")
+  errorMessage    String?  @map("error_message")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  filing       Filing?      @relation(fields: [filingId], references: [id], onDelete: SetNull)
+  user         User?        @relation(fields: [userId], references: [id])
+
+  @@index([filingId])
+  @@index([orgId])
+  @@map("submission_logs")
+}
+
+// ─── Notifications ─────────────────────────────────────────
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  filingId  String?  @map("filing_id") @db.Uuid
+  type      String   @db.VarChar(50)
+  title     String   @db.VarChar(255)
+  message   String?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  filing       Filing?      @relation(fields: [filingId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// ─── Audit Log (immutable) ─────────────────────────────────
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String?  @map("org_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String   @db.VarChar(100)
+  entityType String?  @map("entity_type") @db.VarChar(50)
+  entityId   String?  @map("entity_id") @db.Uuid
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  organization Organization? @relation(fields: [orgId], references: [id])
+  user         User?         @relation(fields: [userId], references: [id])
+
+  @@index([orgId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+// ─── Filing Templates ──────────────────────────────────────
+model FilingTemplate {
+  id           String   @id @default(uuid()) @db.Uuid
+  orgId        String   @map("org_id") @db.Uuid
+  createdById  String   @map("created_by") @db.Uuid
+  name         String   @db.VarChar(255)
+  filingType   String   @map("filing_type") @db.VarChar(10)
+  templateData Json     @map("template_data")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation(fields: [createdById], references: [id])
+
+  @@map("filing_templates")
+}
+
+// ─── Organisation Invitations ──────────────────────────────
+model OrgInvitation {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  invitedById String   @map("invited_by") @db.Uuid
+  email       String   @db.VarChar(255)
+  role        String   @default("operator") @db.VarChar(20) // owner | admin | operator | viewer
+  token       String   @unique @db.VarChar(100) // invite link token
+  status      String   @default("pending") @db.VarChar(20) // pending | accepted | expired | revoked
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz()
+  acceptedAt  DateTime? @map("accepted_at") @db.Timestamptz()
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation("InvitationCreator", fields: [invitedById], references: [id])
+
+  @@index([orgId])
+  @@index([email])
+  @@index([token])
+  @@map("org_invitations")
+}
+
+// ─── Filing Documents (file attachments) ───────────────────
+model FilingDocument {
+  id            String   @id @default(uuid()) @db.Uuid
+  filingId      String   @map("filing_id") @db.Uuid
+  uploadedById  String   @map("uploaded_by") @db.Uuid
+  fileName      String   @map("file_name") @db.VarChar(255)
+  fileType      String   @map("file_type") @db.VarChar(100) // MIME type
+  fileSizeBytes Int      @map("file_size_bytes")
+  storagePath   String   @map("storage_path") @db.VarChar(500) // Local path or S3 key
+  documentType  String   @map("document_type") @db.VarChar(50) // bol, commercial_invoice, packing_list, other
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  filing     Filing @relation(fields: [filingId], references: [id], onDelete: Cascade)
+  uploadedBy User   @relation("DocumentUploader", fields: [uploadedById], references: [id])
+
+  @@index([filingId])
+  @@map("filing_documents")
+}

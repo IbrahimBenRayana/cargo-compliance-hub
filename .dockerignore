@@ -1,0 +1,33 @@
+node_modules
+dist
+dist-ssr
+.git
+.github
+.vscode
+.idea
+.DS_Store
+
+# Logs
+*.log
+logs
+.dev-logs
+
+# Environment files (will be injected at runtime)
+.env
+.env.local
+.env.*.local
+server/.env
+
+# Uploaded files (use volume mount)
+server/uploads
+
+# Dev/test files
+*.test.ts
+*.spec.ts
+playwright.config.ts
+playwright-fixture.ts
+vitest.config.ts
+coverage
+
+# Lockfiles (use bun.lock or package-lock, not both)
+bun.lockb
