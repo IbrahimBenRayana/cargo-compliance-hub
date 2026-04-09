@@ -50,7 +50,7 @@ jobs:
 
       - name: Type check server
         working-directory: server
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit --project tsconfig.build.json
 
   # ── Unit Tests ───────────────────────────────────────────
   test:
