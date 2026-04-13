@@ -2,7 +2,7 @@
  * API Client — Typed fetch wrapper with auto-refresh JWT tokens
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // ─── Token Storage (in memory — never localStorage) ───────
 let accessToken: string | null = null;
