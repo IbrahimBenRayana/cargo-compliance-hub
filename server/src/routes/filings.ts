@@ -365,12 +365,14 @@ router.post('/:id/submit', ccApiLimiter, async (req: AuthRequest, res: Response)
 
     // Handle CC validation failures (201 + array of validation messages)
     if (!createResult.persisted) {
-      const rawErrors = createResult.validationErrors
-        ?.filter((e: any) => e.field)
-        .map((e: any) => `${e.field}: ${e.message}`) || [];
+      const rawErrorObjects = createResult.validationErrors
+        ?.filter((e: any) => e.field) || [];
 
+      const rawErrors = rawErrorObjects.map((e: any) => `${e.field}: ${e.message}`);
       const errorSummary = rawErrors.join('; ') || 'Filing validation failed';
-      const translatedErrors = translateValidationErrors(rawErrors);
+
+      // Pass original objects to translator for better field extraction
+      const translatedErrors = translateValidationErrors(rawErrorObjects);
 
       // Store both human-readable summary and structured translated errors
       const rejectionData = JSON.stringify({

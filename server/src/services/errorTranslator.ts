@@ -9,7 +9,9 @@
 const FIELD_LABELS: Record<string, string> = {
   // BOL & Filing
   masterBOLNumber: 'Master Bill of Lading',
+  MBOLNumber: 'Master Bill of Lading',
   BOLNumber: 'House Bill of Lading',
+  HBOLNumber: 'House Bill of Lading',
   billType: 'Bill Type',
   ISFSubmissionType: 'ISF Submission Type',
   ISFShipmentTypeCode: 'Shipment Type Code',
@@ -22,6 +24,10 @@ const FIELD_LABELS: Record<string, string> = {
   bondActivityCode: 'Bond Activity Code',
   bondHolderID: 'Bond Holder ID (EIN)',
   entryTypeCode: 'Entry Type Code',
+  vesselName: 'Vessel Name',
+  voyageNumber: 'Voyage Number',
+  SCACode: 'SCAC Code',
+  scacCode: 'SCAC Code',
 
   // Importer of Record
   IORName: 'Importer of Record Name',
@@ -87,6 +93,8 @@ const FIELD_LABELS: Record<string, string> = {
   quantity: 'Quantity',
   quantityUOM: 'Quantity Unit of Measure',
   commodityDescription: 'Commodity Description',
+  description: 'Commodity Description',
+  value: 'Declared Value',
 
   // Booking Party
   bookingPartyName: 'Booking Party Name',
@@ -240,9 +248,11 @@ function getFieldLabel(field: string): string {
   const baseName = field.split('.').pop() || field;
   if (FIELD_LABELS[baseName]) return FIELD_LABELS[baseName];
 
-  // Convert camelCase to human readable
+  // Convert camelCase / PascalCase to human readable
+  // Handle consecutive uppercase (acronyms) like MBOLNumber → "MBOL Number"
   return baseName
-    .replace(/([A-Z])/g, ' $1')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')   // "MBOLNumber" → "MBOL Number"
+    .replace(/([a-z])([A-Z])/g, '$1 $2')           // "bondType" → "bond Type"
     .replace(/^./, s => s.toUpperCase())
     .replace(/\s+/g, ' ')
     .trim();
@@ -258,18 +268,48 @@ export interface TranslatedError {
 }
 
 /**
+ * Parse a compound field key from the API.
+ * The API returns fields like "MBOLNumber: MAEU123 - HBOLNumber: HBOL456"
+ * which is a BOL identifier, not the actual field with the error.
+ * The actual field name is often in the message itself (e.g. "description should NOT be longer than 45 characters").
+ */
+function parseFieldFromError(rawField: string, message: string): string {
+  // If the field contains "MBOLNumber:" or "HBOLNumber:", it's a compound BOL key
+  // Try to extract the actual field name from the message
+  if (rawField.includes('BOLNumber:') || rawField.includes(' - ')) {
+    // Check if message starts with a field name like "description should..." or "weightUOM should..."
+    const msgFieldMatch = message.match(/^([a-zA-Z][a-zA-Z0-9_-]*)\s+(should|must|is|has|cannot|invalid)/i);
+    if (msgFieldMatch) {
+      return msgFieldMatch[1]; // e.g. "description", "weightUOM"
+    }
+    // Fallback: return the first part (MBOLNumber)
+    const firstKey = rawField.split(':')[0].trim();
+    return firstKey;
+  }
+  return rawField;
+}
+
+/**
  * Translate a single raw API validation error into a user-friendly message.
  */
 function translateSingleError(field: string, rawMessage: string): TranslatedError {
-  const fieldLabel = getFieldLabel(field);
+  // Extract the actual field name from compound API keys
+  const actualField = parseFieldFromError(field, rawMessage);
+  const fieldLabel = getFieldLabel(actualField);
+
+  // Strip field name prefix from message if present (e.g. "description should NOT be..." → "should NOT be...")
+  let cleanMessage = rawMessage;
+  if (rawMessage.toLowerCase().startsWith(actualField.toLowerCase())) {
+    cleanMessage = rawMessage.slice(actualField.length).trim();
+  }
 
   // Try each pattern
   for (const ep of ERROR_PATTERNS) {
-    const match = rawMessage.match(ep.pattern);
+    const match = cleanMessage.match(ep.pattern) || rawMessage.match(ep.pattern);
     if (match) {
-      const { message, fix } = ep.translate(match, field);
+      const { message, fix } = ep.translate(match, actualField);
       return {
-        field,
+        field: actualField,
         fieldLabel,
         originalMessage: rawMessage,
         message,
@@ -281,7 +321,7 @@ function translateSingleError(field: string, rawMessage: string): TranslatedErro
 
   // Fallback — no pattern matched
   return {
-    field,
+    field: actualField,
     fieldLabel,
     originalMessage: rawMessage,
     message: `There's an issue with "${fieldLabel}".`,
