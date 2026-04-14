@@ -303,7 +303,7 @@ export async function sendFilingSubmittedEmail(params: {
   const body = `
     <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing Submitted 🚀</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
-      <strong>${params.submitterName}</strong> has submitted ISF filing <strong>${params.bolNumber}</strong> to CBP via CustomsCity.
+      <strong>${params.submitterName}</strong> has submitted ISF filing <strong>${params.bolNumber}</strong> to CBP.
     </p>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
       The filing is now being processed. You'll receive a notification when CBP responds with an acceptance or rejection.

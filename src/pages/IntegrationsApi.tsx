@@ -83,7 +83,7 @@ export default function IntegrationsApi() {
           </div>
           API & Integrations
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">CustomsCity API connection status and capabilities</p>
+        <p className="text-muted-foreground text-sm mt-1">CBP Filing Gateway connection status and capabilities</p>
       </div>
 
       {/* Connection Status */}
@@ -93,7 +93,7 @@ export default function IntegrationsApi() {
             <Activity className="h-4 w-4 text-primary" />
             Connection Status
           </CardTitle>
-          <CardDescription>Test your CustomsCity API connectivity</CardDescription>
+          <CardDescription>Test your CBP filing gateway connectivity</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-3">
@@ -168,7 +168,7 @@ export default function IntegrationsApi() {
               { icon: FileText, label: 'ISF-5 Filing', desc: 'Carrier Security Filing (5+2)', status: 'active' },
               { icon: Activity, label: 'Status Polling', desc: 'Automated CBP response checking every 5 minutes', status: 'active' },
               { icon: Search, label: 'HTS Classification', desc: 'AI-powered tariff code suggestions', status: 'active' },
-              { icon: Zap, label: 'Amendment/Cancel', desc: 'File amendments and cancellations via CC API', status: 'active' },
+              { icon: Zap, label: 'Amendment/Cancel', desc: 'File amendments and cancellations via filing gateway', status: 'active' },
               { icon: Globe, label: 'MID Lookup', desc: 'Manufacturer Identification (MID) database', status: 'beta' },
             ].map((cap, i) => (
               <div key={i} className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/30 transition-colors">

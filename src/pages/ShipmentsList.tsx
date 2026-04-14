@@ -71,7 +71,7 @@ export default function ShipmentsList() {
     setSubmittingId(id);
     try {
       await submitFiling.mutateAsync(id);
-      toast.success('Filing submitted to CBP via CustomsCity!');
+      toast.success('Filing submitted to CBP successfully!');
     } catch (err: any) {
       const body = err.body || err;
       if (body?.validationErrors) {

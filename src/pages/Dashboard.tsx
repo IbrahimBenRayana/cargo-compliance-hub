@@ -640,7 +640,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold">API Submission Logs</p>
-                    <p className="text-[11px] text-muted-foreground">View CustomsCity API history</p>
+                    <p className="text-[11px] text-muted-foreground">View CBP submission history</p>
                   </div>
                 </div>
               </div>
@@ -654,8 +654,8 @@ export default function Dashboard() {
                 {[
                   { step: '1', label: 'Create ISF', desc: 'Fill out all required fields' },
                   { step: '2', label: 'Validate', desc: 'Check for errors before sending' },
-                  { step: '3', label: 'Send to CC', desc: 'Submit to CustomsCity API' },
-                  { step: '4', label: 'Send to CBP', desc: 'CustomsCity forwards to CBP' },
+                  { step: '3', label: 'Prepare Filing', desc: 'Prepare document for submission' },
+                  { step: '4', label: 'Send to CBP', desc: 'Transmit filing to U.S. Customs' },
                 ].map((s) => (
                   <div key={s.step} className="flex items-center gap-2.5 text-xs">
                     <span className="h-5 w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">{s.step}</span>

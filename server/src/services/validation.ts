@@ -410,7 +410,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   submitted:   ['pending_cbp', 'accepted', 'rejected', 'on_hold'],
   pending_cbp: ['accepted', 'rejected', 'on_hold'],
   accepted:    ['amended'],            // Can only amend after acceptance
-  rejected:    ['draft'],              // Goes back to draft for editing & resubmission
+  rejected:    ['draft', 'submitted'], // Can edit (→draft) or directly resubmit (→submitted)
   on_hold:     ['accepted', 'rejected'],
   amended:     ['submitted', 'pending_cbp', 'accepted', 'rejected'],
   cancelled:   [],                     // Terminal state

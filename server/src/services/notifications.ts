@@ -83,7 +83,7 @@ export async function notifyFilingSubmitted(orgId: string, userId: string, filin
     filingId,
     type: 'filing_submitted',
     title: 'Filing Submitted',
-    message: `ISF filing ${bolNumber || filingId.slice(0, 8)} has been submitted to CBP via CustomsCity.`,
+    message: `ISF filing ${bolNumber || filingId.slice(0, 8)} has been submitted to CBP.`,
   });
 
   // Send email notification

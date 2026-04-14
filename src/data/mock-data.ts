@@ -101,7 +101,7 @@ export const mockSubmissionLogs: SubmissionLog[] = [
 ];
 
 export const mockActivity: ActivityItem[] = [
-  { id: 'ACT-1', type: 'submission', message: 'ISF-2026-002 submitted to CustomsCity', timestamp: '2026-03-29T11:00:00Z', shipmentId: 'ISF-2026-002' },
+  { id: 'ACT-1', type: 'submission', message: 'ISF-2026-002 submitted to CBP', timestamp: '2026-03-29T11:00:00Z', shipmentId: 'ISF-2026-002' },
   { id: 'ACT-2', type: 'error', message: 'ISF-2026-004 rejected — Invalid HTS code', timestamp: '2026-03-21T12:00:00Z', shipmentId: 'ISF-2026-004' },
   { id: 'ACT-3', type: 'submission', message: 'ISF-2026-001 accepted by CBP', timestamp: '2026-03-26T15:00:00Z', shipmentId: 'ISF-2026-001' },
   { id: 'ACT-4', type: 'alert', message: 'ISF-2026-003 — Filing deadline in 15 days', timestamp: '2026-03-30T08:00:00Z', shipmentId: 'ISF-2026-003' },

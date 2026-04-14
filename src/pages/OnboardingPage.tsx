@@ -54,7 +54,7 @@ export default function OnboardingPage() {
     onSuccess: (result) => {
       setConnectionResult(result);
       if (result.connected) {
-        toast.success('CustomsCity API connected successfully!');
+        toast.success('CBP Filing Gateway connected successfully!');
       } else {
         toast.error('Connection failed — check your API key in environment settings');
       }
@@ -249,7 +249,7 @@ export default function OnboardingPage() {
                   <Plug className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl">Connect to CustomsCity</CardTitle>
+                  <CardTitle className="text-xl">Connect to CBP Filing Gateway</CardTitle>
                   <CardDescription>Test your API connection to start filing ISFs electronically</CardDescription>
                 </div>
               </div>
@@ -261,7 +261,7 @@ export default function OnboardingPage() {
                   How it works
                 </h4>
                 <p className="text-sm text-blue-700 leading-relaxed">
-                  MyCargoLens connects to the <strong>CustomsCity API</strong> to electronically submit your ISF filings
+                  MyCargoLens connects to the <strong>CBP Filing Gateway</strong> to electronically submit your ISF filings
                   to U.S. Customs & Border Protection (CBP). Your API credentials are configured in the server
                   environment — click below to verify the connection.
                 </p>

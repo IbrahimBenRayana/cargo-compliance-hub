@@ -105,15 +105,15 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
 
     // Steps 2+3: Submit (backend does CC create + CC send in one call)
     setCurrentStep('send_cc');
-    updateStep('send_cc', { status: 'running', message: 'Creating document on CustomsCity...' });
+    updateStep('send_cc', { status: 'running', message: 'Preparing CBP filing document...' });
 
     try {
       const result = await submitFiling.mutateAsync(filing.id);
 
-      // CC create succeeded
+      // Filing document created
       updateStep('send_cc', {
         status: 'success',
-        message: `Document created \u2014 CC ID: ${result.ccFilingId || 'assigned'}`,
+        message: `Document created — Ref: ${result.ccFilingId || 'assigned'}`,
       });
 
       await new Promise(r => setTimeout(r, 400));
@@ -122,7 +122,7 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
       setCurrentStep('send_cbp');
       updateStep('send_cbp', {
         status: 'running',
-        message: 'Sending to CBP via CustomsCity...',
+        message: 'Transmitting to CBP...',
       });
 
       await new Promise(r => setTimeout(r, 500));
@@ -135,7 +135,7 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
         details: result.sendResponse,
       });
 
-      toast.success('Filing submitted to CBP via CustomsCity!');
+      toast.success('Filing submitted to CBP successfully!');
       onComplete();
     } catch (err: any) {
       const body = err.body || err;
@@ -145,7 +145,7 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
         // CC validation failed (document creation rejected)
         updateStep('send_cc', {
           status: 'error',
-          message: 'CustomsCity rejected the filing',
+          message: 'Filing was rejected by CBP',
           details: body.validationErrors,
         });
         updateStep('send_cbp', { status: 'idle' });
@@ -153,7 +153,7 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
         // CC API error on create
         updateStep('send_cc', {
           status: 'error',
-          message: body.error || 'CustomsCity API error',
+          message: body.error || 'Filing submission error',
           details: body.apiResponse,
         });
         updateStep('send_cbp', { status: 'idle' });
@@ -180,8 +180,8 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
 
   const stepConfig = [
     { key: 'validate' as PipelineStep, label: 'Validate Fields', desc: 'Check all required fields and formats', icon: Shield },
-    { key: 'send_cc' as PipelineStep, label: 'Send to CustomsCity', desc: 'Create document via CC API', icon: Zap },
-    { key: 'send_cbp' as PipelineStep, label: 'Send to CBP', desc: 'CC transmits filing to U.S. Customs', icon: Send },
+    { key: 'send_cc' as PipelineStep, label: 'Create Filing', desc: 'Prepare document for CBP submission', icon: Zap },
+    { key: 'send_cbp' as PipelineStep, label: 'Send to CBP', desc: 'Transmit filing to U.S. Customs', icon: Send },
   ];
 
   return (
@@ -205,7 +205,7 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
             {isRunning ? 'Processing...' : 'Start Submission'}
           </Button>
         </div>
-        <CardDescription>Validate, create on CustomsCity, and transmit to CBP</CardDescription>
+        <CardDescription>Validate, prepare, and transmit your filing to CBP</CardDescription>
       </CardHeader>
       <CardContent className="space-y-0">
         {stepConfig.map((cfg, i) => {
@@ -379,7 +379,7 @@ function CBPStatusChecker({ filing, onStatusUpdate }: { filing: Filing; onStatus
                   ? 'Auto-checking every 30s for CBP response...'
                   : lastChecked
                   ? `Last checked: ${lastChecked.toLocaleTimeString()}`
-                  : 'Click to check status with CustomsCity'}
+                  : 'Click to check filing status'}
               </CardDescription>
             </div>
           </div>
@@ -565,9 +565,9 @@ export default function ShipmentDetails() {
       toast.success('Filing resubmitted successfully!');
     } catch (err: any) {
       const body = err.body || err;
-      if (body?.validationErrors) {
-        const msgs = body.validationErrors.map((e: any) => `${e.field}: ${e.message}`).join('\n');
-        toast.error(`Validation failed:\n${msgs}`, { duration: 8000 });
+      if (body?.validationErrors && Array.isArray(body.validationErrors)) {
+        const count = body.validationErrors.length;
+        toast.error(`Submission failed: ${count} validation error(s). Please review and fix the issues.`, { duration: 8000 });
       } else {
         toast.error(body?.error || 'Resubmission failed');
       }
@@ -695,7 +695,7 @@ export default function ShipmentDetails() {
             <h1 className="text-2xl font-black tracking-tight">{filing.houseBol || filing.masterBol || filing.id.slice(0, 8)}</h1>
             <StatusBadge status={filing.status as ShipmentStatus} />
             {filing.ccFilingId && (
-              <Badge variant="outline" className="text-[10px] font-mono">CC: {filing.ccFilingId.slice(0, 12)}</Badge>
+              <Badge variant="outline" className="text-[10px] font-mono">Ref: {filing.ccFilingId.slice(0, 12)}</Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -885,13 +885,94 @@ export default function ShipmentDetails() {
         </CardContent>
       </Card>
 
-      {/* Rejection details */}
-      {filing.rejectionReason && (
+      {/* Rejection details — with translated error display */}
+      {filing.status === 'rejected' && filing.rejectionReason && (
+        <Card className="border-red-200 dark:border-red-900/40 opacity-0 animate-fade-in-up" style={{ animationDelay: '250ms', animationFillMode: 'forwards' }}>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <CardTitle className="text-sm font-semibold text-red-700 dark:text-red-400">Rejection Details</CardTitle>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="gap-1.5" asChild>
+                  <Link to={`/shipments/${filing.id}/edit`}><Pencil className="h-3.5 w-3.5" /> Edit & Fix</Link>
+                </Button>
+                <Button size="sm" className="gap-1.5" onClick={handleResubmit} disabled={submitFiling.isPending}>
+                  {submitFiling.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                  Resubmit
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Try to parse translated errors from the rejection reason */}
+            {(() => {
+              // Try to parse structured rejection data (JSON with summary + errors)
+              let validationErrors: any[] = [];
+              let summaryText = filing.rejectionReason || '';
+
+              try {
+                const parsed = JSON.parse(filing.rejectionReason || '');
+                if (parsed.errors && Array.isArray(parsed.errors)) {
+                  validationErrors = parsed.errors;
+                  summaryText = parsed.summary || '';
+                }
+              } catch {
+                // Not JSON — use raw rejection reason as-is
+              }
+
+              // Also check the filing object for inline validationErrors (from submit response)
+              if (validationErrors.length === 0 && (filing as any).validationErrors) {
+                validationErrors = (filing as any).validationErrors;
+              }
+
+              if (validationErrors.length > 0) {
+                return (
+                  <div className="space-y-2">
+                    {validationErrors.map((err: any, i: number) => (
+                      <div key={i} className="rounded-lg border border-red-200/60 dark:border-red-900/30 bg-red-50/30 dark:bg-red-950/10 p-3 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={cn(
+                            'text-[10px] font-bold uppercase',
+                            err.severity === 'critical' ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-400' :
+                            err.severity === 'warning' ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/40 dark:text-amber-400' :
+                            'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/40 dark:text-blue-400',
+                          )}>
+                            {err.severity || 'error'}
+                          </Badge>
+                          <span className="text-sm font-semibold text-foreground">{err.fieldLabel || err.field}</span>
+                        </div>
+                        <p className="text-sm text-red-700 dark:text-red-400">{err.message}</p>
+                        {err.fix && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <span className="font-medium text-primary">💡 Fix:</span> {err.fix}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+
+              // Fallback: show raw rejection reason
+              return (
+                <div className="rounded-lg bg-red-50/50 dark:bg-red-950/20 border border-red-200/50 dark:border-red-900/30 p-3">
+                  <p className="text-sm text-red-700 dark:text-red-400 whitespace-pre-wrap">{summaryText || filing.rejectionReason}</p>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Non-rejected filing rejection reason (e.g. historical) */}
+      {filing.status !== 'rejected' && filing.rejectionReason && (
         <Card className="border-red-200 dark:border-red-900/40 opacity-0 animate-fade-in-up" style={{ animationDelay: '250ms', animationFillMode: 'forwards' }}>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-red-500" />
-              <CardTitle className="text-sm font-semibold text-red-700 dark:text-red-400">Rejection Details</CardTitle>
+              <CardTitle className="text-sm font-semibold text-red-700 dark:text-red-400">Previous Rejection Details</CardTitle>
             </div>
           </CardHeader>
           <CardContent>

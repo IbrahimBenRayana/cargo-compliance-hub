@@ -105,9 +105,9 @@ export default function SettingsPage() {
       const result = await testConnection.mutateAsync();
       setConnectionResult(result);
       if (result.connected) {
-        toast.success('CustomsCity API connection successful');
+        toast.success('CBP Filing Gateway connection successful');
       } else {
-        toast.error('CustomsCity API connection failed');
+        toast.error('CBP Filing Gateway connection failed');
       }
     } catch (err: any) {
       toast.error('Connection test failed: ' + (err.message || 'Unknown error'));
@@ -296,9 +296,9 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Key className="h-4 w-4 text-primary" />
-                CustomsCity API Connection
+                CBP Filing Gateway
               </CardTitle>
-              <CardDescription>Test and manage your CustomsCity integration</CardDescription>
+              <CardDescription>Test and manage your filing gateway integration</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
@@ -347,7 +347,7 @@ export default function SettingsPage() {
               <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 p-4">
                 <p className="text-sm font-medium text-amber-800 dark:text-amber-300">API Configuration</p>
                 <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                  CustomsCity API credentials are configured via environment variables on the server
+                  Filing gateway API credentials are configured via environment variables on the server
                   (<code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded text-[10px]">CC_API_EMAIL</code>, <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded text-[10px]">CC_API_PASSWORD</code>).
                   Contact your administrator to update API credentials.
                 </p>

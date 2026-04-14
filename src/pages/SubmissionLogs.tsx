@@ -35,7 +35,7 @@ export default function SubmissionLogs() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Submission Logs</h1>
-        <p className="text-muted-foreground text-sm">Track all API submissions to CustomsCity</p>
+        <p className="text-muted-foreground text-sm">Track all API submissions to CBP</p>
       </div>
 
       {isLoading ? (
@@ -50,7 +50,7 @@ export default function SubmissionLogs() {
             <FileText className="h-5 w-5 text-muted-foreground" />
           </div>
           <p className="font-medium">No submission logs yet</p>
-          <p className="text-sm text-muted-foreground mt-1">Logs will appear here when filings are submitted to CustomsCity</p>
+          <p className="text-sm text-muted-foreground mt-1">Logs will appear here when filings are submitted to CBP</p>
         </div>
       ) : (
         <div className="rounded-lg border">

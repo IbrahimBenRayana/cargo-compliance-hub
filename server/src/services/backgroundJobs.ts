@@ -382,7 +382,7 @@ async function checkStaleFilings(): Promise<void> {
         filing.id,
         'filing_stale',
         'No CBP Response ⚠️',
-        `ISF filing ${bol} was submitted ${hoursAgo}h ago but no CBP response received. Check CustomsCity for status.`
+        `ISF filing ${bol} was submitted ${hoursAgo}h ago but no CBP response received. Please check the filing status.`
       );
       sentDeadlineAlerts.add(alertKey);
 

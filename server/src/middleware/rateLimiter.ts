@@ -46,14 +46,14 @@ export const generalLimiter = rateLimit({
   },
 });
 
-// CC API calls — protect against accidental hammering of external API
+// CBP filing API calls — protect against accidental hammering of external API
 export const ccApiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    error: 'Too many CustomsCity API requests. Please wait.',
-    code: 'RATE_LIMIT_CC_API',
+    error: 'Too many filing requests. Please wait a moment before trying again.',
+    code: 'RATE_LIMIT_FILING_API',
   },
 });

@@ -1116,7 +1116,7 @@ export default function ShipmentWizard() {
           <Sparkles className="h-5 w-5 text-primary shrink-0" />
           <div>
             <p className="text-sm font-semibold">Ready to create your ISF filing</p>
-            <p className="text-xs text-muted-foreground">Review all details below. After creating, go to the filing list and click "Submit" to send to CBP via CustomsCity.</p>
+            <p className="text-xs text-muted-foreground">Review all details below. After creating, go to the filing list and click "Submit" to send to CBP.</p>
           </div>
         </div>
 

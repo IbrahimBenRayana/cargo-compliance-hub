@@ -7,6 +7,7 @@ import { validateFiling, isValidTransition, getAllowedTransitions, ValidationRes
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { notifyFilingSubmitted, notifyFilingRejected, notifyFilingAmended, notifyFilingCancelled, notifyApiError } from '../services/notifications.js';
 import { filingMutationLimiter, ccApiLimiter } from '../middleware/rateLimiter.js';
+import { translateValidationErrors, sanitizeErrorMessage } from '../services/errorTranslator.js';
 
 const router = Router();
 
@@ -254,8 +255,8 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     return;
   }
 
-  if (existing.status !== 'draft') {
-    res.status(400).json({ error: 'Only draft filings can be edited' });
+  if (existing.status !== 'draft' && existing.status !== 'rejected') {
+    res.status(400).json({ error: 'Only draft or rejected filings can be edited' });
     return;
   }
 
@@ -364,17 +365,25 @@ router.post('/:id/submit', ccApiLimiter, async (req: AuthRequest, res: Response)
 
     // Handle CC validation failures (201 + array of validation messages)
     if (!createResult.persisted) {
-      const errorSummary = createResult.validationErrors
+      const rawErrors = createResult.validationErrors
         ?.filter((e: any) => e.field)
-        .map((e: any) => `${e.field}: ${e.message}`)
-        .join('; ') || 'CustomsCity validation failed';
+        .map((e: any) => `${e.field}: ${e.message}`) || [];
+
+      const errorSummary = rawErrors.join('; ') || 'Filing validation failed';
+      const translatedErrors = translateValidationErrors(rawErrors);
+
+      // Store both human-readable summary and structured translated errors
+      const rejectionData = JSON.stringify({
+        summary: errorSummary,
+        errors: translatedErrors,
+      });
 
       await prisma.filing.update({
         where: { id: filing.id },
         data: {
           status: 'rejected',
           rejectedAt: new Date(),
-          rejectionReason: errorSummary,
+          rejectionReason: rejectionData,
         },
       });
 
@@ -382,22 +391,23 @@ router.post('/:id/submit', ccApiLimiter, async (req: AuthRequest, res: Response)
         data: {
           filingId: filing.id,
           status: 'rejected',
-          message: `CustomsCity validation failed (${createResult.validationErrors?.length ?? 0} issues)`,
+          message: `CBP filing validation failed (${createResult.validationErrors?.length ?? 0} issues)`,
           ccResponse: (createResult.validationErrors ?? createResult.data) as any,
           changedById: req.user!.id,
         },
       });
 
       res.status(422).json({
-        error: 'CustomsCity rejected the filing due to validation errors',
-        validationErrors: createResult.validationErrors,
+        error: 'Filing was rejected due to validation errors. Please review and correct the issues below.',
+        validationErrors: translatedErrors,
+        rawErrors: createResult.validationErrors,
         filing: await prisma.filing.findUnique({ where: { id: filing.id } }),
       });
       return;
     }
 
     if (createResult.status >= 400) {
-      // CC API returned an error
+      // API returned an error
       await prisma.filing.update({
         where: { id: filing.id },
         data: {
@@ -411,14 +421,14 @@ router.post('/:id/submit', ccApiLimiter, async (req: AuthRequest, res: Response)
         data: {
           filingId: filing.id,
           status: 'rejected',
-          message: `CustomsCity API error: ${createResult.status}`,
+          message: `CBP filing system error: ${createResult.status}`,
           ccResponse: createResult.data as any,
           changedById: req.user!.id,
         },
       });
 
       res.status(400).json({
-        error: 'CustomsCity API rejected the filing',
+        error: 'The filing was rejected by the CBP filing system. Please review your data and try again.',
         apiResponse: createResult.data,
       });
       return;
@@ -479,7 +489,7 @@ router.post('/:id/submit', ccApiLimiter, async (req: AuthRequest, res: Response)
         filingId: filing.id,
         status: newStatus,
         message: newStatus === 'submitted'
-          ? 'Filing submitted to CBP via CustomsCity'
+          ? 'Filing submitted to CBP'
           : `Submission failed: ${sendResult?.status ?? createResult.status}`,
         ccResponse: (sendResult?.data ?? createResult.data) as any,
         changedById: req.user!.id,
@@ -521,7 +531,7 @@ router.post('/:id/submit', ccApiLimiter, async (req: AuthRequest, res: Response)
     });
 
     res.status(502).json({
-      error: 'Failed to communicate with CustomsCity API',
+      error: 'Failed to communicate with the CBP filing system. Please try again later.',
       message: err.message,
     });
 
@@ -550,7 +560,7 @@ router.post('/:id/amend', ccApiLimiter, async (req: AuthRequest, res: Response):
   }
 
   if (!filing.ccFilingId) {
-    res.status(400).json({ error: 'Filing has no CustomsCity ID — cannot amend' });
+    res.status(400).json({ error: 'Filing has no CBP reference ID — cannot amend. The filing must be submitted first.' });
     return;
   }
 
@@ -610,8 +620,11 @@ router.post('/:id/amend', ccApiLimiter, async (req: AuthRequest, res: Response):
         data: { status: 'accepted', amendedAt: null },
       });
       res.status(422).json({
-        error: 'CustomsCity rejected the amendment due to validation errors',
-        validationErrors: ccResult.validationErrors,
+        error: 'Amendment was rejected due to validation errors. Please review and correct the issues.',
+        validationErrors: translateValidationErrors(
+          ccResult.validationErrors?.filter((e: any) => e.field).map((e: any) => `${e.field}: ${e.message}`) || []
+        ),
+        rawErrors: ccResult.validationErrors,
       });
       return;
     }
@@ -1027,7 +1040,7 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
   } catch (err: any) {
     console.error(`[Status Check] Error for filing ${filing.id}:`, err);
     res.status(502).json({
-      error: 'Failed to check status with CustomsCity',
+      error: 'Failed to check filing status. Please try again later.',
       message: err.message,
     });
   }
@@ -1321,7 +1334,7 @@ router.post('/bulk-submit', filingMutationLimiter, ccApiLimiter, async (req: Aut
           data: {
             filingId: filing.id,
             status: 'submitted',
-            message: 'Bulk submission to CustomsCity API',
+            message: 'Bulk submission to CBP',
             ccResponse: ccResult?.data || null,
             changedById: req.user!.id,
           },
