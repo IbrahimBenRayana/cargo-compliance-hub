@@ -238,6 +238,162 @@ const ERROR_PATTERNS: ErrorPattern[] = [
   },
 ];
 
+// ─── CBP Disposition Code Translations ────────────────────
+// These are standard CBP response codes for ISF filings.
+// Reference: CBP CATAIR / ABI / ACE appendices.
+
+interface CBPCodeEntry {
+  code: string;
+  pattern: RegExp;
+  message: string;
+  fix: string;
+  severity: 'critical' | 'warning';
+}
+
+const CBP_DISPOSITION_CODES: CBPCodeEntry[] = [
+  // S-codes: ISF Severity / Status codes
+  {
+    code: 'S75',
+    pattern: /S75\s+ENTITY\s+IDENT\s+NOT\s+ON\s+FILE/i,
+    message: 'One of the parties (manufacturer, seller, or buyer) is not recognized in the CBP system.',
+    fix: 'Verify the party name, address, and country exactly match what is registered with CBP. Ensure the manufacturer/seller has been previously reported in a CBP filing. In the test environment, this is expected with sample data.',
+    severity: 'critical',
+  },
+  {
+    code: 'S17',
+    pattern: /S17\s+ISF\s+IMP\s+NBR\s+NOT\s+ON\s+FILE/i,
+    message: 'The Importer Number (EIN) is not registered with CBP.',
+    fix: 'Enter a valid Employer Identification Number (EIN) that is registered with CBP. The EIN must be in XX-XXXXXXX format and actively registered for customs filing. Contact your customs broker if you need to register.',
+    severity: 'critical',
+  },
+  {
+    code: 'SA7',
+    pattern: /SA7\s+CONT\s+BOND\s+NOT\s+ON\s+FILE/i,
+    message: 'No continuous customs bond is on file with CBP for this importer.',
+    fix: 'A valid continuous bond (Type 1) must be on file with CBP for the importer EIN used. Contact your surety company or customs broker to verify the bond is active and properly linked to your EIN.',
+    severity: 'critical',
+  },
+  {
+    code: 'S18',
+    pattern: /S18\s+ISF\s+FILER\s+NOT\s+ON\s+FILE/i,
+    message: 'The ISF filer is not registered with CBP to submit filings.',
+    fix: 'The ISF filer EIN must be registered with CBP as an authorized filer. Contact CBP or your licensed customs broker to register.',
+    severity: 'critical',
+  },
+  {
+    code: 'S01',
+    pattern: /S01\s+/i,
+    message: 'ISF transaction number has been assigned by CBP.',
+    fix: 'This is an informational response — no action needed.',
+    severity: 'warning',
+  },
+  {
+    code: 'S02',
+    pattern: /S02\s+/i,
+    message: 'ISF filing has been accepted by CBP.',
+    fix: 'No action needed — your filing has been accepted.',
+    severity: 'warning',
+  },
+  {
+    code: 'S10',
+    pattern: /S10\s+/i,
+    message: 'There is a data discrepancy in the filing.',
+    fix: 'Review all fields for accuracy. Check BOL numbers, party names, HTS codes, and port codes. Correct any errors and resubmit.',
+    severity: 'critical',
+  },
+  {
+    code: 'S50',
+    pattern: /S50\s+/i,
+    message: 'ISF filing was received but CBP requires additional review.',
+    fix: 'CBP is reviewing the filing. No immediate action needed, but monitor the status for updates.',
+    severity: 'warning',
+  },
+  {
+    code: 'S76',
+    pattern: /S76\s+/i,
+    message: 'A party entity identifier does not match CBP records.',
+    fix: 'Verify the name, address, and country for all parties exactly match what is on file with CBP.',
+    severity: 'critical',
+  },
+  {
+    code: 'ISF REJECTED',
+    pattern: /ISF\s+REJECTED/i,
+    message: 'The ISF filing was rejected by CBP due to one or more errors listed above.',
+    fix: 'Review and fix all the errors listed, then resubmit the filing.',
+    severity: 'critical',
+  },
+  // Generic catch-all for unknown codes
+  {
+    code: 'GENERIC',
+    pattern: /^([A-Z][A-Z0-9]{1,3})\s+(.+)/i,
+    message: '',  // Will be built dynamically
+    fix: 'Please review the error details and correct the filing. Contact support if you need help understanding this code.',
+    severity: 'warning',
+  },
+];
+
+/**
+ * Translate CBP disposition/response codes into user-friendly messages.
+ * Input: raw CBP rejection string like:
+ *   "S75 ENTITY IDENT NOT ON FILE - Party: CN, S17 ISF IMP NBR NOT ON FILE, ..."
+ */
+export function translateCBPRejection(rawReason: string): TranslatedError[] {
+  if (!rawReason) return [];
+
+  // Split by commas, semicolons, or newlines
+  const parts = rawReason.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+
+  const results: TranslatedError[] = [];
+
+  for (const part of parts) {
+    let matched = false;
+
+    for (const entry of CBP_DISPOSITION_CODES) {
+      if (entry.code === 'GENERIC') continue; // Skip catch-all in first pass
+      if (entry.pattern.test(part)) {
+        // Extract any extra context (e.g. "- Party: CN")
+        const extraContext = part.replace(entry.pattern, '').replace(/^[\s\-:]+/, '').trim();
+        results.push({
+          field: entry.code,
+          fieldLabel: `CBP Code ${entry.code}`,
+          originalMessage: part,
+          message: entry.message + (extraContext ? ` (${extraContext})` : ''),
+          fix: entry.fix,
+          severity: entry.severity,
+        });
+        matched = true;
+        break;
+      }
+    }
+
+    if (!matched && part.length > 2) {
+      // Try generic pattern
+      const genericMatch = part.match(/^([A-Z][A-Z0-9]{1,3})\s+(.+)/i);
+      if (genericMatch) {
+        results.push({
+          field: genericMatch[1],
+          fieldLabel: `CBP Code ${genericMatch[1]}`,
+          originalMessage: part,
+          message: `CBP returned code ${genericMatch[1]}: ${genericMatch[2]}`,
+          fix: 'Please review the error details and correct the filing. Contact your customs broker if you need help understanding this code.',
+          severity: 'warning',
+        });
+      } else {
+        results.push({
+          field: 'CBP',
+          fieldLabel: 'CBP Response',
+          originalMessage: part,
+          message: part,
+          fix: 'Review and correct the filing based on this CBP response.',
+          severity: 'warning',
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
 // ─── Helper Functions ─────────────────────────────────────
 
 function getFieldLabel(field: string): string {

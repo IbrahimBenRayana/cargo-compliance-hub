@@ -7,7 +7,7 @@ import { validateFiling, isValidTransition, getAllowedTransitions, ValidationRes
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { notifyFilingSubmitted, notifyFilingRejected, notifyFilingAmended, notifyFilingCancelled, notifyApiError } from '../services/notifications.js';
 import { filingMutationLimiter, ccApiLimiter } from '../middleware/rateLimiter.js';
-import { translateValidationErrors, sanitizeErrorMessage } from '../services/errorTranslator.js';
+import { translateValidationErrors, translateCBPRejection, sanitizeErrorMessage } from '../services/errorTranslator.js';
 
 const router = Router();
 
@@ -980,11 +980,23 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
       // Extract rejection reason if rejected
       let rejectionReason: string | undefined;
       if (newStatus === 'rejected') {
+        // Collect all rejection-related messages from CBP
         const rejectionMsgs = messages
-          .filter((m: any) => m.description?.includes('REJECTED') || m.statusCode === 'REJECTED')
+          .filter((m: any) => m.description?.includes('REJECTED') || m.description?.includes('NOT ON FILE') || m.statusCode === 'REJECTED')
           .map((m: any) => m.description)
-          .join('; ');
-        rejectionReason = rejectionMsgs || matchingDoc?.lastEvent?.codeDescription || 'Rejected by CBP';
+          .filter(Boolean);
+
+        // Also include disposition descriptions from the doc status
+        const allMsgs = [...new Set(rejectionMsgs)]; // deduplicate
+        const rawReason = allMsgs.join(', ') || matchingDoc?.lastEvent?.codeDescription || 'Rejected by CBP';
+
+        // Translate CBP codes into user-friendly messages
+        const translatedErrors = translateCBPRejection(rawReason);
+
+        rejectionReason = JSON.stringify({
+          summary: rawReason,
+          errors: translatedErrors,
+        });
       }
 
       // Extract ISF transaction number
@@ -1002,6 +1014,10 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
       });
 
       // Record status change in history
+      const rawSummary = newStatus === 'rejected'
+        ? (() => { try { return JSON.parse(rejectionReason || '{}').summary; } catch { return rejectionReason; } })()
+        : undefined;
+
       await prisma.filingStatusHistory.create({
         data: {
           filingId: filing.id,
@@ -1009,7 +1025,7 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
           message: newStatus === 'accepted'
             ? `CBP accepted the ISF filing${isfTxnNumber ? ` (ISF Txn: ${isfTxnNumber})` : ''}`
             : newStatus === 'rejected'
-            ? `CBP rejected the ISF filing: ${rejectionReason}`
+            ? `CBP rejected the ISF filing: ${rawSummary || 'See rejection details'}`
             : `CBP placed filing on hold`,
           ccResponse: { documentStatus: matchingDoc, messages } as any,
           changedById: req.user!.id,

@@ -927,6 +927,55 @@ export default function ShipmentDetails() {
                 validationErrors = (filing as any).validationErrors;
               }
 
+              // If still no structured errors, try to parse CBP disposition codes from raw text
+              if (validationErrors.length === 0 && summaryText) {
+                const cbpCodes: Record<string, { message: string; fix: string; severity: string }> = {
+                  'S75': { message: 'A party entity (manufacturer, seller, or buyer) is not recognized in the CBP system.', fix: 'Verify the party name, address, and country exactly match what is registered with CBP. In the test environment, this is expected with sample data.', severity: 'critical' },
+                  'S17': { message: 'The Importer Number (EIN) is not registered with CBP.', fix: 'Enter a valid EIN that is registered with CBP for customs filing. Format: XX-XXXXXXX.', severity: 'critical' },
+                  'SA7': { message: 'No continuous customs bond is on file with CBP for this importer.', fix: 'A valid continuous bond must be on file with CBP. Contact your surety company or customs broker.', severity: 'critical' },
+                  'S18': { message: 'The ISF filer is not registered with CBP.', fix: 'The ISF filer EIN must be registered with CBP as an authorized filer.', severity: 'critical' },
+                  'S10': { message: 'There is a data discrepancy in the filing.', fix: 'Review all fields for accuracy and correct any errors.', severity: 'critical' },
+                  'S76': { message: 'A party entity identifier does not match CBP records.', fix: 'Verify party details exactly match CBP registration.', severity: 'critical' },
+                };
+
+                // Split by comma and try to match CBP codes
+                const parts = summaryText.split(/[,;]+/).map((s: string) => s.trim()).filter(Boolean);
+                for (const part of parts) {
+                  const codeMatch = part.match(/^([A-Z][A-Z0-9]{1,3})\s+(.+)/i);
+                  if (codeMatch) {
+                    const code = codeMatch[1];
+                    const known = cbpCodes[code];
+                    if (known) {
+                      // Extract extra context like "- Party: CN"
+                      const extra = part.replace(/^[A-Z][A-Z0-9]{1,3}\s+[A-Z\s]+/i, '').replace(/^[\s\-:]+/, '').trim();
+                      validationErrors.push({
+                        field: code,
+                        fieldLabel: `CBP Code ${code}`,
+                        message: known.message + (extra ? ` (${extra})` : ''),
+                        fix: known.fix,
+                        severity: known.severity,
+                      });
+                    } else if (part.match(/ISF\s+REJECTED/i)) {
+                      validationErrors.push({
+                        field: 'ISF',
+                        fieldLabel: 'ISF Status',
+                        message: 'The ISF filing was rejected by CBP due to the errors listed above.',
+                        fix: 'Fix all the errors above, then resubmit.',
+                        severity: 'critical',
+                      });
+                    } else {
+                      validationErrors.push({
+                        field: code,
+                        fieldLabel: `CBP Code ${code}`,
+                        message: `${codeMatch[2]}`,
+                        fix: 'Review and correct the filing based on this CBP response.',
+                        severity: 'warning',
+                      });
+                    }
+                  }
+                }
+              }
+
               if (validationErrors.length > 0) {
                 return (
                   <div className="space-y-2">
