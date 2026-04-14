@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useFilings, useSubmitFiling, useTemplates, useApplyTemplate, useBulkSubmit, useBulkDelete, useExportCsv, useExportSummaryPdf } from '@/hooks/useFilings';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -39,6 +39,13 @@ const statusOptions: ShipmentStatus[] = ['draft', 'submitted', 'accepted', 'reje
 
 export default function ShipmentsList() {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [search]);
   const [selectedStatuses, setSelectedStatuses] = useState<ShipmentStatus[]>([]);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
@@ -135,7 +142,7 @@ export default function ShipmentsList() {
 
   // Fetch filings from backend
   const { data: filingsResponse, isLoading, isError } = useFilings({
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     status: selectedStatuses.length === 1 ? selectedStatuses[0] : undefined,
     sortBy: sortField === 'deadline' ? 'filingDeadline' : sortField === 'departure' ? 'estimatedDeparture' : 'createdAt',
     sortOrder: sortDir,
@@ -153,6 +160,7 @@ export default function ShipmentsList() {
 
   const clearAllFilters = () => {
     setSearch('');
+    setDebouncedSearch('');
     setSelectedStatuses([]);
     setSelectedCountries([]);
     setDateFrom(undefined);

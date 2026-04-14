@@ -8,6 +8,7 @@ import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import logger from '../config/logger.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -45,7 +46,7 @@ router.get('/profile', async (req: AuthRequest, res: Response): Promise<void> =>
 
     res.json(user);
   } catch (err: any) {
-    console.error('[Settings] Error fetching profile:', err.message);
+    logger.error({ err: err.message }, '[Settings] Error fetching profile:');
     res.status(500).json({ error: 'Failed to fetch profile' });
   }
 });
@@ -82,7 +83,7 @@ router.patch('/profile', async (req: AuthRequest, res: Response): Promise<void> 
 
     res.json(updated);
   } catch (err: any) {
-    console.error('[Settings] Error updating profile:', err.message);
+    logger.error({ err: err.message }, '[Settings] Error updating profile:');
     res.status(500).json({ error: 'Failed to update profile' });
   }
 });
@@ -126,7 +127,7 @@ router.post('/change-password', async (req: AuthRequest, res: Response): Promise
 
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err: any) {
-    console.error('[Settings] Error changing password:', err.message);
+    logger.error({ err: err.message }, '[Settings] Error changing password:');
     res.status(500).json({ error: 'Failed to change password' });
   }
 });
@@ -161,7 +162,7 @@ router.get('/organization', async (req: AuthRequest, res: Response): Promise<voi
 
     res.json(org);
   } catch (err: any) {
-    console.error('[Settings] Error fetching organization:', err.message);
+    logger.error({ err: err.message }, '[Settings] Error fetching organization:');
     res.status(500).json({ error: 'Failed to fetch organization' });
   }
 });
@@ -191,7 +192,7 @@ router.patch('/organization', async (req: AuthRequest, res: Response): Promise<v
 
     res.json(updated);
   } catch (err: any) {
-    console.error('[Settings] Error updating organization:', err.message);
+    logger.error({ err: err.message }, '[Settings] Error updating organization:');
     res.status(500).json({ error: 'Failed to update organization' });
   }
 });
@@ -233,7 +234,7 @@ router.get('/audit-log', async (req: AuthRequest, res: Response): Promise<void> 
       },
     });
   } catch (err: any) {
-    console.error('[Settings] Error fetching audit log:', err.message);
+    logger.error({ err: err.message }, '[Settings] Error fetching audit log:');
     res.status(500).json({ error: 'Failed to fetch audit log' });
   }
 });

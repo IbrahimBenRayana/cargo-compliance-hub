@@ -10,6 +10,7 @@
  */
 
 import { prisma } from '../config/database.js';
+import logger from '../config/logger.js';
 import {
   sendFilingAcceptedEmail,
   sendFilingRejectedEmail,
@@ -24,6 +25,8 @@ export interface CreateNotificationParams {
   type: string;
   title: string;
   message?: string;
+  /** Optional deduplication key — if a notification with this key already exists it is silently skipped. */
+  dedupeKey?: string;
 }
 
 export async function createNotification(params: CreateNotificationParams): Promise<void> {
@@ -36,10 +39,13 @@ export async function createNotification(params: CreateNotificationParams): Prom
         type: params.type,
         title: params.title,
         message: params.message ?? null,
+        dedupeKey: params.dedupeKey ?? null,
       },
     });
-  } catch (err) {
-    console.error('[Notifications] Failed to create notification:', params.type, err);
+  } catch (err: any) {
+    // P2002 = unique constraint violation — dedupe key already exists, skip silently
+    if (err?.code === 'P2002') return;
+    logger.error({ err, type: params.type }, '[Notifications] Failed to create notification');
   }
 }
 
@@ -51,26 +57,37 @@ export async function notifyOrgUsers(
   filingId: string,
   type: string,
   title: string,
-  message?: string
+  message?: string,
+  dedupeKey?: string
 ): Promise<void> {
   try {
+    // If a dedupeKey is supplied, skip if already exists in DB (survives restarts)
+    if (dedupeKey) {
+      const existing = await prisma.notification.findFirst({ where: { dedupeKey } });
+      if (existing) return;
+    }
+
     const users = await prisma.user.findMany({
       where: { orgId, isActive: true },
       select: { id: true },
     });
 
+    // Only the first user record gets the dedupeKey (unique constraint);
+    // the rest use null so createMany doesn't conflict.
     await prisma.notification.createMany({
-      data: users.map((u) => ({
+      data: users.map((u, i) => ({
         userId: u.id,
         orgId,
         filingId,
         type,
         title,
         message: message ?? null,
+        dedupeKey: i === 0 ? (dedupeKey ?? null) : null,
       })),
+      skipDuplicates: true,
     });
   } catch (err) {
-    console.error('[Notifications] Failed to notify org users:', type, err);
+    logger.error({ err, type }, '[Notifications] Failed to notify org users');
   }
 }
 
@@ -170,12 +187,14 @@ export async function notifyFilingCancelled(orgId: string, userId: string, filin
 }
 
 export async function notifyDeadlineApproaching(orgId: string, filingId: string, bolNumber: string, hoursRemaining: number): Promise<void> {
+  const dedupeKey = `${filingId}_deadline_${hoursRemaining}h`;
   await notifyOrgUsers(
     orgId,
     filingId,
     'deadline_warning',
     `Deadline in ${hoursRemaining}h ⏰`,
-    `ISF filing ${bolNumber || filingId.slice(0, 8)} deadline is in ${hoursRemaining} hours. Submit soon to avoid penalties.`
+    `ISF filing ${bolNumber || filingId.slice(0, 8)} deadline is in ${hoursRemaining} hours. Submit soon to avoid penalties.`,
+    dedupeKey
   );
 
   // Send email to all org users

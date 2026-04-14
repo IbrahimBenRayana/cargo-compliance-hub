@@ -12,6 +12,7 @@
 
 import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
+import logger from '../config/logger.js';
 
 // ─── Transporter ──────────────────────────────────────────
 let transporter: nodemailer.Transporter | null = null;
@@ -20,7 +21,7 @@ function getTransporter(): nodemailer.Transporter | null {
   if (transporter) return transporter;
 
   if (!env.EMAIL_USER || !env.EMAIL_PASS) {
-    console.warn('[Email] SMTP credentials not configured — emails will be logged only.');
+    logger.warn('[Email] SMTP credentials not configured — emails will be logged only.');
     return null;
   }
 
@@ -38,7 +39,7 @@ function getTransporter(): nodemailer.Transporter | null {
     },
   });
 
-  console.log(`[Email] SMTP transporter ready → ${env.EMAIL_HOST}:${env.EMAIL_PORT}`);
+  logger.info({ host: env.EMAIL_HOST, port: env.EMAIL_PORT }, '[Email] SMTP transporter ready');
   return transporter;
 }
 
@@ -48,10 +49,10 @@ export async function verifyEmailConnection(): Promise<boolean> {
   if (!t) return false;
   try {
     await t.verify();
-    console.log('[Email] ✅ SMTP connection verified');
+    logger.info('[Email] SMTP connection verified');
     return true;
   } catch (err: any) {
-    console.error('[Email] ❌ SMTP connection failed:', err.message);
+    logger.error({ err: err.message }, '[Email] SMTP connection failed');
     return false;
   }
 }
@@ -69,9 +70,11 @@ async function sendMail(options: SendMailOptions): Promise<boolean> {
 
   // In development without SMTP, just log
   if (!t) {
-    console.log(`[Email][DEV] Would send to ${options.to}:`);
-    console.log(`  Subject: ${options.subject}`);
-    console.log(`  Preview: ${(options.text || options.html).slice(0, 120)}...`);
+    logger.debug({
+      to: options.to,
+      subject: options.subject,
+      preview: (options.text || options.html).slice(0, 120),
+    }, '[Email][DEV] Would send email');
     return true;
   }
 
@@ -84,10 +87,10 @@ async function sendMail(options: SendMailOptions): Promise<boolean> {
       text: options.text ?? stripHtml(options.html),
     });
 
-    console.log(`[Email] ✉ Sent "${options.subject}" to ${options.to} — messageId: ${info.messageId}`);
+    logger.info({ to: options.to, subject: options.subject, messageId: info.messageId }, '[Email] Sent');
     return true;
   } catch (err: any) {
-    console.error(`[Email] ❌ Failed to send "${options.subject}" to ${options.to}:`, err.message);
+    logger.error({ err: err.message, to: options.to, subject: options.subject }, '[Email] Failed to send');
     return false;
   }
 }

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import OnboardingPage from "@/pages/OnboardingPage";
@@ -23,48 +24,51 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      staleTime: 30_000, // 30 seconds
-      refetchOnWindowFocus: false,
+      staleTime: 30_000,          // 30s before data is considered stale
+      refetchOnWindowFocus: true,  // refetch when user returns to tab
+      refetchOnReconnect: true,    // refetch after network reconnect
     },
   },
 });
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
 
-          {/* Protected routes */}
-          <Route element={<ProtectedRoute />}>
-            {/* Onboarding — full-page, no sidebar */}
-            <Route path="/onboarding" element={<OnboardingPage />} />
+            {/* Protected routes */}
+            <Route element={<ProtectedRoute />}>
+              {/* Onboarding — full-page, no sidebar */}
+              <Route path="/onboarding" element={<ErrorBoundary><OnboardingPage /></ErrorBoundary>} />
 
-            {/* Main app with sidebar layout */}
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/shipments" element={<ShipmentsList />} />
-              <Route path="/shipments/new" element={<ShipmentWizard />} />
-              <Route path="/shipments/:id" element={<ShipmentDetails />} />
-              <Route path="/shipments/:id/edit" element={<ShipmentWizard />} />
-              <Route path="/compliance" element={<CompliancePage />} />
-              <Route path="/integrations/api" element={<IntegrationsApi />} />
-              <Route path="/integrations/logs" element={<SubmissionLogs />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/team" element={<TeamPage />} />
+              {/* Main app with sidebar layout */}
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+                <Route path="/shipments" element={<ErrorBoundary><ShipmentsList /></ErrorBoundary>} />
+                <Route path="/shipments/new" element={<ErrorBoundary><ShipmentWizard /></ErrorBoundary>} />
+                <Route path="/shipments/:id" element={<ErrorBoundary><ShipmentDetails /></ErrorBoundary>} />
+                <Route path="/shipments/:id/edit" element={<ErrorBoundary><ShipmentWizard /></ErrorBoundary>} />
+                <Route path="/compliance" element={<ErrorBoundary><CompliancePage /></ErrorBoundary>} />
+                <Route path="/integrations/api" element={<ErrorBoundary><IntegrationsApi /></ErrorBoundary>} />
+                <Route path="/integrations/logs" element={<ErrorBoundary><SubmissionLogs /></ErrorBoundary>} />
+                <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
+                <Route path="/team" element={<ErrorBoundary><TeamPage /></ErrorBoundary>} />
+              </Route>
             </Route>
-          </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

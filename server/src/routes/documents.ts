@@ -14,6 +14,7 @@ import crypto from 'crypto';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
+import logger from '../config/logger.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -130,7 +131,7 @@ router.post('/:filingId', upload.array('files', 5), async (req: AuthRequest, res
       res.status(400).json({ error: err.message });
       return;
     }
-    console.error('[Documents] Upload error:', err.message);
+    logger.error({ err: err.message }, '[Documents] Upload error:');
     res.status(500).json({ error: 'Failed to upload files' });
   }
 });
@@ -155,7 +156,7 @@ router.get('/:filingId', async (req: AuthRequest, res: Response): Promise<void> 
 
     res.json({ data: documents });
   } catch (err: any) {
-    console.error('[Documents] List error:', err.message);
+    logger.error({ err: err.message }, '[Documents] List error:');
     res.status(500).json({ error: 'Failed to list documents' });
   }
 });
@@ -193,7 +194,7 @@ router.get('/:filingId/:docId/download', async (req: AuthRequest, res: Response)
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
   } catch (err: any) {
-    console.error('[Documents] Download error:', err.message);
+    logger.error({ err: err.message }, '[Documents] Download error:');
     res.status(500).json({ error: 'Failed to download document' });
   }
 });
@@ -240,7 +241,7 @@ router.delete('/:filingId/:docId', async (req: AuthRequest, res: Response): Prom
       ...meta,
     });
   } catch (err: any) {
-    console.error('[Documents] Delete error:', err.message);
+    logger.error({ err: err.message }, '[Documents] Delete error:');
     res.status(500).json({ error: 'Failed to delete document' });
   }
 });

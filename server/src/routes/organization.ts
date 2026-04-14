@@ -12,6 +12,7 @@ import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { sendInvitationEmail } from '../services/email.js';
+import logger from '../config/logger.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -50,7 +51,7 @@ router.get('/members', async (req: AuthRequest, res: Response): Promise<void> =>
 
     res.json({ data: members });
   } catch (err: any) {
-    console.error('[Org] Error listing members:', err.message);
+    logger.error({ err: err.message }, '[Org] Error listing members:');
     res.status(500).json({ error: 'Failed to list members' });
   }
 });
@@ -105,7 +106,7 @@ router.patch('/members/:id/role', requireRole('owner', 'admin'), async (req: Aut
       ...meta,
     });
   } catch (err: any) {
-    console.error('[Org] Error changing role:', err.message);
+    logger.error({ err: err.message }, '[Org] Error changing role:');
     res.status(500).json({ error: 'Failed to change role' });
   }
 });
@@ -150,7 +151,7 @@ router.delete('/members/:id', requireRole('owner', 'admin'), async (req: AuthReq
       ...meta,
     });
   } catch (err: any) {
-    console.error('[Org] Error removing member:', err.message);
+    logger.error({ err: err.message }, '[Org] Error removing member:');
     res.status(500).json({ error: 'Failed to remove member' });
   }
 });
@@ -230,7 +231,7 @@ router.post('/invitations', requireRole('owner', 'admin'), async (req: AuthReque
       organizationName: invitation.organization.name,
       role: data.role,
       inviteToken: token,
-    }).catch((err) => console.error('[Org] Invitation email failed:', err));
+    }).catch((err) => logger.error({ err }, '[Org] Invitation email failed'));
 
     const meta = getRequestMeta(req as any);
     writeAuditLog({
@@ -244,7 +245,7 @@ router.post('/invitations', requireRole('owner', 'admin'), async (req: AuthReque
       res.status(400).json({ error: 'Validation failed', details: err.flatten() });
       return;
     }
-    console.error('[Org] Error creating invitation:', (err as any).message);
+    logger.error({ err: (err as any).message }, '[Org] Error creating invitation');
     res.status(500).json({ error: 'Failed to create invitation' });
   }
 });
@@ -263,7 +264,7 @@ router.get('/invitations', async (req: AuthRequest, res: Response): Promise<void
 
     res.json({ data: invitations });
   } catch (err: any) {
-    console.error('[Org] Error listing invitations:', err.message);
+    logger.error({ err: err.message }, '[Org] Error listing invitations:');
     res.status(500).json({ error: 'Failed to list invitations' });
   }
 });
@@ -287,7 +288,7 @@ router.delete('/invitations/:id', requireRole('owner', 'admin'), async (req: Aut
 
     res.json({ message: 'Invitation revoked' });
   } catch (err: any) {
-    console.error('[Org] Error revoking invitation:', err.message);
+    logger.error({ err: err.message }, '[Org] Error revoking invitation:');
     res.status(500).json({ error: 'Failed to revoke invitation' });
   }
 });
@@ -348,7 +349,7 @@ router.post('/accept-invite', async (req: AuthRequest, res: Response): Promise<v
       ...meta,
     });
   } catch (err: any) {
-    console.error('[Org] Error accepting invitation:', err.message);
+    logger.error({ err: err.message }, '[Org] Error accepting invitation:');
     res.status(500).json({ error: 'Failed to accept invitation' });
   }
 });
@@ -384,7 +385,7 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
 
     res.json(org);
   } catch (err: any) {
-    console.error('[Org] Error fetching overview:', err.message);
+    logger.error({ err: err.message }, '[Org] Error fetching overview:');
     res.status(500).json({ error: 'Failed to fetch organization overview' });
   }
 });
@@ -398,7 +399,7 @@ router.patch('/onboarding', async (req: AuthRequest, res: Response): Promise<voi
     });
     res.json({ success: true });
   } catch (err: any) {
-    console.error('[Org] Error updating onboarding:', err.message);
+    logger.error({ err: err.message }, '[Org] Error updating onboarding:');
     res.status(500).json({ error: 'Failed to update onboarding status' });
   }
 });

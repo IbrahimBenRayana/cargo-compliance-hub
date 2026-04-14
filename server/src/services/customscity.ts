@@ -26,6 +26,7 @@
  */
 
 import { env } from '../config/env.js';
+import logger from '../config/logger.js';
 
 // ─── Types matching the official CC API schema ─────────────
 
@@ -1139,7 +1140,7 @@ export class CustomsCityClient {
               this.retryConfig.baseDelayMs * Math.pow(2, retryCount),
               this.retryConfig.maxDelayMs
             );
-        console.warn(`[CC API] Retrying ${method} ${path} (attempt ${retryCount + 1}/${this.retryConfig.maxRetries}, status ${response.status}, delay ${delay}ms)`);
+        logger.warn({ method, path, attempt: retryCount + 1, maxRetries: this.retryConfig.maxRetries, status: response.status, delay }, '[CC API] Retrying after error response');
         await sleep(delay);
         return this.request<T>(method, path, body, params, retryCount + 1);
       }
@@ -1159,7 +1160,7 @@ export class CustomsCityClient {
           this.retryConfig.baseDelayMs * Math.pow(2, retryCount),
           this.retryConfig.maxDelayMs
         );
-        console.warn(`[CC API] Retrying ${method} ${path} after network error (attempt ${retryCount + 1}/${this.retryConfig.maxRetries}, delay ${delay}ms): ${err.message}`);
+        logger.warn({ method, path, attempt: retryCount + 1, maxRetries: this.retryConfig.maxRetries, delay, err: err.message }, '[CC API] Retrying after network error');
         await sleep(delay);
         return this.request<T>(method, path, body, params, retryCount + 1);
       }

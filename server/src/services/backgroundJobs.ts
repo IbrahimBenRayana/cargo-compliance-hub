@@ -16,6 +16,8 @@
 import cron, { type ScheduledTask } from 'node-cron';
 import { prisma } from '../config/database.js';
 import { ccClient } from './customscity.js';
+import logger from '../config/logger.js';
+import { isValidTransition } from './validation.js';
 import {
   notifyFilingAccepted,
   notifyFilingRejected,
@@ -31,15 +33,14 @@ let lastStatusPoll: Date | null = null;
 let lastDeadlineCheck: Date | null = null;
 let statusPollStats = { checked: 0, updated: 0, errors: 0 };
 
-// Track which deadline alerts we've already sent (to avoid duplicates)
-// Key: `${filingId}_${threshold}h`
-const sentDeadlineAlerts = new Set<string>();
+// Stale-filing dedup is still in-memory (low risk — only advisory notifications)
+const sentStaleAlerts = new Set<string>();
 
 // ─── 1. STATUS POLLING JOB ────────────────────────────────
 
 async function pollSubmittedFilings(): Promise<void> {
   if (isStatusPollRunning) {
-    console.log('[Jobs:StatusPoll] Skipping — previous run still in progress');
+    logger.debug('[Jobs:StatusPoll] Skipping — previous run still in progress');
     return;
   }
 
@@ -69,163 +70,133 @@ async function pollSubmittedFilings(): Promise<void> {
       return;
     }
 
-    console.log(`[Jobs:StatusPoll] Checking ${submittedFilings.length} submitted filing(s)...`);
+    logger.info({ count: submittedFilings.length }, '[Jobs:StatusPoll] Checking submitted filings');
 
-    for (const filing of submittedFilings) {
-      try {
-        const masterBol = filing.masterBol;
-        const houseBol = filing.houseBol;
-        if (!masterBol && !houseBol) continue;
+    // Process in concurrent batches of 5 to respect CC API rate limits
+    const CONCURRENCY = 5;
+    for (let i = 0; i < submittedFilings.length; i += CONCURRENCY) {
+      const batch = submittedFilings.slice(i, i + CONCURRENCY);
+      await Promise.allSettled(batch.map(async (filing) => {
+        try {
+          const masterBol = filing.masterBol;
+          const houseBol = filing.houseBol;
+          if (!masterBol && !houseBol) return;
 
-        // Query CC document-status
-        const statusParams: Record<string, string> = {
-          manifestType: 'ISF',
-          skip: '0',
-        };
-        if (masterBol) statusParams.masterBOLNumber = masterBol;
-        else if (houseBol) statusParams.houseBOLNumber = houseBol;
+          const statusParams: Record<string, string> = { manifestType: 'ISF', skip: '0' };
+          if (masterBol) statusParams.masterBOLNumber = masterBol;
+          else if (houseBol) statusParams.houseBOLNumber = houseBol;
 
-        const statusResult = await ccClient.getDocumentStatus(statusParams);
-        checked++;
+          const statusResult = await ccClient.getDocumentStatus(statusParams);
+          checked++;
 
-        const documents = statusResult.data?.data ?? [];
-        const matchingDoc = documents.find((d: any) =>
-          (houseBol && d.bol === houseBol) ||
-          (masterBol && d.masterBOL === masterBol)
-        ) || documents[0];
+          const documents = statusResult.data?.data ?? [];
+          const matchingDoc = documents.find((d: any) =>
+            (houseBol && d.bol === houseBol) || (masterBol && d.masterBOL === masterBol)
+          ) || documents[0];
 
-        // Also check messages for detailed CBP response
-        let messages: any[] = [];
-        if (houseBol) {
-          try {
-            const dateFrom = filing.submittedAt
-              ? new Date(new Date(filing.submittedAt).getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-              : '2025-01-01';
-            const dateTo = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-            const msgParams: Record<string, string> = {
-              type: 'ISF',
-              houseBOLNumber: houseBol,
-              skip: '0',
-              dateFrom,
-              dateTo,
-              typeDate: 'createdDate',
-            };
-            if (masterBol) msgParams.masterBOLNumber = masterBol;
-
-            const msgResult = await ccClient.getMessages(msgParams);
-            messages = msgResult.data?.data ?? [];
-          } catch { /* non-fatal */ }
-        }
-
-        // Determine status
-        const ccStatus = matchingDoc?.status?.toUpperCase();
-        let newStatus: string | null = null;
-
-        if (ccStatus === 'ACCEPTED' || ccStatus === 'BILL ACCEPTED') {
-          newStatus = 'accepted';
-        } else if (ccStatus === 'REJECTED' || ccStatus === 'BILL REJECTED') {
-          newStatus = 'rejected';
-        } else if (ccStatus === 'ON HOLD' || ccStatus === 'HELD') {
-          newStatus = 'on_hold';
-        }
-
-        // Check messages if document-status didn't yield a result
-        if (!newStatus && messages.length > 0) {
-          const hasAccepted = messages.some((m: any) =>
-            m.description?.includes('ACCEPTED') || m.description?.includes('BILL ACCEPTED')
-          );
-          const hasRejected = messages.some((m: any) =>
-            m.description?.includes('REJECTED') || m.statusCode === 'REJECTED'
-          );
-          if (hasAccepted && !hasRejected) newStatus = 'accepted';
-          else if (hasRejected) newStatus = 'rejected';
-        }
-
-        if (newStatus && newStatus !== filing.status) {
-          updated++;
-
-          let rejectionReason: string | undefined;
-          if (newStatus === 'rejected') {
-            const rejectionMsgs = messages
-              .filter((m: any) => m.description?.includes('REJECTED') || m.statusCode === 'REJECTED')
-              .map((m: any) => m.description)
-              .join('; ');
-            rejectionReason = rejectionMsgs || matchingDoc?.lastEvent?.codeDescription || 'Rejected by CBP';
+          let messages: any[] = [];
+          if (houseBol) {
+            try {
+              const dateFrom = filing.submittedAt
+                ? new Date(new Date(filing.submittedAt).getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+                : '2025-01-01';
+              const dateTo = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+              const msgParams: Record<string, string> = {
+                type: 'ISF', houseBOLNumber: houseBol, skip: '0', dateFrom, dateTo, typeDate: 'createdDate',
+              };
+              if (masterBol) msgParams.masterBOLNumber = masterBol;
+              const msgResult = await ccClient.getMessages(msgParams);
+              messages = msgResult.data?.data ?? [];
+            } catch { /* non-fatal */ }
           }
 
-          const isfTxnNumber = messages.find((m: any) => m.ISFTransactionNumber)?.ISFTransactionNumber;
+          const ccStatus = matchingDoc?.status?.toUpperCase();
+          let newStatus: string | null = null;
+          if (ccStatus === 'ACCEPTED' || ccStatus === 'BILL ACCEPTED') newStatus = 'accepted';
+          else if (ccStatus === 'REJECTED' || ccStatus === 'BILL REJECTED') newStatus = 'rejected';
+          else if (ccStatus === 'ON HOLD' || ccStatus === 'HELD') newStatus = 'on_hold';
 
-          // Update filing status
-          await prisma.filing.update({
-            where: { id: filing.id },
-            data: {
-              status: newStatus,
-              acceptedAt: newStatus === 'accepted' ? new Date() : undefined,
-              rejectedAt: newStatus === 'rejected' ? new Date() : undefined,
-              rejectionReason: rejectionReason ?? undefined,
-              cbpTransactionId: isfTxnNumber ?? filing.cbpTransactionId ?? undefined,
-            },
-          });
-
-          // Status history
-          await prisma.filingStatusHistory.create({
-            data: {
-              filingId: filing.id,
-              status: newStatus,
-              message: newStatus === 'accepted'
-                ? `CBP accepted the ISF filing${isfTxnNumber ? ` (ISF Txn: ${isfTxnNumber})` : ''} [auto-poll]`
-                : newStatus === 'rejected'
-                ? `CBP rejected: ${rejectionReason} [auto-poll]`
-                : `CBP placed filing on hold [auto-poll]`,
-              ccResponse: { documentStatus: matchingDoc, messages } as any,
-              changedById: filing.createdById,
-            },
-          });
-
-          // Log the API call
-          await prisma.submissionLog.create({
-            data: {
-              orgId: filing.orgId,
-              filingId: filing.id,
-              userId: filing.createdById,
-              method: 'GET',
-              url: '/api/document-status [auto-poll]',
-              requestPayload: statusParams as any,
-              responseStatus: statusResult.status,
-              responseBody: statusResult.data as any,
-              latencyMs: statusResult.latencyMs,
-            },
-          });
-
-          // Send notifications
-          const bol = filing.houseBol || filing.masterBol || filing.id.slice(0, 8);
-          if (newStatus === 'accepted') {
-            await notifyFilingAccepted(filing.orgId, filing.id, bol);
-            console.log(`[Jobs:StatusPoll] ✅ Filing ${bol} ACCEPTED by CBP`);
-          } else if (newStatus === 'rejected') {
-            await notifyFilingRejected(filing.orgId, filing.id, bol, rejectionReason);
-            console.log(`[Jobs:StatusPoll] ❌ Filing ${bol} REJECTED by CBP: ${rejectionReason}`);
-          } else if (newStatus === 'on_hold') {
-            await notifyOrgUsers(filing.orgId, filing.id, 'filing_on_hold', 'Filing On Hold ⏸️',
-              `ISF filing ${bol} has been placed on hold by CBP.`);
-            console.log(`[Jobs:StatusPoll] ⏸️ Filing ${bol} placed ON HOLD by CBP`);
+          if (!newStatus && messages.length > 0) {
+            const hasAccepted = messages.some((m: any) => m.description?.includes('ACCEPTED') || m.description?.includes('BILL ACCEPTED'));
+            const hasRejected = messages.some((m: any) => m.description?.includes('REJECTED') || m.statusCode === 'REJECTED');
+            if (hasAccepted && !hasRejected) newStatus = 'accepted';
+            else if (hasRejected) newStatus = 'rejected';
           }
-        }
 
-        // Small delay between API calls to respect rate limits
-        await new Promise(r => setTimeout(r, 500));
-      } catch (err: any) {
-        errors++;
-        console.warn(`[Jobs:StatusPoll] Error checking filing ${filing.id}:`, err.message);
-      }
+          if (newStatus && newStatus !== filing.status && isValidTransition(filing.status, newStatus)) {
+            updated++;
+
+            let rejectionReason: string | undefined;
+            if (newStatus === 'rejected') {
+              rejectionReason = messages
+                .filter((m: any) => m.description?.includes('REJECTED') || m.statusCode === 'REJECTED')
+                .map((m: any) => m.description).join('; ')
+                || matchingDoc?.lastEvent?.codeDescription || 'Rejected by CBP';
+            }
+
+            const isfTxnNumber = messages.find((m: any) => m.ISFTransactionNumber)?.ISFTransactionNumber;
+
+            await prisma.filing.update({
+              where: { id: filing.id },
+              data: {
+                status: newStatus,
+                acceptedAt: newStatus === 'accepted' ? new Date() : undefined,
+                rejectedAt: newStatus === 'rejected' ? new Date() : undefined,
+                rejectionReason: rejectionReason ?? undefined,
+                cbpTransactionId: isfTxnNumber ?? filing.cbpTransactionId ?? undefined,
+              },
+            });
+
+            await prisma.filingStatusHistory.create({
+              data: {
+                filingId: filing.id,
+                status: newStatus,
+                message: newStatus === 'accepted'
+                  ? `CBP accepted the ISF filing${isfTxnNumber ? ` (ISF Txn: ${isfTxnNumber})` : ''} [auto-poll]`
+                  : newStatus === 'rejected'
+                  ? `CBP rejected: ${rejectionReason} [auto-poll]`
+                  : `CBP placed filing on hold [auto-poll]`,
+                ccResponse: { documentStatus: matchingDoc, messages } as any,
+                changedById: filing.createdById,
+              },
+            });
+
+            await prisma.submissionLog.create({
+              data: {
+                orgId: filing.orgId, filingId: filing.id, userId: filing.createdById,
+                method: 'GET', url: '/api/document-status [auto-poll]',
+                requestPayload: statusParams as any,
+                responseStatus: statusResult.status,
+                responseBody: statusResult.data as any,
+                latencyMs: statusResult.latencyMs,
+              },
+            });
+
+            const bol = filing.houseBol || filing.masterBol || filing.id.slice(0, 8);
+            if (newStatus === 'accepted') {
+              await notifyFilingAccepted(filing.orgId, filing.id, bol);
+              logger.info({ bol }, '[Jobs:StatusPoll] Filing ACCEPTED by CBP');
+            } else if (newStatus === 'rejected') {
+              await notifyFilingRejected(filing.orgId, filing.id, bol, rejectionReason);
+              logger.info({ bol, rejectionReason }, '[Jobs:StatusPoll] Filing REJECTED by CBP');
+            } else if (newStatus === 'on_hold') {
+              await notifyOrgUsers(filing.orgId, filing.id, 'filing_on_hold', 'Filing On Hold ⏸️',
+                `ISF filing ${bol} has been placed on hold by CBP.`);
+              logger.info({ bol }, '[Jobs:StatusPoll] Filing placed ON HOLD by CBP');
+            }
+          }
+        } catch (err: any) {
+          errors++;
+          logger.warn({ filingId: filing.id, err: err.message }, '[Jobs:StatusPoll] Error checking filing');
+        }
+      }));
     }
 
     const elapsed = Date.now() - startTime;
     statusPollStats = { checked, updated, errors };
-    console.log(`[Jobs:StatusPoll] Done in ${elapsed}ms — checked: ${checked}, updated: ${updated}, errors: ${errors}`);
+    logger.info({ elapsed, checked, updated, errors }, '[Jobs:StatusPoll] Done');
   } catch (err: any) {
-    console.error('[Jobs:StatusPoll] Fatal error:', err.message);
+    logger.error({ err: err.message }, '[Jobs:StatusPoll] Fatal error');
   } finally {
     isStatusPollRunning = false;
     lastStatusPoll = new Date();
@@ -238,7 +209,7 @@ const DEADLINE_THRESHOLDS = [72, 48, 24]; // hours
 
 async function checkDeadlines(): Promise<void> {
   if (isDeadlineCheckRunning) {
-    console.log('[Jobs:Deadlines] Skipping — previous run still in progress');
+    logger.debug('[Jobs:Deadlines] Skipping — previous run still in progress');
     return;
   }
 
@@ -279,20 +250,14 @@ async function checkDeadlines(): Promise<void> {
     for (const filing of filingsWithDeadlines) {
       const hoursRemaining = (filing.filingDeadline!.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-      // Find the appropriate threshold
+      // Find the appropriate threshold — dedup is handled inside notifyDeadlineApproaching via DB
       for (const threshold of DEADLINE_THRESHOLDS) {
         if (hoursRemaining <= threshold) {
-          const alertKey = `${filing.id}_${threshold}h`;
-
-          // Skip if we already sent this alert
-          if (sentDeadlineAlerts.has(alertKey)) continue;
-
           const bol = filing.houseBol || filing.masterBol || filing.id.slice(0, 8);
           await notifyDeadlineApproaching(filing.orgId, filing.id, bol, threshold);
-          sentDeadlineAlerts.add(alertKey);
           alertsSent++;
 
-          console.log(`[Jobs:Deadlines] ⏰ Alert sent: ${bol} — ${Math.round(hoursRemaining)}h remaining (${threshold}h threshold)`);
+          logger.info({ bol, hoursRemaining: Math.round(hoursRemaining), threshold }, '[Jobs:Deadlines] Deadline alert sent');
 
           // Only send the most relevant threshold (don't spam with 72h + 48h + 24h at once)
           break;
@@ -319,28 +284,26 @@ async function checkDeadlines(): Promise<void> {
     });
 
     for (const filing of overdueFilings) {
-      const alertKey = `${filing.id}_overdue`;
-      if (sentDeadlineAlerts.has(alertKey)) continue;
-
+      const dedupeKey = `${filing.id}_overdue`;
       const bol = filing.houseBol || filing.masterBol || filing.id.slice(0, 8);
       await notifyOrgUsers(
         filing.orgId,
         filing.id,
         'deadline_overdue',
         'OVERDUE: Filing deadline passed 🚨',
-        `ISF filing ${bol} deadline has PASSED. Submit immediately to avoid CBP penalties ($5,000-$10,000).`
+        `ISF filing ${bol} deadline has PASSED. Submit immediately to avoid CBP penalties ($5,000-$10,000).`,
+        dedupeKey
       );
-      sentDeadlineAlerts.add(alertKey);
       alertsSent++;
 
-      console.log(`[Jobs:Deadlines] 🚨 OVERDUE: ${bol}`);
+      logger.warn({ bol }, '[Jobs:Deadlines] OVERDUE filing');
     }
 
     if (alertsSent > 0) {
-      console.log(`[Jobs:Deadlines] Sent ${alertsSent} deadline alert(s)`);
+      logger.info({ alertsSent }, '[Jobs:Deadlines] Deadline alerts sent');
     }
   } catch (err: any) {
-    console.error('[Jobs:Deadlines] Error:', err.message);
+    logger.error({ err: err.message }, '[Jobs:Deadlines] Error');
   } finally {
     isDeadlineCheckRunning = false;
     lastDeadlineCheck = new Date();
@@ -372,7 +335,7 @@ async function checkStaleFilings(): Promise<void> {
 
     for (const filing of staleFilings) {
       const alertKey = `${filing.id}_stale`;
-      if (sentDeadlineAlerts.has(alertKey)) continue;
+      if (sentStaleAlerts.has(alertKey)) continue;
 
       const bol = filing.houseBol || filing.masterBol || filing.id.slice(0, 8);
       const hoursAgo = Math.round((Date.now() - filing.submittedAt!.getTime()) / (1000 * 60 * 60));
@@ -384,12 +347,12 @@ async function checkStaleFilings(): Promise<void> {
         'No CBP Response ⚠️',
         `ISF filing ${bol} was submitted ${hoursAgo}h ago but no CBP response received. Please check the filing status.`
       );
-      sentDeadlineAlerts.add(alertKey);
+      sentStaleAlerts.add(alertKey);
 
-      console.log(`[Jobs:StaleCheck] ⚠️ No response for ${bol} (submitted ${hoursAgo}h ago)`);
+      logger.warn({ bol, hoursAgo }, '[Jobs:StaleCheck] No CBP response for filing');
     }
   } catch (err: any) {
-    console.error('[Jobs:StaleCheck] Error:', err.message);
+    logger.error({ err: err.message }, '[Jobs:StaleCheck] Error');
   }
 }
 
@@ -400,42 +363,66 @@ let deadlineTask: ScheduledTask | null = null;
 let staleCheckTask: ScheduledTask | null = null;
 
 export function startBackgroundJobs(): void {
-  console.log('[Jobs] Starting background job scheduler...');
+  logger.info('[Jobs] Starting background job scheduler');
 
-  // Status polling: every 5 minutes
   statusPollTask = cron.schedule('*/5 * * * *', () => {
-    pollSubmittedFilings().catch(err => console.error('[Jobs:StatusPoll] Unhandled:', err));
+    pollSubmittedFilings().catch(err => logger.error({ err }, '[Jobs:StatusPoll] Unhandled'));
   });
-  console.log('[Jobs] ✅ Status polling — every 5 minutes');
+  logger.info('[Jobs] Status polling scheduled — every 5 minutes');
 
-  // Deadline checks: every hour at :30
   deadlineTask = cron.schedule('30 * * * *', () => {
-    checkDeadlines().catch(err => console.error('[Jobs:Deadlines] Unhandled:', err));
+    checkDeadlines().catch(err => logger.error({ err }, '[Jobs:Deadlines] Unhandled'));
   });
-  console.log('[Jobs] ✅ Deadline alerts — every hour at :30');
+  logger.info('[Jobs] Deadline alerts scheduled — every hour at :30');
 
-  // Stale filing check: every 6 hours
   staleCheckTask = cron.schedule('0 */6 * * *', () => {
-    checkStaleFilings().catch(err => console.error('[Jobs:StaleCheck] Unhandled:', err));
+    checkStaleFilings().catch(err => logger.error({ err }, '[Jobs:StaleCheck] Unhandled'));
   });
-  console.log('[Jobs] ✅ Stale filing check — every 6 hours');
+  logger.info('[Jobs] Stale filing check scheduled — every 6 hours');
 
-  // Run initial deadline check immediately on startup
   setTimeout(() => {
-    checkDeadlines().catch(err => console.error('[Jobs:Deadlines] Initial check error:', err));
+    checkDeadlines().catch(err => logger.error({ err }, '[Jobs:Deadlines] Initial check error'));
   }, 5000);
 
-  console.log('[Jobs] All background jobs scheduled');
+  logger.info('[Jobs] All background jobs scheduled');
 }
 
 export function stopBackgroundJobs(): void {
-  console.log('[Jobs] Stopping background jobs...');
+  logger.info('[Jobs] Stopping background jobs');
   statusPollTask?.stop();
   deadlineTask?.stop();
   staleCheckTask?.stop();
   statusPollTask = null;
   deadlineTask = null;
   staleCheckTask = null;
+}
+
+/**
+ * Wait until any in-progress job cycles finish before shutdown.
+ * Polls every 200ms; gives up after 8s to respect the 10s force-exit window.
+ */
+export function waitForJobsToFinish(): Promise<void> {
+  return new Promise((resolve) => {
+    const maxWait = 8_000;
+    const interval = 200;
+    let elapsed = 0;
+
+    const check = () => {
+      if (!isStatusPollRunning && !isDeadlineCheckRunning) {
+        resolve();
+        return;
+      }
+      elapsed += interval;
+      if (elapsed >= maxWait) {
+        logger.warn('[Jobs] Shutdown wait exceeded — forcing stop with jobs still running');
+        resolve();
+        return;
+      }
+      setTimeout(check, interval);
+    };
+
+    check();
+  });
 }
 
 // ─── Job Status Endpoint Data ──────────────────────────────
@@ -450,7 +437,6 @@ export function getJobStatus() {
     deadlineCheck: {
       running: isDeadlineCheckRunning,
       lastRun: lastDeadlineCheck?.toISOString() ?? null,
-      alertsSentCount: sentDeadlineAlerts.size,
     },
   };
 }

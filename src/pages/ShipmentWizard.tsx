@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useFiling, useCreateFiling, useUpdateFiling } from '@/hooks/useFilings';
 import type { PartyInfo, CommodityInfo, ContainerInfo } from '@/types/shipment';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -421,13 +421,17 @@ function calcProgress(form: ISFFormState): number {
 export default function ShipmentWizard() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isEdit = !!id;
 
   const { data: existing, isLoading: isLoadingFiling } = useFiling(id);
   const createFiling = useCreateFiling();
   const updateFiling = useUpdateFiling();
 
-  const [step, setStep] = useState(0);
+  // Persist step in URL so browser back-button works (?step=0..N)
+  const stepParam = parseInt(searchParams.get('step') ?? '0', 10);
+  const step = Number.isNaN(stepParam) || stepParam < 0 ? 0 : stepParam;
+  const setStep = (n: number) => setSearchParams(p => { p.set('step', String(n)); return p; }, { replace: true });
   const [form, setForm] = useState<ISFFormState>(initialForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
 

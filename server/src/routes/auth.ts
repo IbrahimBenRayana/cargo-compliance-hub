@@ -93,11 +93,8 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
         org = invitation.organization;
         role = invitation.role;
 
-        // Mark invitation as accepted
-        await tx.orgInvitation.update({
-          where: { id: invitation.id },
-          data: { status: 'accepted', acceptedAt: new Date() },
-        });
+        // Invalidate invitation after use — delete it so the token cannot be replayed
+        await tx.orgInvitation.delete({ where: { id: invitation.id } });
       } else {
         // Creating a new org
         org = await tx.organization.create({

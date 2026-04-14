@@ -10,6 +10,7 @@ import { Router, Response } from 'express';
 import PDFDocument from 'pdfkit';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import logger from '../config/logger.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -96,7 +97,7 @@ router.get('/csv', async (req: AuthRequest, res: Response): Promise<void> => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send('\uFEFF' + csv); // BOM for Excel compatibility
   } catch (err: any) {
-    console.error('[Export] CSV error:', err.message);
+    logger.error({ err: err.message }, '[Export] CSV error:');
     res.status(500).json({ error: 'Failed to export CSV' });
   }
 });
@@ -230,7 +231,7 @@ router.get('/pdf/:id', async (req: AuthRequest, res: Response): Promise<void> =>
 
     doc.end();
   } catch (err: any) {
-    console.error('[Export] PDF error:', err.message);
+    logger.error({ err: err.message }, '[Export] PDF error:');
     res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });
@@ -332,7 +333,7 @@ router.get('/pdf-summary', async (req: AuthRequest, res: Response): Promise<void
 
     doc.end();
   } catch (err: any) {
-    console.error('[Export] PDF Summary error:', err.message);
+    logger.error({ err: err.message }, '[Export] PDF Summary error:');
     res.status(500).json({ error: 'Failed to generate summary PDF' });
   }
 });

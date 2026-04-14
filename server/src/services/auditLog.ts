@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '../config/database.js';
+import logger from '../config/logger.js';
 
 export interface AuditLogEntry {
   orgId?: string;
@@ -36,7 +37,7 @@ export async function writeAuditLog(entry: AuditLogEntry): Promise<void> {
     });
   } catch (err) {
     // Audit log failures should never crash the app — log and continue
-    console.error('[AuditLog] Failed to write audit entry:', entry.action, err);
+    logger.error({ err, action: entry.action }, '[AuditLog] Failed to write audit entry');
   }
 }
 

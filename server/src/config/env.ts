@@ -33,3 +33,15 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+// Production-only hard requirements — fail fast at boot rather than at runtime
+if (env.NODE_ENV === 'production') {
+  const missing: string[] = [];
+  if (!env.CC_API_TOKEN) missing.push('CC_API_TOKEN');
+  if (!env.EMAIL_USER)   missing.push('EMAIL_USER');
+  if (!env.EMAIL_PASS)   missing.push('EMAIL_PASS');
+  if (missing.length > 0) {
+    console.error(`❌ Missing required production environment variables: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+}
