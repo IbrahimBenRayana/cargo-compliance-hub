@@ -26,6 +26,7 @@ const app = express();
 // ─── Global Middleware ────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
+    useDefaults: false,
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
@@ -33,8 +34,14 @@ app.use(helmet({
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:"],
       connectSrc: ["'self'", "https://api-cert.customscity.com", "https://api.customscity.com"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
     },
   },
+  crossOriginOpenerPolicy: false,
+  originAgentCluster: false,
 }));
 app.use(cors({
   origin: env.NODE_ENV === 'production'
