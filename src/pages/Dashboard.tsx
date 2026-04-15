@@ -1,675 +1,705 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { useFilings, useFilingStats } from '@/hooks/useFilings';
-import { Filing, getFirstCommodity } from '@/types/shipment';
-import {
-  Ship, Clock, Send, AlertTriangle, CheckCircle2, Plus, Eye, Pencil,
-  ExternalLink, FileText, Shield, Globe, TrendingUp, Activity,
-  Zap, BarChart3, Timer,
-} from 'lucide-react';
-import { StatusBadge } from '@/components/StatusBadge';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useFilings, useFilingStats } from '@/hooks/useFilings';
+import { Filing } from '@/types/shipment';
+import { useCurrentUser } from '@/hooks/useAuth';
+import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, RadialBarChart, RadialBar, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import {
+  ArrowUpRight, ArrowDownRight, Plus, ArrowRight, Minus,
+  CheckCircle2, AlertTriangle,
+} from 'lucide-react';
+import {
+  AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip,
+} from 'recharts';
 import { cn } from '@/lib/utils';
 
-// ─── Animated Counter ──────────────────────────────────────
-
-function useAnimatedCounter(target: number, duration = 1400) {
-  const [value, setValue] = useState(0);
-  const ref = useRef<number>();
-  useEffect(() => {
-    const start = performance.now();
-    const from = 0;
-    const step = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 4);
-      setValue(Math.round(from + (target - from) * eased));
-      if (progress < 1) ref.current = requestAnimationFrame(step);
-    };
-    ref.current = requestAnimationFrame(step);
-    return () => { if (ref.current) cancelAnimationFrame(ref.current); };
-  }, [target, duration]);
-  return value;
-}
-
-// ─── Helpers ───────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 function relativeTime(ts: string) {
   const diff = Date.now() - new Date(ts).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
+  if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  if (days < 30) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function daysUntil(ts: string) {
   return Math.ceil((new Date(ts).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-// ─── Metric Card ───────────────────────────────────────────
-
-function MetricCard({ label, value, icon: Icon, color, delay }: {
-  label: string; value: number; icon: React.ElementType;
-  color: string; delay: number;
-}) {
-  const count = useAnimatedCounter(value);
-  return (
-    <Card className={cn(
-      'relative overflow-hidden opacity-0 animate-fade-in-up group cursor-default',
-      'hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20 transition-all duration-500 hover:-translate-y-1',
-    )} style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
-      <div className={cn('absolute inset-0 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity duration-500', color)} />
-      <CardContent className="p-5 relative">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">{label}</p>
-            <p className="text-4xl font-black tracking-tighter tabular-nums">{count}</p>
-          </div>
-          <div className={cn(
-            'h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-500',
-            'group-hover:scale-110 group-hover:rotate-3',
-            color,
-          )}>
-            <Icon className="h-6 w-6 text-white" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+function useGreeting() {
+  return useMemo(() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
 }
 
-// ─── Filing Pipeline ───────────────────────────────────────
+// Smooth count-up for numeric values. Respects reduced motion.
+function useCountUp(target: number, duration = 900) {
+  const [value, setValue] = useState(target);
+  useEffect(() => {
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { setValue(target); return; }
+    let raf = 0;
+    const start = performance.now();
+    const from = 0;
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setValue(Math.round(from + (target - from) * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+  return value;
+}
 
-function FilingPipeline({ filings }: { filings: Filing[] }) {
-  const stages = useMemo(() => {
-    const draftCount = filings.filter(f => f.status === 'draft').length;
-    const submittedCount = filings.filter(f => f.status === 'submitted' || f.status === 'pending_cbp').length;
-    const acceptedCount = filings.filter(f => f.status === 'accepted').length;
-    const rejectedCount = filings.filter(f => f.status === 'rejected').length;
-    return [
-      { label: 'Draft', count: draftCount, icon: FileText, color: 'bg-slate-500', light: 'bg-slate-100 dark:bg-slate-800/50' },
-      { label: 'Sent to CC', count: submittedCount, icon: Send, color: 'bg-blue-500', light: 'bg-blue-50 dark:bg-blue-950/40' },
-      { label: 'Accepted', count: acceptedCount, icon: CheckCircle2, color: 'bg-emerald-500', light: 'bg-emerald-50 dark:bg-emerald-950/40' },
-      { label: 'Rejected', count: rejectedCount, icon: AlertTriangle, color: 'bg-red-500', light: 'bg-red-50 dark:bg-red-950/40' },
-    ];
-  }, [filings]);
+// ─────────────────────────────────────────────────────────────────────────────
+// Sparkline — minimal inline area chart for metric cards
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Sparkline({ data, tone = 'neutral' }: {
+  data: { v: number }[];
+  tone?: 'neutral' | 'positive' | 'negative' | 'gold';
+}) {
+  if (!data.length) return null;
+  const color =
+    tone === 'positive' ? 'hsl(142 71% 45%)'
+    : tone === 'negative' ? 'hsl(0 72% 51%)'
+    : tone === 'gold' ? 'hsl(43 96% 56%)'
+    : 'hsl(var(--muted-foreground))';
+
+  const gradId = `spark-${tone}-${Math.random().toString(36).slice(2, 7)}`;
 
   return (
-    <div className="flex items-center gap-0">
-      {stages.map((s, i) => (
-        <div key={s.label} className="flex items-center flex-1">
-          <div className={cn('flex items-center gap-2.5 rounded-xl px-3 py-2.5 flex-1 min-w-0 transition-colors', s.light)}>
-            <div className={cn('h-8 w-8 rounded-lg flex items-center justify-center shrink-0', s.color)}>
-              <s.icon className="h-4 w-4 text-white" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-muted-foreground">{s.label}</p>
-              <p className="text-lg font-bold tabular-nums">{s.count}</p>
-            </div>
-          </div>
-          {i < stages.length - 1 && (
-            <div className="w-6 flex justify-center shrink-0">
-              <div className="h-0.5 w-4 bg-border" />
-            </div>
-          )}
-        </div>
-      ))}
+    <div className="h-10 w-full -mb-1">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.25} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <Area
+            type="monotone"
+            dataKey="v"
+            stroke={color}
+            strokeWidth={1.6}
+            fill={`url(#${gradId})`}
+            dot={false}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }
 
-// ─── Main Dashboard ────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Metric Card — Stripe-style: label, big number, delta, subtle sparkline
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Trend = 'up' | 'down' | 'flat';
+
+function MetricCard({
+  label, value, format = 'number', trend, trendValue, trendLabel, series, tone = 'neutral', delay,
+}: {
+  label: string;
+  value: number;
+  format?: 'number' | 'percent';
+  trend: Trend;
+  trendValue?: string;
+  trendLabel: string;
+  series: { v: number }[];
+  tone?: 'neutral' | 'positive' | 'negative' | 'gold';
+  delay: number;
+}) {
+  const count = useCountUp(value);
+  const display = format === 'percent' ? `${count}%` : count.toLocaleString();
+
+  const TrendIcon = trend === 'up' ? ArrowUpRight : trend === 'down' ? ArrowDownRight : Minus;
+  const trendColor =
+    tone === 'negative' && trend === 'up' ? 'text-red-600 dark:text-red-400'
+    : trend === 'up' ? 'text-emerald-600 dark:text-emerald-400'
+    : trend === 'down' ? 'text-red-600 dark:text-red-400'
+    : 'text-muted-foreground';
+
+  return (
+    <div
+      className={cn(
+        'group relative rounded-2xl border border-border/60 bg-card p-5',
+        'transition-all duration-300 hover:border-border hover:shadow-card',
+        'opacity-0 animate-fade-in-up',
+      )}
+      style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+        {label}
+      </p>
+
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className="text-[34px] leading-none font-semibold tracking-tight tabular-nums">
+          {display}
+        </span>
+      </div>
+
+      <div className="mt-2.5 flex items-center gap-1.5 text-[12px] font-medium">
+        {trendValue && (
+          <span className={cn('inline-flex items-center gap-0.5', trendColor)}>
+            <TrendIcon className="h-3 w-3" strokeWidth={2.5} />
+            {trendValue}
+          </span>
+        )}
+        <span className="text-muted-foreground">{trendLabel}</span>
+      </div>
+
+      <div className="mt-3">
+        <Sparkline data={series} tone={tone} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Dashboard
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Range = '7d' | '30d' | '90d';
 
 export default function Dashboard() {
   const { data: statsData, isLoading: statsLoading } = useFilingStats();
-  const { data: filingsData, isLoading: filingsLoading } = useFilings({ sortBy: 'createdAt', sortOrder: 'desc', limit: 100 });
+  const { data: filingsData, isLoading: filingsLoading } = useFilings({
+    sortBy: 'createdAt', sortOrder: 'desc', limit: 200,
+  });
+  const { data: profile } = useCurrentUser();
 
-  const filings = filingsData?.data ?? [];
+  const [range, setRange] = useState<Range>('30d');
+  const greeting = useGreeting();
+
+  const filings: Filing[] = filingsData?.data ?? [];
   const statusCounts = statsData?.statusCounts ?? {};
-  const totalFilings = statsData?.total ?? 0;
+  const total = statsData?.total ?? 0;
 
-  const accepted = statusCounts['accepted'] ?? 0;
-  const rejected = statusCounts['rejected'] ?? 0;
+  const draft     = statusCounts['draft'] ?? 0;
   const submitted = statusCounts['submitted'] ?? 0;
-  const draft = statusCounts['draft'] ?? 0;
+  const pending   = statusCounts['pending_cbp'] ?? 0;
+  const accepted  = statusCounts['accepted'] ?? 0;
+  const rejected  = statusCounts['rejected'] ?? 0;
+  const onHold    = statusCounts['on_hold'] ?? 0;
 
+  const atCbp = submitted + pending + onHold;
+  const needsAttention = rejected + draft;
+
+  // Compliance: accepted / (accepted + rejected). If no resolved, neutral.
   const complianceRate = useMemo(() => {
     const resolved = accepted + rejected;
     if (resolved === 0) return 100;
     return Math.round((accepted / resolved) * 100);
   }, [accepted, rejected]);
 
-  const recentFilings = useMemo(() =>
-    [...filings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 8),
-  [filings]);
+  // ── Bucket filings into a time series for the selected range ─────────────
+  const daysInRange = range === '7d' ? 7 : range === '30d' ? 30 : 90;
 
-  const deadlineFilings = useMemo(() =>
-    filings
+  const timeSeries = useMemo(() => {
+    const buckets: Array<{ key: string; label: string; total: number; accepted: number; rejected: number }> = [];
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const msDay = 86400000;
+    const bucketCount = range === '90d' ? 13 : daysInRange; // weekly for 90d, daily otherwise
+    const bucketDays = range === '90d' ? 7 : 1;
+
+    for (let i = bucketCount - 1; i >= 0; i--) {
+      const end = new Date(now.getTime() - i * bucketDays * msDay);
+      const start = new Date(end.getTime() - (bucketDays - 1) * msDay);
+      const label = bucketDays === 1
+        ? end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+      buckets.push({
+        key: end.toISOString(),
+        label,
+        total: 0,
+        accepted: 0,
+        rejected: 0,
+      });
+    }
+
+    filings.forEach(f => {
+      const created = new Date(f.createdAt);
+      created.setHours(0, 0, 0, 0);
+      const diffDays = Math.floor((now.getTime() - created.getTime()) / msDay);
+      if (diffDays < 0 || diffDays >= daysInRange) return;
+      const idx = bucketCount - 1 - Math.floor(diffDays / bucketDays);
+      if (idx < 0 || idx >= bucketCount) return;
+      buckets[idx].total += 1;
+      if (f.status === 'accepted') buckets[idx].accepted += 1;
+      if (f.status === 'rejected') buckets[idx].rejected += 1;
+    });
+
+    return buckets;
+  }, [filings, range, daysInRange]);
+
+  const periodTotal = timeSeries.reduce((s, b) => s + b.total, 0);
+  const periodAccepted = timeSeries.reduce((s, b) => s + b.accepted, 0);
+
+  // Compare against prior equivalent window
+  const prevPeriodTotal = useMemo(() => {
+    const msDay = 86400000;
+    const now = Date.now();
+    const prevStart = now - 2 * daysInRange * msDay;
+    const prevEnd = now - daysInRange * msDay;
+    return filings.filter(f => {
+      const t = new Date(f.createdAt).getTime();
+      return t >= prevStart && t < prevEnd;
+    }).length;
+  }, [filings, daysInRange]);
+
+  const periodDelta = periodTotal - prevPeriodTotal;
+
+  // ── Sparkline data for metric cards ──────────────────────────────────────
+  const totalSeries = useMemo(() => timeSeries.map(b => ({ v: b.total })), [timeSeries]);
+  const acceptedSeries = useMemo(() => timeSeries.map(b => ({ v: b.accepted })), [timeSeries]);
+  const atCbpSeries = useMemo(() => {
+    // running count of "at CBP" created in this window (submitted/pending)
+    return timeSeries.map((_b, i) => ({
+      v: timeSeries.slice(0, i + 1).reduce((s, x) => s + x.total - x.accepted - x.rejected, 0),
+    }));
+  }, [timeSeries]);
+  const rejectedSeries = useMemo(() => timeSeries.map(b => ({ v: b.rejected })), [timeSeries]);
+
+  // ── Recent filings (top 6, Notion-clean list) ────────────────────────────
+  const recent = useMemo(() => filings.slice(0, 6), [filings]);
+
+  // ── Deadlines within 7 days ──────────────────────────────────────────────
+  const urgent = useMemo(() => {
+    return filings
       .filter(f => (f.status === 'draft' || f.status === 'submitted') && f.filingDeadline)
-      .sort((a, b) => new Date(a.filingDeadline!).getTime() - new Date(b.filingDeadline!).getTime())
-      .slice(0, 5),
-  [filings]);
-
-  const statusData = useMemo(() => [
-    { name: 'Draft', value: draft, fill: 'hsl(var(--status-draft))' },
-    { name: 'Submitted', value: submitted, fill: 'hsl(var(--status-submitted))' },
-    { name: 'Accepted', value: accepted, fill: 'hsl(var(--status-accepted))' },
-    { name: 'Rejected', value: rejected, fill: 'hsl(var(--status-rejected))' },
-  ].filter(d => d.value > 0), [draft, submitted, accepted, rejected]);
-
-  const countryData = useMemo(() => {
-    const counts: Record<string, number> = {};
-    filings.forEach(f => {
-      const c = getFirstCommodity(f).countryOfOrigin || 'N/A';
-      counts[c] = (counts[c] || 0) + 1;
-    });
-    const flags: Record<string, string> = { CN: '\xf0\x9f\x87\xa8\xf0\x9f\x87\xb3', JP: '\xf0\x9f\x87\xaf\xf0\x9f\x87\xb5', VN: '\xf0\x9f\x87\xbb\xf0\x9f\x87\xb3', IN: '\xf0\x9f\x87\xae\xf0\x9f\x87\xb3', DE: '\xf0\x9f\x87\xa9\xf0\x9f\x87\xaa', US: '\xf0\x9f\x87\xba\xf0\x9f\x87\xb8', KR: '\xf0\x9f\x87\xb0\xf0\x9f\x87\xb7', TW: '\xf0\x9f\x87\xb9\xf0\x9f\x87\xbc', TH: '\xf0\x9f\x87\xb9\xf0\x9f\x87\xad', MX: '\xf0\x9f\x87\xb2\xf0\x9f\x87\xbd', BD: '\xf0\x9f\x87\xa7\xf0\x9f\x87\xa9' };
-    const colors = ['hsl(220, 70%, 55%)', 'hsl(142, 60%, 45%)', 'hsl(38, 90%, 50%)', 'hsl(0, 65%, 50%)', 'hsl(280, 55%, 55%)', 'hsl(180, 50%, 45%)'];
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([code, val], i) => ({ name: (flags[code] || '') + ' ' + code, value: val, fill: colors[i % colors.length] }));
+      .map(f => ({ f, days: daysUntil(f.filingDeadline!) }))
+      .filter(x => x.days <= 7)
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 4);
   }, [filings]);
 
-  const weeklyData = useMemo(() => {
-    const weeks: Record<string, { total: number; accepted: number; rejected: number }> = {};
-    filings.forEach(f => {
-      const d = new Date(f.createdAt);
-      const weekStart = new Date(d);
-      weekStart.setDate(d.getDate() - d.getDay());
-      const label = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      if (!weeks[label]) weeks[label] = { total: 0, accepted: 0, rejected: 0 };
-      weeks[label].total++;
-      if (f.status === 'accepted') weeks[label].accepted++;
-      if (f.status === 'rejected') weeks[label].rejected++;
-    });
-    return Object.entries(weeks).map(([week, d]) => ({ week, ...d })).slice(-8);
-  }, [filings]);
-
-  const complianceData = useMemo(() => [{
-    name: 'Score', value: complianceRate,
-    fill: complianceRate > 80 ? 'hsl(142, 71%, 45%)' : complianceRate > 60 ? 'hsl(38, 92%, 50%)' : 'hsl(0, 72%, 51%)',
-  }], [complianceRate]);
-
-  const greeting = useMemo(() => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 18) return 'Good afternoon';
-    return 'Good evening';
-  }, []);
+  // ── Status breakdown bars ────────────────────────────────────────────────
+  const statusBars = useMemo(() => {
+    const rows = [
+      { key: 'accepted',  label: 'Accepted',  count: accepted,          color: 'bg-emerald-500' },
+      { key: 'submitted', label: 'At CBP',    count: atCbp,             color: 'bg-blue-500'    },
+      { key: 'draft',     label: 'Draft',     count: draft,             color: 'bg-slate-400'   },
+      { key: 'rejected',  label: 'Rejected',  count: rejected,          color: 'bg-red-500'     },
+    ];
+    const max = Math.max(...rows.map(r => r.count), 1);
+    return rows.map(r => ({ ...r, pct: (r.count / max) * 100 }));
+  }, [accepted, atCbp, draft, rejected]);
 
   const isLoading = statsLoading || filingsLoading;
+  const firstName = profile?.firstName?.trim() || null;
 
+  // ── Loading skeleton ─────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="space-y-6 max-w-[1400px] mx-auto">
-        <Skeleton className="h-12 w-72 rounded-xl" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+      <div className="space-y-8 max-w-[1400px] mx-auto">
+        <div className="space-y-2">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-9 w-80" />
+          <Skeleton className="h-3 w-60" />
         </div>
-        <Skeleton className="h-20 rounded-xl" />
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Skeleton className="h-80 rounded-xl lg:col-span-2" />
-          <Skeleton className="h-80 rounded-xl" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}
+        </div>
+        <Skeleton className="h-80 rounded-2xl" />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Skeleton className="h-80 rounded-2xl lg:col-span-2" />
+          <Skeleton className="h-80 rounded-2xl" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
-        <div>
-          <h1 className="text-3xl font-black tracking-tight">{greeting} <span role="img" aria-label="wave">👋</span></h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-            {' \u00b7 '}
-            <span className="font-medium text-foreground">{totalFilings} total filings</span>
+    <div className="space-y-8 max-w-[1400px] mx-auto pb-4">
+      {/* ─── Hero ─────────────────────────────────────────────────────── */}
+      <header
+        className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 opacity-0 animate-fade-in-up"
+        style={{ animationFillMode: 'forwards' }}
+      >
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
+            Overview
+          </p>
+          <h1 className="text-[32px] leading-[1.1] font-semibold tracking-tight text-foreground">
+            {greeting}{firstName ? <>, <span className="text-gradient-gold">{firstName}</span></> : ''}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            {' · '}
+            <span className="text-foreground/80 font-medium">{total.toLocaleString()} total filings</span>
           </p>
         </div>
+
         <Link to="/shipments/new">
-          <Button size="default" className="gap-2 shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 transition-all">
-            <Plus className="h-4 w-4" /> New ISF Filing
+          <Button
+            size="default"
+            className={cn(
+              'gap-1.5 h-10 px-4 rounded-xl font-semibold',
+              'shadow-[0_1px_2px_0_hsl(var(--foreground)/0.08),0_0_0_1px_hsl(43_96%_56%/0.1)]',
+              'hover:shadow-gold transition-all duration-200',
+            )}
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} /> New Filing
           </Button>
         </Link>
-      </div>
+      </header>
 
-      {/* Metric Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label="Total Filings" value={totalFilings} icon={Ship} color="bg-blue-500" delay={80} />
-        <MetricCard label="Draft" value={draft} icon={Clock} color="bg-amber-500" delay={160} />
-        <MetricCard label="Submitted to CBP" value={submitted + accepted} icon={Send} color="bg-emerald-500" delay={240} />
-        <MetricCard label="Rejected" value={rejected} icon={AlertTriangle} color="bg-red-500" delay={320} />
-      </div>
+      {/* ─── Metrics ──────────────────────────────────────────────────── */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          label="Total Filings"
+          value={total}
+          trend={periodDelta > 0 ? 'up' : periodDelta < 0 ? 'down' : 'flat'}
+          trendValue={periodDelta !== 0 ? `${Math.abs(periodDelta)}` : undefined}
+          trendLabel={`vs previous ${range}`}
+          series={totalSeries}
+          tone="neutral"
+          delay={60}
+        />
+        <MetricCard
+          label="Compliance"
+          value={complianceRate}
+          format="percent"
+          trend={complianceRate >= 90 ? 'up' : complianceRate >= 70 ? 'flat' : 'down'}
+          trendLabel={complianceRate >= 90 ? 'excellent' : complianceRate >= 70 ? 'acceptable' : 'needs attention'}
+          series={acceptedSeries}
+          tone={complianceRate >= 70 ? 'positive' : 'negative'}
+          delay={140}
+        />
+        <MetricCard
+          label="At CBP"
+          value={atCbp}
+          trend="flat"
+          trendLabel={atCbp > 0 ? 'awaiting response' : 'none pending'}
+          series={atCbpSeries}
+          tone="gold"
+          delay={220}
+        />
+        <MetricCard
+          label="Needs Attention"
+          value={needsAttention}
+          trend={needsAttention > 0 ? 'up' : 'flat'}
+          trendValue={rejected > 0 ? `${rejected} rejected` : undefined}
+          trendLabel={needsAttention === 0 ? 'all clear' : `${draft} draft`}
+          series={rejectedSeries}
+          tone={needsAttention > 0 ? 'negative' : 'neutral'}
+          delay={300}
+        />
+      </section>
 
-      {/* Filing Pipeline */}
-      <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '380ms', animationFillMode: 'forwards' }}>
-        <CardHeader className="pb-2 pt-4">
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-semibold">ISF Filing Pipeline</CardTitle>
+      {/* ─── Urgent Deadlines (conditional, prominent when present) ───── */}
+      {urgent.length > 0 && (
+        <section
+          className="rounded-2xl border border-gold bg-gradient-to-br from-amber-50/40 to-transparent dark:from-amber-500/5 p-5 opacity-0 animate-fade-in-up"
+          style={{ animationDelay: '360ms', animationFillMode: 'forwards' }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-gold/10 flex items-center justify-center">
+                <AlertTriangle className="h-3.5 w-3.5 text-gold-dark" strokeWidth={2.5} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Upcoming deadlines</p>
+                <p className="text-xs text-muted-foreground">{urgent.length} filing{urgent.length === 1 ? '' : 's'} due within 7 days</p>
+              </div>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent className="pb-4">
-          <FilingPipeline filings={filings} />
-        </CardContent>
-      </Card>
-
-      {/* Main Content: Table + Charts */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recent Filings Table */}
-        <Card className="lg:col-span-2 opacity-0 animate-fade-in-up" style={{ animationDelay: '440ms', animationFillMode: 'forwards' }}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm font-semibold">Recent ISF Filings</CardTitle>
-                <Badge variant="secondary" className="text-[10px] ml-1">{totalFilings}</Badge>
-              </div>
-              <Link to="/shipments">
-                <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground">
-                  View All <ExternalLink className="h-3 w-3" />
-                </Button>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-hidden rounded-b-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 h-9">BOL</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 h-9">Importer</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 h-9">Status</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 h-9">Created</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 h-9 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentFilings.map((f, i) => (
-                    <TableRow
-                      key={f.id}
-                      className="group/row opacity-0 animate-fade-in-up hover:bg-muted/40 transition-colors"
-                      style={{ animationDelay: `${480 + i * 50}ms`, animationFillMode: 'forwards' }}
-                    >
-                      <TableCell className="py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0">
-                            <Ship className="h-3.5 w-3.5 text-primary" />
-                          </div>
-                          <div>
-                            <Link to={`/shipments/${f.id}`} className="font-semibold text-sm hover:text-primary transition-colors">
-                              {f.houseBol || f.masterBol || '\u2014'}
-                            </Link>
-                            <p className="text-[10px] text-muted-foreground font-mono">{f.id.slice(0, 8)}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <span className="text-sm">{f.importerName || '\u2014'}</span>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <StatusBadge status={f.status} />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div>
-                          <span className="text-xs tabular-nums">{new Date(f.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                          <p className="text-[10px] text-muted-foreground">{relativeTime(f.createdAt)}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3 text-right">
-                        <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" asChild>
-                            <Link to={`/shipments/${f.id}`}><Eye className="h-3.5 w-3.5" /></Link>
-                          </Button>
-                          {f.status === 'draft' && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" asChild>
-                              <Link to={`/shipments/${f.id}/edit`}><Pencil className="h-3.5 w-3.5" /></Link>
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {recentFilings.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12">
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="h-12 w-12 rounded-2xl bg-muted flex items-center justify-center">
-                            <FileText className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                          <div>
-                            <p className="font-medium">No filings yet</p>
-                            <p className="text-sm text-muted-foreground mt-1">Create your first ISF filing to get started</p>
-                          </div>
-                          <Link to="/shipments/new">
-                            <Button size="sm" className="mt-1"><Plus className="h-3.5 w-3.5 mr-1" /> New Filing</Button>
-                          </Link>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Sidebar: Status Donut + Compliance */}
-        <div className="space-y-6">
-          <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '520ms', animationFillMode: 'forwards' }}>
-            <CardHeader className="pb-1">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm font-semibold">Status Distribution</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {totalFilings > 0 ? (
-                <>
-                  <ChartContainer config={{
-                    draft: { label: 'Draft', color: 'hsl(var(--status-draft))' },
-                    submitted: { label: 'Submitted', color: 'hsl(var(--status-submitted))' },
-                    accepted: { label: 'Accepted', color: 'hsl(var(--status-accepted))' },
-                    rejected: { label: 'Rejected', color: 'hsl(var(--status-rejected))' },
-                  }} className="mx-auto aspect-square max-h-[200px]">
-                    <PieChart>
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Pie data={statusData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} strokeWidth={3} stroke="hsl(var(--background))" paddingAngle={2}>
-                        {statusData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                      </Pie>
-                      <text x="50%" y="46%" textAnchor="middle" dominantBaseline="central" className="fill-foreground text-3xl font-black">{totalFilings}</text>
-                      <text x="50%" y="58%" textAnchor="middle" dominantBaseline="central" className="fill-muted-foreground text-[10px] font-medium uppercase tracking-wider">Filings</text>
-                    </PieChart>
-                  </ChartContainer>
-                  <div className="grid grid-cols-2 gap-2 mt-3">
-                    {statusData.map(s => (
-                      <div key={s.name} className="flex items-center gap-2 text-xs rounded-lg bg-muted/40 px-2.5 py-1.5">
-                        <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: s.fill }} />
-                        <span className="text-muted-foreground flex-1">{s.name}</span>
-                        <span className="font-bold tabular-nums">{s.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground text-sm">No filings data</div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '600ms', animationFillMode: 'forwards' }}>
-            <CardHeader className="pb-1">
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm font-semibold">Compliance Rate</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center pt-2">
-              <div className="relative h-[160px] w-[160px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadialBarChart cx="50%" cy="50%" innerRadius="72%" outerRadius="92%" startAngle={90} endAngle={-270} data={complianceData} barSize={12}>
-                    <RadialBar dataKey="value" cornerRadius={10} background={{ fill: 'hsl(var(--muted))' }} />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-black tabular-nums">{complianceRate}%</span>
-                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                    {complianceRate > 80 ? 'Excellent' : complianceRate > 60 ? 'Good' : 'Needs Work'}
-                  </span>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3 mt-3 w-full">
-                <div className="text-center rounded-lg bg-emerald-50 dark:bg-emerald-950/30 py-2">
-                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{accepted}</p>
-                  <p className="text-[10px] text-muted-foreground font-medium">Accepted</p>
-                </div>
-                <div className="text-center rounded-lg bg-red-50 dark:bg-red-950/30 py-2">
-                  <p className="text-lg font-bold text-red-600 dark:text-red-400 tabular-nums">{rejected}</p>
-                  <p className="text-[10px] text-muted-foreground font-medium">Rejected</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '680ms', animationFillMode: 'forwards' }}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-semibold">Filings Over Time</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {weeklyData.length > 0 ? (
-              <ChartContainer config={{
-                total: { label: 'Total', color: 'hsl(var(--primary))' },
-                accepted: { label: 'Accepted', color: 'hsl(142, 71%, 45%)' },
-              }} className="h-[240px]">
-                <AreaChart data={weeklyData} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-                  <defs>
-                    <linearGradient id="totalGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="acceptedGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="week" tickLine={false} axisLine={false} className="text-xs fill-muted-foreground" />
-                  <YAxis tickLine={false} axisLine={false} className="text-xs fill-muted-foreground" />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Area type="monotone" dataKey="total" stroke="hsl(var(--primary))" fill="url(#totalGrad)" strokeWidth={2.5} />
-                  <Area type="monotone" dataKey="accepted" stroke="hsl(142, 71%, 45%)" fill="url(#acceptedGrad)" strokeWidth={2} strokeDasharray="4 4" />
-                </AreaChart>
-              </ChartContainer>
-            ) : (
-              <div className="h-[240px] flex items-center justify-center text-muted-foreground text-sm">
-                No filing history yet
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '760ms', animationFillMode: 'forwards' }}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Globe className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-semibold">Country of Origin</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {countryData.length > 0 ? (
-              <>
-                <ChartContainer config={{}} className="mx-auto aspect-square max-h-[200px]">
-                  <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Pie data={countryData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} strokeWidth={3} stroke="hsl(var(--background))" paddingAngle={2}>
-                      {countryData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                    </Pie>
-                  </PieChart>
-                </ChartContainer>
-                <div className="grid grid-cols-2 gap-1.5 mt-2">
-                  {countryData.map(c => (
-                    <div key={c.name} className="flex items-center gap-2 text-xs px-2 py-1">
-                      <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: c.fill }} />
-                      <span className="text-muted-foreground flex-1 truncate">{c.name}</span>
-                      <span className="font-bold tabular-nums">{c.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="h-[260px] flex items-center justify-center text-muted-foreground text-sm">
-                No origin data yet
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Deadlines + Quick Actions */}
-      <div className="grid gap-6 lg:grid-cols-5">
-        <Card className="lg:col-span-3 opacity-0 animate-fade-in-up" style={{ animationDelay: '840ms', animationFillMode: 'forwards' }}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Timer className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-semibold">Upcoming Deadlines</CardTitle>
-              {deadlineFilings.length > 0 && (
-                <Badge variant="outline" className="text-[10px] ml-1">{deadlineFilings.length} pending</Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {deadlineFilings.length === 0 ? (
-              <div className="text-center py-8">
-                <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
-                <p className="text-sm font-medium">All caught up!</p>
-                <p className="text-xs text-muted-foreground mt-1">No pending deadlines</p>
-              </div>
-            ) : deadlineFilings.map((f, i) => {
-              const days = daysUntil(f.filingDeadline!);
-              const isUrgent = days <= 3;
-              const isWarning = days <= 7;
-              const totalWindow = new Date(f.filingDeadline!).getTime() - new Date(f.createdAt).getTime();
-              const elapsed = Date.now() - new Date(f.createdAt).getTime();
-              const progress = totalWindow > 0 ? Math.min(Math.max(elapsed / totalWindow, 0), 1) * 100 : 0;
-
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {urgent.map(({ f, days }) => {
+              const overdue = days <= 0;
+              const critical = days <= 2;
               return (
-                <div key={f.id}
+                <Link
+                  key={f.id}
+                  to={`/shipments/${f.id}`}
                   className={cn(
-                    'rounded-xl border p-3 space-y-2 transition-all duration-200 opacity-0 animate-fade-in-up hover:bg-muted/30',
-                    isUrgent && 'border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/10',
-                    isWarning && !isUrgent && 'border-amber-200 dark:border-amber-900/40 bg-amber-50/30 dark:bg-amber-950/10',
+                    'group rounded-xl border bg-card px-3 py-2.5 transition-all hover:shadow-card',
+                    overdue ? 'border-red-300 dark:border-red-900/50' :
+                    critical ? 'border-amber-300 dark:border-amber-900/50' :
+                    'border-border/60',
                   )}
-                  style={{ animationDelay: `${880 + i * 60}ms`, animationFillMode: 'forwards' }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Link to={`/shipments/${f.id}`} className="font-semibold text-sm hover:text-primary transition-colors truncate">
-                        {f.houseBol || f.masterBol || f.id.slice(0, 8)}
-                      </Link>
-                      <StatusBadge status={f.status} />
-                    </div>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-xs font-mono text-muted-foreground truncate">
+                      {f.houseBol || f.masterBol || f.id.slice(0, 8)}
+                    </span>
                     <span className={cn(
-                      'text-xs font-bold tabular-nums shrink-0 px-2 py-0.5 rounded-full',
-                      isUrgent ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' :
-                      isWarning ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
-                      'bg-muted text-muted-foreground',
+                      'text-[10px] font-bold uppercase tracking-wider shrink-0',
+                      overdue ? 'text-red-600 dark:text-red-400' :
+                      critical ? 'text-amber-600 dark:text-amber-500' :
+                      'text-muted-foreground',
                     )}>
-                      {days <= 0 ? 'OVERDUE' : days + 'd left'}
+                      {overdue ? 'Overdue' : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days}d`}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={cn(
-                          'h-full rounded-full transition-all animate-progress-fill',
-                          isUrgent ? 'bg-red-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500',
-                        )}
-                        style={{ width: progress + '%' }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
-                      {new Date(f.filingDeadline!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                  </div>
-                </div>
+                  <p className="text-sm font-medium truncate">{f.importerName || 'Unnamed importer'}</p>
+                </Link>
               );
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
+      )}
 
-        <Card className="lg:col-span-2 opacity-0 animate-fade-in-up" style={{ animationDelay: '920ms', animationFillMode: 'forwards' }}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-semibold">Quick Actions</CardTitle>
+      {/* ─── Filing Activity (main area chart) ────────────────────────── */}
+      <section
+        className="rounded-2xl border border-border/60 bg-card p-6 opacity-0 animate-fade-in-up"
+        style={{ animationDelay: '420ms', animationFillMode: 'forwards' }}
+      >
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+              Filing Activity
+            </p>
+            <div className="mt-2.5 flex items-baseline gap-3">
+              <span className="text-[34px] leading-none font-semibold tabular-nums tracking-tight">
+                {periodTotal}
+              </span>
+              <span className="text-sm text-muted-foreground">filings this period</span>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Link to="/shipments/new" className="block">
-              <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3.5 hover:bg-primary/10 hover:border-primary/50 transition-all cursor-pointer group">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Plus className="h-5 w-5 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">Create New ISF Filing</p>
-                    <p className="text-[11px] text-muted-foreground">Start a new Importer Security Filing</p>
-                  </div>
-                </div>
+            <p className="mt-1.5 text-[12px] text-muted-foreground">
+              <span className="font-medium text-emerald-600 dark:text-emerald-400">{periodAccepted} accepted</span>
+              {' · '}
+              <span>{periodTotal - periodAccepted} in progress or rejected</span>
+            </p>
+          </div>
+
+          {/* Range toggle — segmented control */}
+          <div className="inline-flex items-center rounded-xl border border-border/60 bg-muted/30 p-1">
+            {(['7d', '30d', '90d'] as Range[]).map(r => (
+              <button
+                key={r}
+                onClick={() => setRange(r)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                  range === r
+                    ? 'bg-card text-foreground shadow-[0_1px_2px_0_hsl(var(--foreground)/0.08)]'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="h-[260px] -ml-2">
+          {periodTotal > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={timeSeries} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="dashAreaTotal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.18} />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="dashAreaAccepted" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(142 71% 45%)" stopOpacity={0.14} />
+                    <stop offset="100%" stopColor="hsl(142 71% 45%)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  interval="preserveStartEnd"
+                  minTickGap={28}
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  allowDecimals={false}
+                  width={32}
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <Tooltip
+                  cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--popover))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: 12,
+                    fontSize: 12,
+                    boxShadow: '0 4px 12px hsl(var(--foreground) / 0.08)',
+                  }}
+                  labelStyle={{ color: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="total"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  fill="url(#dashAreaTotal)"
+                  name="Total"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="accepted"
+                  stroke="hsl(142 71% 45%)"
+                  strokeWidth={1.5}
+                  fill="url(#dashAreaAccepted)"
+                  name="Accepted"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
+              <div className="h-10 w-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                <Plus className="h-4 w-4" />
               </div>
-            </Link>
+              <p className="text-sm font-medium">No activity in this period</p>
+              <p className="text-xs">Filings you create will appear here</p>
+            </div>
+          )}
+        </div>
+      </section>
 
-            <Link to="/shipments" className="block">
-              <div className="rounded-xl border p-3.5 hover:bg-muted/50 transition-all cursor-pointer group">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
-                    <FileText className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">View All Filings</p>
-                    <p className="text-[11px] text-muted-foreground">{totalFilings} filings total</p>
-                  </div>
-                </div>
+      {/* ─── Recent Filings + Status Breakdown ───────────────────────── */}
+      <section className="grid gap-6 lg:grid-cols-3">
+        {/* Recent filings list */}
+        <div
+          className="lg:col-span-2 rounded-2xl border border-border/60 bg-card opacity-0 animate-fade-in-up"
+          style={{ animationDelay: '500ms', animationFillMode: 'forwards' }}
+        >
+          <div className="flex items-center justify-between px-6 pt-5 pb-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+                Recent Filings
+              </p>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">Latest activity across your organization</p>
+            </div>
+            <Link to="/shipments">
+              <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground h-8">
+                View all <ArrowRight className="h-3 w-3" />
+              </Button>
+            </Link>
+          </div>
+
+          {recent.length === 0 ? (
+            <div className="px-6 py-16 text-center">
+              <div className="h-12 w-12 mx-auto rounded-2xl bg-muted/50 flex items-center justify-center mb-3">
+                <Plus className="h-5 w-5 text-muted-foreground" />
               </div>
-            </Link>
-
-            <Link to="/submission-logs" className="block">
-              <div className="rounded-xl border p-3.5 hover:bg-muted/50 transition-all cursor-pointer group">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
-                    <Activity className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">API Submission Logs</p>
-                    <p className="text-[11px] text-muted-foreground">View CBP submission history</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            <Separator className="my-3" />
-
-            <div className="rounded-xl bg-muted/30 p-3 space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Filing Process</p>
-              <div className="space-y-1.5">
-                {[
-                  { step: '1', label: 'Create ISF', desc: 'Fill out all required fields' },
-                  { step: '2', label: 'Validate', desc: 'Check for errors before sending' },
-                  { step: '3', label: 'Prepare Filing', desc: 'Prepare document for submission' },
-                  { step: '4', label: 'Send to CBP', desc: 'Transmit filing to U.S. Customs' },
-                ].map((s) => (
-                  <div key={s.step} className="flex items-center gap-2.5 text-xs">
-                    <span className="h-5 w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">{s.step}</span>
-                    <div className="min-w-0">
-                      <span className="font-medium">{s.label}</span>
-                      <span className="text-muted-foreground ml-1">{'\u2014'} {s.desc}</span>
+              <p className="text-sm font-medium">No filings yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Create your first ISF filing to get started</p>
+              <Link to="/shipments/new">
+                <Button size="sm" className="mt-4">Create filing</Button>
+              </Link>
+            </div>
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {recent.map(f => (
+                <li key={f.id}>
+                  <Link
+                    to={`/shipments/${f.id}`}
+                    className="group flex items-center gap-4 px-6 py-3.5 transition-colors hover:bg-muted/30"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                          {f.houseBol || f.masterBol || 'Untitled filing'}
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground/60 shrink-0">
+                          {f.filingType}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {f.importerName || 'No importer set'}
+                      </p>
                     </div>
+
+                    <div className="hidden sm:block shrink-0">
+                      <StatusBadge status={f.status} />
+                    </div>
+
+                    <div className="shrink-0 text-right min-w-[70px]">
+                      <p className="text-xs tabular-nums text-foreground/80">
+                        {relativeTime(f.createdAt)}
+                      </p>
+                    </div>
+
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Status breakdown */}
+        <div
+          className="rounded-2xl border border-border/60 bg-card p-6 opacity-0 animate-fade-in-up"
+          style={{ animationDelay: '580ms', animationFillMode: 'forwards' }}
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+            By Status
+          </p>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">All-time distribution</p>
+
+          <div className="mt-5 space-y-4">
+            {statusBars.map((s, i) => (
+              <div key={s.key} className="space-y-1.5" style={{ animationDelay: `${620 + i * 60}ms` }}>
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className={cn('h-2 w-2 rounded-full', s.color)} />
+                    <span className="font-medium text-foreground">{s.label}</span>
                   </div>
-                ))}
+                  <span className="font-semibold tabular-nums">{s.count}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-muted/60 overflow-hidden">
+                  <div
+                    className={cn('h-full rounded-full transition-all duration-700 origin-left', s.color)}
+                    style={{ width: `${s.pct}%`, opacity: s.count === 0 ? 0.25 : 0.9 }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Compliance score footer */}
+          <div className="mt-6 pt-5 border-t border-border/60">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+                  Compliance
+                </p>
+                <p className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight">
+                  {complianceRate}%
+                </p>
+              </div>
+              <div className={cn(
+                'h-9 w-9 rounded-xl flex items-center justify-center',
+                complianceRate >= 90 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                complianceRate >= 70 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                'bg-red-500/10 text-red-600 dark:text-red-400',
+              )}>
+                {complianceRate >= 70
+                  ? <CheckCircle2 className="h-4 w-4" strokeWidth={2.5} />
+                  : <AlertTriangle className="h-4 w-4" strokeWidth={2.5} />}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {accepted} accepted out of {accepted + rejected} resolved
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

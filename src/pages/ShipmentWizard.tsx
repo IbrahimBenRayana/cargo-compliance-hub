@@ -621,12 +621,12 @@ export default function ShipmentWizard() {
 
   const goNext = useCallback(() => {
     if (step < STEPS.length - 1) {
-      if (validateStep(step)) setStep(s => s + 1);
+      if (validateStep(step)) setStep(step + 1);
       else toast.error('Please fix the highlighted errors before continuing.');
     }
   }, [step, validateStep, STEPS]);
 
-  const goBack = useCallback(() => { if (step > 0) setStep(s => s - 1); }, [step]);
+  const goBack = useCallback(() => { if (step > 0) setStep(step - 1); }, [step]);
 
   // ─── Build payload ─────────────────
   const buildPayload = useCallback(() => {
