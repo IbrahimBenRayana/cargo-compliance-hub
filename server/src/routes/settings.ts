@@ -170,7 +170,7 @@ router.get('/organization', async (req: AuthRequest, res: Response): Promise<voi
 // ─── PATCH /api/v1/settings/organization — Update org settings
 router.patch('/organization', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, iorNumber, einNumber, address } = req.body;
+    const { name, iorNumber, einNumber, address, phone, website } = req.body;
 
     const updated = await prisma.organization.update({
       where: { id: req.user!.orgId },
@@ -179,6 +179,8 @@ router.patch('/organization', async (req: AuthRequest, res: Response): Promise<v
         ...(iorNumber !== undefined && { iorNumber }),
         ...(einNumber !== undefined && { einNumber }),
         ...(address !== undefined && { address }),
+        ...(phone !== undefined && { phone }),
+        ...(website !== undefined && { website }),
       },
       select: {
         id: true,
@@ -187,6 +189,8 @@ router.patch('/organization', async (req: AuthRequest, res: Response): Promise<v
         einNumber: true,
         ccEnvironment: true,
         address: true,
+        phone: true,
+        website: true,
       },
     });
 

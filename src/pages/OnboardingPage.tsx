@@ -87,6 +87,8 @@ export default function OnboardingPage() {
           name: companyName.trim() || undefined,
           iorNumber: iorNumber.trim() || undefined,
           einNumber: einNumber.trim() || undefined,
+          phone: phone.trim() || undefined,
+          website: website.trim() || undefined,
         });
         toast.success('Company profile saved');
       } catch {
@@ -334,10 +336,9 @@ export default function OnboardingPage() {
             <CardContent className="space-y-5">
               <div className="grid gap-4">
                 <button
-                  onClick={() => {
-                    handleNext();
-                    // Will navigate to new filing after onboarding completes
-                    setTimeout(() => navigate('/shipments/new', { replace: true }), 300);
+                  onClick={async () => {
+                    await handleNext();
+                    navigate('/shipments/new', { replace: true });
                   }}
                   className="flex items-start gap-4 p-5 rounded-xl border-2 border-transparent hover:border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all text-left group"
                 >
@@ -357,7 +358,7 @@ export default function OnboardingPage() {
                 <button
                   onClick={async () => {
                     await handleNext();
-                    setTimeout(() => navigate('/', { replace: true }), 300);
+                    navigate('/', { replace: true });
                   }}
                   className="flex items-start gap-4 p-5 rounded-xl border-2 border-transparent hover:border-gray-200 bg-gray-50 hover:bg-gray-100 transition-all text-left group"
                 >

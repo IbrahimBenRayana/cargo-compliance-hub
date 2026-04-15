@@ -340,7 +340,7 @@ export const settingsApi = {
     }>('/api/v1/settings/organization');
   },
 
-  updateOrganization(data: { name?: string; iorNumber?: string; einNumber?: string; address?: any }) {
+  updateOrganization(data: { name?: string; iorNumber?: string; einNumber?: string; address?: any; phone?: string; website?: string }) {
     return apiFetch<any>('/api/v1/settings/organization', {
       method: 'PATCH',
       body: JSON.stringify(data),
