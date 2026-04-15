@@ -121,8 +121,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Tag with full commit SHA (for rollback) + latest (for convenience)
           tags: |
-            type=sha,prefix=
+            type=sha,format=long,prefix=
             type=raw,value=latest
 
       - name: Set up Docker Buildx
@@ -148,31 +149,67 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy via SSH
+      - name: Deploy via SSH (SHA-tagged, health-gated, auto-rollback)
         if: ${{ vars.DEPLOY_METHOD == 'ssh' }}
         uses: appleboy/ssh-action@v1
+        env:
+          NEW_TAG: ${{ github.sha }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: NEW_TAG
           script: |
+            set -euo pipefail
             cd /opt/mycargolens
-            docker compose -f docker-compose.prod.yml pull server
-            docker compose -f docker-compose.prod.yml up -d
-            docker image prune -f
-            echo "✅ Deployed successfully"
-            docker compose -f docker-compose.prod.yml ps
 
-      - name: Deployment info
+            # ── Capture currently-deployed tag (rollback target) ──────────
+            OLD_TAG=$(grep '^IMAGE_TAG=' .env | cut -d= -f2)
+            echo "▶ Deploying ${NEW_TAG:0:12} (previous: ${OLD_TAG:0:12})"
+
+            # ── Point compose at the new image ────────────────────────────
+            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${NEW_TAG}|" .env
+
+            # ── Pull the new image; if it doesn't exist, revert and fail ──
+            if ! docker compose pull server; then
+              echo "❌ Pull failed — reverting .env"
+              sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${OLD_TAG}|" .env
+              exit 1
+            fi
+
+            # ── Restart server (Prisma migrations run via entrypoint) ─────
+            docker compose up -d server
+
+            # ── Wait for /api/health to respond 200 (60s max) ─────────────
+            HEALTHY=false
+            for i in $(seq 1 30); do
+              if curl -fsS http://localhost:3001/api/health > /dev/null 2>&1; then
+                HEALTHY=true
+                break
+              fi
+              sleep 2
+            done
+
+            # ── If unhealthy, roll back to previous tag ───────────────────
+            if [ "$HEALTHY" != "true" ]; then
+              echo "❌ Health check failed after 60s — rolling back to ${OLD_TAG:0:12}"
+              sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${OLD_TAG}|" .env
+              docker compose up -d server
+              docker compose logs --tail=40 server || true
+              exit 1
+            fi
+
+            echo "✅ Deploy healthy — ${NEW_TAG:0:12} is live"
+            docker image prune -f
+            docker compose ps
+
+      - name: Deployment info (fallback when DEPLOY_METHOD unset)
         if: ${{ vars.DEPLOY_METHOD != 'ssh' }}
         run: |
-          echo "🚀 Docker image pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          echo "🚀 Docker image pushed: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
           echo ""
-          echo "To enable auto-deploy via SSH:"
-          echo "  1. Set repository variable:  DEPLOY_METHOD = ssh"
-          echo "  2. Set repository secrets:"
-          echo "     - DEPLOY_HOST     (your server IP)"
-          echo "     - DEPLOY_USER     (ssh username, e.g., root)"
-          echo "     - DEPLOY_SSH_KEY  (private SSH key)"
-          echo ""
-          echo "Manual deploy: ssh user@server '/opt/mycargolens/update.sh'"
+          echo "Auto-deploy is disabled. To enable:"
+          echo "  gh variable set DEPLOY_METHOD --body ssh"
+          echo "  gh secret set DEPLOY_HOST    # VPS IP"
+          echo "  gh secret set DEPLOY_USER    # e.g. deploy"
+          echo "  gh secret set DEPLOY_SSH_KEY # private key contents"
