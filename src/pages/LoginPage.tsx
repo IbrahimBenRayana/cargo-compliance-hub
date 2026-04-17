@@ -58,7 +58,7 @@ export default function LoginPage() {
 
         {/* ── Left: dark brand panel (desktop only) ── */}
         <div className="w-1/2 flex-shrink-0">
-          <AuthBrandPanel />
+          <AuthBrandPanel variant="login" />
         </div>
 
         {/* ── Right: form panel ── */}

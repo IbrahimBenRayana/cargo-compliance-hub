@@ -1,5 +1,7 @@
 import { motion, MotionConfig } from 'framer-motion';
 import { Shield, Lock, Zap } from 'lucide-react';
+import { LoginScene } from './illustrations/login-scene';
+import { RegisterScene } from './illustrations/register-scene';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -13,16 +15,10 @@ const SQUARES = [
 ];
 
 export interface AuthBrandPanelProps {
-  quote?: string;
-  author?: string;
-  company?: string;
+  variant?: 'login' | 'register';
 }
 
-export function AuthBrandPanel({
-  quote = 'We switched from our broker to MyCargoLens and cut our filing time from 20 minutes to 90 seconds. The compliance dashboard alone pays for itself.',
-  author = '— Sarah Chen, Import Manager',
-  company = 'Pacific Trade Solutions',
-}: AuthBrandPanelProps) {
+export function AuthBrandPanel({ variant = 'login' }: AuthBrandPanelProps) {
   return (
     <MotionConfig reducedMotion="user">
       {/* Always-dark navy panel regardless of theme */}
@@ -128,33 +124,16 @@ export function AuthBrandPanel({
           </span>
         </div>
 
-        {/* ── Quote / testimonial — center ── */}
+        {/* ── Scene illustration — center ── */}
         <motion.div
-          className="relative z-10 flex-1 flex flex-col justify-center px-12"
-          initial={{ opacity: 0, y: 20 }}
+          className="relative z-10 flex-1 flex flex-col justify-center px-8"
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3, ease: EASE }}
+          transition={{ duration: 0.7, delay: 0.2, ease: EASE }}
         >
-          {/* Opening quotation mark in gold */}
-          <div
-            className="mb-3 leading-none select-none"
-            style={{ fontSize: '56px', color: 'hsl(43, 96%, 56%)', lineHeight: 1, fontFamily: 'Georgia, serif' }}
-            aria-hidden="true"
-          >
-            &ldquo;
+          <div className="w-full max-w-sm mx-auto h-auto">
+            {variant === 'login' ? <LoginScene /> : <RegisterScene />}
           </div>
-          <p
-            className="text-lg leading-relaxed max-w-md"
-            style={{ color: 'rgba(255,255,255,0.9)' }}
-          >
-            {quote}
-          </p>
-          <p className="mt-5 text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
-            {author}
-          </p>
-          <p className="mt-0.5 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            {company}
-          </p>
         </motion.div>
 
         {/* ── Trust badges — bottom left ── */}

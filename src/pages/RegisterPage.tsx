@@ -81,11 +81,7 @@ export default function RegisterPage() {
 
         {/* ── Left: dark brand panel (desktop only) ── */}
         <div className="w-1/2 flex-shrink-0">
-          <AuthBrandPanel
-            quote="Onboarding new suppliers used to take us a week of back-and-forth. With MyCargoLens, they're filing their first ISF on day one."
-            author="— Marcus Reid, Logistics Director"
-            company="Horizon Imports Group"
-          />
+          <AuthBrandPanel variant="register" />
         </div>
 
         {/* ── Right: form panel ── */}
