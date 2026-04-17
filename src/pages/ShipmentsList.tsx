@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useFilings, useSubmitFiling, useTemplates, useApplyTemplate, useBulkSubmit, useBulkDelete, useExportCsv, useExportSummaryPdf } from '@/hooks/useFilings';
 import { StatusBadge } from '@/components/StatusBadge';
+import { PlanLimitModal } from '@/components/PlanLimitModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -39,13 +40,6 @@ const statusOptions: ShipmentStatus[] = ['draft', 'submitted', 'accepted', 'reje
 
 export default function ShipmentsList() {
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    searchTimerRef.current = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
-  }, [search]);
   const [selectedStatuses, setSelectedStatuses] = useState<ShipmentStatus[]>([]);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
@@ -54,6 +48,7 @@ export default function ShipmentsList() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [planLimit, setPlanLimit] = useState<{ current: number; limit: number } | null>(null);
   const submitFiling = useSubmitFiling();
   const navigate = useNavigate();
   const { data: templatesData } = useTemplates();
@@ -81,7 +76,9 @@ export default function ShipmentsList() {
       toast.success('Filing submitted to CBP successfully!');
     } catch (err: any) {
       const body = err.body || err;
-      if (body?.validationErrors) {
+      if (body?.error === 'plan_limit_reached' && body?.usage) {
+        setPlanLimit(body.usage);
+      } else if (body?.validationErrors) {
         const msgs = body.validationErrors.map((e: any) => `${e.field}: ${e.message}`).join('\n');
         toast.error(`Submission failed:\n${msgs}`, { duration: 8000 });
       } else {
@@ -142,7 +139,7 @@ export default function ShipmentsList() {
 
   // Fetch filings from backend
   const { data: filingsResponse, isLoading, isError } = useFilings({
-    search: debouncedSearch || undefined,
+    search: search || undefined,
     status: selectedStatuses.length === 1 ? selectedStatuses[0] : undefined,
     sortBy: sortField === 'deadline' ? 'filingDeadline' : sortField === 'departure' ? 'estimatedDeparture' : 'createdAt',
     sortOrder: sortDir,
@@ -160,7 +157,6 @@ export default function ShipmentsList() {
 
   const clearAllFilters = () => {
     setSearch('');
-    setDebouncedSearch('');
     setSelectedStatuses([]);
     setSelectedCountries([]);
     setDateFrom(undefined);
@@ -230,6 +226,11 @@ export default function ShipmentsList() {
 
   return (
     <div className="space-y-6">
+      <PlanLimitModal
+        open={planLimit !== null}
+        onClose={() => setPlanLimit(null)}
+        usage={planLimit ?? { current: 0, limit: 0 }}
+      />
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in-up" style={{ animationDelay: '0ms' }}>
         <div>

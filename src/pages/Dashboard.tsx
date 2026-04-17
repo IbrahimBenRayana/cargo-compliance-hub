@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useFilings, useFilingStats } from '@/hooks/useFilings';
 import { Filing } from '@/types/shipment';
 import { useCurrentUser } from '@/hooks/useAuth';
+import { CelebrationModal } from '@/components/CelebrationModal';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -186,6 +187,14 @@ export default function Dashboard() {
   const { data: profile } = useCurrentUser();
 
   const [range, setRange] = useState<Range>('30d');
+
+  // ── Welcome modal (post-upgrade redirect) ────────────────────────────────
+  const [searchParams, setSearchParams] = useSearchParams();
+  const welcomePlanId = searchParams.get('welcome');
+
+  function handleModalClose() {
+    setSearchParams(p => { p.delete('welcome'); return p; });
+  }
   const greeting = useGreeting();
 
   const filings: Filing[] = filingsData?.data ?? [];
@@ -329,6 +338,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 max-w-[1400px] mx-auto pb-4">
+      {/* ─── Post-upgrade celebration modal ───────────────────────────── */}
+      <CelebrationModal planId={welcomePlanId} onClose={handleModalClose} />
+
       {/* ─── Hero ─────────────────────────────────────────────────────── */}
       <header
         className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 opacity-0 animate-fade-in-up"

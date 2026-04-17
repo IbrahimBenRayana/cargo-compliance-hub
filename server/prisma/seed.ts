@@ -197,6 +197,112 @@ async function main() {
   }
 
   console.log(`✅ Created ${filings.length} sample filings`);
+
+  // ─── Plans ─────────────────────────────────────────────
+  // stripePriceId is null until you create prices in Stripe Dashboard and
+  // update these values (or re-seed after editing the IDs below).
+  const plans = [
+    {
+      id: 'starter',
+      name: 'Starter',
+      description: 'For evaluators and single-shipment importers',
+      stripePriceId: null,
+      stripeProductId: null,
+      priceCents: 0,
+      billingInterval: 'free',
+      filingsIncluded: 2,
+      maxSeats: 1,
+      overageCents: 0,
+      features: ['basic_dashboard', 'email_support', 'isf_10_2', 'isf_5'],
+      isPublic: true,
+      sortOrder: 0,
+    },
+    {
+      id: 'grower_monthly',
+      name: 'Grower',
+      description: 'For small importers with consistent volume',
+      stripePriceId: 'price_1TMtJpREhYOSzfjmVS4eUHBK',
+      stripeProductId: 'prod_ULaUWbxxb6S0aq',
+      priceCents: 9900,
+      billingInterval: 'month',
+      filingsIncluded: 15,
+      maxSeats: 3,
+      overageCents: 800,
+      features: ['basic_dashboard', 'email_support', 'chat_support', 'isf_10_2', 'isf_5', 'audit_trail', 'csv_export', 'templates'],
+      isPublic: true,
+      sortOrder: 1,
+    },
+    {
+      id: 'grower_annual',
+      name: 'Grower',
+      description: 'For small importers with consistent volume (annual)',
+      stripePriceId: 'price_1TMtKfREhYOSzfjmt1CzPkoQ',
+      stripeProductId: 'prod_ULaUWbxxb6S0aq',
+      priceCents: 94800, // $948/yr = $79/mo
+      billingInterval: 'year',
+      filingsIncluded: 15,
+      maxSeats: 3,
+      overageCents: 800,
+      features: ['basic_dashboard', 'email_support', 'chat_support', 'isf_10_2', 'isf_5', 'audit_trail', 'csv_export', 'templates'],
+      isPublic: true,
+      sortOrder: 2,
+    },
+    {
+      id: 'scale_monthly',
+      name: 'Scale',
+      description: 'For growing teams and 3PLs',
+      stripePriceId: 'price_1TMtLQREhYOSzfjmq2MnD5aR',
+      stripeProductId: 'prod_ULaWeZKXhlq7QU',
+      priceCents: 29900,
+      billingInterval: 'month',
+      filingsIncluded: 60,
+      maxSeats: 10,
+      overageCents: 800,
+      features: ['everything_in_grower', 'bulk_csv_import', 'api_access', 'priority_support_4h', 'custom_roles'],
+      isPublic: true,
+      sortOrder: 3,
+    },
+    {
+      id: 'scale_annual',
+      name: 'Scale',
+      description: 'For growing teams and 3PLs (annual)',
+      stripePriceId: 'price_1TMtM4REhYOSzfjmhFup9sxD',
+      stripeProductId: 'prod_ULaWeZKXhlq7QU',
+      priceCents: 286800, // $2868/yr = $239/mo
+      billingInterval: 'year',
+      filingsIncluded: 60,
+      maxSeats: 10,
+      overageCents: 800,
+      features: ['everything_in_grower', 'bulk_csv_import', 'api_access', 'priority_support_4h', 'custom_roles'],
+      isPublic: true,
+      sortOrder: 4,
+    },
+    {
+      id: 'enterprise',
+      name: 'Enterprise',
+      description: 'Unlimited filings, SSO, SLA, dedicated support',
+      stripePriceId: null, // negotiated per-contract
+      stripeProductId: null,
+      priceCents: 0, // custom
+      billingInterval: 'year',
+      filingsIncluded: 999999,
+      maxSeats: 999999,
+      overageCents: 0,
+      features: ['everything_in_scale', 'sso', 'dedicated_csm', 'uptime_sla', 'custom_integrations', 'soc2_report'],
+      isPublic: false, // show "Contact us" in UI, not in the card list
+      sortOrder: 5,
+    },
+  ];
+
+  for (const plan of plans) {
+    await prisma.plan.upsert({
+      where: { id: plan.id },
+      update: plan,
+      create: plan,
+    });
+  }
+  console.log(`✓ Seeded ${plans.length} plans`);
+
   console.log('✅ Seed complete!');
   console.log('');
   console.log('📧 Demo login: demo@mycargolens.com / password123');

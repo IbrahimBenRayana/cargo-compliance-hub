@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFiling, useSubmitFiling, useAmendFiling, useCancelFiling, useValidateFiling, useCheckFilingStatus, useDuplicateFiling, useSaveFilingAsTemplate, useFilingDocuments, useUploadDocuments, useDownloadDocument, useDeleteDocument, useExportPdf } from '@/hooks/useFilings';
 import { Filing, getPartyName, getFirstCommodity, ShipmentStatus } from '@/types/shipment';
 import { StatusBadge } from '@/components/StatusBadge';
+import { PlanLimitModal } from '@/components/PlanLimitModal';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +57,7 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
   });
   const [currentStep, setCurrentStep] = useState<PipelineStep | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [planLimit, setPlanLimit] = useState<{ current: number; limit: number } | null>(null);
 
   const updateStep = (step: PipelineStep, state: Partial<StepState>) => {
     setSteps(prev => ({ ...prev, [step]: { ...prev[step], ...state } }));
@@ -140,6 +142,16 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
     } catch (err: any) {
       const body = err.body || err;
 
+      // Plan-limit reached (HTTP 402) — surface upgrade modal
+      if (body?.error === 'plan_limit_reached' && body?.usage) {
+        setPlanLimit(body.usage);
+        updateStep('send_cc', { status: 'idle' });
+        updateStep('send_cbp', { status: 'idle' });
+        setCurrentStep(null);
+        setIsRunning(false);
+        return;
+      }
+
       // Determine which step failed
       if (body?.validationErrors) {
         // CC validation failed (document creation rejected)
@@ -185,6 +197,8 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
   ];
 
   return (
+    <>
+    <PlanLimitModal open={planLimit !== null} onClose={() => setPlanLimit(null)} usage={planLimit ?? { current: 0, limit: 0 }} />
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
@@ -308,6 +322,7 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
         })}
       </CardContent>
     </Card>
+    </>
   );
 }
 
@@ -521,6 +536,7 @@ export default function ShipmentDetails() {
   const [cancelReason, setCancelReason] = useState('');
   const [templateName, setTemplateName] = useState('');
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [planLimit, setPlanLimit] = useState<{ current: number; limit: number } | null>(null);
 
   // Document upload state
   const { data: docsData, isLoading: docsLoading } = useFilingDocuments(id);
@@ -565,6 +581,10 @@ export default function ShipmentDetails() {
       toast.success('Filing resubmitted successfully!');
     } catch (err: any) {
       const body = err.body || err;
+      if (body?.error === 'plan_limit_reached' && body?.usage) {
+        setPlanLimit(body.usage);
+        return;
+      }
       if (body?.validationErrors && Array.isArray(body.validationErrors)) {
         const count = body.validationErrors.length;
         toast.error(`Submission failed: ${count} validation error(s). Please review and fix the issues.`, { duration: 8000 });
@@ -685,6 +705,11 @@ export default function ShipmentDetails() {
 
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
+      <PlanLimitModal
+        open={planLimit !== null}
+        onClose={() => setPlanLimit(null)}
+        usage={planLimit ?? { current: 0, limit: 0 }}
+      />
       {/* Header */}
       <div className="flex items-center gap-3 opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
         <Button variant="ghost" size="icon" className="rounded-xl" asChild>

@@ -30,3 +30,12 @@ server/uploads/
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code project data (skills, worktrees, local memory)
+.claude/
+
+# Landing page (Next.js)
+landing/node_modules/
+landing/.next/
+landing/out/
+landing/next-env.d.ts

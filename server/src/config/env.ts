@@ -22,6 +22,10 @@ const envSchema = z.object({
   EMAIL_PASS: z.string().optional(),
   EMAIL_FROM: z.string().default('noreply@mycargolens.com'),
   EMAIL_FROM_NAME: z.string().default('MyCargoLens'),
+  // Stripe (Billing) — optional in dev, required in production (enforced below)
+  STRIPE_SECRET_KEY: z.string().default(''),
+  STRIPE_WEBHOOK_SECRET: z.string().default(''),
+  STRIPE_PUBLISHABLE_KEY: z.string().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -4,7 +4,6 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { randomUUID } from 'crypto';
 import { env } from './config/env.js';
 import { prisma } from './config/database.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -19,9 +18,9 @@ import settingsRoutes from './routes/settings.js';
 import organizationRoutes from './routes/organization.js';
 import documentRoutes from './routes/documents.js';
 import exportRoutes from './routes/export.js';
-import { startBackgroundJobs, stopBackgroundJobs, waitForJobsToFinish, getJobStatus, pollSubmittedFilings, checkDeadlines } from './services/backgroundJobs.js';
+import billingRoutes from './routes/billing.js';
+import { startBackgroundJobs, stopBackgroundJobs, getJobStatus, pollSubmittedFilings, checkDeadlines } from './services/backgroundJobs.js';
 import { verifyEmailConnection } from './services/email.js';
-import logger from './config/logger.js';
 
 const app = express();
 
@@ -52,37 +51,19 @@ app.use(cors({
   credentials: true,
 }));
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// MUST be before express.json() — Stripe webhook needs raw body for signature verification
+app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
+
 app.use(express.json({ limit: '1mb' }));
 app.use(generalLimiter);
 
-// ─── Request Correlation ID ───────────────────────────────
-// Attach a unique ID to every request for log tracing.
-// Forwards X-Request-ID from client if present, otherwise generates one.
-app.use((req, res, next) => {
-  const id = (req.headers['x-request-id'] as string) || randomUUID();
-  req.headers['x-request-id'] = id;
-  res.setHeader('x-request-id', id);
-  next();
-});
-
 // ─── Health Check ─────────────────────────────────────────
-app.get('/api/health', async (_req, res) => {
-  const checks: Record<string, 'ok' | 'error'> = {};
-
-  // Database ping
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    checks.database = 'ok';
-  } catch {
-    checks.database = 'error';
-  }
-
-  const allOk = Object.values(checks).every(v => v === 'ok');
-  res.status(allOk ? 200 : 503).json({
-    status: allOk ? 'ok' : 'degraded',
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     environment: env.NODE_ENV,
-    checks,
     jobs: getJobStatus(),
   });
 });
@@ -98,6 +79,7 @@ app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/organization', organizationRoutes);
 app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/export', exportRoutes);
+app.use('/api/v1/billing', billingRoutes);
 
 // ─── Background Jobs Endpoints ────────────────────────────
 // GET job status + POST manual trigger (for admin/testing)
@@ -151,15 +133,13 @@ app.use(errorHandler);
 async function main() {
   try {
     await prisma.$connect();
-    logger.info('Database connected');
+    console.log('✅ Database connected');
 
     const server = app.listen(env.PORT, () => {
-      logger.info({
-        port: env.PORT,
-        environment: env.NODE_ENV,
-        frontend: env.FRONTEND_URL,
-        ccApi: env.CC_API_BASE_URL,
-      }, 'MyCargoLens API started');
+      console.log(`🚀 MyCargoLens API running on http://localhost:${env.PORT}`);
+      console.log(`   Environment: ${env.NODE_ENV}`);
+      console.log(`   Frontend:    ${env.FRONTEND_URL}`);
+      console.log(`   CC API:      ${env.CC_API_BASE_URL}`);
     });
 
     // Start background jobs after server is listening
@@ -170,18 +150,17 @@ async function main() {
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {
-      logger.info({ signal }, 'Shutdown signal received — shutting down gracefully');
+      console.log(`\n[Server] ${signal} received — shutting down gracefully...`);
       stopBackgroundJobs();
-      await waitForJobsToFinish();
       server.close(() => {
         prisma.$disconnect().then(() => {
-          logger.info('Database disconnected. Goodbye.');
+          console.log('[Server] Disconnected from database. Goodbye.');
           process.exit(0);
         });
       });
       // Force exit after 10s
       setTimeout(() => {
-        logger.error('Forced shutdown after 10s timeout');
+        console.error('[Server] Forced shutdown after 10s timeout');
         process.exit(1);
       }, 10000);
     };
@@ -189,7 +168,7 @@ async function main() {
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGINT', () => shutdown('SIGINT'));
   } catch (err) {
-    logger.error({ err }, 'Failed to start server');
+    console.error('❌ Failed to start server:', err);
     process.exit(1);
   }
 }

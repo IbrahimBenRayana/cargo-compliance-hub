@@ -8,7 +8,6 @@ import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { notifyFilingSubmitted, notifyFilingRejected, notifyFilingAmended, notifyFilingCancelled, notifyApiError } from '../services/notifications.js';
 import { filingMutationLimiter, ccApiLimiter } from '../middleware/rateLimiter.js';
 import { translateValidationErrors, translateCBPRejection, sanitizeErrorMessage } from '../services/errorTranslator.js';
-import logger from '../config/logger.js';
 
 const router = Router();
 
@@ -233,7 +232,6 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       },
       statusHistory: {
         orderBy: { createdAt: 'desc' },
-        take: 50,
       },
     },
   });
@@ -280,15 +278,6 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
         estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
         filingDeadline: filingDeadline ?? undefined,
       },
-    });
-
-    const meta = getRequestMeta(req);
-    writeAuditLog({
-      orgId: req.user!.orgId, userId: req.user!.id,
-      action: 'filing.updated', entityType: 'filing', entityId: filing.id,
-      oldValue: { masterBol: existing.masterBol, status: existing.status },
-      newValue: data,
-      ...meta,
     });
 
     res.json(filing);
@@ -350,6 +339,33 @@ router.post('/:id/submit', ccApiLimiter, async (req: AuthRequest, res: Response)
       score: validation.score,
     });
     return;
+  }
+
+  // ─── Plan limit enforcement ───────────────────────────────
+  {
+    const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const [sub, usageRow] = await Promise.all([
+      prisma.subscription.findUnique({
+        where: { orgId: req.user!.orgId },
+        include: { plan: true },
+      }),
+      prisma.filingUsage.findUnique({
+        where: { orgId_month: { orgId: req.user!.orgId, month } },
+      }),
+    ]);
+    const plan = sub?.plan ?? (await prisma.plan.findUnique({ where: { id: 'starter' } }));
+    const currentCount = usageRow?.count ?? 0;
+    const hardCap = plan?.id === 'starter'; // only free plan hard-caps; paid plans allow overage
+
+    if (plan && currentCount >= plan.filingsIncluded && hardCap) {
+      res.status(402).json({
+        error: 'plan_limit_reached',
+        message: `You've reached your Starter plan's ${plan.filingsIncluded}-filing monthly limit. Upgrade to continue filing.`,
+        upgradeUrl: '/pricing',
+        usage: { current: currentCount, limit: plan.filingsIncluded },
+      });
+      return;
+    }
   }
 
   try {
@@ -514,6 +530,16 @@ router.post('/:id/submit', ccApiLimiter, async (req: AuthRequest, res: Response)
       ccFilingId,
       sendResponse: sendResult?.data ?? createResult.data,
     });
+
+    // Track billable usage — increment ONLY on successful submit, not on draft create
+    if (newStatus === 'submitted') {
+      const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+      await prisma.filingUsage.upsert({
+        where: { orgId_month: { orgId: req.user!.orgId, month } },
+        update: { count: { increment: 1 } },
+        create: { orgId: req.user!.orgId, month, count: 1 },
+      });
+    }
 
     // Audit log + notifications (fire-and-forget)
     const meta = getRequestMeta(req);
@@ -737,7 +763,7 @@ router.post('/:id/cancel', filingMutationLimiter, async (req: AuthRequest, res: 
       });
 
       if (!ccResult.persisted) {
-        logger.warn('[Cancel] CC API rejected cancellation payload — proceeding with local cancel');
+        console.warn('[Cancel] CC API rejected cancellation payload — proceeding with local cancel');
       } else {
         // Send the cancel to CBP
         const cancelDocType = filing.filingType === 'ISF-5' ? 'isf-5' : 'isf';
@@ -759,7 +785,7 @@ router.post('/:id/cancel', filingMutationLimiter, async (req: AuthRequest, res: 
       }
     } catch (err: any) {
       // Log but don't block cancellation if CC API fails
-      logger.error({ err: err.message }, '[Cancel] CC API call failed:');
+      console.error('[Cancel] CC API call failed:', err.message);
     }
   }
 
@@ -953,7 +979,7 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
           },
         });
       } catch (msgErr: any) {
-        logger.warn(`[Status Check] Messages fetch failed for filing ${filing.id}:`, msgErr.message);
+        console.warn(`[Status Check] Messages fetch failed for filing ${filing.id}:`, msgErr.message);
         // Non-fatal — we can still use document-status
       }
     }
@@ -1067,7 +1093,7 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
       lastEvent: matchingDoc?.lastEvent ?? null,
     });
   } catch (err: any) {
-    logger.error(`[Status Check] Error for filing ${filing.id}:`, err);
+    console.error(`[Status Check] Error for filing ${filing.id}:`, err);
     res.status(502).json({
       error: 'Failed to check filing status. Please try again later.',
       message: err.message,
@@ -1161,7 +1187,7 @@ router.post('/check-all-statuses', ccApiLimiter, async (req: AuthRequest, res: R
       // Small delay between requests to avoid rate limiting
       await new Promise(r => setTimeout(r, 300));
     } catch (err: any) {
-      logger.warn({ err: err.message }, `[Bulk Status Check] Error for filing ${filing.id}:`);
+      console.warn(`[Bulk Status Check] Error for filing ${filing.id}:`, err.message);
       results.push({
         filingId: filing.id,
         bol: filing.houseBol || filing.masterBol || '',
@@ -1404,7 +1430,7 @@ router.post('/bulk-submit', filingMutationLimiter, ccApiLimiter, async (req: Aut
       skippedIds: skipped,
     });
   } catch (err: any) {
-    logger.error({ err: err.message }, '[BulkSubmit] Error:');
+    console.error('[BulkSubmit] Error:', err.message);
     res.status(500).json({ error: 'Bulk submission failed' });
   }
 });
@@ -1437,7 +1463,7 @@ router.post('/bulk-delete', filingMutationLimiter, async (req: AuthRequest, res:
       requested: filingIds.length,
     });
   } catch (err: any) {
-    logger.error({ err: err.message }, '[BulkDelete] Error:');
+    console.error('[BulkDelete] Error:', err.message);
     res.status(500).json({ error: 'Bulk delete failed' });
   }
 });

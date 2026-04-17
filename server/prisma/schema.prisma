@@ -32,6 +32,8 @@ model Organization {
   auditLogs      AuditLog[]
   filingTemplates FilingTemplate[]
   invitations    OrgInvitation[]
+  subscription   Subscription?
+  filingUsage    FilingUsage[]
 
   @@map("organizations")
 }
@@ -288,4 +290,74 @@ model FilingDocument {
 
   @@index([filingId])
   @@map("filing_documents")
+}
+
+// ─── Billing ─────────────────────────────────────────────
+
+// Plan: a subscription tier (e.g., Grower Monthly, Scale Annual).
+// Seeded from DB seed script; each plan maps to a Stripe Price via stripePriceId.
+model Plan {
+  id                String   @id                      // e.g., "grower_monthly"
+  name              String                            // "Grower"
+  description       String?
+  stripePriceId     String?  @unique @map("stripe_price_id")  // null for Free
+  stripeProductId   String?  @map("stripe_product_id")
+  priceCents        Int      @map("price_cents")      // e.g., 9900 for $99
+  currency          String   @default("usd") @db.VarChar(3)
+  billingInterval   String   @map("billing_interval") @db.VarChar(20)  // "month" | "year" | "free"
+  filingsIncluded   Int      @map("filings_included") // 2, 15, 60, or large number for enterprise
+  maxSeats          Int      @map("max_seats")
+  overageCents      Int      @default(0) @map("overage_cents")    // per-filing overage (0 for free/enterprise)
+  features          String[]                          // JSON list of feature keys
+  isActive          Boolean  @default(true) @map("is_active")
+  isPublic          Boolean  @default(true) @map("is_public")      // show in pricing UI
+  sortOrder         Int      @default(0) @map("sort_order")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  subscriptions    Subscription[]
+
+  @@map("plans")
+}
+
+// Subscription: one per organization, tracks current Stripe subscription + plan.
+model Subscription {
+  id                    String   @id @default(uuid()) @db.Uuid
+  orgId                 String   @unique @map("org_id") @db.Uuid
+  planId                String   @map("plan_id")
+  stripeCustomerId      String?  @unique @map("stripe_customer_id")
+  stripeSubscriptionId  String?  @unique @map("stripe_subscription_id")
+  // Stripe-reported status: "trialing" | "active" | "past_due" | "canceled" | "unpaid" | "incomplete"
+  // For the Free (Starter) plan: always "active" with no Stripe IDs.
+  status                String   @default("active") @db.VarChar(30)
+  currentPeriodStart    DateTime? @map("current_period_start") @db.Timestamptz()
+  currentPeriodEnd      DateTime? @map("current_period_end") @db.Timestamptz()
+  cancelAtPeriodEnd     Boolean  @default(false) @map("cancel_at_period_end")
+  canceledAt            DateTime? @map("canceled_at") @db.Timestamptz()
+  trialEnd              DateTime? @map("trial_end") @db.Timestamptz()
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  plan         Plan         @relation(fields: [planId], references: [id])
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+// FilingUsage: per-org monthly counter of "billable filings" (successful submits).
+// Keyed by calendar month in YYYY-MM format for fast lookup + simple reporting.
+model FilingUsage {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  month     String   @db.VarChar(7)    // "2026-04"
+  count     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, month])
+  @@index([orgId, month])
+  @@map("filing_usage")
 }

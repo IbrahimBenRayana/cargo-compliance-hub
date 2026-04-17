@@ -9,6 +9,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import OnboardingPage from "@/pages/OnboardingPage";
+import UpgradePage from "@/pages/UpgradePage";
+import UpgradeSuccessPage from "@/pages/UpgradeSuccessPage";
+import UpgradeCancelPage from "@/pages/UpgradeCancelPage";
 import Dashboard from "@/pages/Dashboard";
 import ShipmentsList from "@/pages/ShipmentsList";
 import ShipmentDetails from "@/pages/ShipmentDetails";
@@ -47,6 +50,11 @@ const App = () => (
             <Route element={<ProtectedRoute />}>
               {/* Onboarding — full-page, no sidebar */}
               <Route path="/onboarding" element={<ErrorBoundary><OnboardingPage /></ErrorBoundary>} />
+
+              {/* Upgrade flow — full-page, no sidebar */}
+              <Route path="/upgrade" element={<ErrorBoundary><UpgradePage /></ErrorBoundary>} />
+              <Route path="/upgrade/success" element={<ErrorBoundary><UpgradeSuccessPage /></ErrorBoundary>} />
+              <Route path="/upgrade/cancel" element={<ErrorBoundary><UpgradeCancelPage /></ErrorBoundary>} />
 
               {/* Main app with sidebar layout */}
               <Route element={<AppLayout />}>

@@ -340,7 +340,7 @@ export const settingsApi = {
     }>('/api/v1/settings/organization');
   },
 
-  updateOrganization(data: { name?: string; iorNumber?: string; einNumber?: string; address?: any; phone?: string; website?: string }) {
+  updateOrganization(data: { name?: string; iorNumber?: string; einNumber?: string; address?: any }) {
     return apiFetch<any>('/api/v1/settings/organization', {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -508,6 +508,47 @@ export const exportApi = {
     return apiDownload(`/api/v1/export/pdf-summary${buildQuery(params)}`);
   },
 };
+
+// ─── Billing API ──────────────────────────────────────────
+export const billingApi = {
+  subscription() {
+    return apiFetch<{
+      plan: {
+        id: string;
+        name: string;
+        description: string | null;
+        priceCents: number;
+        billingInterval: string;
+        filingsIncluded: number;
+        maxSeats: number;
+        overageCents: number;
+        features: string[];
+      } | null;
+      subscription: {
+        status: string;
+        currentPeriodStart: string | null;
+        currentPeriodEnd: string | null;
+        cancelAtPeriodEnd: boolean;
+      } | null;
+      usage: { month: string; count: number; limit: number };
+    }>('/api/v1/billing/subscription');
+  },
+
+  createCheckoutSession(body: { planId: string; successUrl?: string; cancelUrl?: string }) {
+    return apiFetch<{ url: string; sessionId: string }>('/api/v1/billing/checkout-session', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  createPortalSession() {
+    return apiFetch<{ url: string }>('/api/v1/billing/portal-session', {
+      method: 'POST',
+    });
+  },
+};
+
+export type BillingSubscription = Awaited<ReturnType<typeof billingApi.subscription>>;
 
 function buildQuery(params?: Record<string, string | undefined>): string {
   if (!params) return '';
