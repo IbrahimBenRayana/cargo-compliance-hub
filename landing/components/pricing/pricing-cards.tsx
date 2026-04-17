@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://mycargolens.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.mycargolens.com";
 
 const PLANS = [
   {
