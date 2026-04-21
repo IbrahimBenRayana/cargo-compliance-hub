@@ -25,6 +25,9 @@ import { verifyEmailConnection } from './services/email.js';
 const app = express();
 
 // ─── Global Middleware ────────────────────────────────────
+// Trust the first proxy (nginx) so express-rate-limit sees real client IPs
+app.set('trust proxy', 1);
+
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: false,
