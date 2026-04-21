@@ -618,10 +618,10 @@ export function mapFilingToCC(filing: any): CCDocumentCreatePayload {
     placeOfDelivery:       '',       // MUST be empty when isFROB=false
     bondHolderID:        iorTaxId || '00-000000000',
     // USPortOfArrival must be a valid 4-digit CBP port code.
-    // placeOfDelivery stores the 4-digit CBP port (e.g. "2704" = LA).
-    // foreignPortOfUnlading is a 5-digit Schedule D code for the FOREIGN port — NOT a US port.
-    // Fallback chain: placeOfDelivery (4-digit CBP) → first 4 chars of foreignPortOfUnlading only if it's ≤4 digits → default 1001
-    USPortOfArrival:     (filing.placeOfDelivery || '').replace(/\s/g, '').slice(0, 4) || '2704',
+    // The ISF-10 form stores the user's US port selection in foreignPortOfUnlading
+    // (using CBP_PORTS_4DIGIT options). placeOfDelivery is an alternative source.
+    // Fallback chain: foreignPortOfUnlading (form field) → placeOfDelivery → default 2704
+    USPortOfArrival:     (filing.foreignPortOfUnlading || filing.placeOfDelivery || '').replace(/\s/g, '').slice(0, 4) || '2704',
     estimateDateOfArrival: toYYYYMMDDString(filing.estimatedArrival) ?? toYYYYMMDDString(new Date()),
 
     // ── IOR — identifierCode "24" (EIN format: XX-XXXXXXXXX) ──
