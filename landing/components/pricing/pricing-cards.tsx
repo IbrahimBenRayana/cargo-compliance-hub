@@ -102,41 +102,35 @@ export function PricingCards() {
           </p>
 
           {/* Billing toggle */}
-          <div className="flex justify-center mb-12">
-            <div className="relative inline-flex items-center rounded-full bg-muted p-1 h-11 gap-0.5">
-              <motion.div
-                className="absolute inset-y-1 rounded-full bg-card shadow-card"
-                layoutId="billing-indicator"
-                transition={{ type: "spring", stiffness: 400, damping: 35 }}
-                style={{
-                  width: "calc(50% - 4px)",
-                  left: billing === "monthly" ? "4px" : "calc(50%)",
-                }}
-              />
-              <button
-                onClick={() => setBilling("monthly")}
-                className={`relative z-10 px-5 py-2 text-sm font-medium rounded-full transition-colors duration-200 ${
-                  billing === "monthly"
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBilling("annual")}
-                className={`relative z-10 flex items-center gap-2 px-5 py-2 text-sm font-medium rounded-full transition-colors duration-200 ${
-                  billing === "annual"
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Annual
-                <span className="inline-flex items-center rounded-full bg-gold/20 px-2.5 py-0.5 text-[10px] font-bold text-gold tracking-wide">
-                  Save 20%
-                </span>
-              </button>
+          <div className="flex flex-col items-center gap-2.5 mb-12">
+            <div className="inline-flex items-center rounded-full bg-muted p-1 h-11">
+              {(["monthly", "annual"] as const).map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => setBilling(opt)}
+                  className={`relative px-6 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                    billing === opt
+                      ? "bg-card text-foreground shadow-card"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {opt === "monthly" ? "Monthly" : "Annual"}
+                </button>
+              ))}
             </div>
+            <AnimatePresence>
+              {billing === "annual" && (
+                <motion.span
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2 }}
+                  className="inline-flex items-center rounded-full bg-gold/15 px-3 py-1 text-[11px] font-bold text-gold-dark dark:text-gold tracking-wide"
+                >
+                  Save 20% with annual billing
+                </motion.span>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Plan cards */}
