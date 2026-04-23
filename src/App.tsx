@@ -17,6 +17,7 @@ import ShipmentsList from "@/pages/ShipmentsList";
 import ShipmentDetails from "@/pages/ShipmentDetails";
 import ShipmentWizard from "@/pages/ShipmentWizard";
 import CompliancePage from "@/pages/CompliancePage";
+import ManifestQueryPage from "@/pages/ManifestQueryPage";
 import IntegrationsApi from "@/pages/IntegrationsApi";
 import SubmissionLogs from "@/pages/SubmissionLogs";
 import SettingsPage from "@/pages/SettingsPage";
@@ -64,6 +65,7 @@ const App = () => (
                 <Route path="/shipments/:id" element={<ErrorBoundary><ShipmentDetails /></ErrorBoundary>} />
                 <Route path="/shipments/:id/edit" element={<ErrorBoundary><ShipmentWizard /></ErrorBoundary>} />
                 <Route path="/compliance" element={<ErrorBoundary><CompliancePage /></ErrorBoundary>} />
+                <Route path="/manifest-query" element={<ErrorBoundary><ManifestQueryPage /></ErrorBoundary>} />
                 <Route path="/integrations/api" element={<ErrorBoundary><IntegrationsApi /></ErrorBoundary>} />
                 <Route path="/integrations/logs" element={<ErrorBoundary><SubmissionLogs /></ErrorBoundary>} />
                 <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />

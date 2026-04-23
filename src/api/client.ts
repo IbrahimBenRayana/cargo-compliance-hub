@@ -550,6 +550,43 @@ export const billingApi = {
 
 export type BillingSubscription = Awaited<ReturnType<typeof billingApi.subscription>>;
 
+// ─── Manifest Query API ───────────────────────────────────
+export const manifestQueryApi = {
+  create(data: {
+    bolNumber: string;
+    bolType?: 'BOLNUMBER' | 'AWBNUMBER';
+    houseBOLNumber?: string | null;
+    limitOutputOption?: '1' | '2' | '3';
+    requestRelatedBOL?: boolean;
+    requestBOLAndEntryInformation?: boolean;
+    filingId?: string;
+  }) {
+    return apiFetch<{ data: { id: string; ccRequestId: string; status: string; bolNumber: string } }>('/api/v1/manifest-queries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  get(id: string) {
+    return apiFetch<{ data: any }>(`/api/v1/manifest-queries/${id}`);
+  },
+
+  list(params?: { page?: number; limit?: number; bolNumber?: string; status?: string }) {
+    const query = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== '') query.set(k, String(v));
+      });
+    }
+    const qs = query.toString();
+    return apiFetch<{ data: any[]; pagination: { total: number; page: number; limit: number; totalPages: number } }>(`/api/v1/manifest-queries${qs ? `?${qs}` : ''}`);
+  },
+
+  poll(id: string) {
+    return apiFetch<{ data: any }>(`/api/v1/manifest-queries/${id}/poll`, { method: 'POST' });
+  },
+};
+
 function buildQuery(params?: Record<string, string | undefined>): string {
   if (!params) return '';
   const query = new URLSearchParams();

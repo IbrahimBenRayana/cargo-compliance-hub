@@ -19,6 +19,7 @@ import organizationRoutes from './routes/organization.js';
 import documentRoutes from './routes/documents.js';
 import exportRoutes from './routes/export.js';
 import billingRoutes from './routes/billing.js';
+import manifestQueryRoutes from './routes/manifestQuery.js';
 import { startBackgroundJobs, stopBackgroundJobs, getJobStatus, pollSubmittedFilings, checkDeadlines } from './services/backgroundJobs.js';
 import { verifyEmailConnection } from './services/email.js';
 
@@ -83,6 +84,7 @@ app.use('/api/v1/organization', organizationRoutes);
 app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/export', exportRoutes);
 app.use('/api/v1/billing', billingRoutes);
+app.use('/api/v1/manifest-queries', manifestQueryRoutes);
 
 // ─── Background Jobs Endpoints ────────────────────────────
 // GET job status + POST manual trigger (for admin/testing)

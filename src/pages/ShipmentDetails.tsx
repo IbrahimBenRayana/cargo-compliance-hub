@@ -27,7 +27,7 @@ import {
   FileEdit, Ban, Shield, AlertTriangle, Ship, Package, Globe, Anchor,
   Container, Users, FileText, Clock, ChevronRight, Zap, Activity,
   RefreshCw, Radio, Inbox, ArrowDownToLine, Copy, Bookmark, MoreHorizontal,
-  Upload, Trash2, Paperclip,
+  Upload, Trash2, Paperclip, Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -746,6 +746,16 @@ export default function ShipmentDetails() {
             <Button variant="outline" className="gap-1.5" onClick={handleAmend} disabled={amendFiling.isPending}>
               {amendFiling.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileEdit className="h-4 w-4" />}
               Amend
+            </Button>
+          )}
+
+          {/* Check Manifest — look up cargo status at CBP */}
+          {filing.masterBol && (
+            <Button variant="outline" className="gap-1.5" asChild>
+              <Link to={`/manifest-query?bol=${encodeURIComponent(filing.masterBol)}`}>
+                <Search className="h-4 w-4" />
+                Check Manifest
+              </Link>
             </Button>
           )}
 

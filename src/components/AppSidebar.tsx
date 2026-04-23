@@ -1,4 +1,4 @@
-import { LayoutDashboard, Ship, Shield, Plug, Settings, FileText, ChevronRight, Users } from 'lucide-react';
+import { LayoutDashboard, Ship, Shield, Plug, Settings, FileText, ChevronRight, Users, Search } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -25,6 +25,10 @@ const mainNav = [
 const integrationsNav = [
   { title: 'API Settings', url: '/integrations/api', icon: Plug },
   { title: 'Submission Logs', url: '/integrations/logs', icon: FileText },
+];
+
+const toolsNav = [
+  { title: 'Manifest Query', url: '/manifest-query', icon: Search },
 ];
 
 const managementNav = [
@@ -145,6 +149,41 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu className="group-data-[collapsible=icon]:items-center">
               {integrationsNav.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                    className={navItemClass}
+                  >
+                    <NavLink to={item.url}>
+                      <item.icon className="h-[18px] w-[18px] transition-transform duration-200 group-hover/btn:scale-110 shrink-0" />
+                      {!collapsed && (
+                        <>
+                          <span className="font-medium text-[13px]">{item.title}</span>
+                          {isActive(item.url) && (
+                            <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-60" />
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* ── Tools ── */}
+        <SidebarGroup>
+          {!collapsed && (
+            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1 px-3">
+              Tools
+            </SidebarGroupLabel>
+          )}
+          <SidebarGroupContent>
+            <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+              {toolsNav.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
