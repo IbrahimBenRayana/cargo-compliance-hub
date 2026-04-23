@@ -47,6 +47,7 @@ export default function RegisterPage() {
     companyName: '',
   });
   const navigate = useNavigate();
+  const redirectTo = searchParams.get('redirect') || '/';
   const register = useRegister();
 
   const update = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -68,7 +69,7 @@ export default function RegisterPage() {
       }
       await register.mutateAsync(payload);
       toast.success(inviteToken ? 'Welcome to the team!' : 'Account created! Welcome to MyCargoLens.');
-      navigate('/');
+      navigate(redirectTo);
     } catch (err: any) {
       toast.error(err.body?.error || 'Registration failed');
     }
@@ -228,7 +229,7 @@ export default function RegisterPage() {
               <p className="mt-6 text-sm text-muted-foreground text-center">
                 Already have an account?{' '}
                 <Link
-                  to="/login"
+                  to={redirectTo !== '/' ? `/login?redirect=${encodeURIComponent(redirectTo)}` : '/login'}
                   className="text-foreground font-medium hover:underline transition-colors"
                 >
                   Sign in

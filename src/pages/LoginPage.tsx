@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useLogin } from '@/hooks/useAuth';
 import { motion, MotionConfig } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('demo@mycargolens.com');
   const [password, setPassword] = useState('password123');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect') || '/';
   const login = useLogin();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -45,7 +47,7 @@ export default function LoginPage() {
     try {
       await login.mutateAsync({ email, password });
       toast.success('Welcome back!');
-      navigate('/');
+      navigate(redirectTo);
     } catch (err: any) {
       toast.error(err.body?.error || 'Login failed');
     }
@@ -167,7 +169,7 @@ export default function LoginPage() {
               <p className="mt-6 text-sm text-muted-foreground text-center">
                 Don&apos;t have an account?{' '}
                 <Link
-                  to="/register"
+                  to={redirectTo !== '/' ? `/register?redirect=${encodeURIComponent(redirectTo)}` : '/register'}
                   className="text-foreground font-medium hover:underline transition-colors"
                 >
                   Sign up

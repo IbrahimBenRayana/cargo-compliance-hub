@@ -24,8 +24,13 @@ export function ProtectedRoute() {
   }
 
   // If not authenticated and no refresh token, redirect to login
+  // Preserve the intended destination so user returns after auth
   if (!isAuthenticated && !refreshToken) {
-    return <Navigate to="/login" replace />;
+    const intended = location.pathname + location.search;
+    const loginUrl = intended && intended !== '/'
+      ? `/login?redirect=${encodeURIComponent(intended)}`
+      : '/login';
+    return <Navigate to={loginUrl} replace />;
   }
 
   // If onboarding not completed and not already on onboarding page, redirect
