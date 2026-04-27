@@ -514,7 +514,7 @@ export interface CCABIItem {
   informationalMaterialsExemption?: 'Y' | 'N';
   religiousPurposes?: 'Y' | 'N';
   agriculturalExemption?: 'Y' | 'N';
-  semiConductorExemption?: number;
+  semiConductorExemption?: number | null;
   parties: CCABIParty[];
 }
 
