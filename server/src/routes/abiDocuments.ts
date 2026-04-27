@@ -12,6 +12,7 @@ import {
 import {
   mapABIDocumentToCC,
   buildSendPayload,
+  prefillFromFiling,
   prefillFromManifestQuery,
 } from '../services/abiDocumentMapper.js';
 import { sanitizeErrorMessage } from '../services/errorTranslator.js';
@@ -296,6 +297,26 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
   const { payload: providedPayload, manifestQueryId, filingId } = parsed.data;
 
   let initialPayload: any = providedPayload ?? {};
+
+  // Optional pre-fill from an existing ISF Filing (same org only). Runs
+  // BEFORE manifest-query prefill so a manifest query's shipment-level
+  // fields (which are CBP-derived and authoritative) override the
+  // user-supplied ISF data on the few overlapping keys (e.g. mBOL).
+  if (filingId) {
+    const linkedFiling = await prisma.filing.findFirst({
+      where: { id: filingId, orgId: req.user!.orgId },
+    });
+    if (!linkedFiling) {
+      res.status(404).json({ error: 'Linked ISF filing not found' });
+      return;
+    }
+    const filingPrefill = prefillFromFiling(linkedFiling);
+    initialPayload = { ...filingPrefill, ...initialPayload };
+    // Don't lose the prefilled manifest if the user didn't send one.
+    if (filingPrefill.manifest && !providedPayload?.manifest) {
+      initialPayload.manifest = filingPrefill.manifest;
+    }
+  }
 
   // Optional pre-fill from a completed manifest query (same org only).
   if (manifestQueryId) {

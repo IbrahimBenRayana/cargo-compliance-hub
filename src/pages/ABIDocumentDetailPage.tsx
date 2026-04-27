@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Pencil, Trash2, Send, RefreshCw, Loader2, AlertTriangle, FileText,
   Ship, User, MapPin, Package, ChevronDown, ChevronRight, ExternalLink, CheckCircle2,
-  Hash, Calendar, Building2,
+  Hash, Calendar, Building2, Search,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -478,6 +478,40 @@ export default function ABIDocumentDetailPage() {
               />
               <LabeledValue label="Poll Attempts" value={String(doc.pollAttempts ?? 0)} />
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Linked sources — ISF filing and / or manifest query the entry
+          was prefilled from. Cross-links so the user can hop between the
+          three views without losing context. */}
+      {(doc.filingId || doc.manifestQueryId) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Linked sources</CardTitle>
+            <CardDescription>
+              This entry was created from existing records — open them to verify the prefilled data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {doc.filingId && (
+              <Button variant="outline" size="sm" className="gap-1.5" asChild>
+                <Link to={`/shipments/${doc.filingId}`}>
+                  <Ship className="h-3.5 w-3.5" />
+                  Linked ISF Filing
+                  <ExternalLink className="h-3 w-3 opacity-60" />
+                </Link>
+              </Button>
+            )}
+            {doc.manifestQueryId && (
+              <Button variant="outline" size="sm" className="gap-1.5" asChild>
+                <Link to={`/manifest-query?queryId=${doc.manifestQueryId}`}>
+                  <Search className="h-3.5 w-3.5" />
+                  Linked Manifest Query
+                  <ExternalLink className="h-3 w-3 opacity-60" />
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

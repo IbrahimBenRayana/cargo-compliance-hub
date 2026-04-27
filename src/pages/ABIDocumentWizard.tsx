@@ -123,6 +123,7 @@ export default function ABIDocumentWizard() {
   const { id: paramId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const fromManifest = searchParams.get('fromManifest') ?? undefined;
+  const fromShipment = searchParams.get('fromShipment') ?? undefined;
   const navigate = useNavigate();
 
   // The document id we are editing. Undefined until created (new flow).
@@ -173,6 +174,7 @@ export default function ABIDocumentWizard() {
             .mutateAsync({
               payload: next,
               ...(fromManifest ? { manifestQueryId: fromManifest } : {}),
+              ...(fromShipment ? { filingId: fromShipment } : {}),
             })
             .then((res) => {
               const newId = res.data.id;
@@ -191,7 +193,7 @@ export default function ABIDocumentWizard() {
         return next;
       });
     },
-    [docId, autosave, createMut, fromManifest, navigate],
+    [docId, autosave, createMut, fromManifest, fromShipment, navigate],
   );
 
   // ── Transmit

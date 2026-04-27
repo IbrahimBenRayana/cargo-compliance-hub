@@ -20,6 +20,24 @@ import { cn } from '@/lib/utils';
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Map an ISF filing's status to the next user action in the import
+ * lifecycle (ISF → Manifest Query → ABI Entry). Returns null when there
+ * is nothing actionable (cancelled, or awaiting CBP).
+ */
+function computeNextStep(f: { id: string; status: string; masterBol?: string | null }): { label: string; to: string } | null {
+  switch (f.status) {
+    case 'draft':
+      return { label: 'Complete ISF', to: `/shipments/${f.id}/edit` };
+    case 'rejected':
+      return { label: 'Review & resubmit', to: `/shipments/${f.id}` };
+    case 'accepted':
+      return { label: 'File Entry Documents', to: `/abi-documents/new?fromShipment=${f.id}` };
+    default:
+      return null; // submitted (awaiting CBP), cancelled, etc.
+  }
+}
+
 function relativeTime(ts: string) {
   const diff = Date.now() - new Date(ts).getTime();
   const mins = Math.floor(diff / 60000);
@@ -616,40 +634,56 @@ export default function Dashboard() {
             </div>
           ) : (
             <ul className="divide-y divide-border/60">
-              {recent.map(f => (
-                <li key={f.id}>
-                  <Link
-                    to={`/shipments/${f.id}`}
-                    className="group flex items-center gap-4 px-6 py-3.5 transition-colors hover:bg-muted/30"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
-                          {f.houseBol || f.masterBol || 'Untitled filing'}
-                        </span>
-                        <span className="text-[10px] font-mono text-muted-foreground/60 shrink-0">
-                          {f.filingType}
-                        </span>
+              {recent.map(f => {
+                const next = computeNextStep(f);
+                return (
+                  <li key={f.id}>
+                    <div className="group flex items-center gap-4 px-6 py-3.5 transition-colors hover:bg-muted/30">
+                      <Link
+                        to={`/shipments/${f.id}`}
+                        className="flex-1 min-w-0"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                            {f.houseBol || f.masterBol || 'Untitled filing'}
+                          </span>
+                          <span className="text-[10px] font-mono text-muted-foreground/60 shrink-0">
+                            {f.filingType}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {f.importerName || 'No importer set'}
+                        </p>
+                      </Link>
+
+                      <div className="hidden sm:block shrink-0">
+                        <StatusBadge status={f.status} />
                       </div>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {f.importerName || 'No importer set'}
-                      </p>
-                    </div>
 
-                    <div className="hidden sm:block shrink-0">
-                      <StatusBadge status={f.status} />
-                    </div>
+                      {/* Lifecycle next-step CTA. Visible only when there's
+                          an actionable next step (skipped for terminal /
+                          waiting states). */}
+                      {next && (
+                        <Link
+                          to={next.to}
+                          className="hidden md:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors shrink-0"
+                        >
+                          {next.label}
+                          <ArrowRight className="h-3 w-3" />
+                        </Link>
+                      )}
 
-                    <div className="shrink-0 text-right min-w-[70px]">
-                      <p className="text-xs tabular-nums text-foreground/80">
-                        {relativeTime(f.createdAt)}
-                      </p>
-                    </div>
+                      <div className="shrink-0 text-right min-w-[70px]">
+                        <p className="text-xs tabular-nums text-foreground/80">
+                          {relativeTime(f.createdAt)}
+                        </p>
+                      </div>
 
-                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
-                  </Link>
-                </li>
-              ))}
+                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

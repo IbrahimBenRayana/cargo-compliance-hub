@@ -27,7 +27,7 @@ import {
   FileEdit, Ban, Shield, AlertTriangle, Ship, Package, Globe, Anchor,
   Container, Users, FileText, Clock, ChevronRight, Zap, Activity,
   RefreshCw, Radio, Inbox, ArrowDownToLine, Copy, Bookmark, MoreHorizontal,
-  Upload, Trash2, Paperclip, Search,
+  Upload, Trash2, Paperclip, Search, FileCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -755,6 +755,18 @@ export default function ShipmentDetails() {
               <Link to={`/manifest-query?bol=${encodeURIComponent(filing.masterBol)}`}>
                 <Search className="h-4 w-4" />
                 Check Manifest
+              </Link>
+            </Button>
+          )}
+
+          {/* File Entry Documents — once ISF is accepted, file the
+              7501 + 3461 entry. Server prefills IOR, consignee, MBOL,
+              carrier, and bond from this filing. */}
+          {filing.status === 'accepted' && (
+            <Button variant="outline" className="gap-1.5" asChild>
+              <Link to={`/abi-documents/new?fromShipment=${filing.id}`}>
+                <FileCheck className="h-4 w-4" />
+                File Entry Documents
               </Link>
             </Button>
           )}

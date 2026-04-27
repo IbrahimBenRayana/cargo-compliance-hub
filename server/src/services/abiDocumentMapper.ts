@@ -75,6 +75,75 @@ export function buildSendPayload(
  * Dates from CC come through as YYYYMMDD strings already; we pass them
  * through unchanged (ABI uses YYYYMMDD strings, unlike ISF which uses ints).
  */
+/**
+ * Pre-fill an ABI draft from an existing ISF Filing record. Pulls IOR,
+ * consignee, master/house BOL, carrier (SCAC), bond type, and estimated
+ * arrival date. Bond type is translated from the ISF enum
+ * ("continuous" | "single") to the ABI enum ("8" | "9"). Fields the user
+ * still has to fill: bond.taxId, payment, firms, location.portOfEntry,
+ * destinationStateUS, dates.entryDate / importDate, manifest.ports,
+ * quantity / quantityUOM, the entire invoices tree, and the filer-assigned
+ * entryNumber.
+ */
+export function prefillFromFiling(filing: any): Partial<ABIDocumentBody> {
+  const prefill: Partial<ABIDocumentBody> = {};
+
+  if (filing.importerName || filing.importerNumber) {
+    prefill.ior = {
+      number: filing.importerNumber ?? '',
+      name: filing.importerName ?? '',
+    };
+  }
+
+  // ISF stores consigneeAddress as JSONB: { street, city, state, zip, country }
+  // Some legacy rows may use { address, postalCode } — handle both shapes.
+  const ca = filing.consigneeAddress as any;
+  if (filing.consigneeName || ca) {
+    prefill.entryConsignee = {
+      name: filing.consigneeName ?? '',
+      taxId: filing.consigneeNumber ?? '',
+      address: ca?.street ?? ca?.address ?? '',
+      city: ca?.city ?? '',
+      state: ca?.state ?? '',
+      postalCode: ca?.zip ?? ca?.postalCode ?? '',
+      country: ca?.country ?? 'US',
+    };
+  }
+
+  const manifestEntry: any = {};
+  if (filing.masterBol || filing.houseBol) {
+    manifestEntry.bill = {
+      type: filing.houseBol ? 'H' : 'M',
+      mBOL: filing.masterBol ?? '',
+      hBOL: filing.houseBol ?? '',
+      groupBOL: 'N',
+    };
+  }
+  if (filing.scacCode) {
+    manifestEntry.carrier = { code: filing.scacCode };
+  }
+  if (Object.keys(manifestEntry).length > 0) {
+    prefill.manifest = [manifestEntry];
+  }
+
+  // ISF bondType uses words; ABI uses CBP codes.
+  if (filing.bondType === 'continuous') {
+    prefill.bond = { type: '8', taxId: filing.importerNumber ?? '' } as any;
+  } else if (filing.bondType === 'single') {
+    prefill.bond = { type: '9', taxId: filing.importerNumber ?? '' } as any;
+  }
+
+  if (filing.estimatedArrival) {
+    const d = new Date(filing.estimatedArrival);
+    const ymd = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+    if (/^\d{8}$/.test(ymd)) {
+      prefill.dates = { arrivalDate: ymd } as any;
+    }
+  }
+
+  return prefill;
+}
+
 export function prefillFromManifestQuery(
   manifestQuery: { response: Prisma.JsonValue }
 ): Partial<ABIDocumentBody> {
