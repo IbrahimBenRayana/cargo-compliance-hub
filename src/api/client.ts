@@ -797,15 +797,17 @@ export interface ABIDocumentBody {
   manifest: ABIManifest[];
 }
 
-/** DeepPartial — used for draft state in the wizard. */
-export type ABIDocumentDraft = {
-  [K in keyof ABIDocumentBody]?:
-    ABIDocumentBody[K] extends Array<infer U>
-      ? Array<{ [P in keyof U]?: U[P] }>
-      : ABIDocumentBody[K] extends object
-        ? { [P in keyof ABIDocumentBody[K]]?: ABIDocumentBody[K][P] }
-        : ABIDocumentBody[K];
-};
+/** Recursive DeepPartial — every level becomes optional, including
+ *  array element fields. Used for draft state in the wizard so any
+ *  nested setter (e.g. `manifest[0].bill.type`) can land partial values. */
+type _DeepPartial<T> =
+  T extends (infer U)[]
+    ? _DeepPartial<U>[]
+    : T extends object
+      ? { [K in keyof T]?: _DeepPartial<T[K]> }
+      : T;
+
+export type ABIDocumentDraft = _DeepPartial<ABIDocumentBody>;
 
 /**
  * AbiDocument — the row returned by the server for an ABI filing.

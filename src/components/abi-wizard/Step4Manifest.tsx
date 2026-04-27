@@ -22,12 +22,11 @@ interface Props {
 }
 
 export default function Step4Manifest({ value, onChange, doc }: Props) {
-  const manifest = (value.manifest?.[0] || {}) as NonNullable<
-    ABIDocumentDraft['manifest']
-  >[number];
-  const bill = manifest.bill || {};
-  const carrier = manifest.carrier || {};
-  const ports = manifest.ports || {};
+  type ManifestSlice = NonNullable<ABIDocumentDraft['manifest']>[number];
+  const manifest = (value.manifest?.[0] || {}) as ManifestSlice;
+  const bill: NonNullable<ManifestSlice['bill']> = manifest.bill ?? {};
+  const carrier: NonNullable<ManifestSlice['carrier']> = manifest.carrier ?? {};
+  const ports: NonNullable<ManifestSlice['ports']> = manifest.ports ?? {};
 
   const setManifest = (patch: Partial<typeof manifest>) => {
     const rest = value.manifest ? value.manifest.slice(1) : [];

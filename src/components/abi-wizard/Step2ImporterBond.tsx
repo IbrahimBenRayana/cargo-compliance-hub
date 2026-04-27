@@ -76,7 +76,7 @@ export default function Step2ImporterBond({ value, onChange }: Props) {
             label="Bond Type"
             required
             value={bond.type || ''}
-            onChange={(v) => setBond({ type: v })}
+            onChange={(v) => setBond({ type: v as '8' | '9' })}
             options={BOND_TYPES}
             hint="Single entry, continuous, or single transaction."
           />
