@@ -9,32 +9,33 @@ datasource db {
 
 // ─── Organizations ─────────────────────────────────────────
 model Organization {
-  id            String   @id @default(uuid()) @db.Uuid
-  name          String   @db.VarChar(255)
-  slug          String?  @unique @db.VarChar(100) // URL-friendly org identifier
-  iorNumber     String?  @map("ior_number") @db.VarChar(100)
-  einNumber     String?  @map("ein_number") @db.VarChar(20) // Encrypted
-  address       Json?
-  phone         String?  @db.VarChar(30)
-  website       String?  @db.VarChar(255)
-  logoUrl       String?  @map("logo_url") @db.VarChar(500)
-  ccApiKeyEnc   String?  @map("cc_api_key_enc") // Encrypted CustomsCity API key
-  ccEnvironment String   @default("sandbox") @map("cc_environment") @db.VarChar(20)
-  maxUsers      Int      @default(10) @map("max_users") // Seat limit
-  onboardingCompleted Boolean @default(false) @map("onboarding_completed")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  id                  String   @id @default(uuid()) @db.Uuid
+  name                String   @db.VarChar(255)
+  slug                String?  @unique @db.VarChar(100) // URL-friendly org identifier
+  iorNumber           String?  @map("ior_number") @db.VarChar(100)
+  einNumber           String?  @map("ein_number") @db.VarChar(20) // Encrypted
+  address             Json?
+  phone               String?  @db.VarChar(30)
+  website             String?  @db.VarChar(255)
+  logoUrl             String?  @map("logo_url") @db.VarChar(500)
+  ccApiKeyEnc         String?  @map("cc_api_key_enc") // Encrypted CustomsCity API key
+  ccEnvironment       String   @default("sandbox") @map("cc_environment") @db.VarChar(20)
+  maxUsers            Int      @default(10) @map("max_users") // Seat limit
+  onboardingCompleted Boolean  @default(false) @map("onboarding_completed")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  users          User[]
-  filings        Filing[]
-  submissionLogs SubmissionLog[]
-  notifications  Notification[]
-  auditLogs      AuditLog[]
+  users           User[]
+  filings         Filing[]
+  submissionLogs  SubmissionLog[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
   filingTemplates FilingTemplate[]
-  invitations    OrgInvitation[]
-  subscription   Subscription?
-  filingUsage    FilingUsage[]
+  invitations     OrgInvitation[]
+  subscription    Subscription?
+  filingUsage     FilingUsage[]
   manifestQueries ManifestQuery[]
+  abiDocuments    AbiDocument[]
 
   @@map("organizations")
 }
@@ -57,16 +58,17 @@ model User {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  organization    Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  filings         Filing[]         @relation("FilingCreator")
+  organization    Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  filings         Filing[]              @relation("FilingCreator")
   statusChanges   FilingStatusHistory[] @relation("StatusChanger")
   submissionLogs  SubmissionLog[]
   notifications   Notification[]
   auditLogs       AuditLog[]
   filingTemplates FilingTemplate[]
-  invitations     OrgInvitation[]  @relation("InvitationCreator")
-  uploadedDocs    FilingDocument[] @relation("DocumentUploader")
+  invitations     OrgInvitation[]       @relation("InvitationCreator")
+  uploadedDocs    FilingDocument[]      @relation("DocumentUploader")
   manifestQueries ManifestQuery[]
+  abiDocuments    AbiDocument[]
 
   @@index([orgId])
   @@index([email])
@@ -75,71 +77,72 @@ model User {
 
 // ─── ISF Filings ───────────────────────────────────────────
 model Filing {
-  id                String    @id @default(uuid()) @db.Uuid
-  orgId             String    @map("org_id") @db.Uuid
-  createdById       String    @map("created_by") @db.Uuid
-  filingType        String    @map("filing_type") @db.VarChar(10) // ISF-10 | ISF-5
-  status            String    @default("draft") @db.VarChar(30)
-  ccFilingId        String?   @map("cc_filing_id") @db.VarChar(100)
-  cbpTransactionId  String?   @map("cbp_transaction_id") @db.VarChar(100)
+  id               String  @id @default(uuid()) @db.Uuid
+  orgId            String  @map("org_id") @db.Uuid
+  createdById      String  @map("created_by") @db.Uuid
+  filingType       String  @map("filing_type") @db.VarChar(10) // ISF-10 | ISF-5
+  status           String  @default("draft") @db.VarChar(30)
+  ccFilingId       String? @map("cc_filing_id") @db.VarChar(100)
+  cbpTransactionId String? @map("cbp_transaction_id") @db.VarChar(100)
 
   // Importer of Record
-  importerName      String?   @map("importer_name") @db.VarChar(255)
-  importerNumber    String?   @map("importer_number") @db.VarChar(100)
+  importerName   String? @map("importer_name") @db.VarChar(255)
+  importerNumber String? @map("importer_number") @db.VarChar(100)
 
   // Consignee
-  consigneeName     String?   @map("consignee_name") @db.VarChar(255)
-  consigneeNumber   String?   @map("consignee_number") @db.VarChar(100)
-  consigneeAddress  Json?     @map("consignee_address")
+  consigneeName    String? @map("consignee_name") @db.VarChar(255)
+  consigneeNumber  String? @map("consignee_number") @db.VarChar(100)
+  consigneeAddress Json?   @map("consignee_address")
 
   // Parties (JSONB for flexibility)
-  manufacturer      Json?     // { name, address: { street, city, state, zip, country } }
-  seller            Json?
-  buyer             Json?
-  shipToParty       Json?     @map("ship_to_party")
+  manufacturer              Json? // { name, address: { street, city, state, zip, country } }
+  seller                    Json?
+  buyer                     Json?
+  shipToParty               Json? @map("ship_to_party")
   containerStuffingLocation Json? @map("container_stuffing_location")
-  consolidator      Json?
+  consolidator              Json?
 
   // Shipment Details
-  masterBol         String?   @map("master_bol") @db.VarChar(100)
-  houseBol          String?   @map("house_bol") @db.VarChar(100)
-  scacCode          String?   @map("scac_code") @db.VarChar(10)
-  vesselName        String?   @map("vessel_name") @db.VarChar(255)
-  voyageNumber      String?   @map("voyage_number") @db.VarChar(100)
-  foreignPortOfUnlading String? @map("foreign_port_of_unlading") @db.VarChar(10)
-  placeOfDelivery   String?   @map("place_of_delivery") @db.VarChar(10)
-  estimatedDeparture DateTime? @map("estimated_departure") @db.Timestamptz()
-  estimatedArrival  DateTime?  @map("estimated_arrival") @db.Timestamptz()
-  filingDeadline    DateTime?  @map("filing_deadline") @db.Timestamptz()
+  masterBol             String?   @map("master_bol") @db.VarChar(100)
+  houseBol              String?   @map("house_bol") @db.VarChar(100)
+  scacCode              String?   @map("scac_code") @db.VarChar(10)
+  vesselName            String?   @map("vessel_name") @db.VarChar(255)
+  voyageNumber          String?   @map("voyage_number") @db.VarChar(100)
+  foreignPortOfUnlading String?   @map("foreign_port_of_unlading") @db.VarChar(10)
+  placeOfDelivery       String?   @map("place_of_delivery") @db.VarChar(10)
+  estimatedDeparture    DateTime? @map("estimated_departure") @db.Timestamptz()
+  estimatedArrival      DateTime? @map("estimated_arrival") @db.Timestamptz()
+  filingDeadline        DateTime? @map("filing_deadline") @db.Timestamptz()
 
   // Bond Info
-  bondType          String?   @map("bond_type") @db.VarChar(50)
-  bondSuretyCode    String?   @map("bond_surety_code") @db.VarChar(10)
+  bondType       String? @map("bond_type") @db.VarChar(50)
+  bondSuretyCode String? @map("bond_surety_code") @db.VarChar(10)
 
   // ISF-5 specific data (JSONB — booking party, ISF filer, etc.)
-  isf5Data          Json?     @map("isf5_data")
+  isf5Data Json? @map("isf5_data")
 
   // Commodities & Containers (JSONB arrays)
-  commodities       Json      @default("[]")
-  containers        Json      @default("[]")
+  commodities Json @default("[]")
+  containers  Json @default("[]")
 
   // Status timestamps
-  submittedAt       DateTime? @map("submitted_at") @db.Timestamptz()
-  acceptedAt        DateTime? @map("accepted_at") @db.Timestamptz()
-  rejectedAt        DateTime? @map("rejected_at") @db.Timestamptz()
-  rejectionReason   String?   @map("rejection_reason")
-  amendedAt         DateTime? @map("amended_at") @db.Timestamptz()
-  cancelledAt       DateTime? @map("cancelled_at") @db.Timestamptz()
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  submittedAt     DateTime? @map("submitted_at") @db.Timestamptz()
+  acceptedAt      DateTime? @map("accepted_at") @db.Timestamptz()
+  rejectedAt      DateTime? @map("rejected_at") @db.Timestamptz()
+  rejectionReason String?   @map("rejection_reason")
+  amendedAt       DateTime? @map("amended_at") @db.Timestamptz()
+  cancelledAt     DateTime? @map("cancelled_at") @db.Timestamptz()
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  organization      Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  createdBy         User                @relation("FilingCreator", fields: [createdById], references: [id])
-  statusHistory     FilingStatusHistory[]
-  submissionLogs    SubmissionLog[]
-  notifications     Notification[]
-  documents         FilingDocument[]
-  manifestQueries   ManifestQuery[]
+  organization    Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy       User                  @relation("FilingCreator", fields: [createdById], references: [id])
+  statusHistory   FilingStatusHistory[]
+  submissionLogs  SubmissionLog[]
+  notifications   Notification[]
+  documents       FilingDocument[]
+  manifestQueries ManifestQuery[]
+  abiDocuments    AbiDocument[]
 
   @@index([orgId])
   @@index([status])
@@ -151,13 +154,13 @@ model Filing {
 
 // ─── Filing Status History ─────────────────────────────────
 model FilingStatusHistory {
-  id         String   @id @default(uuid()) @db.Uuid
-  filingId   String   @map("filing_id") @db.Uuid
-  status     String   @db.VarChar(30)
-  message    String?
-  ccResponse Json?    @map("cc_response")
-  changedById String? @map("changed_by") @db.Uuid
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  id          String   @id @default(uuid()) @db.Uuid
+  filingId    String   @map("filing_id") @db.Uuid
+  status      String   @db.VarChar(30)
+  message     String?
+  ccResponse  Json?    @map("cc_response")
+  changedById String?  @map("changed_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   filing    Filing @relation(fields: [filingId], references: [id], onDelete: Cascade)
   changedBy User?  @relation("StatusChanger", fields: [changedById], references: [id])
@@ -168,19 +171,19 @@ model FilingStatusHistory {
 
 // ─── Submission Logs (API call audit trail) ────────────────
 model SubmissionLog {
-  id              String   @id @default(uuid()) @db.Uuid
-  orgId           String   @map("org_id") @db.Uuid
-  filingId        String?  @map("filing_id") @db.Uuid
-  userId          String?  @map("user_id") @db.Uuid
-  correlationId   String?  @map("correlation_id") @db.VarChar(100)
-  method          String   @db.VarChar(10)
-  url             String
-  requestPayload  Json?    @map("request_payload")
-  responseStatus  Int?     @map("response_status")
-  responseBody    Json?    @map("response_body")
-  latencyMs       Int?     @map("latency_ms")
-  errorMessage    String?  @map("error_message")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  id             String   @id @default(uuid()) @db.Uuid
+  orgId          String   @map("org_id") @db.Uuid
+  filingId       String?  @map("filing_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  correlationId  String?  @map("correlation_id") @db.VarChar(100)
+  method         String   @db.VarChar(10)
+  url            String
+  requestPayload Json?    @map("request_payload")
+  responseStatus Int?     @map("response_status")
+  responseBody   Json?    @map("response_body")
+  latencyMs      Int?     @map("latency_ms")
+  errorMessage   String?  @map("error_message")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   filing       Filing?      @relation(fields: [filingId], references: [id], onDelete: SetNull)
@@ -193,18 +196,18 @@ model SubmissionLog {
 
 // ─── Notifications ─────────────────────────────────────────
 model Notification {
-  id           String   @id @default(uuid()) @db.Uuid
-  userId       String   @map("user_id") @db.Uuid
-  orgId        String   @map("org_id") @db.Uuid
-  filingId     String?  @map("filing_id") @db.Uuid
-  type         String   @db.VarChar(50)
-  title        String   @db.VarChar(255)
-  message      String?
-  isRead       Boolean  @default(false) @map("is_read")
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  filingId  String?  @map("filing_id") @db.Uuid
+  type      String   @db.VarChar(50)
+  title     String   @db.VarChar(255)
+  message   String?
+  isRead    Boolean  @default(false) @map("is_read")
   // Deduplication key for background-job alerts (e.g. "filingId_72h").
   // Unique per org so the same alert is never sent twice across restarts.
-  dedupeKey    String?  @unique @map("dedupe_key") @db.VarChar(255)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  dedupeKey String?  @unique @map("dedupe_key") @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -256,16 +259,16 @@ model FilingTemplate {
 
 // ─── Organisation Invitations ──────────────────────────────
 model OrgInvitation {
-  id          String   @id @default(uuid()) @db.Uuid
-  orgId       String   @map("org_id") @db.Uuid
-  invitedById String   @map("invited_by") @db.Uuid
-  email       String   @db.VarChar(255)
-  role        String   @default("operator") @db.VarChar(20) // owner | admin | operator | viewer
-  token       String   @unique @db.VarChar(100) // invite link token
-  status      String   @default("pending") @db.VarChar(20) // pending | accepted | expired | revoked
-  expiresAt   DateTime @map("expires_at") @db.Timestamptz()
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  invitedById String    @map("invited_by") @db.Uuid
+  email       String    @db.VarChar(255)
+  role        String    @default("operator") @db.VarChar(20) // owner | admin | operator | viewer
+  token       String    @unique @db.VarChar(100) // invite link token
+  status      String    @default("pending") @db.VarChar(20) // pending | accepted | expired | revoked
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz()
   acceptedAt  DateTime? @map("accepted_at") @db.Timestamptz()
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   invitedBy    User         @relation("InvitationCreator", fields: [invitedById], references: [id])
@@ -300,46 +303,46 @@ model FilingDocument {
 // Plan: a subscription tier (e.g., Grower Monthly, Scale Annual).
 // Seeded from DB seed script; each plan maps to a Stripe Price via stripePriceId.
 model Plan {
-  id                String   @id                      // e.g., "grower_monthly"
-  name              String                            // "Grower"
-  description       String?
-  stripePriceId     String?  @unique @map("stripe_price_id")  // null for Free
-  stripeProductId   String?  @map("stripe_product_id")
-  priceCents        Int      @map("price_cents")      // e.g., 9900 for $99
-  currency          String   @default("usd") @db.VarChar(3)
-  billingInterval   String   @map("billing_interval") @db.VarChar(20)  // "month" | "year" | "free"
-  filingsIncluded   Int      @map("filings_included") // 2, 15, 60, or large number for enterprise
-  maxSeats          Int      @map("max_seats")
-  overageCents      Int      @default(0) @map("overage_cents")    // per-filing overage (0 for free/enterprise)
-  features          String[]                          // JSON list of feature keys
-  isActive          Boolean  @default(true) @map("is_active")
-  isPublic          Boolean  @default(true) @map("is_public")      // show in pricing UI
-  sortOrder         Int      @default(0) @map("sort_order")
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  id              String   @id // e.g., "grower_monthly"
+  name            String // "Grower"
+  description     String?
+  stripePriceId   String?  @unique @map("stripe_price_id") // null for Free
+  stripeProductId String?  @map("stripe_product_id")
+  priceCents      Int      @map("price_cents") // e.g., 9900 for $99
+  currency        String   @default("usd") @db.VarChar(3)
+  billingInterval String   @map("billing_interval") @db.VarChar(20) // "month" | "year" | "free"
+  filingsIncluded Int      @map("filings_included") // 2, 15, 60, or large number for enterprise
+  maxSeats        Int      @map("max_seats")
+  overageCents    Int      @default(0) @map("overage_cents") // per-filing overage (0 for free/enterprise)
+  features        String[] // JSON list of feature keys
+  isActive        Boolean  @default(true) @map("is_active")
+  isPublic        Boolean  @default(true) @map("is_public") // show in pricing UI
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  subscriptions    Subscription[]
+  subscriptions Subscription[]
 
   @@map("plans")
 }
 
 // Subscription: one per organization, tracks current Stripe subscription + plan.
 model Subscription {
-  id                    String   @id @default(uuid()) @db.Uuid
-  orgId                 String   @unique @map("org_id") @db.Uuid
-  planId                String   @map("plan_id")
-  stripeCustomerId      String?  @unique @map("stripe_customer_id")
-  stripeSubscriptionId  String?  @unique @map("stripe_subscription_id")
+  id                   String    @id @default(uuid()) @db.Uuid
+  orgId                String    @unique @map("org_id") @db.Uuid
+  planId               String    @map("plan_id")
+  stripeCustomerId     String?   @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?   @unique @map("stripe_subscription_id")
   // Stripe-reported status: "trialing" | "active" | "past_due" | "canceled" | "unpaid" | "incomplete"
   // For the Free (Starter) plan: always "active" with no Stripe IDs.
-  status                String   @default("active") @db.VarChar(30)
-  currentPeriodStart    DateTime? @map("current_period_start") @db.Timestamptz()
-  currentPeriodEnd      DateTime? @map("current_period_end") @db.Timestamptz()
-  cancelAtPeriodEnd     Boolean  @default(false) @map("cancel_at_period_end")
-  canceledAt            DateTime? @map("canceled_at") @db.Timestamptz()
-  trialEnd              DateTime? @map("trial_end") @db.Timestamptz()
-  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  status               String    @default("active") @db.VarChar(30)
+  currentPeriodStart   DateTime? @map("current_period_start") @db.Timestamptz()
+  currentPeriodEnd     DateTime? @map("current_period_end") @db.Timestamptz()
+  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
+  canceledAt           DateTime? @map("canceled_at") @db.Timestamptz()
+  trialEnd             DateTime? @map("trial_end") @db.Timestamptz()
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   plan         Plan         @relation(fields: [planId], references: [id])
@@ -353,7 +356,7 @@ model Subscription {
 model FilingUsage {
   id        String   @id @default(uuid()) @db.Uuid
   orgId     String   @map("org_id") @db.Uuid
-  month     String   @db.VarChar(7)    // "2026-04"
+  month     String   @db.VarChar(7) // "2026-04"
   count     Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
@@ -367,27 +370,91 @@ model FilingUsage {
 
 // ─── Manifest Queries ─────────────────────────────────────
 model ManifestQuery {
-  id            String    @id @default(uuid()) @db.Uuid
-  orgId         String    @map("org_id") @db.Uuid
-  userId        String    @map("user_id") @db.Uuid
-  bolNumber     String    @map("bol_number") @db.VarChar(100)
-  bolType       String    @default("BOLNUMBER") @map("bol_type") @db.VarChar(20)
-  ccRequestId   String?   @map("cc_request_id") @db.VarChar(100)
-  status        String    @default("pending") @db.VarChar(20)
-  response      Json?
-  errorMessage  String?   @map("error_message")
-  pollAttempts  Int       @default(0) @map("poll_attempts")
-  filingId      String?   @map("filing_id") @db.Uuid
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  completedAt   DateTime? @map("completed_at") @db.Timestamptz()
-  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  id           String    @id @default(uuid()) @db.Uuid
+  orgId        String    @map("org_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  bolNumber    String    @map("bol_number") @db.VarChar(100)
+  bolType      String    @default("BOLNUMBER") @map("bol_type") @db.VarChar(20)
+  ccRequestId  String?   @map("cc_request_id") @db.VarChar(100)
+  status       String    @default("pending") @db.VarChar(20)
+  response     Json?
+  errorMessage String?   @map("error_message")
+  pollAttempts Int       @default(0) @map("poll_attempts")
+  filingId     String?   @map("filing_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz()
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  user          User         @relation(fields: [userId], references: [id])
-  filing        Filing?      @relation(fields: [filingId], references: [id], onDelete: SetNull)
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id])
+  filing       Filing?       @relation(fields: [filingId], references: [id], onDelete: SetNull)
+  abiDocuments AbiDocument[]
 
   @@index([orgId])
   @@index([bolNumber])
   @@index([orgId, createdAt])
   @@map("manifest_queries")
+}
+
+// ─── ABI Documents (CBP Entry Summary 7501 + Cargo Release 3461) ──
+model AbiDocument {
+  id     String @id @default(uuid()) @db.Uuid
+  orgId  String @map("org_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  // Local lifecycle status: DRAFT | SENDING | SENT | ACCEPTED | REJECTED | CANCELLED
+  status String @default("DRAFT") @db.VarChar(20)
+
+  // CC-assigned sub-statuses returned from /api/abi/documents
+  entrySummaryStatus String? @map("entry_summary_status") @db.VarChar(20)
+  cargoReleaseStatus String? @map("cargo_release_status") @db.VarChar(20)
+
+  // Entry identifiers
+  entryType       String  @map("entry_type") @db.VarChar(2) // 01 | 11
+  modeOfTransport String  @map("mode_of_transport") @db.VarChar(2) // 40 = vessel, 41 = air
+  entryNumber     String? @unique @map("entry_number") @db.VarChar(50)
+  ccDocumentId    String? @map("cc_document_id") @db.VarChar(100)
+
+  // Shipment denorm (for list search / filter)
+  mbolNumber String? @map("mbol_number") @db.VarChar(100)
+  hbolNumber String? @map("hbol_number") @db.VarChar(100)
+
+  // Parties denorm
+  iorNumber     String? @map("ior_number") @db.VarChar(100)
+  iorName       String? @map("ior_name") @db.VarChar(255)
+  consigneeName String? @map("consignee_name") @db.VarChar(255)
+
+  // Ports & dates denorm (YYYYMMDD strings in UI; mapped to integers at send time)
+  portOfEntry        String? @map("port_of_entry") @db.VarChar(10)
+  destinationStateUS String? @map("destination_state_us") @db.VarChar(2)
+  entryDate          String? @map("entry_date") @db.VarChar(8)
+  importDate         String? @map("import_date") @db.VarChar(8)
+  arrivalDate        String? @map("arrival_date") @db.VarChar(8)
+
+  // Full CC-ready payload (the wizard-built document body)
+  payload Json @default("{}")
+
+  // Send lifecycle tracking
+  sentAt       DateTime? @map("sent_at") @db.Timestamptz()
+  respondedAt  DateTime? @map("responded_at") @db.Timestamptz()
+  lastError    String?   @map("last_error")
+  pollAttempts Int       @default(0) @map("poll_attempts")
+
+  // Optional links
+  filingId        String? @map("filing_id") @db.Uuid
+  manifestQueryId String? @map("manifest_query_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization  Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id])
+  filing        Filing?        @relation(fields: [filingId], references: [id], onDelete: SetNull)
+  manifestQuery ManifestQuery? @relation(fields: [manifestQueryId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, status])
+  @@index([mbolNumber])
+  @@index([entryNumber])
+  @@index([orgId, createdAt])
+  @@map("abi_documents")
 }

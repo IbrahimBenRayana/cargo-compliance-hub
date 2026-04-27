@@ -18,6 +18,9 @@ import ShipmentDetails from "@/pages/ShipmentDetails";
 import ShipmentWizard from "@/pages/ShipmentWizard";
 import CompliancePage from "@/pages/CompliancePage";
 import ManifestQueryPage from "@/pages/ManifestQueryPage";
+import ABIDocumentsListPage from "@/pages/ABIDocumentsListPage";
+import ABIDocumentDetailPage from "@/pages/ABIDocumentDetailPage";
+import ABIDocumentWizard from "@/pages/ABIDocumentWizard";
 import IntegrationsApi from "@/pages/IntegrationsApi";
 import SubmissionLogs from "@/pages/SubmissionLogs";
 import SettingsPage from "@/pages/SettingsPage";
@@ -66,6 +69,10 @@ const App = () => (
                 <Route path="/shipments/:id/edit" element={<ErrorBoundary><ShipmentWizard /></ErrorBoundary>} />
                 <Route path="/compliance" element={<ErrorBoundary><CompliancePage /></ErrorBoundary>} />
                 <Route path="/manifest-query" element={<ErrorBoundary><ManifestQueryPage /></ErrorBoundary>} />
+                <Route path="/abi-documents" element={<ErrorBoundary><ABIDocumentsListPage /></ErrorBoundary>} />
+                <Route path="/abi-documents/new" element={<ErrorBoundary><ABIDocumentWizard /></ErrorBoundary>} />
+                <Route path="/abi-documents/:id" element={<ErrorBoundary><ABIDocumentDetailPage /></ErrorBoundary>} />
+                <Route path="/abi-documents/:id/edit" element={<ErrorBoundary><ABIDocumentWizard /></ErrorBoundary>} />
                 <Route path="/integrations/api" element={<ErrorBoundary><IntegrationsApi /></ErrorBoundary>} />
                 <Route path="/integrations/logs" element={<ErrorBoundary><SubmissionLogs /></ErrorBoundary>} />
                 <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />

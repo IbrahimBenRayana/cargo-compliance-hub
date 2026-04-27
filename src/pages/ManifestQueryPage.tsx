@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Search, Loader2, RefreshCw, Package, Ship, Plane, MapPin, Hash, Calendar, AlertCircle } from 'lucide-react';
+import { useSearchParams, Link } from 'react-router-dom';
+import { Search, Loader2, RefreshCw, Package, Ship, Plane, MapPin, Hash, Calendar, AlertCircle, FileCheck, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -127,6 +127,29 @@ function ManifestResult({ queryData }: { queryData: any }) {
 
       {houses.length === 0 && (
         <p className="text-sm text-muted-foreground py-2">No house entries returned for this BOL.</p>
+      )}
+
+      {/* Next-step CTA: turn this manifest into an ABI Entry Summary draft */}
+      {queryData?.id && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <FileCheck className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">File an Entry Summary (7501)</p>
+              <p className="text-xs text-muted-foreground truncate">
+                Start a new ABI entry pre-populated with this manifest's MBOL, carrier,
+                and port data.
+              </p>
+            </div>
+          </div>
+          <Button asChild size="sm" className="shrink-0">
+            <Link to={`/abi-documents/new?fromManifest=${queryData.id}`}>
+              Create Entry <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+            </Link>
+          </Button>
+        </div>
       )}
     </div>
   );

@@ -663,3 +663,273 @@ export const organizationApi = {
     return apiFetch('/api/v1/organization/onboarding', { method: 'PATCH' });
   },
 };
+
+// ─── ABI Documents (Entry Summary 7501) API ───────────────
+// Shape is the source-of-truth contract mirroring the server Zod schema
+// at server/src/schemas/abiDocument.ts and the Prisma `AbiDocument` model.
+export type AbiDocumentStatus =
+  | 'DRAFT'
+  | 'SENDING'
+  | 'SENT'
+  | 'ACCEPTED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+export interface ABIDates {
+  entryDate: string;   // YYYYMMDD
+  importDate: string;
+  arrivalDate: string;
+}
+
+export interface ABILocation {
+  portOfEntry: string;
+  destinationStateUS: string;
+}
+
+export interface ABIIOR {
+  number: string;
+  name: string;
+}
+
+export interface ABIBond {
+  type: '8' | '9';   // "8" continuous, "9" single-transaction
+  taxId: string;
+}
+
+export interface ABIPayment {
+  typeCode: number;
+  preliminaryStatementDate: string;
+}
+
+export interface ABIConsignee {
+  name: string;
+  taxId: string;
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+}
+
+export interface ABIBill {
+  type: string;   // "M" | "H"
+  mBOL: string;
+  hBOL: string;
+  groupBOL: 'Y' | 'N';
+}
+
+export interface ABIParty {
+  type: 'manufacturer' | 'seller' | 'buyer' | 'shipTo';
+  loadFrom?: string;
+  taxId?: string;
+  name?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  telephone?: string;
+  email?: string;
+  pointOfContact?: string;
+}
+
+export interface ABIItem {
+  sku: string;
+  htsNumber: string;
+  description: string;
+  origin: { country: string };
+  values: {
+    currency: string;
+    exchangeRate: number;
+    totalValueOfGoods: number;
+  };
+  quantity1: string;
+  weight: { gross: string; uom: string };
+  aluminumPercentage?: number;
+  steelPercentage?: number;
+  copperPercentage?: number;
+  cottonFeeExemption?: 'Y' | 'N';
+  autoPartsExemption?: 'Y' | 'N';
+  otherThanCompletedKitchenParts?: 'Y' | 'N';
+  informationalMaterialsExemption?: 'Y' | 'N';
+  religiousPurposes?: 'Y' | 'N';
+  agriculturalExemption?: 'Y' | 'N';
+  semiConductorExemption?: number;
+  parties: ABIParty[];
+}
+
+export interface ABIInvoice {
+  purchaseOrder: string;
+  invoiceNumber: string;
+  exportDate: string;    // YYYYMMDD
+  relatedParties: 'N';   // Phase 1: only "N" accepted by CC
+  countryOfExport: string;
+  currency: string;
+  exchangeRate: number;
+  items: ABIItem[];
+}
+
+export interface ABIManifest {
+  bill: ABIBill;
+  carrier: { code: string };
+  ports: { portOfUnlading: string };
+  quantity: string;
+  quantityUOM: string;
+  invoices: ABIInvoice[];
+}
+
+/**
+ * Full ABI document body — the object stored as `payload` on an AbiDocument.
+ * This is the "complete" shape required at transmit time; the wizard works
+ * with `Partial<ABIDocumentBody>` / DeepPartial while editing drafts.
+ */
+export interface ABIDocumentBody {
+  entryType: '01' | '11';
+  modeOfTransport: string;   // "40" vessel, "41" air
+  entryNumber: string;       // filer-assigned (not CBP-assigned)
+  dates: ABIDates;
+  location: ABILocation;
+  ior: ABIIOR;
+  bond: ABIBond;
+  payment: ABIPayment;
+  firms: string;
+  entryConsignee: ABIConsignee;
+  manifest: ABIManifest[];
+}
+
+/** DeepPartial — used for draft state in the wizard. */
+export type ABIDocumentDraft = {
+  [K in keyof ABIDocumentBody]?:
+    ABIDocumentBody[K] extends Array<infer U>
+      ? Array<{ [P in keyof U]?: U[P] }>
+      : ABIDocumentBody[K] extends object
+        ? { [P in keyof ABIDocumentBody[K]]?: ABIDocumentBody[K][P] }
+        : ABIDocumentBody[K];
+};
+
+/**
+ * AbiDocument — the row returned by the server for an ABI filing.
+ * Mirrors the Prisma `AbiDocument` model scalars; `payload` contains the
+ * full (possibly partial) ABIDocumentBody the wizard is editing.
+ */
+export interface AbiDocument {
+  id: string;
+  orgId: string;
+  userId: string;
+
+  status: AbiDocumentStatus;
+  entrySummaryStatus: string | null;
+  cargoReleaseStatus: string | null;
+
+  entryType: string;
+  modeOfTransport: string;
+  entryNumber: string | null;
+  ccDocumentId: string | null;
+
+  mbolNumber: string | null;
+  hbolNumber: string | null;
+
+  iorNumber: string | null;
+  iorName: string | null;
+  consigneeName: string | null;
+
+  portOfEntry: string | null;
+  destinationStateUS: string | null;
+  entryDate: string | null;
+  importDate: string | null;
+  arrivalDate: string | null;
+
+  payload: ABIDocumentDraft;
+
+  sentAt: string | null;
+  respondedAt: string | null;
+  lastError: string | null;
+  pollAttempts: number;
+
+  filingId: string | null;
+  manifestQueryId: string | null;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AbiDocumentListParams {
+  status?: AbiDocumentStatus;
+  mbolNumber?: string;
+  entryNumber?: string;
+  skip?: number;
+  take?: number;
+}
+
+/**
+ * List response shape returned by `GET /api/v1/abi-documents`.
+ * Uses skip/take pagination (not page/limit) to match the server route.
+ */
+export interface AbiDocumentListResponse {
+  data: AbiDocument[];
+  pagination: {
+    total: number;
+    skip: number;
+    take: number;
+    totalPages: number;
+  };
+}
+
+/** Single-doc envelope returned by create/get/update/send/poll. */
+export interface AbiDocumentEnvelope {
+  data: AbiDocument;
+  note?: string;
+}
+
+export const abiDocumentsApi = {
+  list(params?: AbiDocumentListParams) {
+    const query = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== '') query.set(k, String(v));
+      });
+    }
+    const qs = query.toString();
+    return apiFetch<AbiDocumentListResponse>(
+      `/api/v1/abi-documents${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  get(id: string) {
+    return apiFetch<AbiDocumentEnvelope>(`/api/v1/abi-documents/${id}`);
+  },
+
+  create(body: {
+    payload: ABIDocumentDraft;
+    manifestQueryId?: string;
+    filingId?: string;
+  }) {
+    return apiFetch<AbiDocumentEnvelope>('/api/v1/abi-documents', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  update(id: string, body: { payload: ABIDocumentDraft }) {
+    return apiFetch<AbiDocumentEnvelope>(`/api/v1/abi-documents/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  },
+
+  remove(id: string) {
+    return apiFetch<void>(`/api/v1/abi-documents/${id}`, { method: 'DELETE' });
+  },
+
+  send(id: string) {
+    return apiFetch<AbiDocumentEnvelope>(`/api/v1/abi-documents/${id}/send`, {
+      method: 'POST',
+    });
+  },
+
+  poll(id: string) {
+    return apiFetch<AbiDocumentEnvelope>(`/api/v1/abi-documents/${id}/poll`, {
+      method: 'POST',
+    });
+  },
+};

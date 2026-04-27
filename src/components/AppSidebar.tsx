@@ -1,4 +1,4 @@
-import { LayoutDashboard, Ship, Shield, Plug, Settings, FileText, ChevronRight, Users, Search } from 'lucide-react';
+import { LayoutDashboard, Ship, Shield, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -29,6 +29,7 @@ const integrationsNav = [
 
 const toolsNav = [
   { title: 'Manifest Query', url: '/manifest-query', icon: Search },
+  { title: 'Entry Documents', url: '/abi-documents', icon: FileCheck },
 ];
 
 const managementNav = [

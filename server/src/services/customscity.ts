@@ -415,6 +415,200 @@ export interface CCManifestQueryResult {
   };
 }
 
+// ── ABI Document Types (CBP Entry Summary 7501 + Cargo Release 3461) ──
+// Field names match the official CustomsCity ABI API examples verbatim.
+// Dates are YYYYMMDD strings per the published ABI schema (not integers
+// like ISF — confirmed against the user-supplied example payload).
+
+export interface CCABIDates {
+  entryDate: string;
+  importDate: string;
+  arrivalDate: string;
+}
+
+export interface CCABILocation {
+  portOfEntry: string;
+  destinationStateUS: string;
+}
+
+export interface CCABIIOR {
+  number: string;
+  name: string;
+}
+
+export interface CCABIBond {
+  type: string;
+  taxId: string;
+}
+
+export interface CCABIPayment {
+  typeCode: number;
+  preliminaryStatementDate: string;
+}
+
+export interface CCABIConsignee {
+  name: string;
+  taxId: string;
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+}
+
+export interface CCABIBill {
+  type: string;           // "M" master, "H" house
+  mBOL: string;
+  hBOL: string;
+  groupBOL: 'Y' | 'N';
+}
+
+export interface CCABICarrier {
+  code: string;           // SCAC
+}
+
+export interface CCABIPorts {
+  portOfUnlading: string;
+}
+
+export interface CCABIParty {
+  type: 'manufacturer' | 'seller' | 'buyer' | 'shipTo';
+  loadFrom?: string;      // shipTo shortcut, e.g. "buyer"
+  taxId?: string;
+  name?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  telephone?: string;
+  email?: string;
+  pointOfContact?: string;
+}
+
+export interface CCABIItemValues {
+  currency: string;
+  exchangeRate: number;
+  totalValueOfGoods: number;
+}
+
+export interface CCABIItemWeight {
+  gross: string;
+  uom: string;            // "K" kg, "L" lb
+}
+
+export interface CCABIItem {
+  sku: string;
+  htsNumber: string;
+  description: string;
+  origin: { country: string };
+  values: CCABIItemValues;
+  quantity1: string;
+  weight: CCABIItemWeight;
+  aluminumPercentage?: number;
+  steelPercentage?: number;
+  copperPercentage?: number;
+  cottonFeeExemption?: 'Y' | 'N';
+  autoPartsExemption?: 'Y' | 'N';
+  otherThanCompletedKitchenParts?: 'Y' | 'N';
+  informationalMaterialsExemption?: 'Y' | 'N';
+  religiousPurposes?: 'Y' | 'N';
+  agriculturalExemption?: 'Y' | 'N';
+  semiConductorExemption?: number;
+  parties: CCABIParty[];
+}
+
+export interface CCABIInvoice {
+  purchaseOrder: string;
+  invoiceNumber: string;
+  exportDate: string;
+  relatedParties: 'Y' | 'N';
+  countryOfExport: string;
+  currency: string;
+  exchangeRate: number;
+  items: CCABIItem[];
+}
+
+export interface CCABIManifest {
+  bill: CCABIBill;
+  carrier: CCABICarrier;
+  ports: CCABIPorts;
+  quantity: string;
+  quantityUOM: string;
+  invoices: CCABIInvoice[];
+}
+
+/** ABI document body — the object inside `body: [<this>]`. */
+export interface CCABIDocumentBody {
+  entryType: '01' | '11';
+  modeOfTransport: string;          // "40" vessel, "41" air
+  entryNumber: string;              // filer-assigned; hyphens auto-stripped by CC
+  dates: CCABIDates;
+  location: CCABILocation;
+  ior: CCABIIOR;
+  bond: CCABIBond;
+  payment: CCABIPayment;
+  firms: string;
+  entryConsignee: CCABIConsignee;
+  manifest: CCABIManifest[];
+}
+
+/** POST /api/abi/documents request envelope. */
+export interface CCABICreateDocumentPayload {
+  type: 'abi';
+  version: string;                  // "2.1"
+  body: CCABIDocumentBody[];
+}
+
+/** GET /api/abi/documents response envelope. */
+export interface CCABIListResponse {
+  type: 'abi';
+  version: string;
+  body: CCABIDocumentBody[];
+}
+
+/** Query params for GET /api/abi/documents. */
+export interface CCABIListParams {
+  dateFrom: string;                 // YYYY-MM-DD
+  dateTo: string;                   // YYYY-MM-DD
+  entryType: '01' | '11';
+  skip?: number;
+  status?: 'ACCEPTED' | 'CANCELLED' | 'DRAFT' | 'REJECTED' | 'SENT' | 'SENDING';
+  houseBOLNumber?: string[];
+  masterBOLNumber?: string[];
+  entryNumber?: string[];
+}
+
+/** Query params for DELETE /api/abi/documents (exactly one of these). */
+export interface CCABIDeleteParams {
+  entryNumber?: string;
+  mbolNumber?: string;
+}
+
+/**
+ * POST /api/abi/send request body.
+ * `action` controls which filings are transmitted (Add/Replace/Cancel/...)
+ * — Phase 1 only uses 'add' + application 'entry-summary-cargo-release'.
+ */
+export interface CCABISendPayload {
+  type: 'abi';
+  action:
+    | 'add'
+    | 'add-entry-summary'
+    | 'add-cargo-release'
+    | 'replace'
+    | 'replace-entry-summary'
+    | 'replace-cargo-release'
+    | 'replace-cargo-release-pga'
+    | 'replace-pga'
+    | 'update-cargo-release'
+    | 'cancel-entry-summary'
+    | 'cancel-cargo-release';
+  application: 'entry-summary-cargo-release' | 'entry-summary' | 'cargo-release' | 'pga';
+  MBOLNumber: string;
+  entryNumber: string[];
+}
+
 // ─── Helpers ───────────────────────────────────────────────
 
 /**
@@ -1187,12 +1381,23 @@ export class CustomsCityClient {
     method: string,
     path: string,
     body?: any,
-    params?: Record<string, string>,
+    params?: Record<string, string | string[] | number | undefined>,
     retryCount = 0
   ): Promise<{ data: T; status: number; latencyMs: number }> {
     const url = new URL(path, this.baseUrl);
     if (params) {
-      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+      Object.entries(params).forEach(([k, v]) => {
+        if (v === undefined || v === null) return;
+        if (Array.isArray(v)) {
+          v.forEach((item) => {
+            if (item !== undefined && item !== null) {
+              url.searchParams.append(k, String(item));
+            }
+          });
+        } else {
+          url.searchParams.set(k, String(v));
+        }
+      });
     }
 
     const start = Date.now();
@@ -1429,6 +1634,70 @@ export class CustomsCityClient {
 
   async getManifestQueryLatest() {
     return this.request<CCManifestQueryResult>('GET', '/api/ManifestQueryLatestResponse');
+  }
+
+  // ── ABI Documents (Entry Summary 7501 + Cargo Release 3461) ────
+
+  /**
+   * Create an ABI document on CustomsCity. Idempotency is owned by the caller
+   * (correlationId is our internal AbiDocument.id).
+   */
+  async createABIDocument(
+    payload: CCABICreateDocumentPayload
+  ): Promise<{ data: any; status: number; latencyMs: number }> {
+    return this.request('POST', '/api/abi/documents', payload);
+  }
+
+  /**
+   * List ABI documents on CustomsCity. Array filters (entryNumber,
+   * masterBOLNumber, houseBOLNumber) are sent as repeated query params per
+   * FeathersJS `$in` convention — the widened `request` params loop handles
+   * the repetition.
+   */
+  async listABIDocuments(
+    params: CCABIListParams
+  ): Promise<{ data: CCABIListResponse; status: number; latencyMs: number }> {
+    const query: Record<string, string | string[] | number | undefined> = {
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
+      entryType: params.entryType,
+      skip: params.skip ?? 0,
+    };
+    if (params.status) query.status = params.status;
+    if (params.houseBOLNumber && params.houseBOLNumber.length > 0) {
+      query.houseBOLNumber = params.houseBOLNumber;
+    }
+    if (params.masterBOLNumber && params.masterBOLNumber.length > 0) {
+      query.masterBOLNumber = params.masterBOLNumber;
+    }
+    if (params.entryNumber && params.entryNumber.length > 0) {
+      query.entryNumber = params.entryNumber;
+    }
+    return this.request<CCABIListResponse>('GET', '/api/abi/documents', undefined, query);
+  }
+
+  /**
+   * Delete an ABI document on CustomsCity. Exactly one of entryNumber or
+   * mbolNumber should be provided (CC uses kebab-case for these params).
+   */
+  async deleteABIDocument(
+    params: CCABIDeleteParams
+  ): Promise<{ data: any; status: number; latencyMs: number }> {
+    const query: Record<string, string | undefined> = {};
+    if (params.entryNumber) query['entry-number'] = params.entryNumber;
+    if (params.mbolNumber) query['mbol-number'] = params.mbolNumber;
+    return this.request('DELETE', '/api/abi/documents', undefined, query);
+  }
+
+  /**
+   * Transmit a previously-created ABI document to CBP via
+   * `POST /api/abi/send`. Phase 1 only uses action='add' with application
+   * 'entry-summary-cargo-release'.
+   */
+  async sendABIDocument(
+    payload: CCABISendPayload
+  ): Promise<{ data: any; status: number; latencyMs: number }> {
+    return this.request('POST', '/api/abi/send', payload);
   }
 
   /**
