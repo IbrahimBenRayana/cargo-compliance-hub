@@ -438,6 +438,7 @@ export interface CCABIIOR {
 
 export interface CCABIBond {
   type: string;
+  suretyCode: string;
   taxId: string;
 }
 

@@ -693,6 +693,7 @@ export interface ABIIOR {
 
 export interface ABIBond {
   type: '8' | '9';   // "8" continuous, "9" single-transaction
+  suretyCode: string; // CBP-issued surety company code (3 chars)
   taxId: string;
 }
 

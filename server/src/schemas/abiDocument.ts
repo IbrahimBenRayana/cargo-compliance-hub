@@ -25,8 +25,19 @@ const abiIORSchema = z.object({
   name: z.string().min(1).max(255),
 });
 
+// CC validator regex for IRS / EIN / SSN / CBP-assigned identifiers used
+// by entryConsignee.taxId. Three valid forms:
+//   • XX-XXXXXXXXX     (EIN-style: 2 chars + dash + 9 chars)
+//   • XXX-XX-XXXX      (SSN-style: 3-2-4)
+//   • XXXXXX-XXXXX     (CBP-assigned: 6-5)
+const CC_TAXID_PATTERN =
+  /^([A-Z0-9]{2})([-])([A-Z0-9]{9})|([A-Z0-9]{3})([-])([A-Z0-9]{2})([-])([A-Z0-9]{4})|([A-Z0-9]{6})([-])([A-Z0-9]{5})$/;
+
 const abiBondSchema = z.object({
   type: z.enum(['8', '9']), // CC: only "8" continuous or "9" single-transaction
+  // CBP-issued 3-character surety company code (e.g. "050", "211"). Distinct
+  // from `taxId` which is the bond *holder*'s tax ID.
+  suretyCode: z.string().min(1).max(10),
   taxId: z.string().min(1).max(50),
 });
 
@@ -37,7 +48,14 @@ const abiPaymentSchema = z.object({
 
 const abiConsigneeSchema = z.object({
   name: z.string().min(1).max(255),
-  taxId: z.string().min(1).max(50), // CC required (IRS / EIN / SSN — same form as IOR number)
+  taxId: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(
+      CC_TAXID_PATTERN,
+      'Tax ID must be in EIN (12-3456789), SSN (123-45-6789), or CBP-assigned (ABCDEF-12345) format',
+    ),
   address: z.string().min(1).max(255),
   city: z.string().min(1).max(100),
   state: z.string().min(1).max(10),
@@ -48,9 +66,10 @@ const abiConsigneeSchema = z.object({
 const abiBillSchema = z.object({
   type: z.string().min(1).max(2), // "M" master, "H" house
   mBOL: z.string().min(1).max(100),
-  // CC requires `hBOL` to be a string (never null). Empty string is allowed
-  // and means "no house BOL" (master-only shipment).
-  hBOL: z.string().max(100).default(''),
+  // CC requires `hBOL` to be a string (never null). `.default('')` only
+  // triggers on `undefined`, so we use `preprocess` to also coerce `null`
+  // (which can sneak in from prefill / older drafts) to the empty string.
+  hBOL: z.preprocess((v) => v ?? '', z.string().max(100)),
   groupBOL: z.enum(['Y', 'N']).default('N'),
 });
 
@@ -84,7 +103,9 @@ const abiItemSchema = z.object({
   origin: z.object({ country: CountryCode }),
   values: z.object({
     currency: z.string().length(3),
-    exchangeRate: z.number().positive(),
+    // CC caps at 8.0 — convention is "1 unit of foreign = X USD" so almost
+    // every real exchange rate fits comfortably (CNY ~0.14, EUR ~1.08, etc.)
+    exchangeRate: z.number().positive().max(8),
     totalValueOfGoods: z.number().nonnegative(),
   }),
   quantity1: z.string().min(1),
@@ -116,7 +137,7 @@ const abiInvoiceSchema = z.object({
   relatedParties: z.literal('N').default('N'),
   countryOfExport: CountryCode,
   currency: z.string().length(3),
-  exchangeRate: z.number().positive(),
+  exchangeRate: z.number().positive().max(8), // CC max 8 (see item.values)
   items: z.array(abiItemSchema).min(1),
 });
 
@@ -125,19 +146,25 @@ const abiManifestSchema = z.object({
   carrier: abiCarrierSchema,
   ports: abiPortsSchema,
   quantity: z.string().min(1),
-  quantityUOM: z.string().min(1).max(5),
+  quantityUOM: z.string().min(3).max(5), // CC: must be at least 3 characters
   invoices: z.array(abiInvoiceSchema).min(1),
 });
 
 // ─── Full ABI document body (the `body[0]` object in the CC payload) ────
 
-export const abiDocumentBodySchema = z.object({
+// Base schema (a plain ZodObject so it stays `.deepPartial()`-able).
+const abiDocumentBodyBaseSchema = z.object({
   entryType: z.enum(['01', '11']),
   modeOfTransport: TwoDigit,
   // Filer-assigned entry number. CBP / CustomsCity do NOT assign this —
   // the broker draws it from their pre-issued block (e.g. "S4G12580927" or
   // "S4G-1258092-7"). Hyphens are stripped on transmit by the mapper.
-  entryNumber: z.string().regex(/^[A-Z0-9-]{9,13}$/, 'Entry number must be 9–13 chars (letters, digits, hyphens)'),
+  entryNumber: z
+    .string()
+    .regex(
+      /^[A-Z0-9-]{9,13}$/,
+      'Entry number must be 9–13 chars (letters, digits, hyphens)',
+    ),
   dates: abiDatesSchema,
   location: abiLocationSchema,
   ior: abiIORSchema,
@@ -148,6 +175,19 @@ export const abiDocumentBodySchema = z.object({
   manifest: z.array(abiManifestSchema).min(1),
 });
 
+// Validated schema used at transmit time — adds the cross-field refine
+// that `.deepPartial()` can't survive. CC: Preliminary Statement Date
+// cannot be earlier than the Entry Date.
+export const abiDocumentBodySchema = abiDocumentBodyBaseSchema.refine(
+  (b) => !b.dates?.entryDate || !b.payment?.preliminaryStatementDate
+    ? true
+    : b.payment.preliminaryStatementDate >= b.dates.entryDate,
+  {
+    path: ['payment', 'preliminaryStatementDate'],
+    message: 'Preliminary Statement Date must be on or after the Entry Date',
+  },
+);
+
 export type ABIDocumentBody = z.infer<typeof abiDocumentBodySchema>;
 
 // ─── Draft / partial schemas for wizard steps ───────────────────────────
@@ -156,7 +196,7 @@ export type ABIDocumentBody = z.infer<typeof abiDocumentBodySchema>;
 // save partial state between steps. The full schema above is only enforced
 // at transmit time (server-side guard in POST /:id/send).
 
-export const abiDocumentDraftSchema = abiDocumentBodySchema.deepPartial();
+export const abiDocumentDraftSchema = abiDocumentBodyBaseSchema.deepPartial();
 
 export type ABIDocumentDraft = z.infer<typeof abiDocumentDraftSchema>;
 

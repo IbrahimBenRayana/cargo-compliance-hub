@@ -43,6 +43,7 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
   if (!draft.ior?.name) missing.push('IOR Name');
 
   if (!draft.bond?.type) missing.push('Bond Type');
+  if (!draft.bond?.suretyCode) missing.push('Bond Surety Code');
   if (!draft.bond?.taxId) missing.push('Bond Tax ID');
 
   if (draft.payment?.typeCode === undefined || draft.payment?.typeCode === null) {
@@ -50,13 +51,26 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
   }
   if (!draft.payment?.preliminaryStatementDate) {
     missing.push('Preliminary Statement Date');
+  } else if (
+    draft.dates?.entryDate &&
+    draft.payment.preliminaryStatementDate < draft.dates.entryDate
+  ) {
+    missing.push('Preliminary Statement Date must be on or after the Entry Date');
   }
 
   if (!draft.firms) missing.push('FIRMS Code');
 
   const c = draft.entryConsignee;
   if (!c?.name) missing.push('Consignee Name');
-  if (!c?.taxId) missing.push('Consignee Tax ID');
+  if (!c?.taxId) {
+    missing.push('Consignee Tax ID');
+  } else if (
+    !/^([A-Z0-9]{2})([-])([A-Z0-9]{9})|([A-Z0-9]{3})([-])([A-Z0-9]{2})([-])([A-Z0-9]{4})|([A-Z0-9]{6})([-])([A-Z0-9]{5})$/.test(
+      c.taxId,
+    )
+  ) {
+    missing.push('Consignee Tax ID format (EIN 12-3456789 / SSN 123-45-6789 / CBP-assigned ABCDEF-12345)');
+  }
   if (!c?.address) missing.push('Consignee Address');
   if (!c?.city) missing.push('Consignee City');
   if (!c?.state) missing.push('Consignee State');
@@ -72,7 +86,11 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
     if (!m.carrier?.code) missing.push('Carrier SCAC');
     if (!m.ports?.portOfUnlading) missing.push('Port of Unlading');
     if (!m.quantity) missing.push('Manifest Quantity');
-    if (!m.quantityUOM) missing.push('Manifest Quantity UOM');
+    if (!m.quantityUOM) {
+      missing.push('Manifest Quantity UOM');
+    } else if (m.quantityUOM.length < 3) {
+      missing.push('Manifest Quantity UOM (must be at least 3 characters)');
+    }
 
     const invoices = m.invoices ?? [];
     if (invoices.length === 0) {
@@ -85,6 +103,9 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
         if (!inv?.exportDate) missing.push(`${prefix}: Export Date`);
         if (!inv?.countryOfExport) missing.push(`${prefix}: Country of Export`);
         if (!inv?.currency) missing.push(`${prefix}: Currency`);
+        if (inv?.exchangeRate !== undefined && inv.exchangeRate > 8) {
+          missing.push(`${prefix}: Exchange Rate must be ≤ 8`);
+        }
 
         const items = inv?.items ?? [];
         if (items.length === 0) {
@@ -100,6 +121,9 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
             if (!it?.origin?.country) missing.push(`${ipref}: Country of Origin`);
             if (it?.values?.totalValueOfGoods === undefined) {
               missing.push(`${ipref}: Total Value`);
+            }
+            if (it?.values?.exchangeRate !== undefined && it.values.exchangeRate > 8) {
+              missing.push(`${ipref}: Exchange Rate must be ≤ 8`);
             }
             if (!it?.quantity1) missing.push(`${ipref}: Quantity`);
             if (!it?.weight?.gross) missing.push(`${ipref}: Gross Weight`);

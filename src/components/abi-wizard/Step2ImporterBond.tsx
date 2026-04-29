@@ -89,6 +89,15 @@ export default function Step2ImporterBond({ value, onChange }: Props) {
             maxLength={15}
             hint="Tax ID of the party holding the bond. Often the same as the IOR."
           />
+          <TextField
+            label="Surety Code"
+            required
+            value={bond.suretyCode || ''}
+            onChange={(v) => setBond({ suretyCode: v.toUpperCase() })}
+            placeholder="e.g., 050, 211"
+            maxLength={10}
+            hint="CBP-issued code identifying the surety company that backs this bond (different from your tax ID)."
+          />
         </div>
       </div>
 
