@@ -65,7 +65,7 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
   if (!c?.taxId) {
     missing.push('Consignee Tax ID');
   } else if (
-    !/^([A-Z0-9]{2})([-])([A-Z0-9]{9})|([A-Z0-9]{3})([-])([A-Z0-9]{2})([-])([A-Z0-9]{4})|([A-Z0-9]{6})([-])([A-Z0-9]{5})$/.test(
+    !/^(?:[A-Z0-9]{2}-[A-Z0-9]{9}|[A-Z0-9]{3}-[A-Z0-9]{2}-[A-Z0-9]{4}|[A-Z0-9]{6}-[A-Z0-9]{5})$/.test(
       c.taxId,
     )
   ) {

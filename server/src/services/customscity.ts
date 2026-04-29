@@ -460,7 +460,7 @@ export interface CCABIConsignee {
 export interface CCABIBill {
   type: string;           // "M" master, "H" house
   mBOL: string;
-  hBOL: string;
+  hBOL?: string;          // omitted when master-only (CC rejects empty string)
   groupBOL: 'Y' | 'N';
 }
 

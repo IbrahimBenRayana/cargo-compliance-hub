@@ -715,7 +715,7 @@ export interface ABIConsignee {
 export interface ABIBill {
   type: string;   // "M" | "H"
   mBOL: string;
-  hBOL: string;
+  hBOL?: string;  // omitted when master-only
   groupBOL: 'Y' | 'N';
 }
 

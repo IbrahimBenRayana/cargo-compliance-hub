@@ -25,13 +25,19 @@ const abiIORSchema = z.object({
   name: z.string().min(1).max(255),
 });
 
-// CC validator regex for IRS / EIN / SSN / CBP-assigned identifiers used
-// by entryConsignee.taxId. Three valid forms:
+// IRS / EIN / SSN / CBP-assigned identifier formats used by
+// entryConsignee.taxId. Three valid forms:
 //   • XX-XXXXXXXXX     (EIN-style: 2 chars + dash + 9 chars)
 //   • XXX-XX-XXXX      (SSN-style: 3-2-4)
 //   • XXXXXX-XXXXX     (CBP-assigned: 6-5)
+//
+// CC's published regex is `^A|B|C$` which has an alternation-anchor bug
+// (the middle branch matches the pattern anywhere in the string, so e.g.
+// "SSN 123-45-6789 " is accepted). We anchor the whole alternation in
+// a non-capturing group so our client-side validation is strict even
+// when CC's isn't.
 const CC_TAXID_PATTERN =
-  /^([A-Z0-9]{2})([-])([A-Z0-9]{9})|([A-Z0-9]{3})([-])([A-Z0-9]{2})([-])([A-Z0-9]{4})|([A-Z0-9]{6})([-])([A-Z0-9]{5})$/;
+  /^(?:[A-Z0-9]{2}-[A-Z0-9]{9}|[A-Z0-9]{3}-[A-Z0-9]{2}-[A-Z0-9]{4}|[A-Z0-9]{6}-[A-Z0-9]{5})$/;
 
 const abiBondSchema = z.object({
   type: z.enum(['8', '9']), // CC: only "8" continuous or "9" single-transaction
@@ -66,10 +72,15 @@ const abiConsigneeSchema = z.object({
 const abiBillSchema = z.object({
   type: z.string().min(1).max(2), // "M" master, "H" house
   mBOL: z.string().min(1).max(100),
-  // CC requires `hBOL` to be a string (never null). `.default('')` only
-  // triggers on `undefined`, so we use `preprocess` to also coerce `null`
-  // (which can sneak in from prefill / older drafts) to the empty string.
-  hBOL: z.preprocess((v) => v ?? '', z.string().max(100)),
+  // hBOL: the abi spec says "string" but CC rejects empty strings AND
+  // null. The right wire shape is to OMIT the field entirely when the
+  // shipment has no house bill (master-only). preprocess coerces both
+  // null and "" → undefined so the optional() branch kicks in and the
+  // serialiser drops the key.
+  hBOL: z.preprocess(
+    (v) => (v == null || v === '' ? undefined : v),
+    z.string().max(100).optional(),
+  ),
   groupBOL: z.enum(['Y', 'N']).default('N'),
 });
 
