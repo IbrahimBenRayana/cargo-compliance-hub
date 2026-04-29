@@ -112,10 +112,14 @@ export function prefillFromFiling(filing: any): Partial<ABIDocumentBody> {
 
   const manifestEntry: any = {};
   if (filing.masterBol || filing.houseBol) {
+    const mBOL = filing.masterBol ?? '';
+    // CC requires hBOL non-empty. Convention for non-consolidated
+    // shipments: hBOL = mBOL.
+    const hBOL = filing.houseBol || mBOL;
     manifestEntry.bill = {
       type: filing.houseBol ? 'H' : 'M',
-      mBOL: filing.masterBol ?? '',
-      hBOL: filing.houseBol ?? '',
+      mBOL,
+      hBOL,
       groupBOL: 'N',
     };
   }
@@ -168,10 +172,13 @@ export function prefillFromManifestQuery(
   // Shipment-level manifest block (single entry)
   const manifestEntry: any = {};
   if (mBOL || hBOL) {
+    const masterBol = mBOL ?? '';
+    // CC requires hBOL non-empty. For master-only shipments use mBOL.
+    const houseBol = hBOL || masterBol;
     manifestEntry.bill = {
       type: hBOL ? 'H' : 'M',
-      mBOL: mBOL ?? '',
-      hBOL: hBOL ?? '',
+      mBOL: masterBol,
+      hBOL: houseBol,
       groupBOL: 'N',
     };
   }

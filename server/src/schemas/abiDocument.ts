@@ -72,15 +72,11 @@ const abiConsigneeSchema = z.object({
 const abiBillSchema = z.object({
   type: z.string().min(1).max(2), // "M" master, "H" house
   mBOL: z.string().min(1).max(100),
-  // hBOL: the abi spec says "string" but CC rejects empty strings AND
-  // null. The right wire shape is to OMIT the field entirely when the
-  // shipment has no house bill (master-only). preprocess coerces both
-  // null and "" → undefined so the optional() branch kicks in and the
-  // serialiser drops the key.
-  hBOL: z.preprocess(
-    (v) => (v == null || v === '' ? undefined : v),
-    z.string().max(100).optional(),
-  ),
+  // hBOL: CC requires this property AND rejects empty strings. For
+  // non-consolidated (master-only) shipments the CBP convention is to
+  // set hBOL = mBOL. The wizard auto-fills this on the client; the
+  // schema enforces non-empty so we never ship a value CC will reject.
+  hBOL: z.string().min(1).max(100),
   groupBOL: z.enum(['Y', 'N']).default('N'),
 });
 

@@ -83,6 +83,7 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
   } else {
     if (!m.bill?.type) missing.push('Bill Type');
     if (!m.bill?.mBOL) missing.push('Master BOL');
+    if (!m.bill?.hBOL) missing.push('House BOL (use Master BOL value if no separate house bill)');
     if (!m.carrier?.code) missing.push('Carrier SCAC');
     if (!m.ports?.portOfUnlading) missing.push('Port of Unlading');
     if (!m.quantity) missing.push('Manifest Quantity');

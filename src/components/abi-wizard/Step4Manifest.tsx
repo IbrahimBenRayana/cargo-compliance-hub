@@ -69,16 +69,20 @@ export default function Step4Manifest({ value, onChange, doc }: Props) {
             label="Master BOL"
             required
             value={bill.mBOL || ''}
-            onChange={(v) =>
-              setManifest({
-                bill: { ...bill, mBOL: v } as typeof bill,
-              })
-            }
+            onChange={(v) => {
+              // Auto-fill hBOL with the master value for non-consolidated
+              // shipments. CC requires hBOL non-empty; CBP convention for
+              // straight bills is hBOL = mBOL. The user can still override.
+              const nextBill = { ...bill, mBOL: v } as typeof bill;
+              if (!bill.hBOL) nextBill.hBOL = v;
+              setManifest({ bill: nextBill });
+            }}
             placeholder="e.g., MAEU1234567890"
             maxLength={50}
           />
           <TextField
             label="House BOL"
+            required
             value={bill.hBOL || ''}
             onChange={(v) =>
               setManifest({
@@ -87,6 +91,7 @@ export default function Step4Manifest({ value, onChange, doc }: Props) {
             }
             placeholder="e.g., HCLA12345678"
             maxLength={50}
+            hint="If you have no separate house bill, use the Master BOL value (we auto-fill it)."
           />
           <SelectField
             label="Group BOL"
