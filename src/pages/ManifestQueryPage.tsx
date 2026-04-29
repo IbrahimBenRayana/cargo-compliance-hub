@@ -41,9 +41,37 @@ function StatusBadge({ status }: { status: string }) {
 // ── Result display ─────────────────────────────────────────────
 function ManifestResult({ queryData }: { queryData: any }) {
   const response = queryData?.response;
-  const manifest = response?.data?.response?.[0];
+  // CC returns `response` as either an array (multi-result) or a single
+  // object (single BOL — including the "BILL NBR NOT ON FILE" case where
+  // the only meaningful field is `errorMessage`). Normalise to an object.
+  const raw = response?.data?.response;
+  const manifest = Array.isArray(raw) ? raw[0] : raw;
+  const ccErrorMessage: string | undefined = manifest?.errorMessage;
 
-  if (!manifest) {
+  // CBP-side error: BOL not on file, formatting issue, etc. Surface the
+  // raw CC code+text rather than hiding behind a generic empty state.
+  if (ccErrorMessage) {
+    return (
+      <div className="flex items-start gap-3 py-4 px-4 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40">
+        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+        <div className="space-y-0.5">
+          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+            CBP responded but had no manifest data
+          </p>
+          <p className="text-xs text-amber-800 dark:text-amber-300/90">
+            {ccErrorMessage}
+          </p>
+          {(manifest?.carrierCode || manifest?.masterBLNumber) && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Carrier {manifest.carrierCode || '—'} · BOL {manifest.masterBLNumber || '—'}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!manifest || (Array.isArray(manifest.houses) && manifest.houses.length === 0 && !manifest.carrierCode)) {
     return (
       <div className="flex items-center gap-2 text-muted-foreground py-4">
         <AlertCircle className="h-4 w-4" />

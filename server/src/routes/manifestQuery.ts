@@ -7,6 +7,37 @@ import { ccApiLimiter } from '../middleware/rateLimiter.js';
 import logger from '../config/logger.js';
 
 const router = Router();
+
+/**
+ * Decide whether a CC manifest-query response is terminal (no more polling
+ * needed). CC returns `response` as either:
+ *   - an array of CCManifestResponseItem (multi-result success), or
+ *   - a single object containing carrierCode / houses[] / errorMessage
+ *     fields (single-BOL queries, including "122-BILL NBR NOT ON FILE"),
+ *     or
+ *   - undefined / empty while still computing.
+ *
+ * The previous `.length > 0` check only handled the array case, so single-
+ * object responses (success OR error) polled to timeout. This treats any
+ * populated response — including ones whose only payload is an
+ * `errorMessage` — as complete.
+ */
+function isManifestQueryComplete(body: any): boolean {
+  const response = body?.data?.response;
+  if (!response) return false;
+  if (Array.isArray(response)) return response.length > 0;
+  if (typeof response === 'object') {
+    const hasMeaningfulField =
+      Boolean(response.carrierCode) ||
+      Boolean(response.errorMessage) ||
+      Boolean(response.transmissionDate) ||
+      Boolean(response.entryNumber) ||
+      (Array.isArray(response.houses) && response.houses.length > 0) ||
+      (Array.isArray(response.statusMsg) && response.statusMsg.length > 0);
+    return hasMeaningfulField;
+  }
+  return false;
+}
 router.use(authMiddleware);
 
 // ── Zod Schemas ──────────────────────────────────────────
@@ -131,8 +162,9 @@ async function pollManifestQueryResult(queryId: string, ccRequestId: string, org
         },
       });
 
-      // Check if we got actual response data
-      const hasData = result.data?.data?.response && result.data.data.response.length > 0;
+      // Check if we got actual response data — handles both array and
+      // object response shapes (CC varies; see isManifestQueryComplete).
+      const hasData = isManifestQueryComplete(result.data);
 
       await prisma.manifestQuery.update({
         where: { id: queryId },
@@ -274,7 +306,7 @@ router.post('/:id/poll', ccApiLimiter, async (req: AuthRequest, res: Response): 
       },
     });
 
-    const hasData = result.data?.data?.response && result.data.data.response.length > 0;
+    const hasData = isManifestQueryComplete(result.data);
 
     const updated = await prisma.manifestQuery.update({
       where: { id: query.id },
