@@ -19,16 +19,34 @@ import type {
  *
  * Throws a ZodError if the payload is not a complete, valid ABI body.
  */
+/**
+ * Normalise an ABI entry number into the canonical CC form `XXX-NNNNNNN-N`
+ * (3-letter filer code, 7-digit sequence, 1-digit check digit, 13 chars
+ * total with hyphens). CC's DELETE endpoint accepts either hyphenated or
+ * un-hyphenated, but `/api/abi/send` only finds entries by the canonical
+ * hyphenated form. We therefore canonicalise on both create AND send so
+ * the value CC stores matches the value we look up by.
+ *
+ * Falls back to the stripped uppercase value when the input doesn't match
+ * the standard 11-char shape (defensive — Zod already enforces the format
+ * before we reach this point).
+ */
+export function canonicaliseEntryNumber(s: string): string {
+  const stripped = s.replace(/-/g, '').toUpperCase();
+  if (/^[A-Z0-9]{11}$/.test(stripped)) {
+    return `${stripped.slice(0, 3)}-${stripped.slice(3, 10)}-${stripped.slice(10, 11)}`;
+  }
+  return stripped;
+}
+
 export function mapABIDocumentToCC(
   doc: { payload: Prisma.JsonValue }
 ): CCABICreateDocumentPayload {
   const body: ABIDocumentBody = abiDocumentBodySchema.parse(doc.payload);
 
-  // CC strips hyphens from entry numbers on its side, but we normalise
-  // here too so the value we send matches the value we'll receive back.
   const normalised: ABIDocumentBody = {
     ...body,
-    entryNumber: body.entryNumber.replace(/-/g, ''),
+    entryNumber: canonicaliseEntryNumber(body.entryNumber),
   };
 
   return {
@@ -61,7 +79,9 @@ export function buildSendPayload(
     action,
     application: 'entry-summary-cargo-release',
     MBOLNumber: doc.mbolNumber,
-    entryNumber: [doc.entryNumber],
+    // Canonical hyphenated form so CC's send-time lookup finds the entry
+    // we created. Storage normalises both ways but lookup is exact.
+    entryNumber: [canonicaliseEntryNumber(doc.entryNumber)],
   };
 }
 
