@@ -15,9 +15,10 @@ interface Props {
   value: ABIDocumentDraft;
   onChange: (patch: ABIDocumentDraft) => void;
   doc?: AbiDocument;
+  errors?: Record<string, string>;
 }
 
-export default function Step2ImporterBond({ value, onChange }: Props) {
+export default function Step2ImporterBond({ value, onChange, errors = {} }: Props) {
   const ior = value.ior || {};
   const bond = value.bond || {};
   const payment = value.payment || {};
@@ -52,6 +53,7 @@ export default function Step2ImporterBond({ value, onChange }: Props) {
             placeholder="XX-XXXXXXXXX"
             maxLength={15}
             hint="EIN, SSN, or CBP-assigned importer number."
+            error={errors['ior.number']}
           />
           <TextField
             label="IOR Name"
@@ -61,6 +63,7 @@ export default function Step2ImporterBond({ value, onChange }: Props) {
             placeholder="e.g., Acme Imports Inc"
             maxLength={35}
             hint="Max 35 characters. No periods — CBP rejects them."
+            error={errors['ior.name']}
           />
         </div>
       </div>
@@ -79,6 +82,7 @@ export default function Step2ImporterBond({ value, onChange }: Props) {
             onChange={(v) => setBond({ type: v as '8' | '9' })}
             options={BOND_TYPES}
             hint="Single entry, continuous, or single transaction."
+            error={errors['bond.type']}
           />
           <TextField
             label="Bond Tax ID"
@@ -88,6 +92,7 @@ export default function Step2ImporterBond({ value, onChange }: Props) {
             placeholder="EIN of the bond holder"
             maxLength={15}
             hint="Tax ID of the party holding the bond. Often the same as the IOR."
+            error={errors['bond.taxId']}
           />
           <TextField
             label="Surety Code"
@@ -97,6 +102,7 @@ export default function Step2ImporterBond({ value, onChange }: Props) {
             placeholder="e.g., 050, 211"
             maxLength={10}
             hint="CBP-issued code identifying the surety company that backs this bond (different from your tax ID)."
+            error={errors['bond.suretyCode']}
           />
         </div>
       </div>
@@ -119,6 +125,7 @@ export default function Step2ImporterBond({ value, onChange }: Props) {
             onChange={(v) => setPayment({ typeCode: Number(v) })}
             options={PAYMENT_TYPE_CODES}
             hint="ABI payment method code."
+            error={errors['payment.typeCode']}
           />
           <DateField
             label="Preliminary Statement Date"
@@ -126,6 +133,7 @@ export default function Step2ImporterBond({ value, onChange }: Props) {
             value={payment.preliminaryStatementDate || ''}
             onChange={(v) => setPayment({ preliminaryStatementDate: v })}
             hint="Statement print/pull date for PMS filings."
+            error={errors['payment.preliminaryStatementDate']}
           />
         </div>
       </div>

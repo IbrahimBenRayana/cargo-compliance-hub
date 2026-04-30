@@ -22,9 +22,10 @@ export interface StepProps {
   value: ABIDocumentDraft;
   onChange: (patch: ABIDocumentDraft) => void;
   doc?: AbiDocument;
+  errors?: Record<string, string>;
 }
 
-export default function Step1EntryShipment({ value, onChange }: StepProps) {
+export default function Step1EntryShipment({ value, onChange, errors = {} }: StepProps) {
   const dates = value.dates || {};
   const location = value.location || {};
 
@@ -55,6 +56,7 @@ export default function Step1EntryShipment({ value, onChange }: StepProps) {
           options={ENTRY_TYPES}
           hint="Phase 1 supports Consumption Entry (01) only. Informal entries are coming soon."
           disabledValues={['11']}
+          error={errors.entryType}
         />
         <SelectField
           label="Mode of Transport"
@@ -63,6 +65,7 @@ export default function Step1EntryShipment({ value, onChange }: StepProps) {
           onChange={(v) => onChange({ modeOfTransport: v })}
           options={MODES_OF_TRANSPORT}
           hint="CBP code describing how the shipment moves (vessel, air, truck, rail)."
+          error={errors.modeOfTransport}
         />
       </div>
 
@@ -74,6 +77,7 @@ export default function Step1EntryShipment({ value, onChange }: StepProps) {
         placeholder="S4G12580927 or S4G-1258092-7"
         maxLength={13}
         hint="Filer-assigned entry number (3-letter filer code + 7-digit sequence + 1-digit check digit). Hyphens are stripped before transmission."
+        error={errors.entryNumber}
       />
 
       <div className="rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 text-xs text-amber-700 dark:text-amber-400 px-3 py-2 flex items-start gap-2">
@@ -91,6 +95,7 @@ export default function Step1EntryShipment({ value, onChange }: StepProps) {
           value={dates.entryDate || ''}
           onChange={(v) => setDates({ entryDate: v })}
           hint="Date the entry is being filed with CBP."
+          error={errors['dates.entryDate']}
         />
         <DateField
           label="Import Date"
@@ -98,6 +103,7 @@ export default function Step1EntryShipment({ value, onChange }: StepProps) {
           value={dates.importDate || ''}
           onChange={(v) => setDates({ importDate: v })}
           hint="Date goods first crossed into the customs territory."
+          error={errors['dates.importDate']}
         />
         <DateField
           label="Arrival Date"
@@ -105,6 +111,7 @@ export default function Step1EntryShipment({ value, onChange }: StepProps) {
           value={dates.arrivalDate || ''}
           onChange={(v) => setDates({ arrivalDate: v })}
           hint="Date the conveyance arrived at the port of entry."
+          error={errors['dates.arrivalDate']}
         />
       </div>
 
@@ -118,6 +125,7 @@ export default function Step1EntryShipment({ value, onChange }: StepProps) {
           placeholder="Select port…"
           searchPlaceholder="Search by code or city…"
           hint="CBP Schedule D port code where goods enter the US."
+          error={errors['location.portOfEntry']}
         />
         <SelectField
           label="Destination State"
@@ -126,14 +134,17 @@ export default function Step1EntryShipment({ value, onChange }: StepProps) {
           onChange={(v) => setLocation({ destinationStateUS: v })}
           options={US_STATES}
           hint="Final US state of delivery."
+          error={errors['location.destinationStateUS']}
         />
         <TextField
           label="FIRMS Code"
+          required
           value={value.firms || ''}
           onChange={(v) => onChange({ firms: v.toUpperCase() })}
           placeholder="ABCD"
           maxLength={4}
           hint="4-character Facilities Information & Resources Management System code."
+          error={errors.firms}
         />
       </div>
     </div>

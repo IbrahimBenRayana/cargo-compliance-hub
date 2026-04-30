@@ -19,9 +19,10 @@ interface Props {
   value: ABIDocumentDraft;
   onChange: (patch: ABIDocumentDraft) => void;
   doc?: AbiDocument;
+  errors?: Record<string, string>;
 }
 
-export default function Step3Consignee({ value, onChange }: Props) {
+export default function Step3Consignee({ value, onChange, errors = {} }: Props) {
   const c = value.entryConsignee || {};
 
   const set = (
@@ -53,6 +54,7 @@ export default function Step3Consignee({ value, onChange }: Props) {
           maxLength={35}
           placeholder="Company or individual name"
           hint="Max 35 characters. No periods."
+          error={errors['entryConsignee.name']}
         />
         <TextField
           label="Tax ID"
@@ -60,8 +62,9 @@ export default function Step3Consignee({ value, onChange }: Props) {
           value={c.taxId || ''}
           onChange={(v) => set({ taxId: v })}
           maxLength={50}
-          placeholder="EIN, SSN, or CBP-assigned number"
-          hint="IRS / EIN / SSN — CC requires this to identify the consignee."
+          placeholder="12-3456789 / 123-45-6789 / ABCDEF-12345"
+          hint="EIN, SSN, or CBP-assigned format. No prefixes or trailing spaces."
+          error={errors['entryConsignee.taxId']}
         />
       </div>
 
@@ -73,6 +76,7 @@ export default function Step3Consignee({ value, onChange }: Props) {
           onChange={(v) => set({ address: v })}
           maxLength={35}
           placeholder="Street address"
+          error={errors['entryConsignee.address']}
         />
       </div>
 
@@ -83,6 +87,7 @@ export default function Step3Consignee({ value, onChange }: Props) {
           value={c.city || ''}
           onChange={(v) => set({ city: v })}
           maxLength={35}
+          error={errors['entryConsignee.city']}
         />
         {isUS ? (
           <SelectField
@@ -91,13 +96,16 @@ export default function Step3Consignee({ value, onChange }: Props) {
             value={c.state || ''}
             onChange={(v) => set({ state: v })}
             options={US_STATES}
+            error={errors['entryConsignee.state']}
           />
         ) : (
           <TextField
             label="State / Province"
+            required
             value={c.state || ''}
             onChange={(v) => set({ state: v })}
             maxLength={20}
+            error={errors['entryConsignee.state']}
           />
         )}
         <TextField
@@ -107,6 +115,7 @@ export default function Step3Consignee({ value, onChange }: Props) {
           onChange={(v) => set({ postalCode: v })}
           maxLength={10}
           placeholder="00000"
+          error={errors['entryConsignee.postalCode']}
         />
         <SelectField
           label="Country"
@@ -114,6 +123,7 @@ export default function Step3Consignee({ value, onChange }: Props) {
           value={c.country || ''}
           onChange={(v) => set({ country: v })}
           options={COUNTRIES}
+          error={errors['entryConsignee.country']}
         />
       </div>
     </div>

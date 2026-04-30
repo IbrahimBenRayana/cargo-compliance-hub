@@ -19,9 +19,10 @@ interface Props {
   value: ABIDocumentDraft;
   onChange: (patch: ABIDocumentDraft) => void;
   doc?: AbiDocument;
+  errors?: Record<string, string>;
 }
 
-export default function Step4Manifest({ value, onChange, doc }: Props) {
+export default function Step4Manifest({ value, onChange, doc, errors = {} }: Props) {
   type ManifestSlice = NonNullable<ABIDocumentDraft['manifest']>[number];
   const manifest = (value.manifest?.[0] || {}) as ManifestSlice;
   const bill: NonNullable<ManifestSlice['bill']> = manifest.bill ?? {};
@@ -64,6 +65,7 @@ export default function Step4Manifest({ value, onChange, doc }: Props) {
               })
             }
             options={BILL_TYPES}
+            error={errors['bill.type']}
           />
           <TextField
             label="Master BOL"
@@ -79,6 +81,7 @@ export default function Step4Manifest({ value, onChange, doc }: Props) {
             }}
             placeholder="e.g., MAEU1234567890"
             maxLength={50}
+            error={errors['bill.mBOL']}
           />
           <TextField
             label="House BOL"
@@ -92,6 +95,7 @@ export default function Step4Manifest({ value, onChange, doc }: Props) {
             placeholder="e.g., HCLA12345678"
             maxLength={50}
             hint="If you have no separate house bill, use the Master BOL value (we auto-fill it)."
+            error={errors['bill.hBOL']}
           />
           <SelectField
             label="Group BOL"
@@ -125,6 +129,7 @@ export default function Step4Manifest({ value, onChange, doc }: Props) {
             placeholder="MAEU"
             maxLength={4}
             hint="Standard Carrier Alpha Code — 4 uppercase letters."
+            error={errors['carrier.code']}
           />
           <ComboboxField
             label="Port of Unlading"
@@ -138,6 +143,7 @@ export default function Step4Manifest({ value, onChange, doc }: Props) {
             options={SCHEDULE_D_PORTS}
             placeholder="Select port…"
             searchPlaceholder="Search by code or city…"
+            error={errors['ports.portOfUnlading']}
           />
           <div className="grid grid-cols-2 gap-3">
             <TextField
@@ -147,6 +153,7 @@ export default function Step4Manifest({ value, onChange, doc }: Props) {
               onChange={(v) => setManifest({ quantity: v })}
               placeholder="100"
               type="number"
+              error={errors.quantity}
             />
             <SelectField
               label="Qty UOM"
@@ -154,6 +161,7 @@ export default function Step4Manifest({ value, onChange, doc }: Props) {
               value={manifest.quantityUOM || ''}
               onChange={(v) => setManifest({ quantityUOM: v })}
               options={QUANTITY_UOM}
+              error={errors.quantityUOM}
             />
           </div>
         </div>

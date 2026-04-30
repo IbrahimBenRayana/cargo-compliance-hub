@@ -48,6 +48,7 @@ interface Props {
   value: ABIDocumentDraft;
   onChange: (patch: ABIDocumentDraft) => void;
   doc?: AbiDocument;
+  errors?: Record<string, string>;
 }
 
 type PartialInvoice = Partial<ABIInvoice>;
@@ -110,7 +111,7 @@ function ConfirmDelete({
   );
 }
 
-export default function Step5Invoices({ value, onChange }: Props) {
+export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
   const manifest = (value.manifest?.[0] || {}) as NonNullable<
     ABIDocumentDraft['manifest']
   >[number];
@@ -253,9 +254,11 @@ export default function Step5Invoices({ value, onChange }: Props) {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <TextField
                   label="Purchase Order"
+                  required
                   value={inv.purchaseOrder || ''}
                   onChange={(v) => updateInvoice(invIdx, { purchaseOrder: v })}
                   maxLength={35}
+                  error={errors[`invoices.${invIdx}.purchaseOrder`]}
                 />
                 <TextField
                   label="Invoice Number"
@@ -263,12 +266,14 @@ export default function Step5Invoices({ value, onChange }: Props) {
                   value={inv.invoiceNumber || ''}
                   onChange={(v) => updateInvoice(invIdx, { invoiceNumber: v })}
                   maxLength={35}
+                  error={errors[`invoices.${invIdx}.invoiceNumber`]}
                 />
                 <DateField
                   label="Export Date"
                   required
                   value={inv.exportDate || ''}
                   onChange={(v) => updateInvoice(invIdx, { exportDate: v })}
+                  error={errors[`invoices.${invIdx}.exportDate`]}
                 />
                 <SelectField
                   label="Related Parties"
@@ -287,6 +292,7 @@ export default function Step5Invoices({ value, onChange }: Props) {
                   value={inv.countryOfExport || ''}
                   onChange={(v) => updateInvoice(invIdx, { countryOfExport: v })}
                   options={COUNTRIES}
+                  error={errors[`invoices.${invIdx}.countryOfExport`]}
                 />
                 <SelectField
                   label="Invoice Currency"
@@ -294,6 +300,7 @@ export default function Step5Invoices({ value, onChange }: Props) {
                   value={inv.currency || 'USD'}
                   onChange={(v) => updateInvoice(invIdx, { currency: v })}
                   options={CURRENCIES}
+                  error={errors[`invoices.${invIdx}.currency`]}
                 />
                 <TextField
                   label="Exchange Rate"
@@ -309,7 +316,8 @@ export default function Step5Invoices({ value, onChange }: Props) {
                     })
                   }
                   type="number"
-                  hint="Invoice-currency to USD exchange rate."
+                  hint="Invoice-currency to USD exchange rate (CC max: 8)."
+                  error={errors[`invoices.${invIdx}.exchangeRate`]}
                 />
               </div>
 
@@ -330,10 +338,12 @@ export default function Step5Invoices({ value, onChange }: Props) {
                 <div className="space-y-4">
                   {((inv.items || []) as PartialItem[]).map((item, itemIdx) => {
                     const hts = (item.htsNumber || '').replace(/\D/g, '');
+                    const itemPath = `invoices.${invIdx}.items.${itemIdx}`;
                     const htsError =
-                      item.htsNumber && hts.length !== 10
+                      errors[`${itemPath}.htsNumber`] ??
+                      (item.htsNumber && hts.length !== 10
                         ? 'HTS number must be exactly 10 digits'
-                        : undefined;
+                        : undefined);
                     return (
                       <div
                         key={itemIdx}
@@ -355,11 +365,13 @@ export default function Step5Invoices({ value, onChange }: Props) {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                           <TextField
                             label="SKU / Part #"
+                            required
                             value={item.sku || ''}
                             onChange={(v) =>
                               updateItem(invIdx, itemIdx, { sku: v })
                             }
                             maxLength={35}
+                            error={errors[`${itemPath}.sku`]}
                           />
                           <TextField
                             label="HTS Number"
@@ -383,6 +395,7 @@ export default function Step5Invoices({ value, onChange }: Props) {
                               updateItem(invIdx, itemIdx, { description: v })
                             }
                             maxLength={60}
+                            error={errors[`${itemPath}.description`]}
                           />
                           <SelectField
                             label="Country of Origin"
@@ -394,6 +407,7 @@ export default function Step5Invoices({ value, onChange }: Props) {
                               })
                             }
                             options={COUNTRIES}
+                            error={errors[`${itemPath}.origin.country`]}
                           />
                           <SelectField
                             label="Item Currency"
@@ -433,6 +447,8 @@ export default function Step5Invoices({ value, onChange }: Props) {
                               })
                             }
                             type="number"
+                            hint="CC max: 8."
+                            error={errors[`${itemPath}.values.exchangeRate`]}
                           />
                           <TextField
                             label="Total Value of Goods"
@@ -456,6 +472,7 @@ export default function Step5Invoices({ value, onChange }: Props) {
                             }
                             type="number"
                             hint="In the item currency above."
+                            error={errors[`${itemPath}.values.totalValueOfGoods`]}
                           />
                           <TextField
                             label="Quantity (Unit 1)"
@@ -464,6 +481,7 @@ export default function Step5Invoices({ value, onChange }: Props) {
                             onChange={(v) =>
                               updateItem(invIdx, itemIdx, { quantity1: v })
                             }
+                            error={errors[`${itemPath}.quantity1`]}
                           />
                           <div className="grid grid-cols-2 gap-3">
                             <TextField
@@ -479,6 +497,7 @@ export default function Step5Invoices({ value, onChange }: Props) {
                                 })
                               }
                               type="number"
+                              error={errors[`${itemPath}.weight.gross`]}
                             />
                             <SelectField
                               label="Weight UOM"

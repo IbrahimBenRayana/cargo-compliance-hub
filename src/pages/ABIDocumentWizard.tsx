@@ -72,6 +72,7 @@ import Step3Consignee from '@/components/abi-wizard/Step3Consignee';
 import Step4Manifest from '@/components/abi-wizard/Step4Manifest';
 import Step5Invoices from '@/components/abi-wizard/Step5Invoices';
 import Step6Review, { validateAbiDraft } from '@/components/abi-wizard/Step6Review';
+import { STEP_VALIDATORS } from '@/components/abi-wizard/validators';
 
 // ─── Step definitions ────────────────────────────────────────
 
@@ -88,6 +89,7 @@ type StepComponent = (p: {
   value: ABIDocumentDraft;
   onChange: (patch: ABIDocumentDraft) => void;
   doc?: AbiDocument;
+  errors?: Record<string, string>;
 }) => JSX.Element;
 
 const STEP_COMPONENTS: StepComponent[] = [
@@ -198,6 +200,15 @@ export default function ABIDocumentWizard() {
 
   // ── Transmit
   const validation = useMemo(() => validateAbiDraft(draft), [draft]);
+
+  // Per-step error map. Recomputes on every draft change so the user
+  // sees inline issues in real time as they type.
+  const stepErrors = useMemo(
+    () => STEP_VALIDATORS[step]?.(draft) ?? {},
+    [draft, step],
+  );
+  const stepErrorCount = Object.keys(stepErrors).length;
+  const canAdvance = stepErrorCount === 0;
   const [transmitOpen, setTransmitOpen] = useState(false);
 
   const handleTransmit = async () => {
@@ -382,7 +393,7 @@ export default function ABIDocumentWizard() {
           <CardDescription>{STEPS[step].desc}</CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
-          <StepComponent value={draft} onChange={onChange} doc={doc} />
+          <StepComponent value={draft} onChange={onChange} doc={doc} errors={stepErrors} />
         </CardContent>
       </Card>
 
@@ -395,10 +406,15 @@ export default function ABIDocumentWizard() {
         <div className="flex items-center gap-2">
           {step < STEPS.length - 1 ? (
             <>
+              {!canAdvance && (
+                <span className="text-xs text-amber-600 dark:text-amber-400 hidden sm:inline">
+                  Fix {stepErrorCount} {stepErrorCount === 1 ? 'issue' : 'issues'} above to continue
+                </span>
+              )}
               <Button variant="outline" size="lg" onClick={handleSaveDraft}>
                 Save Draft
               </Button>
-              <Button onClick={goNext} size="lg">
+              <Button onClick={goNext} size="lg" disabled={!canAdvance}>
                 Next <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </>
