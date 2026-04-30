@@ -12,6 +12,7 @@ import {
 import {
   mapABIDocumentToCC,
   buildSendPayload,
+  canonicaliseEntryNumber,
   prefillFromFiling,
   prefillFromManifestQuery,
 } from '../services/abiDocumentMapper.js';
@@ -533,7 +534,7 @@ router.post('/:id/send', ccApiLimiter, async (req: AuthRequest, res: Response): 
   try {
     // Step 1 — POST /api/abi/documents
     const createPayload = mapABIDocumentToCC(sendingDoc);
-    const createResult = await ccClient.createABIDocument(createPayload);
+    let createResult = await ccClient.createABIDocument(createPayload);
 
     await prisma.submissionLog.create({
       data: {
@@ -548,6 +549,63 @@ router.post('/:id/send', ccApiLimiter, async (req: AuthRequest, res: Response): 
         latencyMs: createResult.latencyMs,
       },
     });
+
+    // Auto-recover from "already exists" — CC keys uniqueness on
+    // (Masters, Houses) and rejects re-creates with a 500. If a previous
+    // transmit attempt left a stale doc on CC's side (e.g. our send call
+    // failed but their create succeeded), we delete the stale entry by
+    // entry number, then retry create. Idempotent transmit semantics.
+    const isDuplicate =
+      createResult.status === 500 &&
+      /already exist/i.test(String(createResult.data?.message ?? ''));
+
+    if (isDuplicate && sendingDoc.entryNumber) {
+      logger.info(
+        { docId: sendingDoc.id, entryNumber: sendingDoc.entryNumber },
+        'CC reports duplicate on create — attempting cleanup-then-retry',
+      );
+
+      const canonicalEntry = canonicaliseEntryNumber(sendingDoc.entryNumber);
+      const deleteResult = await ccClient
+        .deleteABIDocument({ entryNumber: canonicalEntry })
+        .catch((err: any) => ({
+          status: 0,
+          data: { error: err?.message ?? 'delete failed' },
+          latencyMs: 0,
+        }));
+
+      await prisma.submissionLog.create({
+        data: {
+          orgId: req.user!.orgId,
+          userId: req.user!.id,
+          correlationId: sendingDoc.id,
+          method: 'DELETE',
+          url: '/api/abi/documents',
+          requestPayload: { 'entry-number': canonicalEntry } as any,
+          responseStatus: deleteResult.status,
+          responseBody: deleteResult.data as any,
+          latencyMs: deleteResult.latencyMs ?? 0,
+        },
+      });
+
+      if (deleteResult.status >= 200 && deleteResult.status < 300) {
+        createResult = await ccClient.createABIDocument(createPayload);
+
+        await prisma.submissionLog.create({
+          data: {
+            orgId: req.user!.orgId,
+            userId: req.user!.id,
+            correlationId: sendingDoc.id,
+            method: 'POST',
+            url: '/api/abi/documents (retry after duplicate cleanup)',
+            requestPayload: createPayload as any,
+            responseStatus: createResult.status,
+            responseBody: createResult.data as any,
+            latencyMs: createResult.latencyMs,
+          },
+        });
+      }
+    }
 
     // CC returns 2xx only when the document was actually accepted — any
     // 4xx/5xx must surface to the user so we don't silently mark a doc as
