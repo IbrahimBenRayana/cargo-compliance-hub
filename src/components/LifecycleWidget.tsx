@@ -18,11 +18,62 @@
  * a contextual CTA button. The horizontal connector line fills with
  * stage-tinted gradient as stages complete.
  */
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Filing } from '@/types/shipment';
 import { Button } from '@/components/ui/button';
 import { Check, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+// ─── ExpandableDetail — long status text with show-more/less ────────
+
+const DETAIL_CHAR_LIMIT = 140;
+
+function ExpandableDetail({ text, className }: { text: string; className?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > DETAIL_CHAR_LIMIT;
+
+  // Try to extract a readable summary from CC-style JSON error blobs.
+  // CC sometimes returns rejection details like:
+  //   {"summary":"...short msg...","errors":[{...}]}
+  // If we can pull `summary`, that's a much better preview than the raw JSON.
+  const friendly = (() => {
+    if (!text || text.trim()[0] !== '{') return null;
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed?.summary === 'string') return parsed.summary;
+      if (typeof parsed?.message === 'string') return parsed.message;
+    } catch { /* fall through to raw */ }
+    return null;
+  })();
+
+  const preview = friendly ?? text;
+  const previewIsLong = preview.length > DETAIL_CHAR_LIMIT;
+
+  if (!isLong && !previewIsLong) {
+    return <p className={cn(className, 'break-words')}>{preview}</p>;
+  }
+
+  return (
+    <div className={cn('w-full', className)}>
+      <p
+        className={cn(
+          'break-words',
+          !expanded && 'line-clamp-3',
+        )}
+      >
+        {expanded ? text : preview}
+      </p>
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v); }}
+        className="mt-1 text-[10.5px] font-medium text-primary/80 hover:text-primary hover:underline focus-visible:outline-none focus-visible:underline"
+      >
+        {expanded ? 'Show less' : 'Show more'}
+      </button>
+    </div>
+  );
+}
 
 // ─── stage definition + computation ──────────────────────────────────
 
@@ -94,7 +145,7 @@ export function computeShipmentLifecycle(args: {
     : filing.status;
   const isfCta: StageNode['cta'] | undefined =
     filing.status === 'draft' ? { label: 'Edit & submit', to: `/shipments/${filing.id}/edit` }
-    : filing.status === 'rejected' ? { label: 'Review & resubmit', to: `/shipments/${filing.id}` }
+    : filing.status === 'rejected' ? { label: 'Review & resubmit', to: `/shipments/${filing.id}/edit` }
     : undefined;
 
   // ── Stage 2: Manifest Verified
@@ -392,12 +443,13 @@ export function LifecycleWidget({ filing, abiDocs = [], manifestQueries = [] }: 
                   )}>
                     {node.title}
                   </p>
-                  <p className={cn(
-                    'text-[12.5px] font-medium leading-snug px-1',
-                    node.state === 'pending' ? 'text-muted-foreground/60' : 'text-foreground',
-                  )}>
-                    {node.detail}
-                  </p>
+                  <ExpandableDetail
+                    text={node.detail}
+                    className={cn(
+                      'text-[12.5px] font-medium leading-snug px-1',
+                      node.state === 'pending' ? 'text-muted-foreground/60' : 'text-foreground',
+                    )}
+                  />
                   {node.age && (
                     <p className="text-[10.5px] text-muted-foreground/60 tabular-nums">
                       {node.age}
