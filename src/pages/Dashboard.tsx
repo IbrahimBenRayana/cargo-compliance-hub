@@ -340,6 +340,8 @@ const COLUMNS: ColumnDef[] = [
   { stage: 'cleared',  index: '04', title: 'Cleared',           subtitle: 'Accepted by CBP',               emptyTitle: 'No cleared shipments yet',  emptyHint: 'Once CBP accepts an entry, it lands here.' },
 ];
 
+const COLUMN_TILE_LIMIT = 5;
+
 function PipelineColumn({
   def, tiles, indexOffset,
 }: {
@@ -348,6 +350,9 @@ function PipelineColumn({
   indexOffset: number;
 }) {
   const animatedCount = useCountUp(tiles.length, 700);
+  const [expanded, setExpanded] = useState(false);
+  const visibleTiles = expanded ? tiles : tiles.slice(0, COLUMN_TILE_LIMIT);
+  const overflow = tiles.length - COLUMN_TILE_LIMIT;
   return (
     <div className="space-y-3 min-w-0">
       {/* Header */}
@@ -399,13 +404,42 @@ function PipelineColumn({
             <p className="text-[11px] text-muted-foreground/60 mt-1 leading-relaxed">{def.emptyHint}</p>
           </div>
         ) : (
-          tiles.map((t, i) => (
+          visibleTiles.map((t, i) => (
             <ShipmentCard
               key={t.id}
               tile={t}
               delay={140 + (indexOffset + i) * 36}
             />
           ))
+        )}
+
+        {/* Show-more / show-less toggle (only when overflow exists) */}
+        {overflow > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpanded(v => !v)}
+            className={cn(
+              'group relative w-full rounded-xl border border-dashed border-border/60 bg-muted/10 px-3 py-2.5 text-[11px] font-medium',
+              'flex items-center justify-center gap-1.5',
+              'transition-[background-color,border-color,color] duration-200',
+              'hover:bg-muted/30 hover:border-border hover:text-foreground',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'text-muted-foreground/80',
+            )}
+          >
+            {expanded ? (
+              <>
+                <ChevronRight className="h-3 w-3 -rotate-90 transition-transform duration-200" />
+                Show less
+              </>
+            ) : (
+              <>
+                <span className="tabular-nums font-semibold text-foreground/85">+{overflow}</span>
+                <span className="opacity-70">more in {def.title.toLowerCase()}</span>
+                <ChevronRight className="h-3 w-3 rotate-90 transition-transform duration-200 opacity-50 group-hover:opacity-100" />
+              </>
+            )}
+          </button>
         )}
       </div>
     </div>
@@ -520,6 +554,86 @@ function EmptyHero({ greeting, firstName }: { greeting: string; firstName: strin
   );
 }
 
+// ─── KPI strip ───────────────────────────────────────────────────────
+
+type KpiTone = 'primary' | 'amber' | 'emerald' | 'violet';
+
+const KPI_TINT: Record<KpiTone, { number: string; bg: string; ring: string; dot: string }> = {
+  primary: {
+    number: 'text-gradient-accent',
+    bg:     'bg-gradient-to-br from-primary/[0.06] via-card to-card',
+    ring:   'ring-primary/15',
+    dot:    'bg-primary',
+  },
+  amber: {
+    number: 'text-gradient-stage-manifest',
+    bg:     'bg-gradient-to-br from-amber-500/[0.06] via-card to-card',
+    ring:   'ring-amber-500/15',
+    dot:    'bg-amber-500',
+  },
+  emerald: {
+    number: 'text-gradient-stage-cleared',
+    bg:     'bg-gradient-to-br from-emerald-500/[0.06] via-card to-card',
+    ring:   'ring-emerald-500/15',
+    dot:    'bg-emerald-500',
+  },
+  violet: {
+    number: 'text-gradient-stage-entry',
+    bg:     'bg-gradient-to-br from-violet-500/[0.06] via-card to-card',
+    ring:   'ring-violet-500/15',
+    dot:    'bg-violet-500',
+  },
+};
+
+function KpiCard({
+  label, value, format = 'number', sub, tone, delay, pulse,
+}: {
+  label: string;
+  value: number;
+  format?: 'number' | 'percent';
+  sub: string;
+  tone: KpiTone;
+  delay: number;
+  pulse?: boolean;
+}) {
+  const animated = useCountUp(value, 1000);
+  const display = format === 'percent' ? `${animated}%` : animated.toLocaleString();
+  const tint = KPI_TINT[tone];
+  return (
+    <div
+      className={cn(
+        'group relative rounded-xl ring-1 ring-inset px-4 py-3.5 overflow-hidden',
+        tint.ring,
+        tint.bg,
+        'transition-[transform,box-shadow] duration-200 ease-out',
+        'hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-12px_hsl(var(--foreground)/0.18)]',
+        'opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none motion-reduce:hover:translate-y-0',
+      )}
+      style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
+    >
+      <div className="flex items-center gap-1.5 mb-2">
+        {pulse ? (
+          <span className="relative flex h-1.5 w-1.5">
+            <span className={cn('absolute inset-0 rounded-full opacity-60 animate-ping motion-reduce:animate-none', tint.dot)} />
+            <span className={cn('relative h-1.5 w-1.5 rounded-full', tint.dot)} />
+          </span>
+        ) : (
+          <span className={cn('h-1.5 w-1.5 rounded-full', tint.dot)} aria-hidden />
+        )}
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          {label}
+        </p>
+      </div>
+      <p className={cn('text-[30px] leading-none font-semibold tabular-nums tracking-[-0.02em]', tint.number)}>
+        {display}
+      </p>
+      <p className="mt-2 text-[11px] text-muted-foreground/70 leading-snug truncate">
+        {sub}
+      </p>
+    </div>
+  );
+}
+
 // ─── flow indicator ──────────────────────────────────────────────────
 
 function FlowIndicator() {
@@ -575,6 +689,23 @@ export default function Dashboard() {
   const inFlightCount = byStage.isf.length + byStage.manifest.length + byStage.entry.length;
   const attentionCount = tiles.filter(t => t.severity === 'critical' || t.severity === 'warn').length;
   const clearedCount = byStage.cleared.length;
+
+  // KPI metrics
+  const clearedThisMonth = useMemo(() => {
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+    return abiDocs.filter(d => d.status === 'ACCEPTED' && new Date(d.updatedAt).getTime() >= monthStart).length;
+  }, [abiDocs]);
+
+  const acceptanceRate = useMemo(() => {
+    const accepted = filings.filter(f => f.status === 'accepted').length;
+    const rejected = filings.filter(f => f.status === 'rejected').length;
+    const resolved = accepted + rejected;
+    return resolved === 0 ? 100 : Math.round((accepted / resolved) * 100);
+  }, [filings]);
+
+  const inFlightStages =
+    [byStage.isf.length > 0, byStage.manifest.length > 0, byStage.entry.length > 0]
+      .filter(Boolean).length;
 
   const animatedInFlight = useCountUp(inFlightCount, 1100);
 
@@ -656,13 +787,13 @@ export default function Dashboard() {
 
           {/* Big headline */}
           {inFlightCount === 0 ? (
-            <h1 className="text-[64px] leading-[0.95] font-semibold tracking-[-0.035em] max-w-3xl">
+            <h1 className="text-[38px] leading-[1.1] font-semibold tracking-[-0.025em] max-w-3xl">
               <span className="text-gradient-hero">No shipments in flight.</span>
               <br />
               <span className="text-muted-foreground/60">Time to file.</span>
             </h1>
           ) : (
-            <h1 className="text-[64px] leading-[0.95] font-semibold tracking-[-0.035em] max-w-3xl">
+            <h1 className="text-[38px] leading-[1.1] font-semibold tracking-[-0.025em] max-w-3xl">
               <span className="text-muted-foreground/60">You have</span>{' '}
               <span className="text-gradient-accent tabular-nums inline-block min-w-[1ch]">
                 {animatedInFlight}
@@ -717,6 +848,43 @@ export default function Dashboard() {
             </Link>
           </div>
         </header>
+
+        {/* ─── KPIs ────────────────────────────────────────────────────── */}
+        <section
+          className="grid grid-cols-2 md:grid-cols-4 gap-3 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
+          style={{ animationDelay: '40ms', animationFillMode: 'forwards' }}
+        >
+          <KpiCard
+            label="Active"
+            value={inFlightCount}
+            sub={inFlightStages === 0 ? 'no shipments in flight' : `across ${inFlightStages} ${inFlightStages === 1 ? 'stage' : 'stages'}`}
+            tone="primary"
+            delay={120}
+          />
+          <KpiCard
+            label="Needs Attention"
+            value={attentionCount}
+            sub={attentionCount === 0 ? 'all clear' : 'critical or pending action'}
+            tone="amber"
+            delay={170}
+            pulse={attentionCount > 0}
+          />
+          <KpiCard
+            label="Cleared This Month"
+            value={clearedThisMonth}
+            sub="entries accepted by CBP"
+            tone="emerald"
+            delay={220}
+          />
+          <KpiCard
+            label="Acceptance Rate"
+            value={acceptanceRate}
+            format="percent"
+            sub="ISFs accepted vs resolved"
+            tone="violet"
+            delay={270}
+          />
+        </section>
 
         {/* ─── Pipeline ─────────────────────────────────────────────────── */}
         <section
