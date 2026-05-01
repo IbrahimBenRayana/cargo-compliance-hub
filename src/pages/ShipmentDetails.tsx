@@ -1,8 +1,11 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFiling, useSubmitFiling, useAmendFiling, useCancelFiling, useValidateFiling, useCheckFilingStatus, useDuplicateFiling, useSaveFilingAsTemplate, useFilingDocuments, useUploadDocuments, useDownloadDocument, useDeleteDocument, useExportPdf } from '@/hooks/useFilings';
+import { useAbiDocumentsList } from '@/hooks/useAbiDocument';
+import { useManifestQueries } from '@/hooks/useManifestQuery';
 import { Filing, getPartyName, getFirstCommodity, ShipmentStatus } from '@/types/shipment';
 import { StatusBadge } from '@/components/StatusBadge';
+import { LifecycleWidget } from '@/components/LifecycleWidget';
 import { PlanLimitModal } from '@/components/PlanLimitModal';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -540,6 +543,10 @@ export default function ShipmentDetails() {
 
   // Document upload state
   const { data: docsData, isLoading: docsLoading } = useFilingDocuments(id);
+  // Lifecycle widget data — fetched lazily; failure of either is fine
+  // (the widget falls back to ISF-only state if abis/mqs don't load).
+  const { data: abiListData } = useAbiDocumentsList({ take: 100 });
+  const { data: mqListData } = useManifestQueries({ limit: 50 });
   const uploadDocs = useUploadDocuments();
   const downloadDoc = useDownloadDocument();
   const deleteDoc = useDeleteDocument();
@@ -880,6 +887,18 @@ export default function ShipmentDetails() {
             </DialogContent>
           </Dialog>
         </div>
+      </div>
+
+      {/* Lifecycle widget — horizontal stage tracker (ISF · Manifest · Entry · Cleared) */}
+      <div
+        className="opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
+        style={{ animationDelay: '60ms', animationFillMode: 'forwards' }}
+      >
+        <LifecycleWidget
+          filing={filing}
+          abiDocs={(abiListData?.data ?? []) as any}
+          manifestQueries={((mqListData as any)?.data ?? []) as any}
+        />
       </div>
 
       {/* Submission Pipeline — only for draft filings */}
