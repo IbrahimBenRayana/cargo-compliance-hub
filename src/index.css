@@ -157,6 +157,79 @@
 }
 
 @layer utilities {
+  /* ── Aurora background — slow ambient gradient mesh ── */
+  .aurora-bg {
+    background:
+      radial-gradient(ellipse 60% 50% at 18% -10%, hsl(var(--primary) / 0.18), transparent 60%),
+      radial-gradient(ellipse 50% 40% at 82% -10%, hsl(43 96% 56% / 0.16), transparent 60%),
+      radial-gradient(ellipse 55% 35% at 50% -15%, hsl(280 80% 60% / 0.10), transparent 60%);
+    background-size: 140% 100%, 140% 100%, 140% 100%;
+    animation: aurora-pan 22s ease-in-out infinite alternate;
+  }
+  .dark .aurora-bg {
+    background:
+      radial-gradient(ellipse 60% 50% at 18% -10%, hsl(var(--primary) / 0.32), transparent 60%),
+      radial-gradient(ellipse 50% 40% at 82% -10%, hsl(43 96% 56% / 0.22), transparent 60%),
+      radial-gradient(ellipse 55% 35% at 50% -15%, hsl(280 80% 60% / 0.18), transparent 60%);
+    background-size: 140% 100%, 140% 100%, 140% 100%;
+    animation: aurora-pan 22s ease-in-out infinite alternate;
+  }
+  @keyframes aurora-pan {
+    0%   { background-position:  0% 0%, 100% 0%,  50% 0%; }
+    100% { background-position: 12% 0%,  88% 0%,  62% 0%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .aurora-bg { animation: none; }
+  }
+
+  /* ── Gradient text utility (more elegant than text-transparent bg-clip in JSX) ── */
+  .text-gradient-stage-isf      { background: linear-gradient(135deg, hsl(217 91% 60%), hsl(199 89% 48%)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .text-gradient-stage-manifest { background: linear-gradient(135deg, hsl(38 92% 55%),  hsl(24 95% 53%));  -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .text-gradient-stage-entry    { background: linear-gradient(135deg, hsl(262 83% 58%), hsl(292 84% 61%)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .text-gradient-stage-cleared  { background: linear-gradient(135deg, hsl(160 84% 39%), hsl(173 80% 40%)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .text-gradient-hero {
+    background: linear-gradient(135deg, hsl(var(--foreground)) 0%, hsl(var(--foreground) / 0.55) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .text-gradient-accent {
+    background: linear-gradient(120deg, hsl(var(--primary)) 0%, hsl(43 96% 56%) 50%, hsl(280 80% 60%) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* ── Stage-tinted top accent rails (column headers) ── */
+  .stage-rail-isf      { background: linear-gradient(90deg, hsl(217 91% 60%) 0%, hsl(199 89% 48%) 100%); }
+  .stage-rail-manifest { background: linear-gradient(90deg, hsl(38 92% 55%)  0%, hsl(24 95% 53%) 100%);  }
+  .stage-rail-entry    { background: linear-gradient(90deg, hsl(262 83% 58%) 0%, hsl(292 84% 61%) 100%); }
+  .stage-rail-cleared  { background: linear-gradient(90deg, hsl(160 84% 39%) 0%, hsl(173 80% 40%) 100%); }
+
+  /* ── Severity rail glow (gradient + drop shadow) ── */
+  .rail-critical { background: linear-gradient(180deg, hsl(0 84% 60%), hsl(0 72% 51%)); box-shadow: 0 0 8px hsl(0 84% 60% / 0.45); }
+  .rail-warn     { background: linear-gradient(180deg, hsl(38 92% 55%), hsl(24 95% 53%)); box-shadow: 0 0 8px hsl(38 92% 55% / 0.45); }
+  .rail-success  { background: linear-gradient(180deg, hsl(160 84% 45%), hsl(173 80% 40%)); box-shadow: 0 0 8px hsl(160 84% 45% / 0.45); }
+
+  /* ── Hover-glow tints (per stage) ── */
+  .glow-hover-isf:hover      { box-shadow: 0 12px 32px -16px hsl(217 91% 60% / 0.35), 0 2px 8px -2px hsl(217 91% 60% / 0.20); }
+  .glow-hover-manifest:hover { box-shadow: 0 12px 32px -16px hsl(38 92% 55%  / 0.35), 0 2px 8px -2px hsl(38 92% 55%  / 0.20); }
+  .glow-hover-entry:hover    { box-shadow: 0 12px 32px -16px hsl(262 83% 58% / 0.35), 0 2px 8px -2px hsl(262 83% 58% / 0.20); }
+  .glow-hover-cleared:hover  { box-shadow: 0 12px 32px -16px hsl(160 84% 39% / 0.35), 0 2px 8px -2px hsl(160 84% 39% / 0.20); }
+
+  /* ── Spring-eased cascade entry ── */
+  .animate-tile-in {
+    animation: tile-in 0.55s cubic-bezier(0.34, 1.32, 0.64, 1) forwards;
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  @keyframes tile-in {
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-tile-in { animation: none; opacity: 1; transform: none; }
+  }
+
   /* ── Glass morphism ── */
   .glass {
     background: hsl(var(--card) / 0.75);
