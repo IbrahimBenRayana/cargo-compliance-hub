@@ -16,24 +16,72 @@ import {
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
-const mainNav = [
-  { title: 'Dashboard', url: '/', icon: LayoutDashboard },
-  { title: 'Shipments', url: '/shipments', icon: Ship },
-  { title: 'Compliance', url: '/compliance', icon: Shield },
-];
+// ─── Navigation grouped by purpose, not feature type ────────────────
+//
+// The lifecycle goes: ISF → Manifest verified → Entry → Cleared.
+// Sidebar groups follow the verb the user is doing, so the path from
+// "I have a shipment to file" → "I want to track / look something up"
+// → "I need to manage settings" is visually obvious.
+//
+//   Workspace    → where you start (Dashboard)
+//   Operations   → where you DO the work (Shipments, Entry Documents)
+//   Lookups      → where you investigate (Manifest Query)
+//   Compliance   → where you check rules
+//   Activity     → where you audit (Submission Logs)
+//   Account      → where you configure (API, Team)
+// ────────────────────────────────────────────────────────────────────
 
-const integrationsNav = [
-  { title: 'API Settings', url: '/integrations/api', icon: Plug },
-  { title: 'Submission Logs', url: '/integrations/logs', icon: FileText },
-];
+interface NavItem {
+  title: string;
+  url: string;
+  icon: typeof LayoutDashboard;
+  end?: boolean;
+}
 
-const toolsNav = [
-  { title: 'Manifest Query', url: '/manifest-query', icon: Search },
-  { title: 'Entry Documents', url: '/abi-documents', icon: FileCheck },
-];
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
 
-const managementNav = [
-  { title: 'Team', url: '/team', icon: Users },
+const navSections: NavSection[] = [
+  {
+    label: 'Workspace',
+    items: [
+      { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { title: 'Shipments',       url: '/shipments',     icon: Ship },
+      { title: 'Entry Documents', url: '/abi-documents', icon: FileCheck },
+    ],
+  },
+  {
+    label: 'Lookups',
+    items: [
+      { title: 'Manifest Query', url: '/manifest-query', icon: Search },
+    ],
+  },
+  {
+    label: 'Compliance',
+    items: [
+      { title: 'Compliance', url: '/compliance', icon: Shield },
+    ],
+  },
+  {
+    label: 'Activity',
+    items: [
+      { title: 'Submission Logs', url: '/integrations/logs', icon: FileText },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
+      { title: 'API Settings', url: '/integrations/api', icon: Plug },
+      { title: 'Team',         url: '/team',             icon: Users },
+    ],
+  },
 ];
 
 const navItemClass = cn(
@@ -105,145 +153,44 @@ export function AppSidebar() {
           'px-2 group-data-[collapsible=icon]:px-0',
         )}
       >
-        {/* ── Main Navigation ── */}
-        <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1 px-3">
-              Navigation
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-              {mainNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
-                    className={navItemClass}
-                  >
-                    <NavLink to={item.url} end={item.url === '/'}>
-                      <item.icon className="h-[18px] w-[18px] transition-transform duration-200 group-hover/btn:scale-110 shrink-0" />
-                      {!collapsed && (
-                        <>
-                          <span className="font-medium text-[13px]">{item.title}</span>
-                          {isActive(item.url) && (
-                            <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-60" />
-                          )}
-                        </>
-                      )}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* ── Integrations ── */}
-        <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1 px-3">
-              Integrations
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-              {integrationsNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
-                    className={navItemClass}
-                  >
-                    <NavLink to={item.url}>
-                      <item.icon className="h-[18px] w-[18px] transition-transform duration-200 group-hover/btn:scale-110 shrink-0" />
-                      {!collapsed && (
-                        <>
-                          <span className="font-medium text-[13px]">{item.title}</span>
-                          {isActive(item.url) && (
-                            <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-60" />
-                          )}
-                        </>
-                      )}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* ── Tools ── */}
-        <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1 px-3">
-              Tools
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-              {toolsNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
-                    className={navItemClass}
-                  >
-                    <NavLink to={item.url}>
-                      <item.icon className="h-[18px] w-[18px] transition-transform duration-200 group-hover/btn:scale-110 shrink-0" />
-                      {!collapsed && (
-                        <>
-                          <span className="font-medium text-[13px]">{item.title}</span>
-                          {isActive(item.url) && (
-                            <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-60" />
-                          )}
-                        </>
-                      )}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* ── Management ── */}
-        <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1 px-3">
-              Management
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-              {managementNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
-                    className={navItemClass}
-                  >
-                    <NavLink to={item.url}>
-                      <item.icon className="h-[18px] w-[18px] transition-transform duration-200 group-hover/btn:scale-110 shrink-0" />
-                      {!collapsed && (
-                        <>
-                          <span className="font-medium text-[13px]">{item.title}</span>
-                          {isActive(item.url) && (
-                            <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-60" />
-                          )}
-                        </>
-                      )}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Render all sections from the navSections array. The previous
+            implementation had four near-identical JSX blocks; this is one
+            map so adding/reordering groups is a one-line change. */}
+        {navSections.map((section) => (
+          <SidebarGroup key={section.label}>
+            {!collapsed && (
+              <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1 px-3">
+                {section.label}
+              </SidebarGroupLabel>
+            )}
+            <SidebarGroupContent>
+              <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                {section.items.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive(item.url)}
+                      tooltip={item.title}
+                      className={navItemClass}
+                    >
+                      <NavLink to={item.url} end={item.end}>
+                        <item.icon className="h-[18px] w-[18px] transition-transform duration-200 group-hover/btn:scale-110 shrink-0" />
+                        {!collapsed && (
+                          <>
+                            <span className="font-medium text-[13px]">{item.title}</span>
+                            {isActive(item.url) && (
+                              <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-60" />
+                            )}
+                          </>
+                        )}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       {/* ── Footer ── */}
