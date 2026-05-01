@@ -1,4 +1,4 @@
-import { LayoutDashboard, Ship, Shield, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck } from 'lucide-react';
+import { LayoutDashboard, Ship, Shield, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -60,7 +60,8 @@ const navSections: NavSection[] = [
   {
     label: 'Lookups',
     items: [
-      { title: 'Manifest Query', url: '/manifest-query', icon: Search },
+      { title: 'Manifest Query',  url: '/manifest-query',  icon: Search },
+      { title: 'Duty Calculator', url: '/duty-calculator', icon: Calculator },
     ],
   },
   {

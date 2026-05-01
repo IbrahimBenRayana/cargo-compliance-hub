@@ -587,6 +587,163 @@ export const manifestQueryApi = {
   },
 };
 
+// ─── Duty Calculation API ─────────────────────────────────
+// Mirrors the SOURCE-OF-TRUTH types in
+// server/src/services/customscity.ts (CCDutyCalc*). Two endpoints:
+//   POST /api/v1/duty-calculation       — HTS deterministic
+//   POST /api/v1/duty-calculation/ai    — description, AI classifies
+// Both take the same request body; AI response adds `aiRecommendations`
+// and may return `dutiesBreakdown: null`.
+
+export interface DutyCalcItem {
+  hts?: string;                          // required for /, optional for /ai
+  description: string;
+  totalValue: number;
+  quantity1?: number | null;
+  quantity2?: number | null;
+  spi?: string;                          // e.g. "MX" for USMCA
+  aluminumPercentage?: number;
+  steelPercentage?: number;
+  copperPercentage?: number;
+  isCottonExempt?: boolean;
+  isAutoPartExempt?: boolean;
+  kitchenPartNotComplete?: boolean;
+  isInformationalMaterialExempt?: boolean;
+}
+
+export interface DutyCalcRequest {
+  items: DutyCalcItem[];
+  entryType: 'formal' | 'informal';
+  modeOfTransportation: 'air' | 'ocean' | 'truck' | 'rail';
+  estimatedEntryDate: string;            // MM/DD/YYYY
+  countryOfOrigin: string;               // ISO-3166 alpha-2
+  currency: string;                      // ISO-4217
+}
+
+export interface DutyCalcSubheading {
+  hts: string;
+  name: string;
+  duty: number;
+  /** AI mode only: 'section301', 'fentanylCN', 'reciprocal', 'steel', etc. */
+  section?: string;
+}
+
+export interface DutyCalcItemResult {
+  classification: { name: string; hts: string };
+  description: string;
+  quantity1: number | null;
+  quantity1UOM: string | null;
+  quantity2: number | null;
+  quantity2UOM: string | null;
+  quantity3?: number | null;
+  quantity3UOM?: string | null;
+  specificDutyRate?: number;             // AI mode only
+  adValoremDutyRate?: number;            // AI mode only
+  otherDutyRate?: number;                // AI mode only
+  totalDutiable: number;
+  charges: number;
+  duty: number;
+  userFee: number;
+  irTax: number;
+  adcvdAmount: number;
+  subheadingDuties: number;
+  subheadings: DutyCalcSubheading[];
+  pgaFlags?: unknown[];
+  aluminumPercentage?: number;
+  steelPercentage?: number;
+  copperPercentage?: number;
+  isCottonExempt?: boolean;
+  isAutoPartExempt?: boolean;
+  kitchenPartNotComplete?: boolean;
+  isInformationalMaterialExempt?: boolean;
+}
+
+/** Both endpoint variants observed in the wild use overlapping but
+ *  not-identical summary fields. All optional, calling code must
+ *  fall back gracefully. */
+export interface DutyCalcSummary {
+  totalValue?: number;
+  totalDutiableValue: number;
+  ddp: number;
+  totalDutiesTaxes?: number;          // standard endpoint
+  totalDuties?: number;               // AI endpoint
+  totalDutiesFees?: number;           // AI endpoint
+  totalDutyPercentage?: number;       // AI endpoint (e.g. 77.8 = 77.8%)
+  totalUserFee?: number;              // AI endpoint
+}
+
+export interface DutyCalcDutiesBreakdown {
+  totalChargesAmount: number;
+  totalDuties: number;
+  processingFee: number;
+  totalUserFee: number;
+  totalIrTax: number;
+  totaladcvdAmount: number;
+}
+
+export interface DutyCalcResponse {
+  items: DutyCalcItemResult[];
+  entryType: string;
+  countryOfOrigin: string;
+  countryOfOriginName: string;
+  modeOfTransportation: string;
+  estimatedEntryDate: string;
+  currency: string;
+  entryFee: { entryProcessingFee: number; portProcessingFee: number };
+  summary: DutyCalcSummary;
+  /** AI endpoint sometimes returns null — UI must guard. */
+  dutiesBreakdown: DutyCalcDutiesBreakdown | null;
+  ddpBreakdown: {
+    ddpIncluded: boolean;
+    ddp: number;
+    shipping: number;
+    insurance: number;
+  };
+}
+
+export interface DutyCalcAIRecommendationOption {
+  hts: string;
+  description: string;
+  type: number;
+  score: number;
+  naturalized_description: string;
+  participating_agencies: unknown[];
+  construction: {
+    components: Array<{ type: string; number: string; description: string }>;
+    indent_hierarchy: Array<{ level: number; htsno: string; description: string }>;
+  };
+}
+
+export interface DutyCalcAIRecommendation {
+  itemIndex: number;
+  originalDescription: string;
+  selectedHts: string;
+  explanation: string;
+  /** GRI reasoning */
+  specializedExplanation: string;
+  recommendations: DutyCalcAIRecommendationOption[];
+}
+
+export interface DutyCalcAIResponse extends DutyCalcResponse {
+  aiRecommendations: DutyCalcAIRecommendation[];
+}
+
+export const dutyCalculationApi = {
+  calculate(body: DutyCalcRequest) {
+    return apiFetch<{ data: DutyCalcResponse }>('/api/v1/duty-calculation', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  calculateAI(body: DutyCalcRequest) {
+    return apiFetch<{ data: DutyCalcAIResponse }>('/api/v1/duty-calculation/ai', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+};
+
 function buildQuery(params?: Record<string, string | undefined>): string {
   if (!params) return '';
   const query = new URLSearchParams();
