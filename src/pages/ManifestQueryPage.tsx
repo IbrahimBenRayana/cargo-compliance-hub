@@ -278,15 +278,22 @@ export default function ManifestQueryPage() {
   return (
     <div className="space-y-6 max-w-[1100px] mx-auto">
       {/* Page header */}
-      <div className="flex items-center gap-3 opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
-        <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-          <Search className="h-5 w-5 text-amber-500" />
+      <header className="space-y-4 opacity-0 animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100" style={{ animationFillMode: 'forwards' }}>
+        <div className="flex items-center gap-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/70 shrink-0 inline-flex items-center gap-2">
+            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-500/60" aria-hidden />
+            Lookups · CBP
+          </p>
+          <span className="h-px flex-1 bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
         </div>
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">Manifest Query</h1>
-          <p className="text-sm text-muted-foreground">Look up cargo status at CBP by BOL number</p>
+        <div className="min-w-0">
+          <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground inline-flex items-center gap-3">
+            <Search className="h-7 w-7 text-amber-500 shrink-0" strokeWidth={2} />
+            Manifest Query
+          </h1>
+          <p className="text-[14px] text-muted-foreground mt-2">Look up cargo status at CBP by BOL number</p>
         </div>
-      </div>
+      </header>
 
       {/* Search section */}
       <Card className="opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards', animationDelay: '30ms' }}>

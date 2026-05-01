@@ -144,23 +144,32 @@ export default function ABIDocumentsListPage() {
         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 opacity-0 animate-fade-in-up"
         style={{ animationFillMode: 'forwards' }}
       >
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-            <FileText className="h-5 w-5 text-blue-500" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">Entry Documents</h1>
-            <p className="text-sm text-muted-foreground">
-              ABI Entry Summary 7501 filings transmitted to U.S. Customs
+        <div className="space-y-4 w-full">
+          <div className="flex items-center gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/70 shrink-0 inline-flex items-center gap-2">
+              <span className="inline-flex h-1.5 w-1.5 rounded-full bg-violet-500/60" aria-hidden />
+              Operations · ABI
             </p>
+            <span className="h-px flex-1 bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
+          </div>
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground inline-flex items-center gap-3">
+                <FileText className="h-7 w-7 text-violet-500 shrink-0" strokeWidth={2} />
+                Entry Documents
+              </h1>
+              <p className="text-[14px] text-muted-foreground mt-2">
+                ABI Entry Summary 7501 filings transmitted to U.S. Customs
+              </p>
+            </div>
+            <Button asChild className="gap-1.5 h-10 rounded-xl shrink-0">
+              <Link to="/abi-documents/new">
+                <Plus className="h-4 w-4" />
+                New Entry
+              </Link>
+            </Button>
           </div>
         </div>
-        <Button asChild className="gap-1.5">
-          <Link to="/abi-documents/new">
-            <Plus className="h-4 w-4" />
-            New Entry
-          </Link>
-        </Button>
       </div>
 
       {/* Filters */}

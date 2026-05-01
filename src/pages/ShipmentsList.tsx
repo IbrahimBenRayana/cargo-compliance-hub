@@ -232,16 +232,23 @@ export default function ShipmentsList() {
         usage={planLimit ?? { current: 0, limit: 0 }}
       />
       {/* Header */}
-      <div className="flex items-center justify-between animate-fade-in-up" style={{ animationDelay: '0ms' }}>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Ship className="h-5 w-5 text-primary" />
-            </div>
+      <header className="space-y-4 animate-fade-in-up motion-reduce:animate-none" style={{ animationDelay: '0ms' }}>
+        <div className="flex items-center gap-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/70 shrink-0 inline-flex items-center gap-2">
+            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-primary/60" aria-hidden />
+            Operations · ISF
+          </p>
+          <span className="h-px flex-1 bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
+        </div>
+      </header>
+      <div className="flex items-end justify-between gap-4 animate-fade-in-up motion-reduce:animate-none" style={{ animationDelay: '40ms' }}>
+        <div className="min-w-0">
+          <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground inline-flex items-center gap-3">
+            <Ship className="h-7 w-7 text-primary shrink-0" strokeWidth={2} />
             Shipments
-            {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground motion-reduce:animate-none" />}
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage and track your ISF filings</p>
+          <p className="text-[14px] text-muted-foreground mt-2">Manage and track your ISF filings</p>
         </div>
         <div className="flex gap-2">
           <Button asChild className="shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
