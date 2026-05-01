@@ -1,19 +1,16 @@
 /**
  * Dashboard — The Shipment Pipeline.
  *
- * A 4-column Kanban-style lifecycle view of every active shipment in the
- * org, flowing left-to-right through:
+ * 4-column Kanban-style lifecycle view: every active shipment in the
+ * org flowing left-to-right through ISF Filed → Manifest Verified →
+ * Entry Filed → Cleared. Each shipment is one tile in exactly one
+ * column — its current stage. The visual structure IS the lifecycle
+ * teaching.
  *
- *   [ISF Filed]  →  [Manifest Verified]  →  [Entry Filed]  →  [Cleared]
- *
- * Each shipment is one tile. Tiles surface ID, importer, status, age,
- * and a severity strip on the left edge (red = rejected, amber =
- * draft / awaiting action, green = cleared). The visual structure IS
- * the lifecycle teaching — new users see the four-stage pipeline the
- * moment they log in; power users see at a glance what's stuck where.
- *
- * Data joins are computed client-side from existing list endpoints —
- * no new server work needed.
+ * Refined for elegance: numbered stage chips, gradient divider hairlines,
+ * connector chevrons, edge-fade activity strip, tabular numerals
+ * throughout, motion-safe animations, and focus-visible rings on every
+ * interactive surface.
  */
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -26,8 +23,7 @@ import { CelebrationModal } from '@/components/CelebrationModal';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Plus, ArrowRight, Search, FileCheck, ChevronRight, Activity,
-  Clock,
+  Plus, Search, FileCheck, ChevronRight, Activity, Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +42,12 @@ function relativeTime(ts: string | null | undefined) {
   if (day < 7)   return `${day}d`;
   if (day < 30)  return `${Math.floor(day / 7)}w`;
   return `${Math.floor(day / 30)}mo`;
+}
+
+/** Items updated in the last 30 minutes get a subtle "fresh" pulse. */
+function isFresh(ts: string | null | undefined) {
+  if (!ts) return false;
+  return Date.now() - new Date(ts).getTime() < 30 * 60 * 1000;
 }
 
 function useGreeting() {
@@ -76,13 +78,13 @@ interface AbiLite {
 
 interface ShipmentTile {
   id: string;
-  ref: string;          // BOL number or entry number — primary visual identifier
-  subRef?: string | null; // small line below — importer or extra context
+  ref: string;
+  subRef?: string | null;
   stage: Stage;
   severity: Severity;
   statusLabel: string;
-  ageRef: string;       // ISO date used to render relative age
-  to: string;           // navigation target on click
+  ageRef: string;
+  to: string;
 }
 
 // ─── stage / severity computation ────────────────────────────────────
@@ -93,8 +95,7 @@ function buildShipments(args: {
 }): ShipmentTile[] {
   const tiles: ShipmentTile[] = [];
 
-  // Group ABI docs by filingId for fast lookup. Each filing gets at most
-  // one "linked" ABI doc — if there are multiple, prefer the most-recent.
+  // Most-recent ABI doc per filing.
   const abiByFilingId = new Map<string, AbiLite>();
   for (const d of args.abiDocs) {
     if (!d.filingId) continue;
@@ -104,15 +105,12 @@ function buildShipments(args: {
     }
   }
 
-  // Walk filings: each one is a shipment, the linked ABI determines the
-  // furthest stage it has reached.
   for (const f of args.filings) {
-    if (f.status === 'cancelled') continue; // not "in flight" — hidden
+    if (f.status === 'cancelled') continue;
     const abi = abiByFilingId.get(f.id) ?? null;
     const ref = f.houseBol || f.masterBol || f.id.slice(0, 8);
     const importerName = f.importerName || 'No importer set';
 
-    // Stage assignment, walked back from most-advanced state
     let stage: Stage;
     let severity: Severity = 'neutral';
     let statusLabel: string;
@@ -137,7 +135,7 @@ function buildShipments(args: {
       to = `/abi-documents/${abi.id}`;
     } else if (f.status === 'accepted') {
       stage = 'manifest';
-      severity = 'warn'; // user has an action to take — file the entry
+      severity = 'warn';
       statusLabel = 'Ready to file Entry';
       ageRef = f.updatedAt;
       to = `/abi-documents/new?fromShipment=${f.id}`;
@@ -155,21 +153,12 @@ function buildShipments(args: {
       to = f.status === 'draft' ? `/shipments/${f.id}/edit` : `/shipments/${f.id}`;
     }
 
-    tiles.push({
-      id: `f-${f.id}`,
-      ref,
-      subRef: importerName,
-      stage,
-      severity,
-      statusLabel,
-      ageRef,
-      to,
-    });
+    tiles.push({ id: `f-${f.id}`, ref, subRef: importerName, stage, severity, statusLabel, ageRef, to });
   }
 
-  // Standalone ABI docs (no parent ISF). Add as their own tiles.
+  // Standalone ABI docs.
   for (const d of args.abiDocs) {
-    if (d.filingId) continue; // already covered above
+    if (d.filingId) continue;
     if (d.status === 'CANCELLED') continue;
     const ref = d.entryNumber || d.mbolNumber || d.id.slice(0, 8);
     let stage: Stage;
@@ -202,7 +191,7 @@ function buildShipments(args: {
     });
   }
 
-  // Sort within each stage: critical first, then warn, then by recency
+  // Sort: critical → warn → neutral → success, then by recency.
   const sevOrder: Record<Severity, number> = { critical: 0, warn: 1, neutral: 2, success: 3 };
   tiles.sort((a, b) => {
     if (a.severity !== b.severity) return sevOrder[a.severity] - sevOrder[b.severity];
@@ -213,11 +202,11 @@ function buildShipments(args: {
 
 // ─── tile component ──────────────────────────────────────────────────
 
-const SEVERITY_BORDER: Record<Severity, string> = {
-  critical: 'border-l-[3px] border-l-red-500',
-  warn:     'border-l-[3px] border-l-amber-500',
-  success:  'border-l-[3px] border-l-emerald-500',
-  neutral:  'border-l-[3px] border-l-transparent',
+const SEVERITY_RAIL: Record<Severity, string> = {
+  critical: 'before:bg-red-500',
+  warn:     'before:bg-amber-500',
+  success:  'before:bg-emerald-500',
+  neutral:  'before:bg-transparent',
 };
 
 const SEVERITY_LABEL_TINT: Record<Severity, string> = {
@@ -228,27 +217,46 @@ const SEVERITY_LABEL_TINT: Record<Severity, string> = {
 };
 
 function ShipmentCard({ tile, delay }: { tile: ShipmentTile; delay: number }) {
+  const fresh = isFresh(tile.ageRef);
   return (
     <Link
       to={tile.to}
       className={cn(
-        'group block rounded-xl border border-border/60 bg-card pl-3.5 pr-3 py-3',
-        'transition-all duration-200',
-        'hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-[0_8px_24px_-12px_hsl(var(--foreground)/0.15)]',
+        // Layout
+        'group relative block rounded-xl bg-card pl-4 pr-3.5 py-3.5',
+        // Border + colored left rail (using ::before so the border stays subtle)
+        'border border-border/60',
+        "before:content-[''] before:absolute before:left-0 before:top-3 before:bottom-3 before:w-[3px] before:rounded-r-full",
+        SEVERITY_RAIL[tile.severity],
+        // Smooth hover & focus
+        'transition-[transform,box-shadow,border-color] duration-200 ease-out',
+        'hover:-translate-y-0.5 hover:border-foreground/15',
+        'hover:shadow-[0_8px_24px_-12px_hsl(var(--foreground)/0.18),0_2px_4px_-2px_hsl(var(--foreground)/0.06)]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        // Cascade entrance
         'opacity-0 animate-fade-in-up',
-        SEVERITY_BORDER[tile.severity],
+        // Respect reduced motion
+        'motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:animate-none motion-reduce:opacity-100',
       )}
       style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
-        <p className="text-[13px] font-semibold tracking-tight truncate group-hover:text-primary transition-colors">
+        <p className="text-[13px] font-semibold tracking-tight truncate group-hover:text-primary transition-colors duration-150">
           {tile.ref}
         </p>
-        {tile.severity === 'critical' && (
-          <span className="h-1.5 w-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" aria-hidden />
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {fresh && (
+            <span
+              className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse motion-reduce:animate-none"
+              aria-label="Updated recently"
+            />
+          )}
+          {tile.severity === 'critical' && !fresh && (
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" aria-hidden />
+          )}
+        </div>
       </div>
-      <p className="text-[11.5px] text-muted-foreground truncate">
+      <p className="text-[11.5px] text-muted-foreground truncate leading-snug">
         {tile.subRef}
       </p>
       <div className="mt-2.5 flex items-center justify-between gap-2 text-[11px]">
@@ -267,6 +275,7 @@ function ShipmentCard({ tile, delay }: { tile: ShipmentTile; delay: number }) {
 
 interface ColumnDef {
   stage: Stage;
+  index: string;        // "01" .. "04"
   title: string;
   subtitle: string;
   emptyTitle: string;
@@ -274,34 +283,10 @@ interface ColumnDef {
 }
 
 const COLUMNS: ColumnDef[] = [
-  {
-    stage: 'isf',
-    title: 'ISF Filed',
-    subtitle: 'Drafting or with CBP',
-    emptyTitle: 'No ISF filings in flight',
-    emptyHint: 'New ISF filings will appear here.',
-  },
-  {
-    stage: 'manifest',
-    title: 'Manifest Verified',
-    subtitle: 'ISF accepted — file the Entry',
-    emptyTitle: 'Nothing waiting on entry',
-    emptyHint: 'Once an ISF clears, it lands here.',
-  },
-  {
-    stage: 'entry',
-    title: 'Entry Filed',
-    subtitle: '7501 + 3461 with CBP',
-    emptyTitle: 'No entries in flight',
-    emptyHint: 'Transmitted entries appear here.',
-  },
-  {
-    stage: 'cleared',
-    title: 'Cleared',
-    subtitle: 'Accepted by CBP',
-    emptyTitle: 'No cleared shipments yet',
-    emptyHint: 'Once CBP accepts an entry, it lands here.',
-  },
+  { stage: 'isf',      index: '01', title: 'ISF Filed',         subtitle: 'Drafting or with CBP',         emptyTitle: 'No ISF filings in flight',     emptyHint: 'New ISF filings will appear here.' },
+  { stage: 'manifest', index: '02', title: 'Manifest Verified', subtitle: 'ISF accepted — file the Entry', emptyTitle: 'Nothing waiting on entry',     emptyHint: 'Once an ISF clears, it lands here.' },
+  { stage: 'entry',    index: '03', title: 'Entry Filed',       subtitle: '7501 + 3461 with CBP',          emptyTitle: 'No entries in flight',         emptyHint: 'Transmitted entries appear here.' },
+  { stage: 'cleared',  index: '04', title: 'Cleared',           subtitle: 'Accepted by CBP',                emptyTitle: 'No cleared shipments yet',     emptyHint: 'Once CBP accepts an entry, it lands here.' },
 ];
 
 function PipelineColumn({
@@ -313,46 +298,41 @@ function PipelineColumn({
 }) {
   return (
     <div className="space-y-3 min-w-0">
-      {/* header */}
-      <div className="flex items-baseline justify-between px-1 mb-1">
-        <div className="min-w-0">
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      {/* Header */}
+      <div className="px-1">
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="text-[10px] font-mono font-semibold tabular-nums text-muted-foreground/40">
+            {def.index}
+          </span>
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.2em] text-foreground/85">
             {def.title}
           </p>
-          <p className="text-[11px] text-muted-foreground/60 mt-0.5 truncate">
+        </div>
+        <div className="flex items-end justify-between gap-3">
+          <p className="text-[11.5px] text-muted-foreground/70 leading-snug max-w-[220px]">
             {def.subtitle}
           </p>
+          <span className="text-[32px] leading-[0.9] font-semibold tabular-nums tracking-[-0.02em] text-foreground/95">
+            {tiles.length}
+          </span>
         </div>
-        <span className="text-[26px] leading-none font-semibold tabular-nums tracking-tight text-foreground/90 shrink-0">
-          {tiles.length}
-        </span>
+        {/* gradient hairline accent under the column header */}
+        <div className="mt-3 h-px bg-gradient-to-r from-border via-border/60 to-transparent" />
       </div>
 
-      {/* connector line — visual through-line connecting columns */}
-      <div className="relative">
-        <div
-          className={cn(
-            'absolute -top-2 left-0 right-0 h-px bg-gradient-to-r',
-            def.stage === 'isf' ? 'from-transparent via-border/60 to-border/60' :
-            def.stage === 'cleared' ? 'from-border/60 via-border/60 to-transparent' :
-            'from-border/60 via-border/60 to-border/60',
-          )}
-        />
-      </div>
-
-      {/* tiles */}
+      {/* Tiles */}
       <div className="space-y-2">
         {tiles.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-5 text-center">
-            <p className="text-xs font-medium text-muted-foreground">{def.emptyTitle}</p>
-            <p className="text-[11px] text-muted-foreground/60 mt-1">{def.emptyHint}</p>
+          <div className="rounded-xl border border-dashed border-border/60 bg-muted/15 px-4 py-6 text-center">
+            <p className="text-[12px] font-medium text-foreground/70">{def.emptyTitle}</p>
+            <p className="text-[11px] text-muted-foreground/60 mt-1 leading-relaxed">{def.emptyHint}</p>
           </div>
         ) : (
           tiles.map((t, i) => (
             <ShipmentCard
               key={t.id}
               tile={t}
-              delay={120 + (indexOffset + i) * 35}
+              delay={140 + (indexOffset + i) * 32}
             />
           ))
         )}
@@ -367,7 +347,6 @@ interface ActivityEvent {
   id: string;
   ts: string;
   kind: 'isf' | 'mq' | 'abi';
-  emoji: string;
   text: string;
   to: string;
 }
@@ -382,10 +361,7 @@ function buildActivity(args: {
   for (const f of args.filings.slice(0, 50)) {
     const ref = f.houseBol || f.masterBol || f.id.slice(0, 8);
     events.push({
-      id: `isf-${f.id}`,
-      ts: f.updatedAt,
-      kind: 'isf',
-      emoji: f.status === 'accepted' ? '✓' : f.status === 'rejected' ? '✗' : '•',
+      id: `isf-${f.id}`, ts: f.updatedAt, kind: 'isf',
       text: `ISF ${f.status}: ${ref}`,
       to: `/shipments/${f.id}`,
     });
@@ -393,80 +369,84 @@ function buildActivity(args: {
   for (const d of args.abiDocs) {
     const ref = d.entryNumber || d.mbolNumber || d.id.slice(0, 8);
     events.push({
-      id: `abi-${d.id}`,
-      ts: d.updatedAt,
-      kind: 'abi',
-      emoji: d.status === 'ACCEPTED' ? '✓' : d.status === 'REJECTED' ? '✗' : '•',
+      id: `abi-${d.id}`, ts: d.updatedAt, kind: 'abi',
       text: `Entry ${d.status.toLowerCase()}: ${ref}`,
       to: `/abi-documents/${d.id}`,
     });
   }
   for (const q of args.mqs) {
     events.push({
-      id: `mq-${q.id}`,
-      ts: q.completedAt || q.createdAt,
-      kind: 'mq',
-      emoji: q.status === 'completed' ? '✓' : '•',
+      id: `mq-${q.id}`, ts: q.completedAt || q.createdAt, kind: 'mq',
       text: `Manifest ${q.status}: ${q.bolNumber}`,
       to: `/manifest-query`,
     });
   }
   events.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
-  return events.slice(0, 10);
+  return events.slice(0, 12);
 }
 
 function ActivityStrip({ events }: { events: ActivityEvent[] }) {
   if (events.length === 0) {
     return (
-      <p className="text-[11px] text-muted-foreground/70">
+      <p className="text-[11.5px] text-muted-foreground/70 leading-relaxed">
         Activity will appear here as you file ISFs, run manifest queries, and transmit entries.
       </p>
     );
   }
   return (
-    <ol className="flex items-stretch gap-2 overflow-x-auto pb-1 -mx-1 px-1 [scrollbar-width:thin]">
-      {events.map(ev => {
-        const tint =
-          ev.kind === 'isf' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 ring-blue-500/20' :
-          ev.kind === 'mq'  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-amber-500/20' :
-          'bg-primary/10 text-primary ring-primary/20';
-        return (
-          <li key={ev.id} className="shrink-0">
-            <Link
-              to={ev.to}
-              className={cn(
-                'group flex items-center gap-2 rounded-lg ring-1 ring-inset px-3 py-1.5 text-[11.5px] font-medium transition-all hover:scale-[1.015]',
-                tint,
-              )}
-            >
-              <span className="text-[10px] tabular-nums opacity-70 shrink-0">{relativeTime(ev.ts)}</span>
-              <span className="opacity-50">·</span>
-              <span className="truncate max-w-[28ch]">{ev.text}</span>
-            </Link>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="relative -mx-1">
+      {/* edge fade gradients to hint scrollability */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent z-10" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent z-10" />
+
+      <ol className="flex items-stretch gap-2 overflow-x-auto pb-2 px-1 [scrollbar-width:thin] [scroll-behavior:smooth]">
+        {events.map(ev => {
+          const tint =
+            ev.kind === 'isf' ? 'bg-blue-500/[0.06] text-blue-700 dark:text-blue-300 ring-blue-500/15' :
+            ev.kind === 'mq'  ? 'bg-amber-500/[0.06] text-amber-700 dark:text-amber-300 ring-amber-500/15' :
+            'bg-primary/[0.06] text-primary ring-primary/15';
+          return (
+            <li key={ev.id} className="shrink-0">
+              <Link
+                to={ev.to}
+                className={cn(
+                  'group flex items-center gap-2.5 rounded-lg ring-1 ring-inset px-3 py-2 text-[11.5px] font-medium',
+                  'transition-[transform,box-shadow] duration-200 ease-out',
+                  'hover:scale-[1.02] hover:shadow-[0_4px_12px_-4px_hsl(var(--foreground)/0.12)]',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                  'motion-reduce:transition-none motion-reduce:hover:scale-100',
+                  tint,
+                )}
+              >
+                <span className="text-[10px] tabular-nums opacity-70 shrink-0 font-mono">{relativeTime(ev.ts)}</span>
+                <span className="opacity-40">·</span>
+                <span className="truncate max-w-[28ch]">{ev.text}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
-// ─── empty-state hero (zero shipments) ───────────────────────────────
+// ─── empty hero (zero shipments) ─────────────────────────────────────
 
 function EmptyHero({ greeting, firstName }: { greeting: string; firstName: string | null }) {
   return (
-    <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 px-8 py-14 text-center">
-      <div className="mx-auto h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-        <Plus className="h-5 w-5 text-primary" />
+    <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-card via-card to-muted/30 px-8 py-16 text-center">
+      <div className="mx-auto h-12 w-12 rounded-2xl bg-primary/10 ring-1 ring-inset ring-primary/15 flex items-center justify-center mb-5">
+        <Sparkles className="h-5 w-5 text-primary" strokeWidth={2} />
       </div>
-      <h2 className="text-[24px] leading-tight font-semibold tracking-tight">
+      <h2 className="text-[28px] leading-tight font-semibold tracking-tight">
         {greeting}{firstName ? `, ${firstName}` : ''}
       </h2>
-      <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-        Your shipments will flow through here, stage by stage. Start by filing your first ISF — once it's accepted, the next stages unlock automatically.
+      <p className="text-[15px] text-muted-foreground mt-2.5 max-w-md mx-auto leading-relaxed">
+        Your shipments will flow through here, stage by stage. Start with an ISF filing — once it's accepted by CBP, the next stages unlock automatically.
       </p>
-      <div className="flex items-center justify-center gap-2 mt-6">
+      <div className="flex items-center justify-center gap-2 mt-7">
         <Link to="/shipments/new">
-          <Button size="default" className="gap-1.5 h-10 px-4 rounded-xl font-semibold">
+          <Button size="default" className="gap-1.5 h-10 px-5 rounded-xl font-semibold">
             <Plus className="h-4 w-4" /> New ISF Filing
           </Button>
         </Link>
@@ -476,6 +456,23 @@ function EmptyHero({ greeting, firstName }: { greeting: string; firstName: strin
           </Button>
         </Link>
       </div>
+    </div>
+  );
+}
+
+// ─── flow indicator (above the pipeline) ─────────────────────────────
+
+function FlowIndicator() {
+  return (
+    <div className="hidden lg:flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/50 select-none">
+      <span className="text-foreground/65">Flow</span>
+      <span className="h-px w-4 bg-border/60" />
+      {COLUMNS.map((c, i) => (
+        <span key={c.stage} className="flex items-center gap-2">
+          <span className="text-muted-foreground/55">{c.title}</span>
+          {i < COLUMNS.length - 1 && <ChevronRight className="h-3 w-3 text-muted-foreground/30" strokeWidth={2.5} />}
+        </span>
+      ))}
     </div>
   );
 }
@@ -490,17 +487,14 @@ export default function Dashboard() {
   const { data: mqData, isLoading: mqLoading } = useManifestQueries({ limit: 30 });
   const { data: profile } = useCurrentUser();
 
-  // Welcome modal (post-upgrade redirect)
   const [searchParams, setSearchParams] = useSearchParams();
   const welcomePlanId = searchParams.get('welcome');
   function handleModalClose() {
     setSearchParams(p => { p.delete('welcome'); return p; });
   }
 
-  // Animate the headline counter once on first render
   const greeting = useGreeting();
 
-  // Source data — typed loosely since hooks return `any`
   const filings = (filingsData?.data ?? []) as Filing[];
   const abiDocs = ((abiData?.data ?? []) as any[]) as AbiLite[];
   const mqs = (((mqData as any)?.data ?? []) as any[]) as Array<{
@@ -509,11 +503,9 @@ export default function Dashboard() {
 
   const tiles = useMemo(() => buildShipments({ filings, abiDocs }), [filings, abiDocs]);
 
-  // Group tiles by stage (preserve sort order from buildShipments)
   const byStage = useMemo(() => {
     const map: Record<Stage, ShipmentTile[]> = { isf: [], manifest: [], entry: [], cleared: [] };
     for (const t of tiles) map[t.stage].push(t);
-    // Cap "cleared" to most recent 8 — historical clutter is not useful here
     map.cleared = map.cleared.slice(0, 8);
     return map;
   }, [tiles]);
@@ -527,21 +519,37 @@ export default function Dashboard() {
   const isLoading = filingsLoading || abiLoading || mqLoading;
   const firstName = profile?.firstName?.trim() || null;
 
-  // ── loading skeleton ────────────────────────────────────────────────
+  // ── loading ─────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="space-y-10 max-w-[1500px] mx-auto pb-12">
-        <div className="space-y-3">
-          <Skeleton className="h-3 w-28" />
-          <Skeleton className="h-12 w-[60%] max-w-[640px]" />
-          <Skeleton className="h-4 w-[40%] max-w-[420px]" />
+      <div className="space-y-12 max-w-[1500px] mx-auto pb-16">
+        <div className="space-y-4">
+          <Skeleton className="h-3 w-48" />
+          <div className="space-y-2.5 max-w-2xl">
+            <Skeleton className="h-10 w-[80%]" />
+            <Skeleton className="h-10 w-[60%]" />
+          </div>
+          <Skeleton className="h-4 w-[45%] max-w-[420px]" />
+          <div className="flex gap-2 pt-2">
+            <Skeleton className="h-10 w-32 rounded-xl" />
+            <Skeleton className="h-10 w-28 rounded-xl" />
+            <Skeleton className="h-10 w-32 rounded-xl" />
+          </div>
         </div>
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="space-y-3">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-20 rounded-xl" />
-              <Skeleton className="h-20 rounded-xl" />
+              <div className="space-y-1.5 px-1">
+                <Skeleton className="h-3 w-1/2" />
+                <div className="flex justify-between items-end">
+                  <Skeleton className="h-3 w-2/3" />
+                  <Skeleton className="h-8 w-10" />
+                </div>
+              </div>
+              <div className="space-y-2 pt-2">
+                <Skeleton className="h-[78px] rounded-xl" />
+                <Skeleton className="h-[78px] rounded-xl" />
+              </div>
             </div>
           ))}
         </div>
@@ -549,10 +557,10 @@ export default function Dashboard() {
     );
   }
 
-  // Brand-new account empty state
+  // ── brand-new account ─────────────────────────────────────────────────
   if (filings.length === 0 && abiDocs.length === 0) {
     return (
-      <div className="space-y-10 max-w-[1500px] mx-auto pb-12">
+      <div className="space-y-10 max-w-[1500px] mx-auto pb-16">
         <CelebrationModal planId={welcomePlanId} onClose={handleModalClose} />
         <EmptyHero greeting={greeting} firstName={firstName} />
       </div>
@@ -565,55 +573,66 @@ export default function Dashboard() {
 
       {/* ─── Hero ─────────────────────────────────────────────────────── */}
       <header
-        className="space-y-4 opacity-0 animate-fade-in-up"
+        className="space-y-5 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
         style={{ animationFillMode: 'forwards' }}
       >
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/60">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          {' · '}
-          {greeting}{firstName ? `, ${firstName}` : ''}
-        </p>
+        {/* Date / greeting strip with gradient hairline */}
+        <div className="flex items-center gap-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/60 shrink-0">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            <span className="mx-2 text-muted-foreground/30">·</span>
+            {greeting}{firstName ? `, ${firstName}` : ''}
+          </p>
+          <span className="h-px flex-1 bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
+        </div>
 
-        <h1 className="text-[44px] leading-[1.05] font-semibold tracking-tight max-w-3xl">
+        {/* Headline */}
+        <h1 className="text-[44px] leading-[1.05] font-semibold tracking-[-0.025em] max-w-3xl text-foreground">
           {inFlightCount === 0 ? (
-            <><span className="text-foreground">No shipments in flight.</span><span className="text-muted-foreground"> Time to file.</span></>
+            <>No shipments in flight. <span className="text-muted-foreground">Time to file.</span></>
           ) : (
             <>
-              <span className="text-foreground">You have </span>
-              <span className="text-foreground">{inFlightCount} {inFlightCount === 1 ? 'shipment' : 'shipments'}</span>
-              <span className="text-muted-foreground"> in flight</span>
-              {attentionCount > 0 && <span className="text-foreground">.</span>}
+              You have <span className="tabular-nums">{inFlightCount}</span> {inFlightCount === 1 ? 'shipment' : 'shipments'}
+              <span className="text-muted-foreground"> in flight.</span>
             </>
           )}
         </h1>
 
-        <p className="text-base text-muted-foreground max-w-2xl">
+        {/* Sub-line */}
+        <p className="text-[15px] leading-relaxed text-muted-foreground max-w-2xl">
           {attentionCount > 0 ? (
             <>
               <span className="text-amber-600 dark:text-amber-500 font-medium">{attentionCount} {attentionCount === 1 ? 'item needs' : 'items need'} your attention</span>
-              {' · '}
-              <span>{clearedCount} cleared {clearedCount === 1 ? 'this run' : 'this run'}</span>
+              {clearedCount > 0 && <> · <span className="tabular-nums">{clearedCount}</span> recently cleared</>}
             </>
           ) : inFlightCount > 0 ? (
-            <>Everything is on track. {clearedCount > 0 && `${clearedCount} ${clearedCount === 1 ? 'shipment' : 'shipments'} cleared recently.`}</>
+            <>Everything is on track.{clearedCount > 0 && <> <span className="tabular-nums">{clearedCount}</span> {clearedCount === 1 ? 'shipment' : 'shipments'} recently cleared.</>}</>
           ) : (
             <>Run a manifest query to look up CBP data, or start a new ISF filing.</>
           )}
         </p>
 
+        {/* Actions */}
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <Link to="/shipments/new">
-            <Button size="default" className="gap-1.5 h-10 px-4 rounded-xl font-semibold">
+            <Button
+              size="default"
+              className={cn(
+                'gap-1.5 h-10 px-4 rounded-xl font-semibold transition-shadow duration-200',
+                'shadow-[0_1px_2px_0_hsl(var(--foreground)/0.08),0_0_0_1px_hsl(var(--primary)/0.12)]',
+                'hover:shadow-[0_4px_12px_-2px_hsl(var(--primary)/0.22),0_0_0_1px_hsl(var(--primary)/0.18)]',
+              )}
+            >
               <Plus className="h-4 w-4" strokeWidth={2.5} /> New Shipment
             </Button>
           </Link>
           <Link to="/abi-documents/new">
-            <Button variant="outline" size="default" className="gap-1.5 h-10 rounded-xl">
+            <Button variant="outline" size="default" className="gap-1.5 h-10 rounded-xl transition-colors duration-150">
               <FileCheck className="h-3.5 w-3.5" /> New Entry
             </Button>
           </Link>
           <Link to="/manifest-query">
-            <Button variant="outline" size="default" className="gap-1.5 h-10 rounded-xl">
+            <Button variant="outline" size="default" className="gap-1.5 h-10 rounded-xl transition-colors duration-150">
               <Search className="h-3.5 w-3.5" /> Manifest Query
             </Button>
           </Link>
@@ -622,22 +641,11 @@ export default function Dashboard() {
 
       {/* ─── Pipeline ─────────────────────────────────────────────────── */}
       <section
-        className="opacity-0 animate-fade-in-up"
-        style={{ animationDelay: '80ms', animationFillMode: 'forwards' }}
+        className="space-y-5 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
+        style={{ animationDelay: '60ms', animationFillMode: 'forwards' }}
       >
-        {/* Lifecycle flow legend */}
-        <div className="hidden lg:flex items-center gap-2 mb-6 px-1 text-[11px] font-medium text-muted-foreground/70 select-none">
-          <span className="text-foreground/80">Lifecycle</span>
-          <ChevronRight className="h-3 w-3 opacity-60" />
-          {COLUMNS.map((c, i) => (
-            <span key={c.stage} className="flex items-center gap-2">
-              <span className="text-foreground/60">{c.title}</span>
-              {i < COLUMNS.length - 1 && <ChevronRight className="h-3 w-3 opacity-40" />}
-            </span>
-          ))}
-        </div>
+        <FlowIndicator />
 
-        {/* Columns grid */}
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           {COLUMNS.map((def, colIdx) => {
             const colTiles = byStage[def.stage];
@@ -656,27 +664,20 @@ export default function Dashboard() {
 
       {/* ─── Activity strip ───────────────────────────────────────────── */}
       <section
-        className="space-y-3 opacity-0 animate-fade-in-up"
+        className="space-y-3 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
         style={{ animationDelay: '320ms', animationFillMode: 'forwards' }}
       >
         <div className="flex items-center gap-2.5">
-          <div className="h-6 w-6 rounded-md bg-muted flex items-center justify-center text-muted-foreground">
+          <div className="h-6 w-6 rounded-md bg-muted/60 flex items-center justify-center text-muted-foreground">
             <Activity className="h-3 w-3" strokeWidth={2.5} />
           </div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
             Recent activity
           </p>
+          <span className="h-px flex-1 bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
         </div>
         <ActivityStrip events={activity} />
       </section>
-
-      {/* ─── Hint footer ──────────────────────────────────────────────── */}
-      {inFlightCount > 0 && (
-        <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground/60 pt-2">
-          <Clock className="h-3 w-3" />
-          <span>Times shown are relative to now. Click any tile to drill into details.</span>
-        </div>
-      )}
     </div>
   );
 }
