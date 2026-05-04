@@ -26,6 +26,7 @@ import { useCurrentUser } from '@/hooks/useAuth';
 import { CelebrationModal } from '@/components/CelebrationModal';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Sparkline } from '@/components/Sparkline';
 import {
   Plus, Search, FileCheck, ChevronRight, Activity, Sparkles,
 } from 'lucide-react';
@@ -521,35 +522,33 @@ function EmptyHero({ greeting, firstName }: { greeting: string; firstName: strin
 
 type KpiTone = 'primary' | 'amber' | 'emerald' | 'violet';
 
-const KPI_TINT: Record<KpiTone, { number: string; bg: string; ring: string; dot: string }> = {
-  primary: {
-    number: 'text-gradient-accent',
-    bg:     'bg-gradient-to-br from-primary/[0.06] via-card to-card',
-    ring:   'ring-primary/15',
-    dot:    'bg-primary',
-  },
-  amber: {
-    number: 'text-gradient-stage-manifest',
-    bg:     'bg-gradient-to-br from-amber-500/[0.06] via-card to-card',
-    ring:   'ring-amber-500/15',
-    dot:    'bg-amber-500',
-  },
-  emerald: {
-    number: 'text-gradient-stage-cleared',
-    bg:     'bg-gradient-to-br from-emerald-500/[0.06] via-card to-card',
-    ring:   'ring-emerald-500/15',
-    dot:    'bg-emerald-500',
-  },
-  violet: {
-    number: 'text-gradient-stage-entry',
-    bg:     'bg-gradient-to-br from-violet-500/[0.06] via-card to-card',
-    ring:   'ring-violet-500/15',
-    dot:    'bg-violet-500',
-  },
+// Tone is now a single dot + ring + soft bg only. The number itself is
+// foreground — gradient lives in the hero count alone (calm-lane rule).
+const KPI_TINT: Record<KpiTone, { bg: string; ring: string; dot: string; sparkTone: 'primary' | 'amber' | 'emerald' | 'rose' | 'neutral' }> = {
+  primary: { bg: 'bg-gradient-to-br from-primary/[0.05] via-card to-card',     ring: 'ring-primary/15',     dot: 'bg-primary',      sparkTone: 'primary' },
+  amber:   { bg: 'bg-gradient-to-br from-amber-500/[0.05] via-card to-card',   ring: 'ring-amber-500/15',   dot: 'bg-amber-500',    sparkTone: 'amber'   },
+  emerald: { bg: 'bg-gradient-to-br from-emerald-500/[0.05] via-card to-card', ring: 'ring-emerald-500/15', dot: 'bg-emerald-500',  sparkTone: 'emerald' },
+  violet:  { bg: 'bg-gradient-to-br from-violet-500/[0.05] via-card to-card',  ring: 'ring-violet-500/15',  dot: 'bg-violet-500',   sparkTone: 'primary' },
+};
+
+// Delta is computed by the caller because "up is good" is metric-specific:
+// `+12% in attention` is bad; `+12% cleared` is good. Caller decides tone.
+type DeltaTone = 'positive' | 'negative' | 'neutral';
+
+interface KpiDelta {
+  pct: number;
+  direction: 'up' | 'down' | 'flat';
+  tone: DeltaTone;
+}
+
+const DELTA_TONE_CLASS: Record<DeltaTone, string> = {
+  positive: 'text-emerald-600 dark:text-emerald-400',
+  negative: 'text-red-600 dark:text-red-400',
+  neutral:  'text-muted-foreground',
 };
 
 function KpiCard({
-  label, value, format = 'number', sub, tone, delay, pulse,
+  label, value, format = 'number', sub, tone, delay, pulse, series, delta,
 }: {
   label: string;
   value: number;
@@ -558,6 +557,8 @@ function KpiCard({
   tone: KpiTone;
   delay: number;
   pulse?: boolean;
+  series?: number[];
+  delta?: KpiDelta;
 }) {
   const animated = useCountUp(value, 1000);
   const display = format === 'percent' ? `${animated}%` : animated.toLocaleString();
@@ -575,6 +576,7 @@ function KpiCard({
       )}
       style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
     >
+      {/* Eyebrow */}
       <div className="flex items-center gap-1.5 mb-2">
         {pulse ? (
           <span className="relative flex h-1.5 w-1.5">
@@ -588,14 +590,85 @@ function KpiCard({
           {label}
         </p>
       </div>
-      <p className={cn('text-[30px] leading-none font-semibold tabular-nums tracking-[-0.02em]', tint.number)}>
-        {display}
-      </p>
-      <p className="mt-2 text-[11px] text-muted-foreground/70 leading-snug truncate">
+
+      {/* Number + sparkline row. Sparkline pinned right; number takes remaining space. */}
+      <div className="flex items-end justify-between gap-3 min-w-0">
+        <p className="text-[30px] leading-none font-semibold tabular-nums tracking-[-0.02em] text-foreground">
+          {display}
+        </p>
+        {series && series.length > 0 && (
+          <Sparkline series={series} tone={tint.sparkTone} width={64} height={24} />
+        )}
+      </div>
+
+      {/* Delta line (when available) — sits between number and sub. */}
+      {delta && delta.direction !== 'flat' && (
+        <p className={cn('mt-2 text-[11px] font-medium tabular-nums flex items-center gap-1', DELTA_TONE_CLASS[delta.tone])}>
+          <span aria-hidden>{delta.direction === 'up' ? '↑' : '↓'}</span>
+          <span>{Math.abs(Math.round(delta.pct))}%</span>
+          <span className="text-muted-foreground/60 font-normal">vs last 7d</span>
+        </p>
+      )}
+
+      <p className={cn('text-[11px] text-muted-foreground/70 leading-snug truncate', delta && delta.direction !== 'flat' ? 'mt-1' : 'mt-2')}>
         {sub}
       </p>
     </div>
   );
+}
+
+// ─── KPI series helpers ──────────────────────────────────────────────
+// Build a daily-count series for the last `days` days (oldest → newest).
+// `extract` returns the relevant timestamp (or null to skip the row).
+
+function buildDailySeries<T>(items: readonly T[], extract: (it: T) => string | Date | null | undefined, days = 14): number[] {
+  const series = new Array<number>(days).fill(0);
+  const now = new Date();
+  // Bucket boundary: start of "today" in local time. Day i corresponds to D-i offsets.
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  for (const it of items) {
+    const raw = extract(it);
+    if (!raw) continue;
+    const t = new Date(raw).getTime();
+    if (Number.isNaN(t)) continue;
+    const dayOffset = Math.floor((startOfToday - t + oneDayMs - 1) / oneDayMs); // days ago, 0 = today
+    if (dayOffset < 0 || dayOffset >= days) continue;
+    series[days - 1 - dayOffset] += 1; // newest bucket sits at the end
+  }
+  return series;
+}
+
+function computeDelta(series: number[]): { pct: number; direction: 'up' | 'down' | 'flat' } {
+  if (series.length < 14) return { pct: 0, direction: 'flat' };
+  const half = series.length >> 1;
+  const recent = series.slice(-half).reduce((s, n) => s + n, 0);
+  const prior  = series.slice(0, half).reduce((s, n) => s + n, 0);
+  if (recent === 0 && prior === 0) return { pct: 0, direction: 'flat' };
+  if (prior === 0) return { pct: 100, direction: 'up' }; // appearing-from-zero
+  const pct = ((recent - prior) / prior) * 100;
+  if (Math.abs(pct) < 1) return { pct: 0, direction: 'flat' };
+  return { pct, direction: pct > 0 ? 'up' : 'down' };
+}
+
+/**
+ * Promote a raw `computeDelta` result into a `KpiDelta` with tone semantics:
+ *   - 'standard': up = good (cleared, accepted)
+ *   - 'inverted': up = bad  (rejected, attention required)
+ *   - 'neutral':  no value judgment (volume metrics like new filings)
+ */
+function shapeDelta(
+  raw: { pct: number; direction: 'up' | 'down' | 'flat' },
+  semantic: 'standard' | 'inverted' | 'neutral',
+): KpiDelta {
+  if (raw.direction === 'flat' || semantic === 'neutral') {
+    return { ...raw, tone: 'neutral' };
+  }
+  if (semantic === 'standard') {
+    return { ...raw, tone: raw.direction === 'up' ? 'positive' : 'negative' };
+  }
+  // inverted
+  return { ...raw, tone: raw.direction === 'up' ? 'negative' : 'positive' };
 }
 
 // ─── main ────────────────────────────────────────────────────────────
@@ -653,6 +726,29 @@ export default function Dashboard() {
       .filter(Boolean).length;
 
   const animatedInFlight = useCountUp(inFlightCount, 1100);
+
+  // ── 14-day series + deltas for the KPI strip ─────────────────────────
+  // Trends are computed from the filings/abiDocs we already fetched —
+  // no extra API call. Each metric uses a different "what counts as one
+  // event" rule, encoded inline. `direction` rolls last 7d vs prev 7d.
+  //
+  // Tone semantics: positive (green) = good, negative (red) = bad. The
+  // mapping is metric-specific, so each KPI annotates its own delta tone.
+  const kpiSeries = useMemo(() => {
+    const activeSeries     = buildDailySeries(filings, f => f.createdAt);
+    // "needs attention": rejected filings (by rejectedAt) on each day.
+    const attentionSeries  = buildDailySeries(filings, f => f.status === 'rejected' ? (f.rejectedAt ?? f.updatedAt) : null);
+    // "cleared": ABI docs that became ACCEPTED on each day (status updatedAt).
+    const clearedSeries    = buildDailySeries(abiDocs, d => d.status === 'ACCEPTED' ? d.updatedAt : null);
+    // For acceptance rate we leave the sparkline omitted — daily ratios
+    // are noisy with low resolution counts and would mislead more than
+    // they'd inform.
+    return {
+      active:    { series: activeSeries,    delta: shapeDelta(computeDelta(activeSeries),    'neutral')  },
+      attention: { series: attentionSeries, delta: shapeDelta(computeDelta(attentionSeries), 'inverted') },
+      cleared:   { series: clearedSeries,   delta: shapeDelta(computeDelta(clearedSeries),   'standard') },
+    };
+  }, [filings, abiDocs]);
 
   const activity = useMemo(() => buildActivity({ filings, abiDocs, mqs }), [filings, abiDocs, mqs]);
 
@@ -829,6 +925,8 @@ export default function Dashboard() {
             sub={inFlightStages === 0 ? 'no shipments in flight' : `across ${inFlightStages} ${inFlightStages === 1 ? 'stage' : 'stages'}`}
             tone="primary"
             delay={120}
+            series={kpiSeries.active.series}
+            delta={kpiSeries.active.delta}
           />
           <KpiCard
             label="Needs Attention"
@@ -837,6 +935,8 @@ export default function Dashboard() {
             tone="amber"
             delay={170}
             pulse={attentionCount > 0}
+            series={kpiSeries.attention.series}
+            delta={kpiSeries.attention.delta}
           />
           <KpiCard
             label="Cleared This Month"
@@ -844,6 +944,8 @@ export default function Dashboard() {
             sub="entries accepted by CBP"
             tone="emerald"
             delay={220}
+            series={kpiSeries.cleared.series}
+            delta={kpiSeries.cleared.delta}
           />
           <KpiCard
             label="Acceptance Rate"
