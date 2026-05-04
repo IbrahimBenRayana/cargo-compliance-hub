@@ -59,3 +59,15 @@ export interface NotificationListResponse {
   /** New in Phase 1 — count of unread notifications with severity = 'critical'. */
   criticalUnreadCount: number;
 }
+
+// ─── Preferences (Phase 5) ───────────────────────────────────────────
+
+export interface NotificationPreference {
+  kind: string;
+  inApp: boolean;
+  email: boolean;
+}
+
+export interface NotificationPreferencesResponse {
+  data: NotificationPreference[];
+}

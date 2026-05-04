@@ -58,17 +58,18 @@ model User {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  organization    Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  filings         Filing[]              @relation("FilingCreator")
-  statusChanges   FilingStatusHistory[] @relation("StatusChanger")
-  submissionLogs  SubmissionLog[]
-  notifications   Notification[]
-  auditLogs       AuditLog[]
-  filingTemplates FilingTemplate[]
-  invitations     OrgInvitation[]       @relation("InvitationCreator")
-  uploadedDocs    FilingDocument[]      @relation("DocumentUploader")
-  manifestQueries ManifestQuery[]
-  abiDocuments    AbiDocument[]
+  organization           Organization             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  filings                Filing[]                 @relation("FilingCreator")
+  statusChanges          FilingStatusHistory[]    @relation("StatusChanger")
+  submissionLogs         SubmissionLog[]
+  notifications          Notification[]
+  notificationPreferences NotificationPreference[]
+  auditLogs              AuditLog[]
+  filingTemplates        FilingTemplate[]
+  invitations            OrgInvitation[]          @relation("InvitationCreator")
+  uploadedDocs           FilingDocument[]         @relation("DocumentUploader")
+  manifestQueries        ManifestQuery[]
+  abiDocuments           AbiDocument[]
 
   @@index([orgId])
   @@index([email])
@@ -239,6 +240,24 @@ model Notification {
   // Powers the Critical tab: only critical for this user.
   @@index([userId, severity, createdAt(sort: Desc)])
   @@map("notifications")
+}
+
+// ─── Notification Preferences ──────────────────────────────
+// Per-user, per-kind opt-out. Defaults are opt-in (true) so new users
+// receive everything until they actively turn channels off. Missing rows
+// behave identically to {inApp: true, email: true} — saves us from
+// having to seed prefs for every user × kind cross product.
+model NotificationPreference {
+  userId    String   @map("user_id") @db.Uuid
+  kind      String   @db.VarChar(50)
+  inApp     Boolean  @default(true) @map("in_app")
+  email     Boolean  @default(true)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, kind])
+  @@map("notification_preferences")
 }
 
 // ─── Audit Log (immutable) ─────────────────────────────────

@@ -13,18 +13,20 @@ import {
 import {
   User, Building2, Shield, Key, Activity, CheckCircle2, XCircle,
   Loader2, Clock, Users, FileText, Save, Eye, EyeOff, ChevronRight,
-  Mail, CalendarDays, BadgeCheck, Plus, Trash2, Copy, ShieldCheck,
+  Mail, CalendarDays, BadgeCheck, Plus, Trash2, Copy, ShieldCheck, Bell,
 } from 'lucide-react';
+import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-type SettingsTab = 'profile' | 'organization' | 'api' | 'activity';
+type SettingsTab = 'profile' | 'organization' | 'api' | 'notifications' | 'activity';
 
 const tabs: { id: SettingsTab; label: string; desc: string; icon: React.ElementType }[] = [
-  { id: 'profile', label: 'Profile', desc: 'Personal info & security', icon: User },
-  { id: 'organization', label: 'Organization', desc: 'Company & IOR details', icon: Building2 },
-  { id: 'api', label: 'API & Integrations', desc: 'Filing gateway connection', icon: Key },
-  { id: 'activity', label: 'Audit Log', desc: 'Recent activity', icon: Activity },
+  { id: 'profile',       label: 'Profile',           desc: 'Personal info & security',  icon: User },
+  { id: 'organization',  label: 'Organization',      desc: 'Company & IOR details',     icon: Building2 },
+  { id: 'api',           label: 'API & Integrations',desc: 'Filing gateway connection', icon: Key },
+  { id: 'notifications', label: 'Notifications',     desc: 'Per-event delivery channels', icon: Bell },
+  { id: 'activity',      label: 'Audit Log',         desc: 'Recent activity',           icon: Activity },
 ];
 
 export default function SettingsPage() {
@@ -494,6 +496,24 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── NOTIFICATIONS ── */}
+          {activeTab === 'notifications' && (
+            <Card>
+              <CardHeader className="border-b">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-amber-600" />
+                  Notifications
+                </CardTitle>
+                <CardDescription>
+                  Choose which events you receive in-app and via email. Defaults: everything on.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <NotificationPreferencesPanel />
               </CardContent>
             </Card>
           )}
