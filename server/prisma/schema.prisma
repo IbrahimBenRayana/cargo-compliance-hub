@@ -195,26 +195,49 @@ model SubmissionLog {
 }
 
 // ─── Notifications ─────────────────────────────────────────
+// Severity drives UI surface (toast escalation, severity rail color) and
+// — once the dispatcher lands — email subject prefixing and retention.
+enum NotificationSeverity {
+  info
+  warning
+  critical
+
+  @@map("notification_severity")
+}
+
 model Notification {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  orgId     String   @map("org_id") @db.Uuid
-  filingId  String?  @map("filing_id") @db.Uuid
-  type      String   @db.VarChar(50)
-  title     String   @db.VarChar(255)
-  message   String?
-  isRead    Boolean  @default(false) @map("is_read")
+  id            String               @id @default(uuid()) @db.Uuid
+  userId        String               @map("user_id") @db.Uuid
+  orgId         String               @map("org_id") @db.Uuid
+  filingId      String?              @map("filing_id") @db.Uuid
+  abiDocumentId String?              @map("abi_document_id") @db.Uuid
+  type          String               @db.VarChar(50)
+  severity      NotificationSeverity @default(info)
+  title         String               @db.VarChar(255)
+  message       String?
+  // Deep-link target the bell click should navigate to (eg. /shipments/:id).
+  linkUrl       String?              @map("link_url") @db.VarChar(500)
+  // Structured event payload (BOL number, deadline timestamp, CBP txn id, etc.).
+  // Lets the UI render rich notification content without parsing title/message.
+  metadata      Json?
+  isRead        Boolean              @default(false) @map("is_read")
+  readAt        DateTime?            @map("read_at") @db.Timestamptz()
   // Deduplication key for background-job alerts (e.g. "filingId_72h").
-  // Unique per org so the same alert is never sent twice across restarts.
-  dedupeKey String?  @unique @map("dedupe_key") @db.VarChar(255)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  // Globally unique so the same alert is never sent twice across restarts.
+  dedupeKey     String?              @unique @map("dedupe_key") @db.VarChar(255)
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz()
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   filing       Filing?      @relation(fields: [filingId], references: [id], onDelete: SetNull)
+  abiDocument  AbiDocument? @relation(fields: [abiDocumentId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userId, isRead])
+  // Powers the bell feed: paginate-by-date, filter unread.
+  @@index([userId, createdAt(sort: Desc)])
+  // Powers the Critical tab: only critical for this user.
+  @@index([userId, severity, createdAt(sort: Desc)])
   @@map("notifications")
 }
 
@@ -451,6 +474,7 @@ model AbiDocument {
   user          User           @relation(fields: [userId], references: [id])
   filing        Filing?        @relation(fields: [filingId], references: [id], onDelete: SetNull)
   manifestQuery ManifestQuery? @relation(fields: [manifestQueryId], references: [id], onDelete: SetNull)
+  notifications Notification[]
 
   @@index([orgId, status])
   @@index([mbolNumber])

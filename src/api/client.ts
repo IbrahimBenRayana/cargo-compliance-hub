@@ -228,9 +228,20 @@ export const submissionLogsApi = {
 };
 
 // ─── Notifications API ────────────────────────────────────
+import type { NotificationListResponse, NotificationSeverity } from '@/types/notification';
+
+export interface NotificationsListParams {
+  unreadOnly?: boolean;
+  severity?: NotificationSeverity;
+}
+
 export const notificationsApi = {
-  list(unreadOnly = false) {
-    return apiFetch<{ data: any[]; unreadCount: number }>(`/api/v1/notifications${unreadOnly ? '?unreadOnly=true' : ''}`);
+  list(params: NotificationsListParams = {}) {
+    const qs = new URLSearchParams();
+    if (params.unreadOnly) qs.set('unreadOnly', 'true');
+    if (params.severity) qs.set('severity', params.severity);
+    const suffix = qs.toString();
+    return apiFetch<NotificationListResponse>(`/api/v1/notifications${suffix ? `?${suffix}` : ''}`);
   },
 
   markRead(id: string) {
