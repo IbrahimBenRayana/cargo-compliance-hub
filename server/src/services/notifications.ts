@@ -1,19 +1,30 @@
 /**
  * Notification Service
  *
- * Creates in-app notifications for users when key events occur:
- *   - Filing submitted / accepted / rejected / amended / cancelled
- *   - Filing deadline approaching (72h, 48h, 24h)
- *   - API connection errors
+ * Architecture (after Phase 2 of the rethink):
  *
- * Phase 1 of the notification rethink (2026-05-04):
- *   - Adds `severity` (info | warning | critical) — drives UI tab + toast escalation.
- *   - Adds `linkUrl` — deep link the bell click should follow.
- *   - Adds `metadata` (Json) — structured payload (BOL, hours remaining, etc.).
+ *   ┌─────────────────────────────────────────────────────────────┐
+ *   │ notifyFilingSubmitted / notifyFilingAccepted / ...          │  ← public API
+ *   │   (thin shims — keep their old signatures so callers stay)  │
+ *   └────────────┬────────────────────────────────────────────────┘
+ *                │
+ *                ▼
+ *   ┌─────────────────────────────────────────────────────────────┐
+ *   │   notify(event)                                              │  ← single dispatcher
+ *   │     • resolves audience (roles → user list)                  │
+ *   │     • applies kind→severity defaults                          │
+ *   │     • idempotent on dedupeKey                                 │
+ *   │     • bulk createMany in one round-trip                       │
+ *   └────────────┬────────────────────────────────────────────────┘
+ *                │
+ *                ▼
+ *   ┌─────────────────────────────────────────────────────────────┐
+ *   │   prisma.notification                                        │
+ *   └─────────────────────────────────────────────────────────────┘
  *
- * Phase 2 will replace the per-event trigger functions with a single
- * dispatcher and add role-aware audience resolution. For now we just
- * plumb the new fields through so the frontend can rely on them.
+ * Email delivery still happens inside each helper (fire-and-forget) for
+ * now. Phase 6 will fold delivery into a queued NotificationDelivery
+ * model with retries; this PR is strictly about the in-app fan-out.
  */
 
 import { Prisma, type NotificationSeverity } from '@prisma/client';
@@ -27,8 +38,6 @@ import {
 } from './email.js';
 
 // ─── Defaults per notification kind ───────────────────────────────────
-// Single source of truth so a kind's severity can never drift between the
-// trigger function and the (eventual) email subject prefixer.
 
 const SEVERITY_BY_KIND: Record<string, NotificationSeverity> = {
   filing_submitted: 'info',
@@ -47,7 +56,125 @@ function severityFor(kind: string, fallback: NotificationSeverity = 'info'): Not
   return SEVERITY_BY_KIND[kind] ?? fallback;
 }
 
-// ─── Public types ─────────────────────────────────────────────────────
+// ─── Roles & audience resolution ──────────────────────────────────────
+// User.role values in the DB: 'owner' | 'admin' | 'operator' | 'viewer'.
+// We treat the union as our role primitive and expose three audience
+// tags as the public dispatcher surface.
+
+export type Role = 'owner' | 'admin' | 'operator' | 'viewer';
+export type AudienceRole = 'OPERATOR' | 'ADMIN' | 'OWNER';
+
+// Each audience tag expands to the set of DB roles that should receive
+// the notification. Operator-class events fan out to operators+up so
+// owners and admins also see them; viewers never get action notifications.
+const AUDIENCE_ROLES: Record<AudienceRole, Role[]> = {
+  OPERATOR: ['operator', 'admin', 'owner'],
+  ADMIN:    ['admin', 'owner'],
+  OWNER:    ['owner'],
+};
+
+export interface AudienceSpec {
+  orgId: string;
+  /** Send to anyone in the org with one of these audience tags. */
+  roles?: AudienceRole[];
+  /** Send to specific user ids (typically the actor). */
+  userIds?: string[];
+  /** Legacy fallback: every active user in the org. Avoid for new triggers — */
+  /** prefer `roles: ['OPERATOR', 'ADMIN', 'OWNER']` which excludes viewers. */
+  allInOrg?: boolean;
+}
+
+async function resolveAudience(spec: AudienceSpec): Promise<string[]> {
+  const ids = new Set<string>();
+
+  // Direct user IDs win — actor-only triggers always go through here.
+  if (spec.userIds) {
+    for (const uid of spec.userIds) ids.add(uid);
+  }
+
+  // Role-based fan-out.
+  if (spec.roles && spec.roles.length > 0) {
+    const roleSet = new Set<Role>();
+    for (const tag of spec.roles) {
+      for (const r of AUDIENCE_ROLES[tag]) roleSet.add(r);
+    }
+    const users = await prisma.user.findMany({
+      where: { orgId: spec.orgId, isActive: true, role: { in: Array.from(roleSet) } },
+      select: { id: true },
+    });
+    for (const u of users) ids.add(u.id);
+  }
+
+  // Legacy: everyone in the org. Only used by deprecated callers; new
+  // triggers should specify roles explicitly.
+  if (spec.allInOrg) {
+    const users = await prisma.user.findMany({
+      where: { orgId: spec.orgId, isActive: true },
+      select: { id: true },
+    });
+    for (const u of users) ids.add(u.id);
+  }
+
+  return Array.from(ids);
+}
+
+// ─── notify() — single dispatcher ────────────────────────────────────
+
+export interface NotifyEvent {
+  kind: string;
+  severity?: NotificationSeverity;
+  audience: AudienceSpec;
+  title: string;
+  message?: string;
+  linkUrl?: string;
+  metadata?: Prisma.InputJsonValue;
+  filingId?: string | null;
+  abiDocumentId?: string | null;
+  /** Dedupe is global-unique. Use {filingId}_{discriminator}h or similar. */
+  dedupeKey?: string;
+}
+
+export async function notify(event: NotifyEvent): Promise<void> {
+  try {
+    // Idempotency check: if we've already sent this dedupeKey, no-op.
+    if (event.dedupeKey) {
+      const existing = await prisma.notification.findFirst({
+        where: { dedupeKey: event.dedupeKey },
+        select: { id: true },
+      });
+      if (existing) return;
+    }
+
+    const userIds = await resolveAudience(event.audience);
+    if (userIds.length === 0) return;
+
+    const severity = event.severity ?? severityFor(event.kind);
+    const metadata = event.metadata ?? Prisma.JsonNull;
+
+    // First user gets the dedupeKey (unique constraint); rest get null
+    // so the createMany doesn't conflict.
+    await prisma.notification.createMany({
+      data: userIds.map((userId, i) => ({
+        userId,
+        orgId:         event.audience.orgId,
+        filingId:      event.filingId ?? null,
+        abiDocumentId: event.abiDocumentId ?? null,
+        type:          event.kind,
+        severity,
+        title:         event.title,
+        message:       event.message ?? null,
+        linkUrl:       event.linkUrl ?? null,
+        metadata,
+        dedupeKey:     i === 0 ? (event.dedupeKey ?? null) : null,
+      })),
+      skipDuplicates: true,
+    });
+  } catch (err) {
+    logger.error({ err, kind: event.kind }, '[Notifications] Dispatcher failed');
+  }
+}
+
+// ─── Backwards-compat wrappers (kept so existing call sites compile) ─
 
 export interface CreateNotificationParams {
   userId: string;
@@ -60,37 +187,24 @@ export interface CreateNotificationParams {
   message?: string;
   linkUrl?: string;
   metadata?: Prisma.InputJsonValue;
-  /** Optional deduplication key — if a notification with this key already exists it is silently skipped. */
   dedupeKey?: string;
 }
 
-// ─── Single-user creator (silent on dedupe collision) ────────────────
-
+/** Single-user notification. Use `notify({ audience: { orgId, userIds: [...] }, ... })` for new code. */
 export async function createNotification(params: CreateNotificationParams): Promise<void> {
-  try {
-    await prisma.notification.create({
-      data: {
-        userId:        params.userId,
-        orgId:         params.orgId,
-        filingId:      params.filingId ?? null,
-        abiDocumentId: params.abiDocumentId ?? null,
-        type:          params.type,
-        severity:      params.severity ?? severityFor(params.type),
-        title:         params.title,
-        message:       params.message ?? null,
-        linkUrl:       params.linkUrl ?? null,
-        metadata:      params.metadata ?? Prisma.JsonNull,
-        dedupeKey:     params.dedupeKey ?? null,
-      },
-    });
-  } catch (err: any) {
-    // P2002 = unique constraint violation — dedupe key already exists, skip silently
-    if (err?.code === 'P2002') return;
-    logger.error({ err, type: params.type }, '[Notifications] Failed to create notification');
-  }
+  await notify({
+    kind:          params.type,
+    severity:      params.severity,
+    audience:      { orgId: params.orgId, userIds: [params.userId] },
+    title:         params.title,
+    message:       params.message,
+    linkUrl:       params.linkUrl,
+    metadata:      params.metadata,
+    filingId:      params.filingId ?? null,
+    abiDocumentId: params.abiDocumentId ?? null,
+    dedupeKey:     params.dedupeKey,
+  });
 }
-
-// ─── Org-wide broadcast ──────────────────────────────────────────────
 
 interface NotifyOrgUsersOptions {
   severity?: NotificationSeverity;
@@ -99,6 +213,8 @@ interface NotifyOrgUsersOptions {
   dedupeKey?: string;
 }
 
+/** Org-wide broadcast (legacy — fans out to every active user, including viewers). */
+/** Prefer `notify({ audience: { orgId, roles: ['OPERATOR', 'ADMIN', 'OWNER'] } })` for new triggers. */
 export async function notifyOrgUsers(
   orgId: string,
   filingId: string | null,
@@ -107,67 +223,41 @@ export async function notifyOrgUsers(
   message?: string,
   options: NotifyOrgUsersOptions = {},
 ): Promise<void> {
-  try {
-    // If a dedupeKey is supplied, skip if already exists in DB (survives restarts)
-    if (options.dedupeKey) {
-      const existing = await prisma.notification.findFirst({ where: { dedupeKey: options.dedupeKey } });
-      if (existing) return;
-    }
-
-    const users = await prisma.user.findMany({
-      where: { orgId, isActive: true },
-      select: { id: true },
-    });
-    if (users.length === 0) return;
-
-    const severity = options.severity ?? severityFor(type);
-    const metadata = options.metadata ?? Prisma.JsonNull;
-
-    // Only the first user record gets the dedupeKey (unique constraint);
-    // the rest use null so createMany doesn't conflict.
-    await prisma.notification.createMany({
-      data: users.map((u, i) => ({
-        userId:    u.id,
-        orgId,
-        filingId,
-        type,
-        severity,
-        title,
-        message:   message ?? null,
-        linkUrl:   options.linkUrl ?? null,
-        metadata,
-        dedupeKey: i === 0 ? (options.dedupeKey ?? null) : null,
-      })),
-      skipDuplicates: true,
-    });
-  } catch (err) {
-    logger.error({ err, type }, '[Notifications] Failed to notify org users');
-  }
+  await notify({
+    kind:      type,
+    severity:  options.severity,
+    audience:  { orgId, allInOrg: true },
+    title,
+    message,
+    linkUrl:   options.linkUrl,
+    metadata:  options.metadata,
+    filingId,
+    dedupeKey: options.dedupeKey,
+  });
 }
 
-// ─── Pre-built notification triggers ─────────────────────────────────
-// These remain the public surface for now. Phase 2 will replace them with
-// a single `notify(event)` dispatcher; for the time being, every helper
-// just calls into the dispatcher primitives above with the right defaults.
+// ─── Pre-built triggers (public API — keep their signatures stable) ──
+// All seven now route through notify() with explicit role audiences.
 
-const filingLinkUrl = (filingId: string) => `/shipments/${filingId}`;
+const filingLink = (filingId: string) => `/shipments/${filingId}`;
 
 export async function notifyFilingSubmitted(orgId: string, userId: string, filingId: string, bolNumber: string): Promise<void> {
   const ref = bolNumber || filingId.slice(0, 8);
-  await createNotification({
-    userId,
-    orgId,
-    filingId,
-    type:     'filing_submitted',
+  await notify({
+    kind:     'filing_submitted',
+    audience: { orgId, userIds: [userId] },
     title:    'Filing Submitted',
     message:  `ISF filing ${ref} has been submitted to CBP.`,
-    linkUrl:  filingLinkUrl(filingId),
+    linkUrl:  filingLink(filingId),
     metadata: { bolNumber: ref },
+    filingId,
   });
 
-  // Email
   try {
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, firstName: true, lastName: true } });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, firstName: true, lastName: true },
+    });
     if (user) {
       sendFilingSubmittedEmail({
         to: user.email,
@@ -181,22 +271,25 @@ export async function notifyFilingSubmitted(orgId: string, userId: string, filin
 
 export async function notifyFilingAccepted(orgId: string, filingId: string, bolNumber: string): Promise<void> {
   const ref = bolNumber || filingId.slice(0, 8);
-  await notifyOrgUsers(
-    orgId,
+  await notify({
+    kind:     'filing_accepted',
+    audience: { orgId, roles: ['OPERATOR', 'ADMIN', 'OWNER'] },
+    title:    'Filing Accepted',
+    message:  `ISF filing ${ref} has been accepted by CBP.`,
+    linkUrl:  filingLink(filingId),
+    metadata: { bolNumber: ref },
     filingId,
-    'filing_accepted',
-    'Filing Accepted',
-    `ISF filing ${ref} has been accepted by CBP.`,
-    {
-      linkUrl:  filingLinkUrl(filingId),
-      metadata: { bolNumber: ref },
-    },
-  );
+  });
 
-  // Email
   try {
-    const users = await prisma.user.findMany({ where: { orgId, isActive: true }, select: { email: true } });
-    const filing = await prisma.filing.findUnique({ where: { id: filingId }, select: { cbpTransactionId: true } });
+    const users = await prisma.user.findMany({
+      where: { orgId, isActive: true, role: { in: ['operator', 'admin', 'owner'] } },
+      select: { email: true },
+    });
+    const filing = await prisma.filing.findUnique({
+      where: { id: filingId },
+      select: { cbpTransactionId: true },
+    });
     if (users.length > 0) {
       sendFilingAcceptedEmail({
         to: users.map(u => u.email),
@@ -210,21 +303,21 @@ export async function notifyFilingAccepted(orgId: string, filingId: string, bolN
 
 export async function notifyFilingRejected(orgId: string, filingId: string, bolNumber: string, reason?: string): Promise<void> {
   const ref = bolNumber || filingId.slice(0, 8);
-  await notifyOrgUsers(
-    orgId,
+  await notify({
+    kind:     'filing_rejected',
+    audience: { orgId, roles: ['OPERATOR', 'ADMIN', 'OWNER'] },
+    title:    'Filing Rejected',
+    message:  `ISF filing ${ref} was rejected by CBP.${reason ? ` Reason: ${reason}` : ''}`,
+    linkUrl:  filingLink(filingId),
+    metadata: { bolNumber: ref, reason: reason ?? null },
     filingId,
-    'filing_rejected',
-    'Filing Rejected',
-    `ISF filing ${ref} was rejected by CBP.${reason ? ` Reason: ${reason}` : ''}`,
-    {
-      linkUrl:  filingLinkUrl(filingId),
-      metadata: { bolNumber: ref, reason: reason ?? null },
-    },
-  );
+  });
 
-  // Email
   try {
-    const users = await prisma.user.findMany({ where: { orgId, isActive: true }, select: { email: true } });
+    const users = await prisma.user.findMany({
+      where: { orgId, isActive: true, role: { in: ['operator', 'admin', 'owner'] } },
+      select: { email: true },
+    });
     if (users.length > 0) {
       sendFilingRejectedEmail({
         to: users.map(u => u.email),
@@ -238,29 +331,27 @@ export async function notifyFilingRejected(orgId: string, filingId: string, bolN
 
 export async function notifyFilingAmended(orgId: string, userId: string, filingId: string, bolNumber: string): Promise<void> {
   const ref = bolNumber || filingId.slice(0, 8);
-  await createNotification({
-    userId,
-    orgId,
-    filingId,
-    type:     'filing_amended',
+  await notify({
+    kind:     'filing_amended',
+    audience: { orgId, userIds: [userId] },
     title:    'Filing Amendment Submitted',
     message:  `Amendment for ISF filing ${ref} has been submitted.`,
-    linkUrl:  filingLinkUrl(filingId),
+    linkUrl:  filingLink(filingId),
     metadata: { bolNumber: ref },
+    filingId,
   });
 }
 
 export async function notifyFilingCancelled(orgId: string, userId: string, filingId: string, bolNumber: string): Promise<void> {
   const ref = bolNumber || filingId.slice(0, 8);
-  await createNotification({
-    userId,
-    orgId,
-    filingId,
-    type:     'filing_cancelled',
+  await notify({
+    kind:     'filing_cancelled',
+    audience: { orgId, userIds: [userId] },
     title:    'Filing Cancelled',
     message:  `ISF filing ${ref} has been cancelled.`,
-    linkUrl:  filingLinkUrl(filingId),
+    linkUrl:  filingLink(filingId),
     metadata: { bolNumber: ref },
+    filingId,
   });
 }
 
@@ -269,23 +360,23 @@ export async function notifyDeadlineApproaching(orgId: string, filingId: string,
   // 24h or less → critical; 48h/72h → warning. Matches operational urgency.
   const severity: NotificationSeverity = hoursRemaining <= 24 ? 'critical' : 'warning';
 
-  await notifyOrgUsers(
-    orgId,
+  await notify({
+    kind:      'deadline_warning',
+    severity,
+    audience:  { orgId, roles: ['OPERATOR', 'ADMIN', 'OWNER'] },
+    title:     `Deadline in ${hoursRemaining}h`,
+    message:   `ISF filing ${ref} deadline is in ${hoursRemaining} hours. Submit soon to avoid penalties.`,
+    linkUrl:   filingLink(filingId),
+    metadata:  { bolNumber: ref, hoursRemaining },
     filingId,
-    'deadline_warning',
-    `Deadline in ${hoursRemaining}h`,
-    `ISF filing ${ref} deadline is in ${hoursRemaining} hours. Submit soon to avoid penalties.`,
-    {
-      severity,
-      dedupeKey: `${filingId}_deadline_${hoursRemaining}h`,
-      linkUrl:   filingLinkUrl(filingId),
-      metadata:  { bolNumber: ref, hoursRemaining },
-    },
-  );
+    dedupeKey: `${filingId}_deadline_${hoursRemaining}h`,
+  });
 
-  // Email
   try {
-    const users = await prisma.user.findMany({ where: { orgId, isActive: true }, select: { email: true } });
+    const users = await prisma.user.findMany({
+      where: { orgId, isActive: true, role: { in: ['operator', 'admin', 'owner'] } },
+      select: { email: true },
+    });
     if (users.length > 0) {
       sendDeadlineWarningEmail({
         to: users.map(u => u.email),
@@ -298,11 +389,10 @@ export async function notifyDeadlineApproaching(orgId: string, filingId: string,
 }
 
 export async function notifyApiError(orgId: string, userId: string, message: string): Promise<void> {
-  await createNotification({
-    userId,
-    orgId,
-    type:    'api_error',
-    title:   'API Connection Error',
+  await notify({
+    kind:     'api_error',
+    audience: { orgId, userIds: [userId] },
+    title:    'API Connection Error',
     message,
   });
 }
