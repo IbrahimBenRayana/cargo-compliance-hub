@@ -11,6 +11,11 @@ import {
   FileText,
   PauseCircle,
   Hourglass,
+  FileCheck,
+  Search,
+  CreditCard,
+  XOctagon,
+  UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -28,16 +33,32 @@ import { cn } from '@/lib/utils';
 // ─── Visual mapping (kind → icon, severity → rail color) ─────────────
 
 const typeConfig: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
-  filing_submitted: { icon: Upload,        color: 'text-blue-500',    bg: 'bg-blue-500/10' },
+  // Filing
+  filing_submitted: { icon: Upload,        color: 'text-blue-500',    bg: 'bg-blue-500/10'    },
   filing_accepted:  { icon: CheckCircle2,  color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-  filing_rejected:  { icon: XCircle,       color: 'text-red-500',     bg: 'bg-red-500/10' },
-  filing_on_hold:   { icon: PauseCircle,   color: 'text-amber-500',   bg: 'bg-amber-500/10' },
-  filing_amended:   { icon: FilePen,       color: 'text-amber-500',   bg: 'bg-amber-500/10' },
-  filing_cancelled: { icon: Ban,           color: 'text-slate-400',   bg: 'bg-slate-400/10' },
-  filing_stale:     { icon: Hourglass,     color: 'text-amber-500',   bg: 'bg-amber-500/10' },
-  deadline_warning: { icon: Clock,         color: 'text-amber-500',   bg: 'bg-amber-500/10' },
-  deadline_overdue: { icon: Clock,         color: 'text-red-500',     bg: 'bg-red-500/10' },
-  api_error:        { icon: AlertCircle,   color: 'text-red-500',     bg: 'bg-red-500/10' },
+  filing_rejected:  { icon: XCircle,       color: 'text-red-500',     bg: 'bg-red-500/10'     },
+  filing_on_hold:   { icon: PauseCircle,   color: 'text-amber-500',   bg: 'bg-amber-500/10'   },
+  filing_amended:   { icon: FilePen,       color: 'text-amber-500',   bg: 'bg-amber-500/10'   },
+  filing_cancelled: { icon: Ban,           color: 'text-slate-400',   bg: 'bg-slate-400/10'   },
+  filing_stale:     { icon: Hourglass,     color: 'text-amber-500',   bg: 'bg-amber-500/10'   },
+  // Deadlines
+  deadline_warning: { icon: Clock,         color: 'text-amber-500',   bg: 'bg-amber-500/10'   },
+  deadline_overdue: { icon: Clock,         color: 'text-red-500',     bg: 'bg-red-500/10'     },
+  // ABI / CBP entry
+  entry_submitted:  { icon: Upload,        color: 'text-violet-500',  bg: 'bg-violet-500/10'  },
+  entry_accepted:   { icon: FileCheck,     color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+  entry_rejected:   { icon: XCircle,       color: 'text-red-500',     bg: 'bg-red-500/10'     },
+  // Manifest queries
+  manifest_query_complete: { icon: Search, color: 'text-blue-500',    bg: 'bg-blue-500/10'    },
+  manifest_query_failed:   { icon: Search, color: 'text-amber-500',   bg: 'bg-amber-500/10'   },
+  // Billing
+  billing_subscription_changed:  { icon: CreditCard, color: 'text-blue-500',  bg: 'bg-blue-500/10'  },
+  billing_subscription_canceled: { icon: XOctagon,   color: 'text-amber-500', bg: 'bg-amber-500/10' },
+  billing_payment_failed:        { icon: XOctagon,   color: 'text-red-500',   bg: 'bg-red-500/10'   },
+  // Team
+  team_member_joined: { icon: UserPlus,    color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+  // System
+  api_error:        { icon: AlertCircle,   color: 'text-red-500',     bg: 'bg-red-500/10'     },
 };
 const defaultType = { icon: FileText, color: 'text-muted-foreground', bg: 'bg-muted' };
 

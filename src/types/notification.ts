@@ -18,6 +18,19 @@ export type NotificationKind =
   // Deadlines
   | 'deadline_warning'
   | 'deadline_overdue'
+  // ABI / CBP entry
+  | 'entry_submitted'
+  | 'entry_accepted'
+  | 'entry_rejected'
+  // Manifest queries
+  | 'manifest_query_complete'
+  | 'manifest_query_failed'
+  // Billing
+  | 'billing_subscription_changed'
+  | 'billing_subscription_canceled'
+  | 'billing_payment_failed'
+  // Team
+  | 'team_member_joined'
   // System
   | 'api_error';
 
