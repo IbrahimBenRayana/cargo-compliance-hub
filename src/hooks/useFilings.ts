@@ -208,6 +208,27 @@ export function useMarkAllNotificationsRead() {
 // — but the canonical home is @/types/notification.
 export type { Notification, NotificationSeverity };
 
+// ─── Phase 5 — preferences ───────────────────────────────
+
+export function useNotificationPreferences() {
+  return useQuery({
+    queryKey: ['notification-preferences'],
+    queryFn: () => notificationsApi.listPreferences(),
+    staleTime: 60_000,
+  });
+}
+
+export function useUpdateNotificationPreferences() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (preferences: import('@/types/notification').NotificationPreference[]) =>
+      notificationsApi.updatePreferences(preferences),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification-preferences'] });
+    },
+  });
+}
+
 // ─── Templates ────────────────────────────────────────────
 export function useTemplates(params?: { filingType?: string; search?: string }) {
   return useQuery({

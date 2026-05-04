@@ -228,7 +228,12 @@ export const submissionLogsApi = {
 };
 
 // ─── Notifications API ────────────────────────────────────
-import type { NotificationListResponse, NotificationSeverity } from '@/types/notification';
+import type {
+  NotificationListResponse,
+  NotificationSeverity,
+  NotificationPreference,
+  NotificationPreferencesResponse,
+} from '@/types/notification';
 
 export interface NotificationsListParams {
   unreadOnly?: boolean;
@@ -250,6 +255,18 @@ export const notificationsApi = {
 
   markAllRead() {
     return apiFetch('/api/v1/notifications/read-all', { method: 'POST' });
+  },
+
+  // Phase 5 — preferences
+  listPreferences() {
+    return apiFetch<NotificationPreferencesResponse>('/api/v1/notifications/preferences');
+  },
+
+  updatePreferences(preferences: NotificationPreference[]) {
+    return apiFetch<{ message: string; count: number }>('/api/v1/notifications/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify({ preferences }),
+    });
   },
 };
 
