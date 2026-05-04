@@ -31,6 +31,18 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// ─── design tokens ───────────────────────────────────────────────────
+// Single type scale. Compose from these instead of writing ad-hoc
+// text-[Npx]. Anything outside the scale should be a deliberate exception
+// (the hero count is the only one allowed today).
+const TYPE = {
+  h1:      'text-[22px] leading-[1.15] tracking-[-0.02em] font-semibold',
+  h2:      'text-[15px] leading-[1.3]  tracking-[-0.01em] font-semibold',
+  body:    'text-[13px] leading-[1.45] font-normal',
+  meta:    'text-[12px] leading-[1.4]  font-medium',
+  eyebrow: 'text-[10.5px] leading-none tracking-[0.14em] uppercase font-semibold',
+} as const;
+
 // ─── helpers ─────────────────────────────────────────────────────────
 
 function relativeTime(ts: string | null | undefined) {
@@ -211,23 +223,17 @@ const STAGE_RAIL_CLASS: Record<Stage, string> = {
   entry:    'stage-rail-entry',
   cleared:  'stage-rail-cleared',
 };
-const STAGE_TEXT_GRADIENT: Record<Stage, string> = {
-  isf:      'text-gradient-stage-isf',
-  manifest: 'text-gradient-stage-manifest',
-  entry:    'text-gradient-stage-entry',
-  cleared:  'text-gradient-stage-cleared',
-};
-const STAGE_GLOW_HOVER: Record<Stage, string> = {
-  isf:      'glow-hover-isf',
-  manifest: 'glow-hover-manifest',
-  entry:    'glow-hover-entry',
-  cleared:  'glow-hover-cleared',
-};
 const STAGE_CHIP_TINT: Record<Stage, string> = {
   isf:      'bg-blue-500/10    text-blue-600    dark:text-blue-300    ring-blue-500/20',
   manifest: 'bg-amber-500/10   text-amber-700   dark:text-amber-300   ring-amber-500/20',
   entry:    'bg-violet-500/10  text-violet-700  dark:text-violet-300  ring-violet-500/20',
   cleared:  'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20',
+};
+const STAGE_DOT: Record<Stage, string> = {
+  isf:      'bg-blue-500',
+  manifest: 'bg-amber-500',
+  entry:    'bg-violet-500',
+  cleared:  'bg-emerald-500',
 };
 
 const SEVERITY_RAIL_CLASS: Record<Severity, string> = {
@@ -251,43 +257,30 @@ function ShipmentCard({ tile, delay }: { tile: ShipmentTile; delay: number }) {
     <Link
       to={tile.to}
       className={cn(
-        'group relative block rounded-xl bg-card pl-4 pr-3.5 py-3.5 border border-border/60 overflow-hidden',
-        'transition-[transform,box-shadow,border-color] duration-300 ease-out',
-        'hover:-translate-y-1 hover:border-foreground/20',
-        STAGE_GLOW_HOVER[tile.stage],
+        'group relative block rounded-xl bg-card p-4 border border-border/60 overflow-hidden',
+        'shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.55)] dark:shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.04)]',
+        'transition duration-150 ease-out',
+        'hover:-translate-y-px hover:border-foreground/15',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         'animate-tile-in',
         'motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:animate-none',
       )}
       style={{ animationDelay: `${delay}ms` }}
     >
-      {/* Severity rail — glowing gradient bar on the left edge */}
+      {/* Severity rail — left edge, only for warn/critical/success */}
       {tile.severity !== 'neutral' && (
         <span
           className={cn(
-            'absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full',
+            'absolute left-0 top-3 bottom-3 w-[2px] rounded-r-full',
             SEVERITY_RAIL_CLASS[tile.severity],
           )}
           aria-hidden
         />
       )}
 
-      {/* Subtle hover wash — column-tinted gradient that fades in */}
-      <span
-        className={cn(
-          'absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300 pointer-events-none',
-          'group-hover:opacity-100',
-          tile.stage === 'isf' && 'bg-gradient-to-br from-blue-500/[0.04] to-transparent',
-          tile.stage === 'manifest' && 'bg-gradient-to-br from-amber-500/[0.05] to-transparent',
-          tile.stage === 'entry' && 'bg-gradient-to-br from-violet-500/[0.04] to-transparent',
-          tile.stage === 'cleared' && 'bg-gradient-to-br from-emerald-500/[0.04] to-transparent',
-        )}
-        aria-hidden
-      />
-
       <div className="relative">
         <div className="flex items-start justify-between gap-2 mb-1">
-          <p className="text-[13px] font-semibold tracking-tight truncate transition-colors duration-150 group-hover:text-foreground">
+          <p className={cn(TYPE.h2, 'truncate text-foreground')}>
             {tile.ref}
           </p>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -306,7 +299,7 @@ function ShipmentCard({ tile, delay }: { tile: ShipmentTile; delay: number }) {
             )}
           </div>
         </div>
-        <p className="text-[11.5px] text-muted-foreground truncate leading-snug">
+        <p className={cn(TYPE.meta, 'truncate text-muted-foreground/80')}>
           {tile.subRef}
         </p>
         <div className="mt-2.5 flex items-center justify-between gap-2 text-[11px]">
@@ -355,44 +348,26 @@ function PipelineColumn({
   const overflow = tiles.length - COLUMN_TILE_LIMIT;
   return (
     <div className="space-y-3 min-w-0">
-      {/* Header */}
+      {/* Header — single row: dot · title · count, then a hairline with a 24px stage segment */}
       <div className="px-1">
-        {/* Stage chip + title */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-baseline gap-2">
           <span
-            className={cn(
-              'inline-flex items-center justify-center text-[9.5px] font-mono font-semibold tabular-nums',
-              'h-4 px-1.5 rounded-md ring-1 ring-inset',
-              STAGE_CHIP_TINT[def.stage],
-            )}
-          >
-            {def.index}
-          </span>
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.2em] text-foreground/85">
-            {def.title}
-          </p>
-        </div>
-        {/* Subtitle + count */}
-        <div className="flex items-end justify-between gap-3">
-          <p className="text-[11.5px] text-muted-foreground/70 leading-snug max-w-[220px]">
-            {def.subtitle}
-          </p>
-          <span
-            className={cn(
-              'text-[36px] leading-[0.85] font-semibold tabular-nums tracking-[-0.025em]',
-              tiles.length > 0 ? STAGE_TEXT_GRADIENT[def.stage] : 'text-muted-foreground/30',
-            )}
-          >
+            className={cn('h-1.5 w-1.5 rounded-full mt-[7px] shrink-0', STAGE_DOT[def.stage])}
+            aria-hidden
+          />
+          <h3 className={cn(TYPE.h2, 'text-foreground')}>{def.title}</h3>
+          <span className="text-[13px] font-medium tabular-nums text-muted-foreground/80">
             {animatedCount}
           </span>
         </div>
-        {/* Colored gradient rail under the header */}
-        <div className="mt-3 relative h-px overflow-visible">
-          <div className={cn(
-            'absolute inset-x-0 h-[2px] -top-px rounded-full',
-            tiles.length > 0 ? STAGE_RAIL_CLASS[def.stage] : 'bg-border/60',
-            tiles.length > 0 && 'opacity-60',
-          )} />
+        <p className={cn(TYPE.meta, 'mt-1 max-w-[240px] text-muted-foreground/70')}>
+          {def.subtitle}
+        </p>
+        <div className="mt-3 relative h-px">
+          <div className="absolute inset-x-0 top-0 h-px bg-border/60" aria-hidden />
+          {tiles.length > 0 && (
+            <div className={cn('absolute left-0 top-0 h-px w-6', STAGE_RAIL_CLASS[def.stage])} aria-hidden />
+          )}
         </div>
       </div>
 
@@ -602,7 +577,7 @@ function KpiCard({
   return (
     <div
       className={cn(
-        'group relative rounded-xl ring-1 ring-inset px-4 py-3.5 overflow-hidden',
+        'group relative rounded-xl ring-1 ring-inset p-5 overflow-hidden',
         tint.ring,
         tint.bg,
         'transition-[transform,box-shadow] duration-200 ease-out',
@@ -717,7 +692,7 @@ export default function Dashboard() {
   // ── loading ─────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="space-y-12 max-w-[1500px] mx-auto pb-16">
+      <div className="space-y-10 max-w-[1500px] mx-auto pb-16">
         <div className="space-y-4">
           <Skeleton className="h-3 w-48" />
           <div className="space-y-2.5 max-w-2xl">
@@ -731,7 +706,7 @@ export default function Dashboard() {
             <Skeleton className="h-10 w-32 rounded-xl" />
           </div>
         </div>
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="space-y-3">
               <div className="space-y-1.5 px-1">
@@ -769,7 +744,7 @@ export default function Dashboard() {
 
       <CelebrationModal planId={welcomePlanId} onClose={handleModalClose} />
 
-      <div className="space-y-12 relative">
+      <div className="space-y-10 relative">
         {/* ─── Hero ─────────────────────────────────────────────────────── */}
         <header
           className="space-y-5 pt-2 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
@@ -851,7 +826,7 @@ export default function Dashboard() {
 
         {/* ─── KPIs ────────────────────────────────────────────────────── */}
         <section
-          className="grid grid-cols-2 md:grid-cols-4 gap-3 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
+          className="grid grid-cols-2 md:grid-cols-4 gap-4 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
           style={{ animationDelay: '40ms', animationFillMode: 'forwards' }}
         >
           <KpiCard
@@ -893,7 +868,7 @@ export default function Dashboard() {
         >
           <FlowIndicator />
 
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {COLUMNS.map((def, colIdx) => {
               const colTiles = byStage[def.stage];
               const indexOffset = COLUMNS.slice(0, colIdx).reduce((s, c) => s + byStage[c.stage].length, 0);
