@@ -5,6 +5,7 @@ import Stripe from 'stripe';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { getStripe, stripeConfigured } from '../services/stripe.js';
+import { notify } from '../services/notifications.js';
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
 
@@ -125,6 +126,16 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session): Promise<vo
     },
   });
   logger.info({ orgId, planId }, '✓ Subscription activated via checkout');
+
+  // Phase 3: notify owners + admins that the subscription is live.
+  await notify({
+    kind:     'billing_subscription_changed',
+    audience: { orgId, roles: ['ADMIN', 'OWNER'] },
+    title:    'Subscription Activated',
+    message:  `Your ${planId} plan is now active.`,
+    linkUrl:  '/settings?tab=billing',
+    metadata: { planId, status: stripeSub.status },
+  });
 }
 
 async function onSubscriptionChanged(sub: Stripe.Subscription): Promise<void> {
@@ -175,6 +186,17 @@ async function onSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
     },
   });
   logger.info({ orgId: existing.orgId }, '✓ Subscription canceled, downgraded to Starter');
+
+  // Phase 3: warn owners + admins. Severity is 'warning' (default for kind),
+  // not 'critical' — the org has been downgraded but is not blocked.
+  await notify({
+    kind:     'billing_subscription_canceled',
+    audience: { orgId: existing.orgId, roles: ['ADMIN', 'OWNER'] },
+    title:    'Subscription Canceled',
+    message:  'Your plan has been canceled. The org has been downgraded to Starter.',
+    linkUrl:  '/settings?tab=billing',
+    metadata: { previousPlanId: existing.planId },
+  });
 }
 
 async function onInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
@@ -188,6 +210,28 @@ async function onInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
     data: { status: 'past_due' },
   });
   logger.warn({ subscriptionId: subId }, 'Payment failed — subscription marked past_due');
+
+  // Phase 3: critical alert to admin + owner. Service may be suspended if
+  // not resolved before grace period lapses, so this is the highest-urgency
+  // billing notification we send.
+  const sub = await prisma.subscription.findUnique({
+    where: { stripeSubscriptionId: subId },
+    select: { orgId: true },
+  });
+  if (sub) {
+    // Dedupe per-invoice so retries within a single dunning cycle don't
+    // spam users; a fresh payment_failed event for the same invoice is a
+    // no-op.
+    await notify({
+      kind:      'billing_payment_failed',
+      audience:  { orgId: sub.orgId, roles: ['ADMIN', 'OWNER'] },
+      title:     'Payment Failed',
+      message:   'A subscription invoice failed to charge. Update your payment method to keep service running.',
+      linkUrl:   '/settings?tab=billing',
+      metadata:  { invoiceId: invoice.id, subscriptionId: subId },
+      dedupeKey: `billing_failed_${invoice.id}`,
+    });
+  }
 }
 
 // ─── Authenticated endpoints ─────────────────────────────────

@@ -4,6 +4,7 @@ import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { ccClient, CCManifestQueryPayload } from '../services/customscity.js';
 import { ccApiLimiter } from '../middleware/rateLimiter.js';
+import { notify } from '../services/notifications.js';
 import logger from '../config/logger.js';
 
 const router = Router();
@@ -172,27 +173,46 @@ async function pollManifestQueryResult(queryId: string, ccRequestId: string, org
       });
 
       if (hasData) {
-        await prisma.manifestQuery.update({
+        const updated = await prisma.manifestQuery.update({
           where: { id: queryId },
           data: {
             status: 'completed',
             response: result.data as any,
             completedAt: new Date(),
           },
+          select: { userId: true, bolNumber: true },
         });
         logger.info({ queryId, attempt }, 'Manifest query completed');
+        // Phase 3: notify the actor only — manifest queries are personal lookups.
+        await notify({
+          kind:     'manifest_query_complete',
+          audience: { orgId, userIds: [updated.userId] },
+          title:    'Manifest Query Ready',
+          message:  `Results for ${updated.bolNumber} are available.`,
+          linkUrl:  `/manifest-query?id=${queryId}`,
+          metadata: { bolNumber: updated.bolNumber, queryId },
+        });
         return;
       }
     } catch (err: any) {
       logger.warn({ err, queryId, attempt }, 'Manifest query poll attempt failed');
 
       if (attempt === MAX_ATTEMPTS) {
-        await prisma.manifestQuery.update({
+        const updated = await prisma.manifestQuery.update({
           where: { id: queryId },
           data: {
             status: 'failed',
             errorMessage: err.message || 'All poll attempts failed',
           },
+          select: { userId: true, bolNumber: true },
+        });
+        await notify({
+          kind:     'manifest_query_failed',
+          audience: { orgId, userIds: [updated.userId] },
+          title:    'Manifest Query Failed',
+          message:  `Couldn't fetch results for ${updated.bolNumber}: ${err.message || 'all retries exhausted'}.`,
+          linkUrl:  `/manifest-query?id=${queryId}`,
+          metadata: { bolNumber: updated.bolNumber, queryId, error: err.message ?? null },
         });
         return;
       }
@@ -200,12 +220,21 @@ async function pollManifestQueryResult(queryId: string, ccRequestId: string, org
   }
 
   // Timeout — all attempts exhausted without data
-  await prisma.manifestQuery.update({
+  const timedOut = await prisma.manifestQuery.update({
     where: { id: queryId },
     data: {
       status: 'timeout',
       errorMessage: `No response after ${MAX_ATTEMPTS} poll attempts (${MAX_ATTEMPTS * POLL_INTERVAL_MS / 1000}s)`,
     },
+    select: { userId: true, bolNumber: true },
+  });
+  await notify({
+    kind:     'manifest_query_failed',
+    audience: { orgId, userIds: [timedOut.userId] },
+    title:    'Manifest Query Timed Out',
+    message:  `No CBP response for ${timedOut.bolNumber} after ${MAX_ATTEMPTS} attempts. Try again later.`,
+    linkUrl:  `/manifest-query?id=${queryId}`,
+    metadata: { bolNumber: timedOut.bolNumber, queryId, reason: 'timeout' },
   });
 }
 

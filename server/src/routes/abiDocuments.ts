@@ -17,6 +17,7 @@ import {
   prefillFromManifestQuery,
 } from '../services/abiDocumentMapper.js';
 import { sanitizeErrorMessage } from '../services/errorTranslator.js';
+import { notify } from '../services/notifications.js';
 import logger from '../config/logger.js';
 
 const router = Router();
@@ -243,6 +244,24 @@ async function runSinglePoll(args: {
       ...(nextStatus ? { status: nextStatus, respondedAt: new Date() } : {}),
     },
   });
+
+  // Phase 3: notify on terminal ABI status. Reuses the dedupeKey to ensure
+  // that a re-poll of the same accepted/rejected entry does not double-fire.
+  if (nextStatus) {
+    const ref = ccEntryNumber || entryNumber || mbolNumber || docId.slice(0, 8);
+    await notify({
+      kind:     nextStatus === 'ACCEPTED' ? 'entry_accepted' : 'entry_rejected',
+      audience: { orgId, roles: ['OPERATOR', 'ADMIN', 'OWNER'] },
+      title:    nextStatus === 'ACCEPTED' ? 'Entry Accepted by CBP' : 'Entry Rejected by CBP',
+      message:  nextStatus === 'ACCEPTED'
+        ? `Entry ${ref} has been accepted by CBP.`
+        : `Entry ${ref} was rejected by CBP. Review and resubmit.`,
+      linkUrl:       `/abi-documents/${docId}`,
+      metadata:      { entryNumber: ref, entryType, mbolNumber },
+      abiDocumentId: docId,
+      dedupeKey:     `abi_${docId}_${nextStatus.toLowerCase()}`,
+    });
+  }
 
   return { terminal: !!nextStatus };
 }
@@ -654,6 +673,21 @@ router.post('/:id/send', ccApiLimiter, async (req: AuthRequest, res: Response): 
       where: { id: postCreateDoc.id },
       data: { status: 'SENT' },
     });
+
+    // Phase 3: actor-only notification confirming the entry left for CBP.
+    notify({
+      kind:     'entry_submitted',
+      audience: { orgId: req.user!.orgId, userIds: [req.user!.id] },
+      title:    'Entry Transmitted',
+      message:  `Entry ${sentDoc.entryNumber || sentDoc.mbolNumber || sentDoc.id.slice(0, 8)} sent to CBP. Awaiting acceptance.`,
+      linkUrl:  `/abi-documents/${sentDoc.id}`,
+      metadata: {
+        entryNumber: sentDoc.entryNumber,
+        entryType:   sentDoc.entryType,
+        mbolNumber:  sentDoc.mbolNumber,
+      },
+      abiDocumentId: sentDoc.id,
+    }).catch(() => {});
 
     // Fire-and-forget polling.
     pollABIDocumentStatus(

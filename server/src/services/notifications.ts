@@ -40,6 +40,7 @@ import {
 // ─── Defaults per notification kind ───────────────────────────────────
 
 const SEVERITY_BY_KIND: Record<string, NotificationSeverity> = {
+  // Filing
   filing_submitted: 'info',
   filing_accepted:  'info',
   filing_rejected:  'critical',
@@ -47,9 +48,24 @@ const SEVERITY_BY_KIND: Record<string, NotificationSeverity> = {
   filing_cancelled: 'info',
   filing_on_hold:   'critical',
   filing_stale:     'warning',
+  // Deadlines
   deadline_warning: 'warning',  // overridden to critical when hoursRemaining <= 24
   deadline_overdue: 'critical',
-  api_error:        'critical',
+  // ABI / CBP entry
+  entry_submitted:  'info',
+  entry_accepted:   'info',
+  entry_rejected:   'critical',
+  // Manifest queries
+  manifest_query_complete: 'info',
+  manifest_query_failed:   'warning',
+  // Billing
+  billing_subscription_changed:  'info',
+  billing_subscription_canceled: 'warning',
+  billing_payment_failed:        'critical',
+  // Team
+  team_member_joined: 'info',
+  // System
+  api_error: 'critical',
 };
 
 function severityFor(kind: string, fallback: NotificationSeverity = 'info'): NotificationSeverity {

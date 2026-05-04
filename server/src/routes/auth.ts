@@ -8,6 +8,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { sendWelcomeEmail } from '../services/email.js';
+import { notify } from '../services/notifications.js';
 
 const router = Router();
 
@@ -167,6 +168,21 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
       firstName: result.user.firstName || 'there',
       organizationName: result.org.name,
     }).catch(() => {});
+
+    // Phase 3: when someone joins via invite, ping the org admins so they
+    // know the seat was taken. Skip for first-org-creation (no admins
+    // existed yet, would be a self-notification).
+    if (invitation) {
+      const fullName = `${result.user.firstName || ''} ${result.user.lastName || ''}`.trim() || result.user.email;
+      notify({
+        kind:     'team_member_joined',
+        audience: { orgId: result.org.id, roles: ['ADMIN', 'OWNER'] },
+        title:    'New Team Member',
+        message:  `${fullName} joined the team as ${result.user.role}.`,
+        linkUrl:  '/team',
+        metadata: { newUserId: result.user.id, role: result.user.role, email: result.user.email },
+      }).catch(() => {});
+    }
   } catch (err) {
     if (err instanceof z.ZodError) {
       res.status(400).json({ error: 'Validation failed', details: err.flatten() });
