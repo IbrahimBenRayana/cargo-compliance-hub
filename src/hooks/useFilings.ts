@@ -126,19 +126,48 @@ export function useCancelFiling() {
 }
 
 // ─── Notifications ────────────────────────────────────────
-export function useNotifications(unreadOnly = false) {
+import type { Notification, NotificationListResponse, NotificationSeverity } from '@/types/notification';
+import type { NotificationsListParams } from '../api/client';
+
+export function useNotifications(params: NotificationsListParams = {}) {
   return useQuery({
-    queryKey: ['notifications', unreadOnly],
-    queryFn: () => notificationsApi.list(unreadOnly),
+    queryKey: ['notifications', params],
+    queryFn: () => notificationsApi.list(params),
     refetchInterval: 30_000, // Poll every 30s for new notifications
   });
 }
 
+/** Optimistic mark-read: flips isRead/unreadCount in the cache before the
+ *  server roundtrip resolves, so the UI never shows a stale unread badge. */
 export function useMarkNotificationRead() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => notificationsApi.markRead(id),
-    onSuccess: () => {
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] });
+      const snapshots = queryClient.getQueriesData<NotificationListResponse>({ queryKey: ['notifications'] });
+      for (const [key, snap] of snapshots) {
+        if (!snap) continue;
+        const target = snap.data.find(n => n.id === id);
+        const wasUnread = target ? !target.isRead : false;
+        const wasUnreadCritical = target ? !target.isRead && target.severity === 'critical' : false;
+        queryClient.setQueryData<NotificationListResponse>(key, {
+          ...snap,
+          data: snap.data.map(n => n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n),
+          unreadCount: Math.max(0, snap.unreadCount - (wasUnread ? 1 : 0)),
+          criticalUnreadCount: Math.max(0, snap.criticalUnreadCount - (wasUnreadCritical ? 1 : 0)),
+        });
+      }
+      return { snapshots };
+    },
+    onError: (_err, _id, context) => {
+      // Roll back on failure.
+      if (!context?.snapshots) return;
+      for (const [key, snap] of context.snapshots) {
+        queryClient.setQueryData(key, snap);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
@@ -148,11 +177,36 @@ export function useMarkAllNotificationsRead() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => notificationsApi.markAllRead(),
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] });
+      const snapshots = queryClient.getQueriesData<NotificationListResponse>({ queryKey: ['notifications'] });
+      const now = new Date().toISOString();
+      for (const [key, snap] of snapshots) {
+        if (!snap) continue;
+        queryClient.setQueryData<NotificationListResponse>(key, {
+          ...snap,
+          data: snap.data.map(n => n.isRead ? n : { ...n, isRead: true, readAt: now }),
+          unreadCount: 0,
+          criticalUnreadCount: 0,
+        });
+      }
+      return { snapshots };
+    },
+    onError: (_err, _vars, context) => {
+      if (!context?.snapshots) return;
+      for (const [key, snap] of context.snapshots) {
+        queryClient.setQueryData(key, snap);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 }
+
+// Re-export types so callers can `import { Notification, NotificationSeverity } from '@/hooks/useFilings'`
+// — but the canonical home is @/types/notification.
+export type { Notification, NotificationSeverity };
 
 // ─── Templates ────────────────────────────────────────────
 export function useTemplates(params?: { filingType?: string; search?: string }) {

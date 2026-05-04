@@ -292,7 +292,7 @@ async function checkDeadlines(): Promise<void> {
         'deadline_overdue',
         'OVERDUE: Filing deadline passed 🚨',
         `ISF filing ${bol} deadline has PASSED. Submit immediately to avoid CBP penalties ($5,000-$10,000).`,
-        dedupeKey
+        { dedupeKey, linkUrl: `/shipments/${filing.id}`, metadata: { bolNumber: bol } },
       );
       alertsSent++;
 
