@@ -157,29 +157,18 @@
 }
 
 @layer utilities {
-  /* ── Aurora background — slow ambient gradient mesh ── */
+  /* ── Aurora background — calm static gradient mesh ── */
+  /* The motion was tiring on a work dashboard. Two soft radials, lower
+     opacity, no animation. Same warmth, less flicker. */
   .aurora-bg {
     background:
-      radial-gradient(ellipse 60% 50% at 18% -10%, hsl(var(--primary) / 0.18), transparent 60%),
-      radial-gradient(ellipse 50% 40% at 82% -10%, hsl(43 96% 56% / 0.16), transparent 60%),
-      radial-gradient(ellipse 55% 35% at 50% -15%, hsl(280 80% 60% / 0.10), transparent 60%);
-    background-size: 140% 100%, 140% 100%, 140% 100%;
-    animation: aurora-pan 22s ease-in-out infinite alternate;
+      radial-gradient(ellipse 60% 50% at 18% -10%, hsl(var(--primary) / 0.10), transparent 60%),
+      radial-gradient(ellipse 50% 40% at 82% -10%, hsl(43 96% 56% / 0.08), transparent 60%);
   }
   .dark .aurora-bg {
     background:
-      radial-gradient(ellipse 60% 50% at 18% -10%, hsl(var(--primary) / 0.32), transparent 60%),
-      radial-gradient(ellipse 50% 40% at 82% -10%, hsl(43 96% 56% / 0.22), transparent 60%),
-      radial-gradient(ellipse 55% 35% at 50% -15%, hsl(280 80% 60% / 0.18), transparent 60%);
-    background-size: 140% 100%, 140% 100%, 140% 100%;
-    animation: aurora-pan 22s ease-in-out infinite alternate;
-  }
-  @keyframes aurora-pan {
-    0%   { background-position:  0% 0%, 100% 0%,  50% 0%; }
-    100% { background-position: 12% 0%,  88% 0%,  62% 0%; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .aurora-bg { animation: none; }
+      radial-gradient(ellipse 60% 50% at 18% -10%, hsl(var(--primary) / 0.22), transparent 60%),
+      radial-gradient(ellipse 50% 40% at 82% -10%, hsl(43 96% 56% / 0.14), transparent 60%);
   }
 
   /* ── Gradient text utility (more elegant than text-transparent bg-clip in JSX) ── */

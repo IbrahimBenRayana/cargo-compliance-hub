@@ -223,12 +223,6 @@ const STAGE_RAIL_CLASS: Record<Stage, string> = {
   entry:    'stage-rail-entry',
   cleared:  'stage-rail-cleared',
 };
-const STAGE_CHIP_TINT: Record<Stage, string> = {
-  isf:      'bg-blue-500/10    text-blue-600    dark:text-blue-300    ring-blue-500/20',
-  manifest: 'bg-amber-500/10   text-amber-700   dark:text-amber-300   ring-amber-500/20',
-  entry:    'bg-violet-500/10  text-violet-700  dark:text-violet-300  ring-violet-500/20',
-  cleared:  'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20',
-};
 const STAGE_DOT: Record<Stage, string> = {
   isf:      'bg-blue-500',
   manifest: 'bg-amber-500',
@@ -285,14 +279,10 @@ function ShipmentCard({ tile, delay }: { tile: ShipmentTile; delay: number }) {
           </p>
           <div className="flex items-center gap-1.5 shrink-0">
             {fresh && (
-              <span className="relative flex h-2 w-2" aria-label="Updated recently">
-                <span className="absolute inset-0 rounded-full bg-emerald-400/70 animate-ping motion-reduce:animate-none" />
-                <span
-                  className="absolute inset-0 rounded-full bg-emerald-400/50 animate-ping motion-reduce:animate-none"
-                  style={{ animationDelay: '600ms' }}
-                />
-                <span className="relative h-2 w-2 rounded-full bg-emerald-500" />
-              </span>
+              <span
+                className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse motion-reduce:animate-none"
+                aria-label="Updated recently"
+              />
             )}
             {tile.severity === 'critical' && !fresh && (
               <span className="h-1.5 w-1.5 rounded-full bg-red-500" aria-hidden />
@@ -468,19 +458,17 @@ function ActivityStrip({ events }: { events: ActivityEvent[] }) {
       <ol className="flex items-stretch gap-2 overflow-x-auto pb-2 px-1 [scrollbar-width:thin] [scroll-behavior:smooth]">
         {events.map((ev, i) => {
           const tint =
-            ev.kind === 'isf' ? 'bg-blue-500/[0.07]    text-blue-700    dark:text-blue-300    ring-blue-500/20    hover:shadow-[0_4px_16px_-6px_hsl(217_91%_60%/0.35)]'
-          : ev.kind === 'mq'  ? 'bg-amber-500/[0.07]   text-amber-700   dark:text-amber-300   ring-amber-500/20   hover:shadow-[0_4px_16px_-6px_hsl(38_92%_55%/0.35)]'
-          :                     'bg-violet-500/[0.07]  text-violet-700  dark:text-violet-300  ring-violet-500/20  hover:shadow-[0_4px_16px_-6px_hsl(262_83%_58%/0.35)]';
+            ev.kind === 'isf' ? 'bg-blue-500/[0.07]    text-blue-700    dark:text-blue-300    ring-blue-500/20    hover:ring-blue-500/40'
+          : ev.kind === 'mq'  ? 'bg-amber-500/[0.07]   text-amber-700   dark:text-amber-300   ring-amber-500/20   hover:ring-amber-500/40'
+          :                     'bg-violet-500/[0.07]  text-violet-700  dark:text-violet-300  ring-violet-500/20  hover:ring-violet-500/40';
           return (
             <li key={ev.id} className="shrink-0 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none" style={{ animationDelay: `${380 + i * 40}ms`, animationFillMode: 'forwards' }}>
               <Link
                 to={ev.to}
                 className={cn(
                   'group flex items-center gap-2.5 rounded-lg ring-1 ring-inset px-3 py-2 text-[11.5px] font-medium',
-                  'transition-[transform,box-shadow] duration-200 ease-out',
-                  'hover:scale-[1.03]',
+                  'transition-[ring-color,background-color] duration-150 ease-out',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                  'motion-reduce:transition-none motion-reduce:hover:scale-100',
                   tint,
                 )}
               >
@@ -580,8 +568,9 @@ function KpiCard({
         'group relative rounded-xl ring-1 ring-inset p-5 overflow-hidden',
         tint.ring,
         tint.bg,
-        'transition-[transform,box-shadow] duration-200 ease-out',
-        'hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-12px_hsl(var(--foreground)/0.18)]',
+        'shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.55)] dark:shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.04)]',
+        'transition duration-150 ease-out',
+        'hover:-translate-y-px hover:ring-foreground/15',
         'opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none motion-reduce:hover:translate-y-0',
       )}
       style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
@@ -605,25 +594,6 @@ function KpiCard({
       <p className="mt-2 text-[11px] text-muted-foreground/70 leading-snug truncate">
         {sub}
       </p>
-    </div>
-  );
-}
-
-// ─── flow indicator ──────────────────────────────────────────────────
-
-function FlowIndicator() {
-  return (
-    <div className="hidden lg:flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] select-none">
-      <span className="text-foreground/60">Flow</span>
-      <span className="h-px w-4 bg-border/60" />
-      {COLUMNS.map((c, i) => (
-        <span key={c.stage} className="flex items-center gap-2">
-          <span className={cn('px-2 h-5 inline-flex items-center rounded-md ring-1 ring-inset', STAGE_CHIP_TINT[c.stage])}>
-            {c.title}
-          </span>
-          {i < COLUMNS.length - 1 && <ChevronRight className="h-3 w-3 text-muted-foreground/40" strokeWidth={2.5} />}
-        </span>
-      ))}
     </div>
   );
 }
@@ -746,78 +716,102 @@ export default function Dashboard() {
 
       <div className="space-y-10 relative">
         {/* ─── Hero ─────────────────────────────────────────────────────── */}
+        {/* Calm-lane hero: eyebrow + date · big count with inline 4-dot stage legend
+            on the right · sub-line · 3 actions. The hero count is intentionally the
+            only place on the page where a digit is this large. No gradient on the
+            number itself — restraint is what makes it feel like Stripe/Linear. */}
         <header
-          className="space-y-5 pt-2 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
+          className="space-y-4 pt-2 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
           style={{ animationFillMode: 'forwards' }}
         >
-          {/* Date / greeting strip */}
-          <div className="flex items-center gap-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/70 shrink-0">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-              <span className="mx-2 text-muted-foreground/30">·</span>
+          {/* Eyebrow row: greeting · date */}
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <p className={cn(TYPE.eyebrow, 'text-muted-foreground/80')}>
               {greeting}{firstName ? `, ${firstName}` : ''}
             </p>
-            <span className="h-px flex-1 bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
+            <p className="text-[11px] font-medium tabular-nums text-muted-foreground/60">
+              {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              <span className="mx-1.5 text-muted-foreground/30">·</span>
+              {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </p>
           </div>
 
-          {/* Big headline */}
+          {/* Hero row: count + inline stage legend (right-aligned, vertically centered) */}
           {inFlightCount === 0 ? (
-            <h1 className="text-[38px] leading-[1.1] font-semibold tracking-[-0.025em] max-w-3xl">
-              <span className="text-gradient-hero">No shipments in flight.</span>
-              <br />
-              <span className="text-muted-foreground/60">Time to file.</span>
+            <h1 className="text-[44px] leading-[1.05] font-semibold tracking-[-0.025em] text-foreground">
+              Nothing in flight yet.
+              <span className="ml-3 text-[28px] font-medium text-muted-foreground/60 tracking-[-0.015em]">
+                Time to file.
+              </span>
             </h1>
           ) : (
-            <h1 className="text-[38px] leading-[1.1] font-semibold tracking-[-0.025em] max-w-3xl">
-              <span className="text-muted-foreground/60">You have</span>{' '}
-              <span className="text-gradient-accent tabular-nums inline-block min-w-[1ch]">
-                {animatedInFlight}
-              </span>{' '}
-              <span className="text-gradient-hero">{inFlightCount === 1 ? 'shipment' : 'shipments'} in flight.</span>
-            </h1>
+            <div className="flex items-baseline justify-between gap-6 flex-wrap">
+              <h1 className="text-[44px] leading-[1.05] font-semibold tracking-[-0.025em] text-foreground flex items-baseline gap-3 min-w-0">
+                <span className="tabular-nums inline-block min-w-[1ch]">{animatedInFlight}</span>
+                <span className="text-[26px] font-medium text-muted-foreground tracking-[-0.015em]">
+                  {inFlightCount === 1 ? 'shipment in flight' : 'shipments in flight'}
+                </span>
+              </h1>
+              {/* Stage legend — 4 small dots + counts. Stage identity at a glance,
+                  without putting color into the headline number. */}
+              <div className="flex items-center gap-3 text-[11px] shrink-0">
+                {COLUMNS.map((c) => {
+                  const n = byStage[c.stage].length;
+                  const dim = n === 0;
+                  return (
+                    <span key={c.stage} className="flex items-center gap-1.5 tabular-nums">
+                      <span
+                        className={cn('h-1.5 w-1.5 rounded-full', STAGE_DOT[c.stage], dim && 'opacity-30')}
+                        aria-hidden
+                      />
+                      <span className={cn('font-semibold', dim ? 'text-muted-foreground/50' : 'text-foreground/85')}>{n}</span>
+                      <span className={cn(dim ? 'text-muted-foreground/40' : 'text-muted-foreground/70')}>
+                        {c.title.split(' ')[0]}
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {/* Sub-line */}
-          <p className="text-[15px] leading-relaxed text-muted-foreground max-w-2xl">
+          <p className="text-[14px] leading-relaxed text-muted-foreground max-w-2xl">
             {attentionCount > 0 ? (
-              <>
-                <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-500 font-medium">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="absolute inset-0 rounded-full bg-amber-500/70 animate-ping motion-reduce:animate-none" />
-                    <span className="relative h-1.5 w-1.5 rounded-full bg-amber-500" />
-                  </span>
-                  {attentionCount} {attentionCount === 1 ? 'item needs' : 'items need'} your attention
+              <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
+                  <span className="text-foreground font-medium tabular-nums">{attentionCount}</span>
+                  <span>{attentionCount === 1 ? 'item needs your attention' : 'items need your attention'}</span>
                 </span>
-                {clearedCount > 0 && <> · <span className="tabular-nums">{clearedCount}</span> recently cleared</>}
-              </>
+                {clearedCount > 0 && (
+                  <span className="text-muted-foreground/60">
+                    <span className="mx-1.5 text-muted-foreground/30">·</span>
+                    <span className="tabular-nums text-foreground/85 font-medium">{clearedCount}</span> recently cleared
+                  </span>
+                )}
+              </span>
             ) : inFlightCount > 0 ? (
-              <>Everything is on track.{clearedCount > 0 && <> <span className="tabular-nums">{clearedCount}</span> {clearedCount === 1 ? 'shipment' : 'shipments'} recently cleared.</>}</>
+              <>Everything is on track.{clearedCount > 0 && <> <span className="tabular-nums text-foreground/85 font-medium">{clearedCount}</span> {clearedCount === 1 ? 'shipment' : 'shipments'} recently cleared.</>}</>
             ) : (
               <>Run a manifest query to look up CBP data, or start a new ISF filing.</>
             )}
           </p>
 
-          {/* Actions */}
+          {/* Actions — calm shadow on primary, compact height */}
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <Link to="/shipments/new">
-              <Button
-                size="default"
-                className={cn(
-                  'gap-1.5 h-10 px-4 rounded-xl font-semibold transition-shadow duration-200',
-                  'shadow-[0_2px_8px_-2px_hsl(var(--primary)/0.30),0_0_0_1px_hsl(var(--primary)/0.20)]',
-                  'hover:shadow-[0_8px_20px_-4px_hsl(var(--primary)/0.45),0_0_0_1px_hsl(var(--primary)/0.30)]',
-                )}
-              >
+              <Button size="default" className="gap-1.5 h-9 px-4 rounded-lg font-medium shadow-sm transition-shadow duration-150 hover:shadow-md">
                 <Plus className="h-4 w-4" strokeWidth={2.5} /> New Shipment
               </Button>
             </Link>
             <Link to="/abi-documents/new">
-              <Button variant="outline" size="default" className="gap-1.5 h-10 rounded-xl transition-colors duration-150">
+              <Button variant="outline" size="default" className="gap-1.5 h-9 rounded-lg font-medium transition-colors duration-150">
                 <FileCheck className="h-3.5 w-3.5" /> New Entry
               </Button>
             </Link>
             <Link to="/manifest-query">
-              <Button variant="outline" size="default" className="gap-1.5 h-10 rounded-xl transition-colors duration-150">
+              <Button variant="outline" size="default" className="gap-1.5 h-9 rounded-lg font-medium transition-colors duration-150">
                 <Search className="h-3.5 w-3.5" /> Manifest Query
               </Button>
             </Link>
@@ -863,11 +857,9 @@ export default function Dashboard() {
 
         {/* ─── Pipeline ─────────────────────────────────────────────────── */}
         <section
-          className="space-y-5 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
+          className="opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
           style={{ animationDelay: '60ms', animationFillMode: 'forwards' }}
         >
-          <FlowIndicator />
-
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {COLUMNS.map((def, colIdx) => {
               const colTiles = byStage[def.stage];
