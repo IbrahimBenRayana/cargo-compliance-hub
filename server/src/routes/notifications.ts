@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { inAppOptedOutKinds } from '../services/notifications.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -40,25 +41,33 @@ const KNOWN_KINDS = [
 //   severity=critical   filter to a single severity level (powers the Critical tab)
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   const { unreadOnly, severity } = req.query as Record<string, string>;
+  const userId = req.user!.id;
 
-  const where: any = { userId: req.user!.id };
+  // Phase 6: notify() now writes rows for the full role audience
+  // regardless of in-app preference, so the read-time filter has to
+  // strip out kinds the user has opted out of.
+  const optedOut = await inAppOptedOutKinds(userId);
+
+  const where: any = { userId };
   if (unreadOnly === 'true') where.isRead = false;
   if (severity === 'critical' || severity === 'warning' || severity === 'info') {
     where.severity = severity;
   }
+  if (optedOut.length > 0) {
+    where.type = { notIn: optedOut };
+  }
+
+  const unreadWhere: any = { userId, isRead: false };
+  const criticalWhere: any = { userId, isRead: false, severity: 'critical' };
+  if (optedOut.length > 0) {
+    unreadWhere.type = { notIn: optedOut };
+    criticalWhere.type = { notIn: optedOut };
+  }
 
   const [notifications, unreadCount, criticalUnreadCount] = await Promise.all([
-    prisma.notification.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    }),
-    prisma.notification.count({
-      where: { userId: req.user!.id, isRead: false },
-    }),
-    prisma.notification.count({
-      where: { userId: req.user!.id, isRead: false, severity: 'critical' },
-    }),
+    prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, take: 50 }),
+    prisma.notification.count({ where: unreadWhere }),
+    prisma.notification.count({ where: criticalWhere }),
   ]);
 
   res.json({ data: notifications, unreadCount, criticalUnreadCount });

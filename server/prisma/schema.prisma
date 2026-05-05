@@ -228,10 +228,11 @@ model Notification {
   dedupeKey     String?              @unique @map("dedupe_key") @db.VarChar(255)
   createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz()
 
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  filing       Filing?      @relation(fields: [filingId], references: [id], onDelete: SetNull)
-  abiDocument  AbiDocument? @relation(fields: [abiDocumentId], references: [id], onDelete: SetNull)
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  filing       Filing?                @relation(fields: [filingId], references: [id], onDelete: SetNull)
+  abiDocument  AbiDocument?           @relation(fields: [abiDocumentId], references: [id], onDelete: SetNull)
+  deliveries   NotificationDelivery[]
 
   @@index([userId])
   @@index([userId, isRead])
@@ -240,6 +241,39 @@ model Notification {
   // Powers the Critical tab: only critical for this user.
   @@index([userId, severity, createdAt(sort: Desc)])
   @@map("notifications")
+}
+
+// ─── Notification Delivery (Phase 6) ───────────────────────
+// One row per (notification, channel) pair the system intends to deliver.
+// In-app delivery is implicit — notifications already exist as Notification
+// rows. This table is for out-of-band channels: email today, push later.
+//
+// Lifecycle:
+//   queued  → worker picks up
+//   sent    → terminal success
+//   failed  → terminal failure (after `attempts` exhausted)
+//   bounced → terminal failure reported by the email provider webhook
+//
+// Backoff: a failed attempt sets nextAttemptAt = now() + (2 ^ attempts)
+// minutes, capped. The worker only picks rows where nextAttemptAt <= now().
+model NotificationDelivery {
+  id             String    @id @default(uuid()) @db.Uuid
+  notificationId String    @map("notification_id") @db.Uuid
+  channel        String    @db.VarChar(20)         // 'email' (and 'push' later)
+  recipient      String    @db.VarChar(255)
+  status         String    @default("queued") @db.VarChar(20)
+  attempts       Int       @default(0)
+  lastError      String?   @map("last_error")
+  nextAttemptAt  DateTime  @default(now()) @map("next_attempt_at") @db.Timestamptz()
+  sentAt         DateTime? @map("sent_at") @db.Timestamptz()
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  // Worker drain index. Prefix order matches the WHERE clause.
+  @@index([status, nextAttemptAt])
+  @@index([notificationId])
+  @@map("notification_deliveries")
 }
 
 // ─── Notification Preferences ──────────────────────────────
