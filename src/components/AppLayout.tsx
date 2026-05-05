@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useAuthStore, useLogout } from '@/hooks/useAuth';
+import { useNotificationStream } from '@/hooks/useNotificationStream';
 import { cn } from '@/lib/utils';
 
 function UserAvatar({ user }: { user: any }) {
@@ -36,6 +37,10 @@ export function AppLayout() {
   const user = useAuthStore((s) => s.user);
   const logout = useLogout();
   const navigate = useNavigate();
+  // Phase 7: open the SSE stream once per authenticated session.
+  // Falls back transparently to the existing 30s polling if EventSource
+  // can't connect (e.g. proxy issues, expired token).
+  useNotificationStream();
 
   return (
     <SidebarProvider>

@@ -23,6 +23,7 @@ import manifestQueryRoutes from './routes/manifestQuery.js';
 import abiDocumentsRoutes from './routes/abiDocuments.js';
 import dutyCalculationRoutes from './routes/dutyCalculation.js';
 import { startBackgroundJobs, stopBackgroundJobs, getJobStatus, pollSubmittedFilings, checkDeadlines } from './services/backgroundJobs.js';
+import { startNotificationStream, stopNotificationStream } from './services/notificationStream.js';
 import { verifyEmailConnection } from './services/email.js';
 
 const app = express();
@@ -154,6 +155,10 @@ async function main() {
     // Start background jobs after server is listening
     startBackgroundJobs();
 
+    // Phase 7: open the Postgres LISTEN socket for real-time notification
+    // streaming. Failures are non-fatal — clients fall back to 30s polling.
+    startNotificationStream().catch(() => {});
+
     // Verify email connection (non-blocking)
     verifyEmailConnection();
 
@@ -161,6 +166,7 @@ async function main() {
     const shutdown = async (signal: string) => {
       console.log(`\n[Server] ${signal} received — shutting down gracefully...`);
       stopBackgroundJobs();
+      await stopNotificationStream().catch(() => {});
       server.close(() => {
         prisma.$disconnect().then(() => {
           console.log('[Server] Disconnected from database. Goodbye.');
