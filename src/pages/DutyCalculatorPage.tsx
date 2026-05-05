@@ -64,6 +64,9 @@ import type {
   DutyCalcResponse,
   DutyCalcSubheading,
 } from '@/api/client';
+import { filingToDutyCalc, type SourceProvenance } from '@/lib/duty-calc-prefill';
+import { SourcePicker } from '@/components/duty-calc/SourcePicker';
+import type { Filing } from '@/types/shipment';
 
 // ─── Mode + form types ─────────────────────────────────────
 type Mode = 'standard' | 'ai';
@@ -805,6 +808,35 @@ export default function DutyCalculatorPage() {
 
   const [items, setItems] = useState<ItemDraft[]>([emptyItem()]);
 
+  // Pre-fill provenance (Phase 1 of the chained-data feature). When set,
+  // a banner above the form shows the source filing and lets the user
+  // clear back to defaults. Edits to any field after pre-fill stick;
+  // we don't try to "lock" anything.
+  const [source, setSource] = useState<SourceProvenance | null>(null);
+
+  function applyFilingPrefill(filing: Filing) {
+    const { prefill, provenance } = filingToDutyCalc(filing);
+    if (prefill.countryOfOrigin) setCountryOfOrigin(prefill.countryOfOrigin);
+    if (prefill.modeOfTransportation) setModeOfTransportation(prefill.modeOfTransportation);
+    if (prefill.currency) setCurrency(prefill.currency);
+    if (prefill.items && prefill.items.length > 0) {
+      setItems(prefill.items.map(p => ({ ...p })));
+    }
+    setSource(provenance);
+    // Clear any prior result so the user explicitly clicks Calculate
+    // after reviewing the new inputs (compliance-trust principle).
+    setResultMode(null);
+    standardCalc.reset();
+    aiCalc.reset();
+    toast.success('Pre-filled', {
+      description: `Source: ${provenance.label}. Review and edit any field before calculating.`,
+    });
+  }
+
+  function clearPrefill() {
+    setSource(null);
+  }
+
   const standardCalc = useDutyCalculate();
   const aiCalc = useAIDutyCalculate();
   const isPending = standardCalc.isPending || aiCalc.isPending;
@@ -975,6 +1007,14 @@ export default function DutyCalculatorPage() {
           className="space-y-4 animate-fade-in-up motion-reduce:animate-none"
           style={{ animationDelay: '40ms', animationFillMode: 'forwards' }}
         >
+          {/* Source picker — pre-fill from an existing ISF filing.
+              Optional shortcut; the form below works fine without it. */}
+          <SourcePicker
+            source={source}
+            onPickFiling={applyFilingPrefill}
+            onClear={clearPrefill}
+          />
+
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Shipment metadata</CardTitle>
