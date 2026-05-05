@@ -1,10 +1,71 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { inAppOptedOutKinds } from '../services/notifications.js';
+import { registerStreamClient } from '../services/notificationStream.js';
+import { env } from '../config/env.js';
 
 const router = Router();
+
+// ─── GET /api/v1/notifications/stream (SSE) ────────────────
+// Real-time push channel for the bell. EventSource can't send custom
+// headers, so the access token is taken from the ?token= query param.
+// Token TTL is short (15m today) so the URL appearing in access logs
+// has limited blast radius; HTTPS is enforced in prod.
+//
+// We deliberately do NOT use the global authMiddleware for this route
+// (it requires the Authorization header). The check is inlined below.
+//
+// IMPORTANT: this handler must be registered BEFORE `router.use(authMiddleware)`
+// or the middleware will reject the request before we can read the query.
+router.get('/stream', async (req: Request, res: Response): Promise<void> => {
+  const token = (req.query.token as string | undefined)?.trim();
+  if (!token) {
+    res.status(401).json({ error: 'Missing stream token' });
+    return;
+  }
+
+  let userId: string;
+  try {
+    const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as { sub: string };
+    userId = decoded.sub;
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired stream token' });
+    return;
+  }
+
+  // SSE headers. The "X-Accel-Buffering: no" hint is for nginx — without
+  // it, nginx buffers the response and events arrive in batches.
+  res.set({
+    'Content-Type':      'text/event-stream',
+    'Cache-Control':     'no-cache, no-transform',
+    'Connection':        'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders();
+
+  // Open the stream with a comment so the client knows we're connected.
+  res.write(`: connected\n\n`);
+
+  // Heartbeat every 25s to keep idle proxies from closing the connection.
+  // SSE comments (lines starting with ":") are ignored by EventSource.
+  const heartbeat = setInterval(() => {
+    try { res.write(`: heartbeat\n\n`); } catch { /* connection gone */ }
+  }, 25_000);
+
+  const unregister = registerStreamClient(userId, res);
+
+  const close = () => {
+    clearInterval(heartbeat);
+    unregister();
+    try { res.end(); } catch { /* already ended */ }
+  };
+  req.on('close', close);
+  req.on('error', close);
+});
+
 router.use(authMiddleware);
 
 // ─── Notification kinds known to the UI (drives the Settings matrix) ─

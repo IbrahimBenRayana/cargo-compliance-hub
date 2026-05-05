@@ -30,6 +30,7 @@
 import { Prisma, type NotificationSeverity } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import logger from '../config/logger.js';
+import { publishNotificationEvents } from './notificationStream.js';
 // Email delivery moved to the queue worker (Phase 6) — no direct
 // send* imports here anymore.
 
@@ -191,6 +192,13 @@ export async function notify(event: NotifyEvent): Promise<void> {
     // Phase 6: enqueue email deliveries. Skip users with email opt-out.
     if (created.length > 0) {
       await enqueueEmailDeliveries(created, event.kind);
+
+      // Phase 7: pg_notify so connected SSE clients refetch immediately.
+      // Tiny payload — clients use it as a "refetch the bell" signal,
+      // not as the full Notification body.
+      publishNotificationEvents(
+        created.map(c => ({ userId: c.userId, kind: event.kind, severity })),
+      ).catch(() => { /* non-fatal — clients will still poll */ });
     }
   } catch (err) {
     logger.error({ err, kind: event.kind }, '[Notifications] Dispatcher failed');
