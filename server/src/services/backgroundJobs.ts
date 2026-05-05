@@ -24,6 +24,7 @@ import {
   notifyDeadlineApproaching,
   notifyOrgUsers,
 } from './notifications.js';
+import { drainEmailDeliveries } from './notificationDeliveryWorker.js';
 
 // ─── Job State ─────────────────────────────────────────────
 
@@ -361,6 +362,7 @@ async function checkStaleFilings(): Promise<void> {
 let statusPollTask: ScheduledTask | null = null;
 let deadlineTask: ScheduledTask | null = null;
 let staleCheckTask: ScheduledTask | null = null;
+let deliveryDrainTask: ScheduledTask | null = null;
 
 export function startBackgroundJobs(): void {
   logger.info('[Jobs] Starting background job scheduler');
@@ -380,6 +382,14 @@ export function startBackgroundJobs(): void {
   });
   logger.info('[Jobs] Stale filing check scheduled — every 6 hours');
 
+  // Phase 6: drain the email delivery queue every 30s. The worker is
+  // re-entrant (skips if a previous tick is still running) so this
+  // cadence is safe even if a single batch takes longer than 30s.
+  deliveryDrainTask = cron.schedule('*/30 * * * * *', () => {
+    drainEmailDeliveries().catch(err => logger.error({ err }, '[Jobs:Delivery] Unhandled'));
+  });
+  logger.info('[Jobs] Email delivery drain scheduled — every 30 seconds');
+
   setTimeout(() => {
     checkDeadlines().catch(err => logger.error({ err }, '[Jobs:Deadlines] Initial check error'));
   }, 5000);
@@ -392,6 +402,7 @@ export function stopBackgroundJobs(): void {
   statusPollTask?.stop();
   deadlineTask?.stop();
   staleCheckTask?.stop();
+  deliveryDrainTask?.stop();
   statusPollTask = null;
   deadlineTask = null;
   staleCheckTask = null;

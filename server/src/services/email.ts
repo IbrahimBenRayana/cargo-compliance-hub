@@ -375,3 +375,172 @@ export async function sendTestEmail(to: string): Promise<boolean> {
     html: wrapTemplate(body),
   });
 }
+
+// ─── Phase 6: Generic notification renderer ──────────────────────────
+// Used by the delivery worker to render any notification into a sendable
+// email. Delegates to the existing specialized templates for the four
+// well-known kinds (filing submitted/accepted/rejected/deadline_warning)
+// and falls back to a single generic template for everything else.
+//
+// The worker calls renderNotificationEmail(...) → sendMail(...) per
+// delivery row. Both are exported.
+
+export { sendMail };
+
+interface RenderableNotification {
+  type: string;
+  title: string;
+  message: string | null;
+  linkUrl: string | null;
+  severity: 'info' | 'warning' | 'critical';
+  metadata: Record<string, unknown> | null;
+}
+
+interface RenderedEmail {
+  subject: string;
+  html: string;
+}
+
+const SEVERITY_PREFIX: Record<RenderableNotification['severity'], string> = {
+  info:     '',
+  warning:  '⚠ ',
+  critical: '🔴 ',
+};
+
+const SEVERITY_BANNER_BG: Record<RenderableNotification['severity'], string> = {
+  info:     '#eff6ff',
+  warning:  '#fffbeb',
+  critical: '#fef2f2',
+};
+
+const SEVERITY_BANNER_BORDER: Record<RenderableNotification['severity'], string> = {
+  info:     '#2563eb',
+  warning:  '#d97706',
+  critical: '#dc2626',
+};
+
+/** Pull a string field out of metadata safely. Falsy → undefined. */
+function meta(n: RenderableNotification, key: string): string | undefined {
+  const v = n.metadata?.[key];
+  return typeof v === 'string' ? v : undefined;
+}
+
+function metaNum(n: RenderableNotification, key: string): number | undefined {
+  const v = n.metadata?.[key];
+  return typeof v === 'number' ? v : undefined;
+}
+
+/**
+ * Generic template — used for any kind without a bespoke renderer.
+ * Looks like the specialized ones (same wrapTemplate + buttonHtml) but
+ * driven entirely by Notification fields.
+ */
+function renderGeneric(n: RenderableNotification): RenderedEmail {
+  const subject = `${SEVERITY_PREFIX[n.severity]}${n.title}`;
+  const dashboardUrl = n.linkUrl ? `${env.FRONTEND_URL}${n.linkUrl}` : env.FRONTEND_URL;
+
+  const banner = n.severity !== 'info' ? `
+    <div style="margin:0 0 16px; padding:12px 16px; background:${SEVERITY_BANNER_BG[n.severity]}; border-left:4px solid ${SEVERITY_BANNER_BORDER[n.severity]}; border-radius:4px;">
+      <p style="margin:0; font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:${SEVERITY_BANNER_BORDER[n.severity]};">
+        ${n.severity}
+      </p>
+    </div>` : '';
+
+  const body = `
+    ${banner}
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">${n.title}</h2>
+    ${n.message ? `<p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">${n.message}</p>` : ''}
+    ${n.linkUrl ? buttonHtml('Open in MyCargoLens', dashboardUrl) : ''}
+  `;
+  return { subject, html: wrapTemplate(body) };
+}
+
+/** Dispatcher — maps known kinds to their bespoke renderers; falls back to generic. */
+export function renderNotificationEmail(n: RenderableNotification): RenderedEmail {
+  switch (n.type) {
+    case 'filing_submitted':
+      return renderFilingSubmitted(n);
+    case 'filing_accepted':
+      return renderFilingAccepted(n);
+    case 'filing_rejected':
+      return renderFilingRejected(n);
+    case 'deadline_warning':
+      return renderDeadlineWarning(n);
+    default:
+      return renderGeneric(n);
+  }
+}
+
+// Bespoke renderers — same HTML as the existing send* functions but pure
+// (no sendMail call), so the worker can use them as part of a render →
+// send pipeline. The existing send* functions still live above for any
+// caller that wants to send synchronously; new callers should go through
+// the queue.
+
+function renderFilingSubmitted(n: RenderableNotification): RenderedEmail {
+  const bol = meta(n, 'bolNumber') ?? 'unknown';
+  const dashboardUrl = n.linkUrl ? `${env.FRONTEND_URL}${n.linkUrl}` : env.FRONTEND_URL;
+  const body = `
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing Submitted 🚀</h2>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      Your ISF filing <strong>${bol}</strong> has been submitted to U.S. Customs and Border Protection. We'll let you know as soon as we hear back.
+    </p>
+    ${buttonHtml('View Filing', dashboardUrl)}
+  `;
+  return { subject: `🚀 ISF Filing Submitted — ${bol}`, html: wrapTemplate(body) };
+}
+
+function renderFilingAccepted(n: RenderableNotification): RenderedEmail {
+  const bol = meta(n, 'bolNumber') ?? 'unknown';
+  const cbpTxn = meta(n, 'cbpTransactionId');
+  const dashboardUrl = n.linkUrl ? `${env.FRONTEND_URL}${n.linkUrl}` : env.FRONTEND_URL;
+  const body = `
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing Accepted ✅</h2>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      Your ISF filing <strong>${bol}</strong> has been <strong style="color:#16a34a;">accepted</strong> by U.S. Customs and Border Protection.
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px; font-size:14px; color:#475569;">
+      <tr><td style="padding:4px 16px 4px 0; font-weight:600;">BOL Number</td><td>${bol}</td></tr>
+      ${cbpTxn ? `<tr><td style="padding:4px 16px 4px 0; font-weight:600;">CBP Transaction ID</td><td>${cbpTxn}</td></tr>` : ''}
+    </table>
+    ${buttonHtml('View Filing Details', dashboardUrl)}
+  `;
+  return { subject: `✅ ISF Filing Accepted — ${bol}`, html: wrapTemplate(body) };
+}
+
+function renderFilingRejected(n: RenderableNotification): RenderedEmail {
+  const bol = meta(n, 'bolNumber') ?? 'unknown';
+  const reason = meta(n, 'reason');
+  const dashboardUrl = n.linkUrl ? `${env.FRONTEND_URL}${n.linkUrl}` : env.FRONTEND_URL;
+  const body = `
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing Rejected ❌</h2>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      Your ISF filing <strong>${bol}</strong> has been <strong style="color:#dc2626;">rejected</strong> by U.S. Customs and Border Protection.
+    </p>
+    ${reason ? `
+    <div style="margin:0 0 16px; padding:12px 16px; background:#fef2f2; border-left:4px solid #dc2626; border-radius:4px;">
+      <p style="margin:0; font-size:14px; color:#991b1b;"><strong>Reason:</strong> ${reason}</p>
+    </div>` : ''}
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      Please review the filing and submit an amendment or corrected filing.
+    </p>
+    ${buttonHtml('Review Filing', dashboardUrl)}
+  `;
+  return { subject: `❌ ISF Filing Rejected — ${bol}`, html: wrapTemplate(body) };
+}
+
+function renderDeadlineWarning(n: RenderableNotification): RenderedEmail {
+  const bol = meta(n, 'bolNumber') ?? 'unknown';
+  const hours = metaNum(n, 'hoursRemaining') ?? 0;
+  const dashboardUrl = n.linkUrl ? `${env.FRONTEND_URL}${n.linkUrl}` : env.FRONTEND_URL;
+  const urgency = hours <= 24 ? '🚨 URGENT' : hours <= 48 ? '⏰ Soon' : '📅 Reminder';
+  const body = `
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">${urgency}: Filing Deadline in ${hours}h</h2>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      Your ISF filing <strong>${bol}</strong> deadline is in <strong>${hours} hours</strong>.
+      Submit soon to avoid CBP penalties ($5,000–$10,000).
+    </p>
+    ${buttonHtml('Open Filing', dashboardUrl)}
+  `;
+  return { subject: `${urgency}: ISF Deadline in ${hours}h — ${bol}`, html: wrapTemplate(body) };
+}

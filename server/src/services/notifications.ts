@@ -30,12 +30,8 @@
 import { Prisma, type NotificationSeverity } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import logger from '../config/logger.js';
-import {
-  sendFilingAcceptedEmail,
-  sendFilingRejectedEmail,
-  sendDeadlineWarningEmail,
-  sendFilingSubmittedEmail,
-} from './email.js';
+// Email delivery moved to the queue worker (Phase 6) — no direct
+// send* imports here anymore.
 
 // ─── Defaults per notification kind ───────────────────────────────────
 
@@ -164,17 +160,18 @@ export async function notify(event: NotifyEvent): Promise<void> {
     const audienceUserIds = await resolveAudience(event.audience);
     if (audienceUserIds.length === 0) return;
 
-    // Apply user preferences (Phase 5). Missing rows = opt-in.
-    const userIds = await filterByInAppPreference(audienceUserIds, event.kind);
-    if (userIds.length === 0) return;
-
     const severity = event.severity ?? severityFor(event.kind);
     const metadata = event.metadata ?? Prisma.JsonNull;
 
-    // First user gets the dedupeKey (unique constraint); rest get null
-    // so the createMany doesn't conflict.
-    await prisma.notification.createMany({
-      data: userIds.map((userId, i) => ({
+    // Phase 6: always create Notification rows for the full audience.
+    // The bell GET endpoint filters by the user's in-app preference
+    // at read time, so opted-out users still have a row (which the
+    // email delivery row can FK to) but never see it.
+    //
+    // createManyAndReturn gives us back the inserted ids so we can
+    // chain delivery rows onto them in a single round-trip.
+    const created = await prisma.notification.createManyAndReturn({
+      data: audienceUserIds.map((userId, i) => ({
         userId,
         orgId:         event.audience.orgId,
         filingId:      event.filingId ?? null,
@@ -188,52 +185,69 @@ export async function notify(event: NotifyEvent): Promise<void> {
         dedupeKey:     i === 0 ? (event.dedupeKey ?? null) : null,
       })),
       skipDuplicates: true,
+      select: { id: true, userId: true },
     });
+
+    // Phase 6: enqueue email deliveries. Skip users with email opt-out.
+    if (created.length > 0) {
+      await enqueueEmailDeliveries(created, event.kind);
+    }
   } catch (err) {
     logger.error({ err, kind: event.kind }, '[Notifications] Dispatcher failed');
   }
 }
 
-// ─── Preference filtering ────────────────────────────────────────────
-// Drop user IDs that have opted OUT of this kind on the in-app channel.
-// Default behavior: missing row = opted IN. We only fetch the explicit
-// rows where inApp = false and subtract from the set.
+// ─── Email delivery enqueue (Phase 6) ────────────────────────────────
+// One DB round-trip resolves email addresses + opt-outs. We then write
+// one NotificationDelivery row per (notification, recipient) pair the
+// worker should attempt.
 
-async function filterByInAppPreference(userIds: string[], kind: string): Promise<string[]> {
+async function enqueueEmailDeliveries(
+  notifications: Array<{ id: string; userId: string }>,
+  kind: string,
+): Promise<void> {
+  const userIds = notifications.map(n => n.userId);
+
+  // Pull email addresses for the audience.
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds }, isActive: true },
+    select: { id: true, email: true },
+  });
+  if (users.length === 0) return;
+
+  // Pull opt-outs in one shot (default = opted in, so we only fetch the
+  // explicit `false` rows).
   const optedOut = await prisma.notificationPreference.findMany({
-    where: { kind, inApp: false, userId: { in: userIds } },
+    where: { kind, email: false, userId: { in: userIds } },
     select: { userId: true },
   });
-  if (optedOut.length === 0) return userIds;
   const optedOutSet = new Set(optedOut.map(p => p.userId));
-  return userIds.filter(id => !optedOutSet.has(id));
+
+  // Build (notificationId, recipientEmail) pairs, skipping opt-outs.
+  const emailById = new Map(users.map(u => [u.id, u.email]));
+  const deliveries: Array<{ notificationId: string; channel: string; recipient: string }> = [];
+  for (const n of notifications) {
+    if (optedOutSet.has(n.userId)) continue;
+    const recipient = emailById.get(n.userId);
+    if (!recipient) continue;
+    deliveries.push({ notificationId: n.id, channel: 'email', recipient });
+  }
+
+  if (deliveries.length === 0) return;
+  await prisma.notificationDelivery.createMany({ data: deliveries });
 }
 
 /**
- * Returns the email addresses of users in `orgId` who:
- *   - have one of the given roles, AND
- *   - are active, AND
- *   - have NOT opted out of email for this kind.
- * Used by the email-side of trigger functions (filing accepted/rejected,
- * deadline warning, etc.) so prefs apply to email delivery too.
+ * Read-time helper for the bell GET endpoint: returns the kinds the
+ * user has explicitly opted out of (in-app channel). Caller uses this
+ * as a `notIn` filter so opted-out kinds disappear from the feed.
  */
-export async function emailRecipientsFor(args: {
-  orgId: string;
-  roles: Role[];
-  kind: string;
-}): Promise<string[]> {
-  const users = await prisma.user.findMany({
-    where: { orgId: args.orgId, isActive: true, role: { in: args.roles } },
-    select: { id: true, email: true },
+export async function inAppOptedOutKinds(userId: string): Promise<string[]> {
+  const rows = await prisma.notificationPreference.findMany({
+    where: { userId, inApp: false },
+    select: { kind: true },
   });
-  if (users.length === 0) return [];
-
-  const optedOut = await prisma.notificationPreference.findMany({
-    where: { kind: args.kind, email: false, userId: { in: users.map(u => u.id) } },
-    select: { userId: true },
-  });
-  const optedOutSet = new Set(optedOut.map(p => p.userId));
-  return users.filter(u => !optedOutSet.has(u.id)).map(u => u.email);
+  return rows.map(r => r.kind);
 }
 
 // ─── Backwards-compat wrappers (kept so existing call sites compile) ─
@@ -305,68 +319,50 @@ const filingLink = (filingId: string) => `/shipments/${filingId}`;
 
 export async function notifyFilingSubmitted(orgId: string, userId: string, filingId: string, bolNumber: string): Promise<void> {
   const ref = bolNumber || filingId.slice(0, 8);
+  // Pull the submitter's name into metadata so the worker can render the
+  // "Submitted by …" line in the email without re-fetching at send time.
+  let submitterName: string | undefined;
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, firstName: true, lastName: true },
+    });
+    if (user) submitterName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email;
+  } catch {}
+
   await notify({
     kind:     'filing_submitted',
     audience: { orgId, userIds: [userId] },
     title:    'Filing Submitted',
     message:  `ISF filing ${ref} has been submitted to CBP.`,
     linkUrl:  filingLink(filingId),
-    metadata: { bolNumber: ref },
+    metadata: { bolNumber: ref, submitterName },
     filingId,
   });
-
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, firstName: true, lastName: true },
-    });
-    if (!user) return;
-    // Single-user email also respects the user's email preference for this kind.
-    const optedOut = await prisma.notificationPreference.findFirst({
-      where: { userId, kind: 'filing_submitted', email: false },
-      select: { userId: true },
-    });
-    if (optedOut) return;
-    sendFilingSubmittedEmail({
-      to: user.email,
-      bolNumber: ref,
-      filingId,
-      submitterName: `${user.firstName} ${user.lastName}`.trim() || user.email,
-    }).catch(() => {});
-  } catch {}
 }
 
 export async function notifyFilingAccepted(orgId: string, filingId: string, bolNumber: string): Promise<void> {
   const ref = bolNumber || filingId.slice(0, 8);
+  // Pull cbpTransactionId into metadata so the email renderer can show
+  // it without a second DB lookup at send time.
+  let cbpTransactionId: string | undefined;
+  try {
+    const filing = await prisma.filing.findUnique({
+      where: { id: filingId },
+      select: { cbpTransactionId: true },
+    });
+    cbpTransactionId = filing?.cbpTransactionId ?? undefined;
+  } catch {}
+
   await notify({
     kind:     'filing_accepted',
     audience: { orgId, roles: ['OPERATOR', 'ADMIN', 'OWNER'] },
     title:    'Filing Accepted',
     message:  `ISF filing ${ref} has been accepted by CBP.`,
     linkUrl:  filingLink(filingId),
-    metadata: { bolNumber: ref },
+    metadata: { bolNumber: ref, cbpTransactionId },
     filingId,
   });
-
-  try {
-    const recipients = await emailRecipientsFor({
-      orgId,
-      roles: ['operator', 'admin', 'owner'],
-      kind: 'filing_accepted',
-    });
-    const filing = await prisma.filing.findUnique({
-      where: { id: filingId },
-      select: { cbpTransactionId: true },
-    });
-    if (recipients.length > 0) {
-      sendFilingAcceptedEmail({
-        to: recipients,
-        bolNumber: ref,
-        filingId,
-        cbpTransactionId: filing?.cbpTransactionId ?? undefined,
-      }).catch(() => {});
-    }
-  } catch {}
 }
 
 export async function notifyFilingRejected(orgId: string, filingId: string, bolNumber: string, reason?: string): Promise<void> {
@@ -380,22 +376,6 @@ export async function notifyFilingRejected(orgId: string, filingId: string, bolN
     metadata: { bolNumber: ref, reason: reason ?? null },
     filingId,
   });
-
-  try {
-    const recipients = await emailRecipientsFor({
-      orgId,
-      roles: ['operator', 'admin', 'owner'],
-      kind: 'filing_rejected',
-    });
-    if (recipients.length > 0) {
-      sendFilingRejectedEmail({
-        to: recipients,
-        bolNumber: ref,
-        filingId,
-        reason,
-      }).catch(() => {});
-    }
-  } catch {}
 }
 
 export async function notifyFilingAmended(orgId: string, userId: string, filingId: string, bolNumber: string): Promise<void> {
@@ -440,22 +420,6 @@ export async function notifyDeadlineApproaching(orgId: string, filingId: string,
     filingId,
     dedupeKey: `${filingId}_deadline_${hoursRemaining}h`,
   });
-
-  try {
-    const recipients = await emailRecipientsFor({
-      orgId,
-      roles: ['operator', 'admin', 'owner'],
-      kind: 'deadline_warning',
-    });
-    if (recipients.length > 0) {
-      sendDeadlineWarningEmail({
-        to: recipients,
-        bolNumber: ref,
-        filingId,
-        hoursRemaining,
-      }).catch(() => {});
-    }
-  } catch {}
 }
 
 export async function notifyApiError(orgId: string, userId: string, message: string): Promise<void> {
