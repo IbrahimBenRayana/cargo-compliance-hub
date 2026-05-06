@@ -30,7 +30,7 @@ import {
   FileEdit, Ban, Shield, AlertTriangle, Ship, Package, Globe, Anchor,
   Container, Users, FileText, Clock, ChevronRight, Zap, Activity,
   RefreshCw, Radio, Inbox, ArrowDownToLine, Copy, Bookmark, MoreHorizontal,
-  Upload, Trash2, Paperclip, Search, FileCheck,
+  Upload, Trash2, Paperclip, Search, FileCheck, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -789,6 +789,10 @@ export default function ShipmentDetails() {
               <DropdownMenuItem onClick={handleDuplicate} disabled={duplicateFiling.isPending}>
                 <Copy className="h-4 w-4 mr-2" />
                 {duplicateFiling.isPending ? 'Duplicating...' : 'Duplicate as New Draft'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate(`/shipments/new?fromFiling=${filing.id}`)}>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Use as starting point
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => { setTemplateName(filing.importerName ? `${filing.importerName} — ${filing.filingType}` : `Template — ${filing.filingType}`); setTemplateDialogOpen(true); }}>
                 <Bookmark className="h-4 w-4 mr-2" />
