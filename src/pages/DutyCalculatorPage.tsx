@@ -219,6 +219,7 @@ function ItemCard({
   onRemove,
   canRemove,
   provenanceFor,
+  errors,
 }: {
   index: number;
   mode: Mode;
@@ -228,6 +229,8 @@ function ItemCard({
   canRemove: boolean;
   /** Returns the source object (or null) for `item.${index}.${key}`. */
   provenanceFor?: (key: string) => SourceProvenance | null;
+  /** Per-field error map keyed by ItemDraft field name (e.g., 'hts', 'totalValue'). */
+  errors?: Partial<Record<keyof ItemDraft, string>>;
 }) {
   return (
     <div className="rounded-lg border bg-muted/10 p-4 space-y-4">
@@ -272,6 +275,7 @@ function ItemCard({
             placeholder="7320.20.1000 or 7320201000"
             hint="10-digit HTS code. Dots are optional."
             labelExtra={<ProvenanceChip source={provenanceFor?.('hts') ?? null} />}
+            error={errors?.hts}
           />
         )}
         <TextField
@@ -291,6 +295,7 @@ function ItemCard({
               : undefined
           }
           labelExtra={<ProvenanceChip source={provenanceFor?.('description') ?? null} />}
+          error={errors?.description}
         />
         <TextField
           label="Total Value"
@@ -299,7 +304,9 @@ function ItemCard({
           value={item.totalValue}
           onChange={(v) => onChange({ totalValue: v })}
           placeholder="0.00"
+          hint="Customs value of the merchandise in the currency selected above."
           labelExtra={<ProvenanceChip source={provenanceFor?.('totalValue') ?? null} />}
+          error={errors?.totalValue}
         />
         <TextField
           label="SPI Code"
@@ -308,21 +315,34 @@ function ItemCard({
           placeholder="MX, JP, KR…"
           maxLength={4}
           hint="Special Programs Indicator (e.g. MX for USMCA). Optional."
+          error={errors?.spi}
         />
         <TextField
-          label="Quantity 1"
+          label="Quantity 1 (HTS primary unit)"
           type="number"
           value={item.quantity1}
           onChange={(v) => onChange({ quantity1: v })}
-          placeholder="0"
+          placeholder="e.g. 1500"
+          hint={
+            'Reportable quantity in the HTS primary unit of measure. ' +
+            'The unit (kilograms, meters, pieces, dozens, etc.) is set by the HTS line itself — ' +
+            'check the HTS chapter for the required UOM. Leave blank if unknown; CC will use 0.'
+          }
           labelExtra={<ProvenanceChip source={provenanceFor?.('quantity1') ?? null} />}
+          error={errors?.quantity1}
         />
         <TextField
-          label="Quantity 2"
+          label="Quantity 2 (HTS secondary unit, if any)"
           type="number"
           value={item.quantity2}
           onChange={(v) => onChange({ quantity2: v })}
-          placeholder="0"
+          placeholder="e.g. 12"
+          hint={
+            'Some HTS lines require a SECOND reportable unit alongside Q1 (e.g. kg + pieces). ' +
+            'Most HTS codes do not — leave blank when not applicable. ' +
+            'If your HTS line shows two unit columns, the second one goes here.'
+          }
+          error={errors?.quantity2}
         />
       </div>
 
@@ -910,8 +930,11 @@ export default function DutyCalculatorPage() {
     setItems((prev) =>
       prev.map((it, i) => (i === index ? { ...it, ...patch } : it)),
     );
-    // Drop the chip on every key the user just touched.
-    for (const k of Object.keys(patch)) markFieldEdited(`item.${index}.${k}`);
+    // Drop the chip + clear any server error on every key the user just touched.
+    for (const k of Object.keys(patch)) {
+      markFieldEdited(`item.${index}.${k}`);
+      clearServerError(`item.${index}.${k}`);
+    }
   };
 
   const addItem = () => {
@@ -929,25 +952,49 @@ export default function DutyCalculatorPage() {
   };
 
   // ─── Validation & submit ──────────────────────────────────
-  const formError = useMemo(() => {
-    if (!countryOfOrigin) return 'Country of origin is required';
-    if (!modeOfTransportation) return 'Mode of transportation is required';
-    if (!entryType) return 'Entry type is required';
-    if (!currency) return 'Currency is required';
-    if (!estimatedEntryDateYYYYMMDD || estimatedEntryDateYYYYMMDD.length !== 8)
-      return 'Estimated entry date is required';
-    if (!items.length) return 'At least one item is required';
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
-      if (!it.description.trim())
-        return `Item ${i + 1}: description is required`;
-      if (mode === 'standard' && !it.hts.trim())
-        return `Item ${i + 1}: HTS is required in Standard mode`;
-      const v = Number(it.totalValue);
-      if (!Number.isFinite(v) || v <= 0)
-        return `Item ${i + 1}: total value must be greater than 0`;
+  // Per-field error map. Top-level keys: 'countryOfOrigin', 'modeOfTransportation',
+  // 'entryType', 'currency', 'entryDate'. Item keys: `item.${index}.${fieldName}`.
+  // Returns ALL errors (not just the first), so the form can highlight every
+  // problem at once rather than making the user fix-then-resubmit-then-fix.
+  const validationErrors = useMemo<Record<string, string>>(() => {
+    const errs: Record<string, string> = {};
+    if (!countryOfOrigin) errs.countryOfOrigin = 'Country of origin is required';
+    if (!modeOfTransportation) errs.modeOfTransportation = 'Mode of transportation is required';
+    if (!entryType) errs.entryType = 'Entry type is required';
+    if (!currency) errs.currency = 'Currency is required';
+    if (!estimatedEntryDateYYYYMMDD || estimatedEntryDateYYYYMMDD.length !== 8) {
+      errs.entryDate = 'Estimated entry date is required';
     }
-    return null;
+    if (!items.length) {
+      errs['items'] = 'At least one item is required';
+    } else {
+      items.forEach((it, i) => {
+        if (!it.description.trim()) errs[`item.${i}.description`] = 'Description is required';
+        if (mode === 'standard' && !it.hts.trim()) {
+          errs[`item.${i}.hts`] = 'HTS code is required in Standard mode';
+        } else if (mode === 'standard' && it.hts.trim()) {
+          // HTS_FORMAT regex: 6-10 digits, optional dots between groups.
+          const stripped = it.hts.replace(/\./g, '');
+          if (!/^\d{6,10}$/.test(stripped)) {
+            errs[`item.${i}.hts`] = 'HTS must be 6–10 digits (dots optional)';
+          }
+        }
+        const v = Number(it.totalValue);
+        if (it.totalValue === '' || !Number.isFinite(v)) {
+          errs[`item.${i}.totalValue`] = 'Total value is required';
+        } else if (v <= 0) {
+          errs[`item.${i}.totalValue`] = 'Total value must be greater than 0';
+        }
+        // Quantity sanity: if filled, must be a non-negative number.
+        if (it.quantity1 !== '' && (!Number.isFinite(Number(it.quantity1)) || Number(it.quantity1) < 0)) {
+          errs[`item.${i}.quantity1`] = 'Must be a non-negative number';
+        }
+        if (it.quantity2 !== '' && (!Number.isFinite(Number(it.quantity2)) || Number(it.quantity2) < 0)) {
+          errs[`item.${i}.quantity2`] = 'Must be a non-negative number';
+        }
+      });
+    }
+    return errs;
   }, [
     countryOfOrigin,
     modeOfTransportation,
@@ -958,12 +1005,52 @@ export default function DutyCalculatorPage() {
     mode,
   ]);
 
+  // Server-side errors merged in after a 400 response. Cleared per-field
+  // when the user touches that field, or wholesale on resubmit.
+  const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
+
+  function clearServerError(key: string) {
+    if (!(key in serverErrors)) return;
+    setServerErrors(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
+
+  /** Build the per-item error subset that ItemCard expects (keyed by ItemDraft field). */
+  function itemErrorsAt(index: number): Partial<Record<keyof ItemDraft, string>> {
+    const out: Partial<Record<keyof ItemDraft, string>> = {};
+    const prefix = `item.${index}.`;
+    for (const [k, v] of Object.entries(allErrors)) {
+      if (k.startsWith(prefix)) {
+        const field = k.slice(prefix.length) as keyof ItemDraft;
+        out[field] = v;
+      }
+    }
+    return out;
+  }
+
+  // Effective error map = client-side + server-side (latter wins). The
+  // server only tells us about the issues the client missed, so any
+  // overlap is the same field anyway.
+  const allErrors = useMemo<Record<string, string>>(() => ({ ...validationErrors, ...serverErrors }),
+    [validationErrors, serverErrors]);
+
+  const errorCount = Object.keys(allErrors).length;
+  const hasErrors = errorCount > 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formError) {
-      toast.error(formError);
+    if (hasErrors) {
+      const first = Object.values(allErrors)[0];
+      toast.error(`${errorCount} ${errorCount === 1 ? 'field needs' : 'fields need'} attention`, {
+        description: first,
+      });
       return;
     }
+    // Clear any stale server errors from a previous submit.
+    setServerErrors({});
 
     const payloadItems: DutyCalcItem[] = items.map((it) => {
       const base: DutyCalcItem = {
@@ -1009,11 +1096,65 @@ export default function DutyCalculatorPage() {
       }
       toast.success('Duty calculation complete');
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : 'Duty calculation failed';
+      const msg = err instanceof Error ? err.message : 'Duty calculation failed';
+      const body = (err as any)?.body as { issues?: Array<{ path: (string | number)[]; message: string }> } | undefined;
+
+      // 400 from server with Zod issues — map each path to a form field
+      // key and surface inline. Every issue gets a pin on a specific field.
+      if (body?.issues && Array.isArray(body.issues) && body.issues.length > 0) {
+        const next: Record<string, string> = {};
+        for (const issue of body.issues) {
+          const key = pathToKey(issue.path);
+          if (key && !next[key]) next[key] = issue.message;
+        }
+        setServerErrors(next);
+        const count = Object.keys(next).length;
+        toast.error(`Server rejected ${count} ${count === 1 ? 'field' : 'fields'}`, {
+          description: 'Scroll down — each issue is highlighted in red.',
+        });
+        return;
+      }
+
       toast.error(msg);
     }
   };
+
+  /** Convert a Zod issue path to our form's field-key shape.
+   *  Examples:
+   *    ['countryOfOrigin']        → 'countryOfOrigin'
+   *    ['items', 0, 'hts']        → 'item.0.hts'
+   *    ['items', 2, 'totalValue'] → 'item.2.totalValue'
+   *    ['items']                  → 'items'   (top-level array error)
+   */
+  function pathToKey(path: (string | number)[]): string | null {
+    if (path.length === 0) return null;
+    if (path[0] === 'items' && path.length >= 3 && typeof path[1] === 'number') {
+      return `item.${path[1]}.${path[2]}`;
+    }
+    if (path[0] === 'items' && path.length === 1) return 'items';
+    return path.join('.');
+  }
+
+  /** Friendly label for a field-key in the error summary. */
+  function humanKey(key: string): string {
+    if (key.startsWith('item.')) {
+      const [, idx, field] = key.split('.');
+      const friendly = ({
+        hts: 'HTS', description: 'Description', totalValue: 'Total value',
+        quantity1: 'Quantity 1', quantity2: 'Quantity 2', spi: 'SPI',
+      } as Record<string, string>)[field] ?? field;
+      return `Item ${Number(idx) + 1} · ${friendly}`;
+    }
+    return ({
+      countryOfOrigin:      'Country of origin',
+      modeOfTransportation: 'Mode of transport',
+      entryType:            'Entry type',
+      currency:             'Currency',
+      entryDate:            'Entry date',
+      estimatedEntryDate:   'Entry date',
+      items:                'Items',
+    } as Record<string, string>)[key] ?? key;
+  }
 
   // ─── Render ───────────────────────────────────────────────
   return (
@@ -1080,10 +1221,15 @@ export default function DutyCalculatorPage() {
                 label="Country of Origin"
                 required
                 value={countryOfOrigin}
-                onChange={(v) => { setCountryOfOrigin(v); markFieldEdited('countryOfOrigin'); }}
+                onChange={(v) => {
+                  setCountryOfOrigin(v);
+                  markFieldEdited('countryOfOrigin');
+                  clearServerError('countryOfOrigin');
+                }}
                 options={COUNTRIES}
                 placeholder="Select country…"
                 labelExtra={<ProvenanceChip source={provenanceFor('countryOfOrigin')} />}
+                error={allErrors.countryOfOrigin}
               />
               <SelectField
                 label="Mode of Transportation"
@@ -1092,6 +1238,7 @@ export default function DutyCalculatorPage() {
                 onChange={(v) => {
                   setModeOfTransportation(v as DutyCalcRequest['modeOfTransportation']);
                   markFieldEdited('modeOfTransportation');
+                  clearServerError('modeOfTransportation');
                 }}
                 options={[
                   { value: 'ocean', label: 'Ocean' },
@@ -1100,33 +1247,38 @@ export default function DutyCalculatorPage() {
                   { value: 'rail', label: 'Rail' },
                 ]}
                 labelExtra={<ProvenanceChip source={provenanceFor('modeOfTransportation')} />}
+                error={allErrors.modeOfTransportation}
               />
               <SelectField
                 label="Entry Type"
                 required
                 value={entryType}
-                onChange={(v) =>
-                  setEntryType(v as DutyCalcRequest['entryType'])
-                }
+                onChange={(v) => {
+                  setEntryType(v as DutyCalcRequest['entryType']);
+                  clearServerError('entryType');
+                }}
                 options={[
                   { value: 'formal', label: 'Formal' },
                   { value: 'informal', label: 'Informal' },
                 ]}
+                error={allErrors.entryType}
               />
               <SelectField
                 label="Currency"
                 required
                 value={currency}
-                onChange={(v) => { setCurrency(v); markFieldEdited('currency'); }}
+                onChange={(v) => { setCurrency(v); markFieldEdited('currency'); clearServerError('currency'); }}
                 options={CURRENCIES}
                 labelExtra={<ProvenanceChip source={provenanceFor('currency')} />}
+                error={allErrors.currency}
               />
               <DateField
                 label="Estimated Entry Date"
                 required
                 value={estimatedEntryDateYYYYMMDD}
-                onChange={setEstimatedEntryDateYYYYMMDD}
+                onChange={(v) => { setEstimatedEntryDateYYYYMMDD(v); clearServerError('entryDate'); clearServerError('estimatedEntryDate'); }}
                 hint={`UI: ${yyyymmddToISO(estimatedEntryDateYYYYMMDD) || '—'}`}
+                error={allErrors.entryDate || allErrors.estimatedEntryDate}
               />
             </CardContent>
           </Card>
@@ -1166,15 +1318,33 @@ export default function DutyCalculatorPage() {
                   onRemove={() => removeItem(idx)}
                   canRemove={items.length > 1}
                   provenanceFor={(key) => provenanceFor(`item.${idx}.${key}`)}
+                  errors={itemErrorsAt(idx)}
                 />
               ))}
             </CardContent>
           </Card>
 
-          {formError && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40 text-amber-900 dark:text-amber-200 text-xs">
-              <AlertCircle className="h-3.5 w-3.5" />
-              {formError}
+          {hasErrors && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40 px-3 py-2.5">
+              <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 text-[12.5px] font-medium">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {errorCount} {errorCount === 1 ? 'issue' : 'issues'} to fix before calculating
+              </div>
+              <ul className="mt-1.5 space-y-0.5 text-[12px] text-amber-900/85 dark:text-amber-200/85 leading-snug pl-5 list-disc">
+                {Object.entries(allErrors).slice(0, 6).map(([key, msg]) => (
+                  <li key={key}>
+                    <span className="font-mono text-[11px] text-amber-900/70 dark:text-amber-200/70 mr-1">
+                      {humanKey(key)}
+                    </span>
+                    {msg}
+                  </li>
+                ))}
+                {errorCount > 6 && (
+                  <li className="text-amber-900/70 dark:text-amber-200/70 italic">
+                    + {errorCount - 6} more — each highlighted in red below
+                  </li>
+                )}
+              </ul>
             </div>
           )}
 
@@ -1182,7 +1352,7 @@ export default function DutyCalculatorPage() {
             <Separator className="mb-3" />
             <Button
               type="submit"
-              disabled={isPending || !!formError}
+              disabled={isPending || hasErrors}
               className="w-full sm:w-auto gap-2 bg-amber-500 hover:bg-amber-600 text-amber-950 font-semibold"
             >
               {isPending ? (
