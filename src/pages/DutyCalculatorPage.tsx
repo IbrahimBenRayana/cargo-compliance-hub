@@ -64,9 +64,10 @@ import type {
   DutyCalcResponse,
   DutyCalcSubheading,
 } from '@/api/client';
-import { filingToDutyCalc, type SourceProvenance } from '@/lib/duty-calc-prefill';
+import { filingToDutyCalc, abiDocumentToDutyCalc, type SourceProvenance } from '@/lib/duty-calc-prefill';
 import { SourcePicker } from '@/components/duty-calc/SourcePicker';
 import type { Filing } from '@/types/shipment';
+import type { AbiDocument } from '@/api/client';
 
 // ─── Mode + form types ─────────────────────────────────────
 type Mode = 'standard' | 'ai';
@@ -814,8 +815,7 @@ export default function DutyCalculatorPage() {
   // we don't try to "lock" anything.
   const [source, setSource] = useState<SourceProvenance | null>(null);
 
-  function applyFilingPrefill(filing: Filing) {
-    const { prefill, provenance } = filingToDutyCalc(filing);
+  function applyPrefill(prefill: ReturnType<typeof filingToDutyCalc>['prefill'], provenance: SourceProvenance) {
     if (prefill.countryOfOrigin) setCountryOfOrigin(prefill.countryOfOrigin);
     if (prefill.modeOfTransportation) setModeOfTransportation(prefill.modeOfTransportation);
     if (prefill.currency) setCurrency(prefill.currency);
@@ -828,9 +828,20 @@ export default function DutyCalculatorPage() {
     setResultMode(null);
     standardCalc.reset();
     aiCalc.reset();
+    const sourceType = provenance.kind === 'abi' ? 'CBP Entry' : 'ISF Filing';
     toast.success('Pre-filled', {
-      description: `Source: ${provenance.label}. Review and edit any field before calculating.`,
+      description: `Source: ${sourceType} ${provenance.label}. Review and edit any field before calculating.`,
     });
+  }
+
+  function applyFilingPrefill(filing: Filing) {
+    const { prefill, provenance } = filingToDutyCalc(filing);
+    applyPrefill(prefill, provenance);
+  }
+
+  function applyAbiPrefill(doc: AbiDocument) {
+    const { prefill, provenance } = abiDocumentToDutyCalc(doc);
+    applyPrefill(prefill, provenance);
   }
 
   function clearPrefill() {
@@ -1012,6 +1023,7 @@ export default function DutyCalculatorPage() {
           <SourcePicker
             source={source}
             onPickFiling={applyFilingPrefill}
+            onPickAbiDocument={applyAbiPrefill}
             onClear={clearPrefill}
           />
 
