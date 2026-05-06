@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import {
   ArrowLeft, ArrowRight, Check, ChevronsUpDown, Loader2, Info, Ship, Package, Users, FileText,
-  Building2, MapPin, Plus, Trash2, AlertCircle, CheckCircle2, Sparkles, Container,
+  Building2, MapPin, Plus, Trash2, AlertCircle, CheckCircle2, Sparkles, Container, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -428,6 +428,16 @@ export default function ShipmentWizard() {
   const createFiling = useCreateFiling();
   const updateFiling = useUpdateFiling();
 
+  // Filing→Filing prefill chain. If `?fromFiling=<id>` is set on a NEW
+  // wizard (not edit), we fetch that filing and hydrate the form from it,
+  // blanking identity fields (BOL, voyage, containers, dates) so the user
+  // must supply per-shipment values. Banner stays visible until cleared.
+  const fromFilingId = searchParams.get('fromFiling') ?? undefined;
+  const { data: sourceFiling } = useFiling(!isEdit ? fromFilingId : undefined);
+  const [sourceProvenance, setSourceProvenance] = useState<{
+    id: string; label: string; url: string; createdAt: string;
+  } | null>(null);
+
   // Persist step in URL so browser back-button works (?step=0..N)
   const stepParam = parseInt(searchParams.get('step') ?? '0', 10);
   const step = Number.isNaN(stepParam) || stepParam < 0 ? 0 : stepParam;
@@ -456,6 +466,76 @@ export default function ShipmentWizard() {
       country: obj.country || '',
     };
   }, []);
+
+  // Filing→Filing prefill: hydrate form from a source filing. Identity
+  // fields are intentionally blanked (BOL, voyage, containers, dates) —
+  // those must be unique per shipment, so we make the user fill them in.
+  useEffect(() => {
+    if (isEdit) return; // editing path uses the other useEffect below
+    if (!sourceFiling) return;
+    const c0 = sourceFiling.commodities?.[0];
+    setForm({
+      filingType: sourceFiling.filingType || 'ISF-10',
+      // Identity fields blanked — user must supply per-shipment values.
+      masterBol: '',
+      houseBol: '',
+      voyageNumber: '',
+      estimatedDeparture: '',
+      estimatedArrival: '',
+      // Carry over reusable bond + party info.
+      bondType: sourceFiling.bondType || 'continuous',
+      importerName: sourceFiling.importerName || '',
+      importerNumber: sourceFiling.importerNumber || '',
+      consigneeName: sourceFiling.consigneeName || '',
+      consigneeNumber: sourceFiling.consigneeNumber || '',
+      consigneeAddress: parseParty(sourceFiling.consigneeAddress),
+      buyer: parseParty(sourceFiling.buyer),
+      seller: parseParty(sourceFiling.seller),
+      shipToParty: parseParty(sourceFiling.shipToParty),
+      manufacturer: parseParty(Array.isArray(sourceFiling.manufacturer) ? sourceFiling.manufacturer[0] : sourceFiling.manufacturer),
+      consolidator: parseParty(sourceFiling.consolidator),
+      containerStuffingLocation: parseParty(sourceFiling.containerStuffingLocation),
+      scacCode: sourceFiling.scacCode || '',
+      vesselName: sourceFiling.vesselName || '',
+      foreignPortOfUnlading: sourceFiling.foreignPortOfUnlading || '',
+      commodities: c0 ? [{
+        htsCode: c0.htsCode || '',
+        description: c0.description || '',
+        countryOfOrigin: c0.countryOfOrigin || '',
+        quantity: c0.quantity != null ? String(c0.quantity) : '',
+        quantityUOM: c0.quantityUOM || c0.weight?.unit === 'L' ? 'PCS' : 'PKG',
+        weight: c0.weight?.value != null ? String(c0.weight.value) : '',
+        weightUOM: c0.weight?.unit || 'K',
+      }] : [emptyCommodity()],
+      // Containers blanked — different per shipment.
+      containers: [emptyContainer()],
+      isf5: sourceFiling.isf5Data ? {
+        bookingPartyName: sourceFiling.isf5Data.bookingPartyName || '',
+        bookingPartyTaxID: sourceFiling.isf5Data.bookingPartyTaxID || '',
+        bookingPartyIdentifierCode: sourceFiling.isf5Data.bookingPartyIdentifierCode || '',
+        bookingPartyAddress1: sourceFiling.isf5Data.bookingPartyAddress1 || '',
+        bookingPartyAddress2: sourceFiling.isf5Data.bookingPartyAddress2 || '',
+        bookingPartyCity: sourceFiling.isf5Data.bookingPartyCity || '',
+        bookingPartyStateOrProvince: sourceFiling.isf5Data.bookingPartyStateOrProvince || '',
+        bookingPartyPostalCode: sourceFiling.isf5Data.bookingPartyPostalCode || '',
+        bookingPartyCountry: sourceFiling.isf5Data.bookingPartyCountry || '',
+        ISFFilerName: sourceFiling.isf5Data.ISFFilerName || '',
+        ISFFilerLastName: sourceFiling.isf5Data.ISFFilerLastName || '',
+        ISFFilerIDCodeQualifier: sourceFiling.isf5Data.ISFFilerIDCodeQualifier || '24',
+        ISFFilerNumber: sourceFiling.isf5Data.ISFFilerNumber || '',
+        ISFShipmentTypeCode: sourceFiling.isf5Data.ISFShipmentTypeCode || '01',
+        bondActivityCode: sourceFiling.isf5Data.bondActivityCode || '01',
+        bondHolderID: sourceFiling.isf5Data.bondHolderID || '',
+        USPortOfArrival: sourceFiling.isf5Data.USPortOfArrival || '',
+      } : emptyISF5(),
+    });
+    setSourceProvenance({
+      id:        sourceFiling.id,
+      label:     sourceFiling.masterBol || sourceFiling.houseBol || sourceFiling.id.slice(0, 8).toUpperCase(),
+      url:       `/shipments/${sourceFiling.id}`,
+      createdAt: sourceFiling.createdAt,
+    });
+  }, [sourceFiling, isEdit, parseParty]);
 
   // Populate form when editing
   useEffect(() => {
@@ -1255,6 +1335,42 @@ export default function ShipmentWizard() {
           </div>
         </div>
       </div>
+
+      {/* Filing→Filing prefill banner */}
+      {sourceProvenance && !isEdit && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.04] p-4 flex items-start gap-3">
+          <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-600">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-medium text-foreground">
+              Started from filing{' '}
+              <Link
+                to={sourceProvenance.url}
+                className="font-mono text-foreground underline-offset-2 hover:underline"
+              >
+                {sourceProvenance.label}
+              </Link>
+            </p>
+            <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
+              We carried over parties, bond, vessel, and the first commodity. BOL, voyage, dates, and containers are blanked
+              — those must be unique per shipment.
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSourceProvenance(null);
+              setSearchParams(p => { p.delete('fromFiling'); return p; }, { replace: true });
+              setForm(initialForm());
+            }}
+            className="text-xs h-7 text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <X className="h-3.5 w-3.5 mr-1" /> Clear
+          </Button>
+        </div>
+      )}
 
       {/* Step Progress Bar */}
       <div className="bg-card border rounded-xl p-3">
