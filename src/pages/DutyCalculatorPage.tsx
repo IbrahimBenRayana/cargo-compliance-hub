@@ -1134,9 +1134,12 @@ export default function DutyCalculatorPage() {
    *    ['items', 0, 'hts']        → 'item.0.hts'
    *    ['items', 2, 'totalValue'] → 'item.2.totalValue'
    *    ['items']                  → 'items'   (top-level array error)
+   *  Defensive against a missing or malformed `path` (some upstream
+   *  error shapes don't ship one) — returns null so the caller falls
+   *  through to a generic toast instead of crashing.
    */
-  function pathToKey(path: (string | number)[]): string | null {
-    if (path.length === 0) return null;
+  function pathToKey(path: (string | number)[] | undefined | null): string | null {
+    if (!Array.isArray(path) || path.length === 0) return null;
     if (path[0] === 'items' && path.length >= 3 && typeof path[1] === 'number') {
       return `item.${path[1]}.${path[2]}`;
     }

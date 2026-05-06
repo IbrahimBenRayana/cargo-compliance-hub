@@ -67,22 +67,41 @@ async function apiFetch<T = any>(
   return response.json();
 }
 
+// Single in-flight refresh promise. Prevents the refresh-token race that
+// killed sessions: if N parallel requests all see 401 at once and each
+// fires its own refresh, the server rotates the token on the first one
+// and rejects the rest — every "loser" then triggers clearTokens() +
+// redirect-to-login, kicking the user out mid-flow.
+//
+// With this guard, the first 401 starts a refresh; concurrent 401s wait
+// on the same promise and all see the same outcome.
+let refreshInFlight: Promise<boolean> | null = null;
+
 async function tryRefreshToken(): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
+  if (refreshInFlight) return refreshInFlight;
 
-    if (!res.ok) return false;
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
 
-    const data = await res.json();
-    setTokens(data.accessToken, data.refreshToken);
-    return true;
-  } catch {
-    return false;
-  }
+      if (!res.ok) return false;
+
+      const data = await res.json();
+      setTokens(data.accessToken, data.refreshToken);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      // Release the lock so the next 401-cycle can refresh again.
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
 }
 
 // ─── Auth API ─────────────────────────────────────────────
