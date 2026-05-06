@@ -157,26 +157,50 @@ function ManifestResult({ queryData }: { queryData: any }) {
         <p className="text-sm text-muted-foreground py-2">No house entries returned for this BOL.</p>
       )}
 
-      {/* Next-step CTA: turn this manifest into an ABI Entry Summary draft */}
+      {/* Next-step CTAs: turn this manifest into either an ISF filing
+          or an Entry Summary. ISF is upstream (before arrival), Entry
+          comes later — both pre-fill the BOL/carrier/port fields. */}
       {queryData?.id && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <FileCheck className="h-4 w-4 text-primary" />
+        <div className="space-y-2">
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Ship className="h-4 w-4 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">File an ISF (10+2)</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  Start a new ISF filing pre-populated with this manifest's BOL, carrier,
+                  port of unlading, and arrival date. Parties and bond still need entry.
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">File an Entry Summary (7501)</p>
-              <p className="text-xs text-muted-foreground truncate">
-                Start a new ABI entry pre-populated with this manifest's MBOL, carrier,
-                and port data.
-              </p>
-            </div>
+            <Button asChild size="sm" variant="outline" className="shrink-0">
+              <Link to={`/shipments/new?fromManifestQuery=${queryData.id}`}>
+                File ISF <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+              </Link>
+            </Button>
           </div>
-          <Button asChild size="sm" className="shrink-0">
-            <Link to={`/abi-documents/new?fromManifest=${queryData.id}`}>
-              Create Entry <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-            </Link>
-          </Button>
+
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <FileCheck className="h-4 w-4 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">File an Entry Summary (7501)</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  Start a new ABI entry pre-populated with this manifest's MBOL, carrier,
+                  and port data.
+                </p>
+              </div>
+            </div>
+            <Button asChild size="sm" className="shrink-0">
+              <Link to={`/abi-documents/new?fromManifest=${queryData.id}`}>
+                Create Entry <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+              </Link>
+            </Button>
+          </div>
         </div>
       )}
     </div>
