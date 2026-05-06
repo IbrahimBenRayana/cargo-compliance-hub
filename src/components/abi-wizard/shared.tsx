@@ -105,10 +105,13 @@ export const HintLabel = memo(function HintLabel({
   label,
   hint,
   required,
+  labelExtra,
 }: {
   label: string;
   hint?: string;
   required?: boolean;
+  /** Optional slot rendered after the label (e.g. provenance chip). */
+  labelExtra?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center gap-1.5">
@@ -128,6 +131,7 @@ export const HintLabel = memo(function HintLabel({
           </Tooltip>
         </TooltipProvider>
       )}
+      {labelExtra}
     </div>
   );
 });
@@ -145,6 +149,7 @@ export const TextField = memo(function TextField({
   error,
   disabled,
   className: cls,
+  labelExtra,
 }: {
   label: string;
   hint?: string;
@@ -157,10 +162,11 @@ export const TextField = memo(function TextField({
   error?: string;
   disabled?: boolean;
   className?: string;
+  labelExtra?: React.ReactNode;
 }) {
   return (
     <div className={cn('space-y-1.5', cls)}>
-      <HintLabel label={label} hint={hint} required={required} />
+      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} />
       <Input
         type={type}
         value={value}
@@ -193,6 +199,7 @@ export const SelectField = memo(function SelectField({
   disabled,
   disabledValues,
   className: cls,
+  labelExtra,
 }: {
   label: string;
   hint?: string;
@@ -205,10 +212,11 @@ export const SelectField = memo(function SelectField({
   disabled?: boolean;
   disabledValues?: string[];
   className?: string;
+  labelExtra?: React.ReactNode;
 }) {
   return (
     <div className={cn('space-y-1.5', cls)}>
-      <HintLabel label={label} hint={hint} required={required} />
+      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} />
       <Select value={value || undefined} onValueChange={onChange} disabled={disabled}>
         <SelectTrigger className={cn(error && 'border-red-500')}>
           <SelectValue placeholder={placeholder || 'Select...'} />
@@ -247,6 +255,7 @@ export const ComboboxField = memo(function ComboboxField({
   error,
   className: cls,
   searchPlaceholder,
+  labelExtra,
 }: {
   label: string;
   hint?: string;
@@ -258,12 +267,13 @@ export const ComboboxField = memo(function ComboboxField({
   error?: string;
   className?: string;
   searchPlaceholder?: string;
+  labelExtra?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
   return (
     <div className={cn('space-y-1.5', cls)}>
-      <HintLabel label={label} hint={hint} required={required} />
+      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -336,6 +346,7 @@ export const DateField = memo(function DateField({
   error,
   disabled,
   className: cls,
+  labelExtra,
 }: {
   label: string;
   hint?: string;
@@ -345,11 +356,12 @@ export const DateField = memo(function DateField({
   error?: string;
   disabled?: boolean;
   className?: string;
+  labelExtra?: React.ReactNode;
 }) {
   const iso = yyyymmddToISO(value);
   return (
     <div className={cn('space-y-1.5', cls)}>
-      <HintLabel label={label} hint={hint} required={required} />
+      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} />
       <Input
         type="date"
         value={iso}

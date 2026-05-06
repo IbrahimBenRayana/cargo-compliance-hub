@@ -65,7 +65,7 @@ import type {
   DutyCalcSubheading,
 } from '@/api/client';
 import { filingToDutyCalc, abiDocumentToDutyCalc, type SourceProvenance } from '@/lib/duty-calc-prefill';
-import { SourcePicker } from '@/components/duty-calc/SourcePicker';
+import { SourcePicker, ProvenanceChip } from '@/components/duty-calc/SourcePicker';
 import type { Filing } from '@/types/shipment';
 import type { AbiDocument } from '@/api/client';
 
@@ -218,6 +218,7 @@ function ItemCard({
   onChange,
   onRemove,
   canRemove,
+  provenanceFor,
 }: {
   index: number;
   mode: Mode;
@@ -225,6 +226,8 @@ function ItemCard({
   onChange: (patch: Partial<ItemDraft>) => void;
   onRemove: () => void;
   canRemove: boolean;
+  /** Returns the source object (or null) for `item.${index}.${key}`. */
+  provenanceFor?: (key: string) => SourceProvenance | null;
 }) {
   return (
     <div className="rounded-lg border bg-muted/10 p-4 space-y-4">
@@ -268,6 +271,7 @@ function ItemCard({
             onChange={(v) => onChange({ hts: v })}
             placeholder="7320.20.1000 or 7320201000"
             hint="10-digit HTS code. Dots are optional."
+            labelExtra={<ProvenanceChip source={provenanceFor?.('hts') ?? null} />}
           />
         )}
         <TextField
@@ -286,6 +290,7 @@ function ItemCard({
               ? 'The richer the description, the better the AI classification.'
               : undefined
           }
+          labelExtra={<ProvenanceChip source={provenanceFor?.('description') ?? null} />}
         />
         <TextField
           label="Total Value"
@@ -294,6 +299,7 @@ function ItemCard({
           value={item.totalValue}
           onChange={(v) => onChange({ totalValue: v })}
           placeholder="0.00"
+          labelExtra={<ProvenanceChip source={provenanceFor?.('totalValue') ?? null} />}
         />
         <TextField
           label="SPI Code"
@@ -309,6 +315,7 @@ function ItemCard({
           value={item.quantity1}
           onChange={(v) => onChange({ quantity1: v })}
           placeholder="0"
+          labelExtra={<ProvenanceChip source={provenanceFor?.('quantity1') ?? null} />}
         />
         <TextField
           label="Quantity 2"
@@ -809,11 +816,19 @@ export default function DutyCalculatorPage() {
 
   const [items, setItems] = useState<ItemDraft[]>([emptyItem()]);
 
-  // Pre-fill provenance (Phase 1 of the chained-data feature). When set,
-  // a banner above the form shows the source filing and lets the user
-  // clear back to defaults. Edits to any field after pre-fill stick;
-  // we don't try to "lock" anything.
+  // Pre-fill provenance. When set, a banner above the form shows the
+  // source and small ✨ chips appear next to each pre-filled field.
+  // Editing a field clears its specific chip — the field is now
+  // user-owned. Adding/removing items wipes all item-level chips since
+  // the indices shift and chips can't be trusted any more.
   const [source, setSource] = useState<SourceProvenance | null>(null);
+  const [filledFields, setFilledFields] = useState<Set<string>>(() => new Set());
+
+  /** Returns the current source if `key` was pre-filled and not yet edited. */
+  const provenanceFor = (key: string): SourceProvenance | null => {
+    if (!source) return null;
+    return filledFields.has(key) ? source : null;
+  };
 
   function applyPrefill(prefill: ReturnType<typeof filingToDutyCalc>['prefill'], provenance: SourceProvenance) {
     if (prefill.countryOfOrigin) setCountryOfOrigin(prefill.countryOfOrigin);
@@ -822,6 +837,7 @@ export default function DutyCalculatorPage() {
     if (prefill.items && prefill.items.length > 0) {
       setItems(prefill.items.map(p => ({ ...p })));
     }
+    setFilledFields(new Set(prefill.filledFields));
     setSource(provenance);
     // Clear any prior result so the user explicitly clicks Calculate
     // after reviewing the new inputs (compliance-trust principle).
@@ -846,6 +862,27 @@ export default function DutyCalculatorPage() {
 
   function clearPrefill() {
     setSource(null);
+    setFilledFields(new Set());
+  }
+
+  /** Drop a single field's chip when the user edits it. */
+  function markFieldEdited(key: string) {
+    if (filledFields.size === 0 || !filledFields.has(key)) return;
+    setFilledFields(prev => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }
+
+  /** Drop all item-level chips. Used on add/remove (indices shift). */
+  function clearAllItemChips() {
+    if (filledFields.size === 0) return;
+    setFilledFields(prev => {
+      const next = new Set<string>();
+      for (const k of prev) if (!k.startsWith('item.')) next.add(k);
+      return next;
+    });
   }
 
   const standardCalc = useDutyCalculate();
@@ -873,6 +910,8 @@ export default function DutyCalculatorPage() {
     setItems((prev) =>
       prev.map((it, i) => (i === index ? { ...it, ...patch } : it)),
     );
+    // Drop the chip on every key the user just touched.
+    for (const k of Object.keys(patch)) markFieldEdited(`item.${index}.${k}`);
   };
 
   const addItem = () => {
@@ -881,10 +920,12 @@ export default function DutyCalculatorPage() {
       return;
     }
     setItems((prev) => [...prev, emptyItem()]);
+    clearAllItemChips();
   };
 
   const removeItem = (index: number) => {
     setItems((prev) => prev.filter((_, i) => i !== index));
+    clearAllItemChips();
   };
 
   // ─── Validation & submit ──────────────────────────────────
@@ -1039,25 +1080,26 @@ export default function DutyCalculatorPage() {
                 label="Country of Origin"
                 required
                 value={countryOfOrigin}
-                onChange={setCountryOfOrigin}
+                onChange={(v) => { setCountryOfOrigin(v); markFieldEdited('countryOfOrigin'); }}
                 options={COUNTRIES}
                 placeholder="Select country…"
+                labelExtra={<ProvenanceChip source={provenanceFor('countryOfOrigin')} />}
               />
               <SelectField
                 label="Mode of Transportation"
                 required
                 value={modeOfTransportation}
-                onChange={(v) =>
-                  setModeOfTransportation(
-                    v as DutyCalcRequest['modeOfTransportation'],
-                  )
-                }
+                onChange={(v) => {
+                  setModeOfTransportation(v as DutyCalcRequest['modeOfTransportation']);
+                  markFieldEdited('modeOfTransportation');
+                }}
                 options={[
                   { value: 'ocean', label: 'Ocean' },
                   { value: 'air', label: 'Air' },
                   { value: 'truck', label: 'Truck' },
                   { value: 'rail', label: 'Rail' },
                 ]}
+                labelExtra={<ProvenanceChip source={provenanceFor('modeOfTransportation')} />}
               />
               <SelectField
                 label="Entry Type"
@@ -1075,8 +1117,9 @@ export default function DutyCalculatorPage() {
                 label="Currency"
                 required
                 value={currency}
-                onChange={setCurrency}
+                onChange={(v) => { setCurrency(v); markFieldEdited('currency'); }}
                 options={CURRENCIES}
+                labelExtra={<ProvenanceChip source={provenanceFor('currency')} />}
               />
               <DateField
                 label="Estimated Entry Date"
@@ -1122,6 +1165,7 @@ export default function DutyCalculatorPage() {
                   onChange={(patch) => updateItem(idx, patch)}
                   onRemove={() => removeItem(idx)}
                   canRemove={items.length > 1}
+                  provenanceFor={(key) => provenanceFor(`item.${idx}.${key}`)}
                 />
               ))}
             </CardContent>
