@@ -1099,8 +1099,11 @@ export default function DutyCalculatorPage() {
       const msg = err instanceof Error ? err.message : 'Duty calculation failed';
       const body = (err as any)?.body as { issues?: Array<{ path: (string | number)[]; message: string }> } | undefined;
 
-      // 400 from server with Zod issues — map each path to a form field
-      // key and surface inline. Every issue gets a pin on a specific field.
+      // 4xx from server with field-level issues — could be Zod (our schema)
+      // or CC's downstream validator (mapped server-side into the same
+      // issues[] shape). Map each path to a form-field key and surface
+      // inline. Toast shows the FIRST specific message so the user knows
+      // exactly what to fix without having to scroll.
       if (body?.issues && Array.isArray(body.issues) && body.issues.length > 0) {
         const next: Record<string, string> = {};
         for (const issue of body.issues) {
@@ -1109,8 +1112,14 @@ export default function DutyCalculatorPage() {
         }
         setServerErrors(next);
         const count = Object.keys(next).length;
-        toast.error(`Server rejected ${count} ${count === 1 ? 'field' : 'fields'}`, {
-          description: 'Scroll down — each issue is highlighted in red.',
+        const first = Object.entries(next)[0];
+        const firstFieldLabel = first ? humanKey(first[0]) : '';
+        toast.error(`${count} ${count === 1 ? 'field' : 'fields'} need attention`, {
+          description: first
+            ? (count > 1
+                ? `${firstFieldLabel}: ${first[1]} (and ${count - 1} more — see below)`
+                : `${firstFieldLabel}: ${first[1]}`)
+            : 'Scroll down — issues are highlighted in red.',
         });
         return;
       }
