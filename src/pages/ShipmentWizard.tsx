@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useFiling, useCreateFiling, useUpdateFiling } from '@/hooks/useFilings';
+import { useManifestQuery } from '@/hooks/useManifestQuery';
 import type { PartyInfo, CommodityInfo, ContainerInfo } from '@/types/shipment';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -434,8 +435,19 @@ export default function ShipmentWizard() {
   // must supply per-shipment values. Banner stays visible until cleared.
   const fromFilingId = searchParams.get('fromFiling') ?? undefined;
   const { data: sourceFiling } = useFiling(!isEdit ? fromFilingId : undefined);
+
+  // Manifest→ISF prefill chain. If `?fromManifestQuery=<id>` is set on a
+  // NEW wizard, we fetch that manifest query and pull the small set of
+  // fields CC's response carries (mBOL, hBOL, carrier, port of unlading,
+  // arrival date). Most ISF fields still need entry; the banner says so.
+  const fromManifestQueryId = searchParams.get('fromManifestQuery') ?? undefined;
+  const { data: sourceManifestQuery } = useManifestQuery(!isEdit ? fromManifestQueryId : undefined);
+
   const [sourceProvenance, setSourceProvenance] = useState<{
-    id: string; label: string; url: string; createdAt: string;
+    kind: 'filing' | 'manifest';
+    label: string;
+    url: string;
+    createdAt: string;
   } | null>(null);
 
   // Persist step in URL so browser back-button works (?step=0..N)
@@ -530,12 +542,51 @@ export default function ShipmentWizard() {
       } : emptyISF5(),
     });
     setSourceProvenance({
-      id:        sourceFiling.id,
+      kind:      'filing',
       label:     sourceFiling.masterBol || sourceFiling.houseBol || sourceFiling.id.slice(0, 8).toUpperCase(),
       url:       `/shipments/${sourceFiling.id}`,
       createdAt: sourceFiling.createdAt,
     });
   }, [sourceFiling, isEdit, parseParty]);
+
+  // Manifest→ISF prefill: hydrate the BOL / carrier / port / arrival
+  // fields. Everything else (importer, parties, bond, vessel, voyage,
+  // commodities) stays empty — the banner copy is explicit about that.
+  useEffect(() => {
+    if (isEdit) return;
+    const mq = (sourceManifestQuery as any)?.data ?? sourceManifestQuery;
+    if (!mq) return;
+    const resp = mq.response;
+    const raw = resp?.data?.response;
+    const item = Array.isArray(raw) ? raw[0] : raw;
+    if (!item) return;
+
+    const firstHouse = Array.isArray(item.houses) ? item.houses[0] : undefined;
+    const masterBol: string = item.masterBOLNumber ?? resp?.data?.masterBOLNumber ?? item.awbNumber ?? '';
+    const houseBol:  string = firstHouse?.hawbNumber ?? firstHouse?.awbNumber ?? '';
+    const carrierCode: string = item.carrierCode ?? item.importingCarrierCode ?? '';
+    const port: string = item.manifestedPortOfUnlading ?? firstHouse?.manifestedPort ?? item.actualPortOcean ?? '';
+    // CC arrival dates are YYYYMMDD; the wizard form uses ISO YYYY-MM-DD.
+    const arrivalRaw: string | undefined = item.scheduledArrivalDate ?? firstHouse?.scheduledArrivalDate ?? item.wr1DateOfArrival;
+    const arrivalIso = arrivalRaw && /^\d{8}$/.test(arrivalRaw)
+      ? `${arrivalRaw.slice(0, 4)}-${arrivalRaw.slice(4, 6)}-${arrivalRaw.slice(6, 8)}`
+      : '';
+
+    setForm(prev => ({
+      ...prev,
+      masterBol: prev.masterBol || masterBol,
+      houseBol:  prev.houseBol  || houseBol,
+      scacCode:  prev.scacCode  || carrierCode,
+      foreignPortOfUnlading: prev.foreignPortOfUnlading || port,
+      estimatedArrival: prev.estimatedArrival || arrivalIso,
+    }));
+    setSourceProvenance({
+      kind:      'manifest',
+      label:     mq.bolNumber || mq.id.slice(0, 8).toUpperCase(),
+      url:       `/manifest-query?id=${mq.id}`,
+      createdAt: mq.createdAt,
+    });
+  }, [sourceManifestQuery, isEdit]);
 
   // Populate form when editing
   useEffect(() => {
@@ -1336,7 +1387,7 @@ export default function ShipmentWizard() {
         </div>
       </div>
 
-      {/* Filing→Filing prefill banner */}
+      {/* Pre-fill banner — copy varies by source kind. */}
       {sourceProvenance && !isEdit && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.04] p-4 flex items-start gap-3">
           <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-600">
@@ -1344,7 +1395,7 @@ export default function ShipmentWizard() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-medium text-foreground">
-              Started from filing{' '}
+              Started from {sourceProvenance.kind === 'filing' ? 'filing' : 'manifest query'}{' '}
               <Link
                 to={sourceProvenance.url}
                 className="font-mono text-foreground underline-offset-2 hover:underline"
@@ -1353,8 +1404,9 @@ export default function ShipmentWizard() {
               </Link>
             </p>
             <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
-              We carried over parties, bond, vessel, and the first commodity. BOL, voyage, dates, and containers are blanked
-              — those must be unique per shipment.
+              {sourceProvenance.kind === 'filing'
+                ? 'We carried over parties, bond, vessel, and the first commodity. BOL, voyage, dates, and containers are blanked — those must be unique per shipment.'
+                : 'We carried over the BOL, carrier, port of unlading, and arrival date. Importer, consignee, parties, bond, vessel, and commodities still need to be filled in.'}
             </p>
           </div>
           <Button
@@ -1362,7 +1414,11 @@ export default function ShipmentWizard() {
             size="sm"
             onClick={() => {
               setSourceProvenance(null);
-              setSearchParams(p => { p.delete('fromFiling'); return p; }, { replace: true });
+              setSearchParams(p => {
+                p.delete('fromFiling');
+                p.delete('fromManifestQuery');
+                return p;
+              }, { replace: true });
               setForm(initialForm());
             }}
             className="text-xs h-7 text-muted-foreground hover:text-foreground shrink-0"
