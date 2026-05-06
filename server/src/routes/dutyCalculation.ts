@@ -45,7 +45,16 @@ function extractCCErrorMessage(body: any, httpStatus: number, label: string): st
 router.post('/', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = dutyCalcStandardSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+    // `flatten()` collapses nested array paths to their top-level key, so
+    // `items[0].hts` errors all show up under `items` — useful for a one-line
+    // summary but unable to drive per-field UI. Ship `issues` (the raw Zod
+    // array of { path, message }) so the client can map errors back to
+    // specific item rows + fields.
+    res.status(400).json({
+      error:   'Validation failed',
+      details: parsed.error.flatten(),
+      issues:  parsed.error.issues,
+    });
     return;
   }
 
@@ -107,7 +116,16 @@ router.post('/', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<
 router.post('/ai', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = dutyCalcAISchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+    // `flatten()` collapses nested array paths to their top-level key, so
+    // `items[0].hts` errors all show up under `items` — useful for a one-line
+    // summary but unable to drive per-field UI. Ship `issues` (the raw Zod
+    // array of { path, message }) so the client can map errors back to
+    // specific item rows + fields.
+    res.status(400).json({
+      error:   'Validation failed',
+      details: parsed.error.flatten(),
+      issues:  parsed.error.issues,
+    });
     return;
   }
 
