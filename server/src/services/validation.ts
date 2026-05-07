@@ -370,28 +370,6 @@ export function validateFiling(filing: any): ValidationResult {
     });
   }
 
-  // ── Bond ─────────────────────────────────────────────────
-  // CC requires a surety code whenever a bond is present. We accept either
-  // top-level `bondSuretyCode` or nested `bond.suretyCode` for flexibility.
-  if (filing.bondType) {
-    const surety = filing.bondSuretyCode ?? filing.bond?.suretyCode;
-    if (!surety || String(surety).trim().length === 0) {
-      errors.push({
-        field:    'bondSuretyCode',
-        code:     'MISSING_FIELD',
-        message:  'Surety code is required when a bond is set. (CC rejects bond payloads without a surety code.)',
-        severity: 'critical',
-      });
-    } else if (!/^\d{3}$/.test(String(surety).trim())) {
-      errors.push({
-        field:    'bondSuretyCode',
-        code:     'INVALID_FORMAT',
-        message:  `Surety code must be exactly 3 digits (e.g., "123"). Received: "${surety}"`,
-        severity: 'critical',
-      });
-    }
-  }
-
   // ── Containers ──────────────────────────────────────────
   const containers = Array.isArray(filing.containers) ? filing.containers : [];
   containers.forEach((c: any, i: number) => {

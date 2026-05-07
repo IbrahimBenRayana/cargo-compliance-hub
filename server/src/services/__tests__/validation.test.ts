@@ -164,42 +164,9 @@ describe('commodity weight unit', () => {
   });
 });
 
-// ─── Bond surety code ────────────────────────────────────────────────
-
-describe('bond surety code', () => {
-  it('requires suretyCode when bondType is set (real prod error)', () => {
-    const result = validateFiling(validIsf10({
-      bondType: 'continuous',
-      bondSuretyCode: undefined,
-    }));
-    const bondError = result.errors.find(e => e.field === 'bondSuretyCode');
-    expect(bondError).toBeDefined();
-    expect(bondError?.severity).toBe('critical');
-  });
-
-  it('rejects suretyCode that is not exactly 3 digits', () => {
-    const result = validateFiling(validIsf10({
-      bondType: 'continuous',
-      bondSuretyCode: 'ABC',
-    }));
-    const bondError = result.errors.find(e => e.field === 'bondSuretyCode');
-    expect(bondError?.severity).toBe('critical');
-    expect(bondError?.message).toMatch(/3 digits/);
-  });
-
-  it('accepts 3-digit numeric suretyCode', () => {
-    const result = validateFiling(validIsf10({
-      bondType: 'continuous',
-      bondSuretyCode: '123',
-    }));
-    expect(result.errors.some(e => e.field === 'bondSuretyCode')).toBe(false);
-  });
-
-  it('skips check when bondType is absent', () => {
-    const result = validateFiling(validIsf10({ bondType: undefined }));
-    expect(result.errors.some(e => e.field === 'bondSuretyCode')).toBe(false);
-  });
-});
+// Bond surety code is NOT validated for ISF (CC's ISF-10 spec uses
+// bondType + bondHolderID = IOR tax ID, no separate surety code).
+// Surety code is an ABI requirement, enforced in schemas/abiDocument.ts.
 
 // ─── Smoke: a fully-valid ISF-10 should pass ────────────────────────
 
@@ -208,7 +175,6 @@ describe('happy path', () => {
     const result = validateFiling(validIsf10({
       foreignPortOfUnlading: '2704',
       bondType: 'continuous',
-      bondSuretyCode: '123',
     }));
     // Non-critical warnings are OK (e.g., date-in-past). Gate only blocks on critical.
     expect(result.valid).toBe(true);
