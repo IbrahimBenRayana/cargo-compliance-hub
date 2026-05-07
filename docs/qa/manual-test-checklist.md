@@ -30,6 +30,31 @@
 - [ ] You have at least 1 active filing in the org (create one if needed via the wizard with synthetic but realistic data).
 - [ ] DevTools open in Network tab for the auth-race tests.
 
+### Test data (paste these — they're known-good in CC sandbox)
+
+The constants below come from the CC API docs. Use them anywhere a test
+asks for "a known-good X". Source: `server/src/__tests__/fixtures/customscity-samples.ts`.
+
+| What | Value | Notes |
+|---|---|---|
+| ISF-10 master BOL | `8CUS1AA` | sandbox-known good |
+| ISF-10 house BOL | `8CCGENR9001` | pairs with above |
+| ABI master BOL | `123-141241001` | hyphenated form CC uses internally |
+| ABI house BOL | `22222220` | pairs with above |
+| ABI entry numbers (for /api/abi/send) | `S4G-7508876-8`, `S4G-7508875-0` | hyphenated canonical form |
+| Manifest query AWB | `16072007541` | type=AWBNUMBER, returns 3 houses |
+| Working HTS (10-digit dotted) | `7320.20.1000` | Helical springs, 3.2% duty |
+| Working HTS (10-digit no-dot) | `9608600000` | Wireless network routers |
+| Working HTS (alternative) | `0101290090` | livestock |
+| AI duty calc descriptions | `Electric motor, 15 kW, for industrial use, 3-phase AC.`, `HONEY`, `POTATO` | get back classified HTS |
+| Bad HTS to force CC error | `6204624000` | "HTS code not found in the system" |
+| EIN (CC sample, working) | `20-493538700` | XX-XXXXXXXXX format |
+| Tax ID (alt format) | `57-123456789` | XX-XXXXXXXXX |
+| US port code (Houston-equivalent in sandbox) | `1001` | 4-digit |
+| US port code (LAX) | `USLAX` | 5-letter UN/LOCODE |
+| Country code (China) | `CN` | ISO-3166 alpha-2 |
+| Bond surety code | `123` | 3-digit |
+
 ---
 
 ## 1. Authentication & session

@@ -24,6 +24,7 @@ import {
   normaliseHts,
 } from '../schemas/dutyCalculation.js';
 import { sanitizeErrorMessage } from '../services/errorTranslator.js';
+import { ccErrorsToIssues } from '../services/ccErrorMapping.js';
 import logger from '../config/logger.js';
 
 const router = Router();
@@ -40,57 +41,10 @@ function extractCCErrorMessage(body: any, httpStatus: number, label: string): st
   return `${label} failed (${httpStatus})`;
 }
 
-/**
- * Convert CC's `errors` map into the same Zod-style `{ path, message }`
- * issues array our client uses to pin per-field UI.
- *
- * CC ships `errors: { "items[0]": ["HTS code 'X' not found"], "currency": ["..."] }`.
- * We turn each entry into one or more issues with a path the client can
- * map to a specific item row + field.
- *
- * Field guess: CC doesn't tell us which sub-field of an item failed —
- * just that something in items[N] is wrong. The message text is our only
- * signal. We do a simple keyword sniff and fall back to `description`
- * (the most generic) when nothing matches.
- */
-function ccErrorsToIssues(errors: unknown): Array<{ path: (string | number)[]; message: string }> {
-  if (!errors || typeof errors !== 'object') return [];
-  const out: Array<{ path: (string | number)[]; message: string }> = [];
-
-  for (const [key, value] of Object.entries(errors as Record<string, unknown>)) {
-    const messages: string[] = Array.isArray(value)
-      ? (value as unknown[]).filter((v): v is string => typeof v === 'string')
-      : typeof value === 'string'
-      ? [value]
-      : [];
-
-    const itemMatch = key.match(/^items?\[(\d+)\]$/);
-    if (itemMatch) {
-      const idx = parseInt(itemMatch[1] as string, 10);
-      for (const msg of messages) {
-        out.push({ path: ['items', idx, guessItemField(msg)], message: msg });
-      }
-    } else {
-      // Top-level key (e.g. "currency", "modeOfTransportation").
-      for (const msg of messages) {
-        out.push({ path: [key], message: msg });
-      }
-    }
-  }
-  return out;
-}
-
-function guessItemField(message: string): string {
-  const m = message.toLowerCase();
-  if (m.includes('hts'))         return 'hts';
-  if (m.includes('description')) return 'description';
-  if (m.includes('quantity'))    return 'quantity1';
-  if (m.includes('value'))       return 'totalValue';
-  if (m.includes('spi'))         return 'spi';
-  // Default: pin to description so the user sees the message somewhere
-  // visible on the row. Beats hiding it under a generic banner.
-  return 'description';
-}
+// ccErrorsToIssues moved to services/ccErrorMapping.ts so it can be
+// unit-tested + reused by the ABI / ISF error paths. See that module
+// for the full mapper, including the parallel ccIsfErrorsToIssues helper
+// for ISF's error-array shape.
 
 // ── POST / — standard calculator (HTS required) ─────────────────
 
