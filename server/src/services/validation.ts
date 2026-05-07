@@ -49,17 +49,9 @@ const VALID_COUNTRY_CODES = new Set([
   'UZ','VU','VE','VN','YE','ZM','ZW',
 ]);
 
-// Common US port codes (Schedule D — CBP port codes)
-const VALID_US_PORTS = new Set([
-  // Major ports
-  '0101','0401','0901','1001','1101','1303','1401','1601','1703','1801','1901','2001',
-  '2101','2301','2501','2704','2709','2720','2809','3001','3101','3501','3601','3701',
-  '3801','3901','4001','4101','4601','4701','4801','5201','5301','5501',
-  // Additional major ports
-  '2704','2709','2720','5301','4601','1001','2809','4701','0401','1303',
-  // Commonly used
-  'USLAX','USNYC','USSAV','USHOU','USCHI','USMIA','USSEA','USBAL','USNWK','USOAK',
-]);
+// CBP Schedule D port codes used to be hand-listed here; we now enforce
+// format only (4-digit CBP or 5-letter UN/LOCODE) since maintaining a
+// complete list is brittle and CC enforces the membership check anyway.
 
 // ─── Validation Rules ──────────────────────────────────────
 
@@ -132,12 +124,40 @@ function validatePortCode(port: string | null | undefined, fieldPath: string, fi
   }
 
   const trimmed = port.trim().toUpperCase();
-  // Accept either numeric CBP port codes or UN/LOCODE style
-  if (!/^[A-Z0-9]{2,5}$/.test(trimmed) && !VALID_US_PORTS.has(trimmed)) {
-    errors.push({ field: fieldPath, code: 'INVALID_FORMAT', message: `${fieldLabel} format is not recognized. Use a valid CBP port code`, severity: 'warning' });
+  // CBP Schedule D port codes are exactly 4 digits (e.g., "2704" = Houston).
+  // UN/LOCODEs are 5 letters (e.g., "USLAX" = Los Angeles).
+  // Anything else is rejected. This is `critical` severity now (was 'warning')
+  // because CC's allowed-values list is fixed and a freeform port string
+  // produces a CC error the user can't act on.
+  const isCbpFourDigit = /^\d{4}$/.test(trimmed);
+  const isUnLocodeFive = /^[A-Z]{5}$/.test(trimmed);
+  if (!isCbpFourDigit && !isUnLocodeFive) {
+    errors.push({
+      field:    fieldPath,
+      code:     'INVALID_FORMAT',
+      message:  `${fieldLabel} must be a 4-digit CBP port code (e.g., "2704") or a 5-letter UN/LOCODE (e.g., "USLAX"). Received: "${port}"`,
+      severity: 'critical',
+    });
   }
 
   return errors;
+}
+
+// Accepted commodity weight UOM per CustomsCity: 'K' (kilograms) or 'L' (pounds).
+// 'KG' / 'LB' / freeform text is rejected by CC; we catch it here so the user
+// gets an inline error instead of a CC-flavored 400.
+function validateWeightUnit(unit: string | null | undefined, fieldPath: string, commodityIndex: number): ValidationError[] {
+  if (!unit) return []; // weight itself optional; missing unit only matters when weight present
+  const trimmed = unit.trim().toUpperCase();
+  if (trimmed !== 'K' && trimmed !== 'L') {
+    return [{
+      field:    fieldPath,
+      code:     'INVALID_FORMAT',
+      message:  `Commodity ${commodityIndex + 1} weight unit must be "K" (kilograms) or "L" (pounds). Received: "${unit}"`,
+      severity: 'critical',
+    }];
+  }
+  return [];
 }
 
 function validateBillOfLading(bol: string | null | undefined, fieldPath: string): ValidationError[] {
@@ -328,10 +348,48 @@ export function validateFiling(filing: any): ValidationResult {
       errors.push(...validateHTSCode(c.htsCode || c.htsNumber, `${prefix}.htsCode`));
       errors.push(...validateCountryCode(c.countryOfOrigin, `${prefix}.countryOfOrigin`, `Commodity ${i + 1} country of origin`));
 
-      if (!c.description || c.description.trim().length === 0) {
+      // Description length: CC schema rejects > 45 chars on `description`.
+      // Empty is `info`-level (recommended); over-length is `critical` (CC blocks).
+      const desc = (c.description ?? '').toString();
+      if (desc.trim().length === 0) {
         errors.push({ field: `${prefix}.description`, code: 'MISSING_FIELD', message: `Commodity ${i + 1}: Description is recommended`, severity: 'info' });
+      } else if (desc.length > 45) {
+        errors.push({
+          field:    `${prefix}.description`,
+          code:     'INVALID_FORMAT',
+          message:  `Commodity ${i + 1}: Description must be 45 characters or fewer (currently ${desc.length}). Shorten or split into multiple lines.`,
+          severity: 'critical',
+        });
+      }
+
+      // Weight unit: CC accepts only K (kilograms) or L (pounds). Anything
+      // else (KG, LB, lbs, etc.) is rejected.
+      if (c.weight && c.weight.unit !== undefined && c.weight.unit !== null) {
+        errors.push(...validateWeightUnit(c.weight.unit, `${prefix}.weight.unit`, i));
       }
     });
+  }
+
+  // ── Bond ─────────────────────────────────────────────────
+  // CC requires a surety code whenever a bond is present. We accept either
+  // top-level `bondSuretyCode` or nested `bond.suretyCode` for flexibility.
+  if (filing.bondType) {
+    const surety = filing.bondSuretyCode ?? filing.bond?.suretyCode;
+    if (!surety || String(surety).trim().length === 0) {
+      errors.push({
+        field:    'bondSuretyCode',
+        code:     'MISSING_FIELD',
+        message:  'Surety code is required when a bond is set. (CC rejects bond payloads without a surety code.)',
+        severity: 'critical',
+      });
+    } else if (!/^\d{3}$/.test(String(surety).trim())) {
+      errors.push({
+        field:    'bondSuretyCode',
+        code:     'INVALID_FORMAT',
+        message:  `Surety code must be exactly 3 digits (e.g., "123"). Received: "${surety}"`,
+        severity: 'critical',
+      });
+    }
   }
 
   // ── Containers ──────────────────────────────────────────

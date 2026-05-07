@@ -29,7 +29,17 @@ export const dutyCalcStandardItemSchema = baseItemSchema.extend({
 });
 
 /** AI endpoint: HTS is optional (AI classifies from description). */
-export const dutyCalcAIItemSchema = baseItemSchema;
+// AI mode: at least one of quantity1 / quantity2 must be a number.
+// Without it, CC returns:
+//   "items[N]": ["At least quantity1 or quantity2 (as number) must be provided"]
+// (Confirmed in prod submission_logs — see audit 2026-05-07.)
+export const dutyCalcAIItemSchema = baseItemSchema.refine(
+  (it) => typeof it.quantity1 === 'number' || typeof it.quantity2 === 'number',
+  {
+    path: ['quantity1'],
+    message: 'AI mode requires at least one of Quantity 1 or Quantity 2 as a number',
+  },
+);
 
 const baseRequestSchema = z.object({
   entryType:            z.enum(['formal', 'informal']),
