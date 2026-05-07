@@ -505,7 +505,10 @@ export function translateValidationErrors(errors: any[]): TranslatedError[] {
       return translateSingleError('unknown', err);
     }
     if (err.field && err.message) {
-      return translateSingleError(err.field, err.message);
+      // Defensive: if upstream forgot to flatten a nested message, render the
+      // structure as JSON instead of letting it template-stringify into "[object Object]".
+      const msg = typeof err.message === 'string' ? err.message : JSON.stringify(err.message);
+      return translateSingleError(err.field, msg);
     }
     return translateSingleError('unknown', JSON.stringify(err));
   });

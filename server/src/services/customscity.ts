@@ -1645,10 +1645,26 @@ export class CustomsCityClient {
           ? JSON.parse(result.data.errors)
           : result.data.errors;
         // CC errors format: { "MBOLNumber: X - HBOLNumber: Y": ["err1", "err2"], "ISFValidations": ["err3"] }
+        // CC ships two shapes here:
+        //   A) { "FieldX": ["err1", "err2"] }                       — flat array
+        //   B) { "BOLValidations": { "BOL Numbers already exist": ["MAEU1234..."] } }
+        //                                                          — nested object
+        // For shape B, the inner *key* is the human-readable reason and the
+        // inner array holds the offending values; flatten to "<reason>: <values>".
         for (const [key, msgs] of Object.entries(errObj)) {
           if (Array.isArray(msgs)) {
             for (const msg of msgs) {
               parsedErrors.push({ field: key, message: String(msg) });
+            }
+          } else if (msgs && typeof msgs === 'object') {
+            for (const [innerReason, innerVals] of Object.entries(msgs as Record<string, unknown>)) {
+              const detail = Array.isArray(innerVals)
+                ? innerVals.map(String).join(', ')
+                : String(innerVals);
+              parsedErrors.push({
+                field: key,
+                message: detail ? `${innerReason}: ${detail}` : innerReason,
+              });
             }
           } else {
             parsedErrors.push({ field: key, message: String(msgs) });
