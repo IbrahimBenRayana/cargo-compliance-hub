@@ -21,78 +21,100 @@ const paramId = (req: AuthRequest): string => {
 };
 
 // ─── Zod Schemas ──────────────────────────────────────────
+// Each schema mirrors what the ISF wizard actually sends (see
+// src/pages/ShipmentWizard.tsx → buildPayload). Tighter than `z.any()`
+// so bad data is caught at the route boundary instead of being silently
+// passed to CC and rejected there.
+
 const addressSchema = z.object({
-  name: z.string().min(1),
-  address1: z.string().optional(),
-  address2: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  zip: z.string().optional(),
-  country: z.string().optional(),
-}).or(z.string()); // Also accept plain string for backward compatibility
+  name: z.string().min(1).max(35, 'Party name must be 35 characters or fewer (CC limit)'),
+  address1: z.string().max(100).optional(),
+  address2: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  state: z.string().max(50).optional(),
+  zip: z.string().max(20).optional(),
+  country: z.string().max(2).optional(), // ISO-2 when present; loose for drafts
+}).or(z.string()); // Plain string accepted for legacy / partial drafts
 
 const commoditySchema = z.object({
-  htsCode: z.string().min(4),
-  countryOfOrigin: z.string().min(2),
-  description: z.string().optional(),
-  quantity: z.number().optional(),
+  // Wizard sends digits-only, max 6 chars (ISF requires HTS-6 prefix).
+  // We accept 4-10 digits at the boundary so callers other than the wizard
+  // (e.g., AI prefill, API) work too. Strict format check at /submit time.
+  htsCode: z.string().regex(/^\d{4,10}$/, 'HTS code must be 4–10 digits (no dots/dashes)').or(
+    z.string().regex(/^[\d\.\-\s]+$/, 'HTS code may include digits, dots, dashes, or spaces').refine(
+      (s) => /^\d{4,10}$/.test(s.replace(/[\.\-\s]/g, '')),
+      'HTS code must be 4–10 digits after stripping separators',
+    ),
+  ),
+  countryOfOrigin: z.string().regex(/^[A-Z]{2}$/i, 'Country of origin must be a 2-letter ISO code (e.g., CN, US)'),
+  description: z.string().max(45, 'Commodity description must be 45 characters or fewer (CC limit)').optional(),
+  quantity: z.number().nonnegative().optional(),
+  quantityUOM: z.string().max(10).optional(),
   weight: z.object({
-    value: z.number(),
-    unit: z.string().default('KG'),
+    value: z.number().nonnegative(),
+    // CC accepts only K (kilograms) or L (pounds). 'KG' / 'LB' / freeform = rejected.
+    unit: z.enum(['K', 'L'], { errorMap: () => ({ message: 'Weight unit must be "K" (kilograms) or "L" (pounds)' }) }).default('K'),
   }).optional(),
   value: z.object({
-    amount: z.number(),
-    currency: z.string().default('USD'),
+    amount: z.number().nonnegative(),
+    currency: z.string().regex(/^[A-Z]{3}$/, 'Currency must be a 3-letter ISO code (e.g., USD)').default('USD'),
   }).optional(),
 });
 
 const containerSchema = z.object({
-  number: z.string().min(1),
-  type: z.string().optional(),
-  sealNumber: z.string().optional(),
+  number: z.string().min(1).max(20, 'Container number must be 20 characters or fewer'),
+  // CC container types (CN = standard, NC = none/no-container, 20/40/40HC = sizes).
+  // Wizard defaults to 'CN' when type is missing — schema reflects that.
+  type: z.enum(['CN', 'NC', '20', '40', '40HC', '20GP', '40GP', 'TW', 'CL', 'R0']).optional(),
+  sealNumber: z.string().max(50).optional(),
 });
 
 const createFilingSchema = z.object({
   filingType: z.enum(['ISF-10', 'ISF-5']).default('ISF-10'),
-  
-  // Importer
-  importerName: z.string().optional(),
-  importerNumber: z.string().optional(),
-  
+
+  // Importer (string fields stay loose at create time so partial drafts can save).
+  // Strict checks run at /submit via validateFiling().
+  importerName: z.string().max(35, 'Importer name must be 35 characters or fewer (CC limit)').optional(),
+  importerNumber: z.string().max(50).optional(),
+
   // Consignee
-  consigneeName: z.string().optional(),
-  consigneeNumber: z.string().optional(),
-  consigneeAddress: z.any().optional(),
-  
-  // Parties
-  manufacturer: z.any().optional(),
-  seller: z.any().optional(),
-  buyer: z.any().optional(),
-  shipToParty: z.any().optional(),
-  containerStuffingLocation: z.any().optional(),
-  consolidator: z.any().optional(),
-  
+  consigneeName: z.string().max(35, 'Consignee name must be 35 characters or fewer').optional(),
+  consigneeNumber: z.string().max(50).optional(),
+  consigneeAddress: addressSchema.optional(),
+
+  // Parties — wizard sends `manufacturer` as a single-element array; everything
+  // else as a single object. Both shapes work via `.or(z.array(addressSchema))`.
+  manufacturer: addressSchema.or(z.array(addressSchema)).optional(),
+  seller: addressSchema.optional(),
+  buyer: addressSchema.optional(),
+  shipToParty: addressSchema.optional(),
+  containerStuffingLocation: addressSchema.optional(),
+  consolidator: addressSchema.optional(),
+
   // Shipment details
-  masterBol: z.string().optional(),
-  houseBol: z.string().optional(),
-  scacCode: z.string().optional(),
-  vesselName: z.string().optional(),
-  voyageNumber: z.string().optional(),
-  foreignPortOfUnlading: z.string().optional(),
-  placeOfDelivery: z.string().optional(),
+  masterBol: z.string().max(100).optional(),
+  houseBol: z.string().max(100).optional(),
+  scacCode: z.string().max(10).optional(),
+  vesselName: z.string().max(100).optional(),
+  voyageNumber: z.string().max(50).optional(),
+  foreignPortOfUnlading: z.string().max(10).optional(),
+  placeOfDelivery: z.string().max(10).optional(),
   estimatedDeparture: z.string().optional(),
   estimatedArrival: z.string().optional(),
-  
+
   // Bond
-  bondType: z.string().optional(),
-  bondSuretyCode: z.string().optional(),
-  
-  // ISF-5 specific data (JSONB)
+  bondType: z.string().max(50).optional(),
+  bondSuretyCode: z.string().max(10).optional(),
+
+  // ISF-5 specific data (JSONB) — kept loose since the shape is heterogeneous;
+  // validateFiling() does the field-by-field checks at /submit.
   isf5Data: z.any().optional(),
-  
-  // Commodities & containers
-  commodities: z.array(z.any()).default([]),
-  containers: z.array(z.any()).default([]),
+
+  // Commodities & containers — now use the structured sub-schemas above.
+  // Bad data (HTS-non-numeric, weight unit "KG", description > 45 chars,
+  // country "USA" instead of "US") is rejected here at the route boundary.
+  commodities: z.array(commoditySchema).default([]),
+  containers: z.array(containerSchema).default([]),
 });
 
 // ─── POST /api/v1/filings — Create new filing ─────────────
