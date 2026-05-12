@@ -60,7 +60,12 @@ export function useSubmitFiling() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => filingsApi.submit(id),
-    onSuccess: (_, id) => {
+    // onSettled (not onSuccess) — a 422 rejection still mutates the filing
+    // server-side (status flips to "rejected", rejectionReason updated),
+    // so the cache must refresh even when the mutation throws. Without this,
+    // resubmitting a fixed filing kept showing the previous rejection until
+    // the user hard-refreshed.
+    onSettled: (_data, _err, id) => {
       queryClient.invalidateQueries({ queryKey: ['filings'] });
       queryClient.invalidateQueries({ queryKey: ['filing', id] });
       queryClient.invalidateQueries({ queryKey: ['filingStats'] });
@@ -105,7 +110,9 @@ export function useAmendFiling() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data?: any }) => filingsApi.amend(id, data),
-    onSuccess: (_, variables) => {
+    // onSettled — amendment failures still update server-side status / rejection
+    // reason, so the UI needs the fresh record either way.
+    onSettled: (_data, _err, variables) => {
       queryClient.invalidateQueries({ queryKey: ['filings'] });
       queryClient.invalidateQueries({ queryKey: ['filing', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['filingStats'] });
@@ -117,7 +124,7 @@ export function useCancelFiling() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) => filingsApi.cancel(id, reason),
-    onSuccess: (_, variables) => {
+    onSettled: (_data, _err, variables) => {
       queryClient.invalidateQueries({ queryKey: ['filings'] });
       queryClient.invalidateQueries({ queryKey: ['filing', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['filingStats'] });
