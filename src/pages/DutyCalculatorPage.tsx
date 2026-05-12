@@ -725,13 +725,26 @@ function ResultsPanel({
   const summary = result.summary || ({} as DutyCalcResponse['summary']);
   const currency = result.currency || 'USD';
 
-  // Total duties — AI uses totalDuties / totalDutiesFees, standard uses totalDutiesTaxes.
+  // Total duties — CC's standard endpoint sets `summary.totalDutiesTaxes` to 0
+  // even when real duties exist (it's a category-specific field, not the grand
+  // total), so we MUST prefer `dutiesBreakdown.totalDuties` over it. `??` treats
+  // 0 as a real value and would short-circuit there, hiding the actual number.
+  //
+  // Precedence:
+  //   1. dutiesBreakdown.totalDuties  — authoritative, both endpoints
+  //   2. summary.totalDuties           — AI endpoint
+  //   3. summary.totalDutiesFees       — AI endpoint legacy
+  //   4. summary.totalDutiesTaxes      — standard endpoint (often 0, last resort)
+  //   5. sum of items[i].duty + subheadingDuties — final defense
+  const itemSum = Array.isArray(result.items)
+    ? result.items.reduce((s, it) => s + (it.duty || 0) + (it.subheadingDuties || 0), 0)
+    : undefined;
   const totalDuties =
+    result.dutiesBreakdown?.totalDuties ??
     summary.totalDuties ??
     summary.totalDutiesFees ??
     summary.totalDutiesTaxes ??
-    result.dutiesBreakdown?.totalDuties ??
-    undefined;
+    itemSum;
 
   // Effective rate — AI sends totalDutyPercentage; otherwise compute.
   const effectivePct =
