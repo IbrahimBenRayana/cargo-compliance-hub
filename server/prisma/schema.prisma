@@ -70,10 +70,43 @@ model User {
   uploadedDocs           FilingDocument[]         @relation("DocumentUploader")
   manifestQueries        ManifestQuery[]
   abiDocuments           AbiDocument[]
+  emailVerificationTokens EmailVerificationToken[]
 
   @@index([orgId])
   @@index([email])
   @@map("users")
+}
+
+// ─── Email Verification Tokens ─────────────────────────────
+// 6-digit codes emailed to the user. Stored as bcrypt hash since the
+// numeric search space is small (1M); rate-limiting + 15-min expiry +
+// 5-attempt cap is what actually keeps brute force off, but hashing is
+// cheap defense in depth.
+//
+// Lifecycle:
+//   request  → invalidate prior unconsumed → insert new token (15-min TTL)
+//   confirm  → bcrypt.compare against most-recent active token → on match,
+//              set User.emailVerified=true and mark consumedAt
+//   resend   → 60s cooldown since lastIssuedAt; otherwise same as request
+//
+// We deliberately do NOT include the recipient email in the token — it
+// belongs to one user, and that user's email is mutable. The userId FK
+// is what binds the token to the right person.
+model EmailVerificationToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  codeHash   String    @map("code_hash") @db.VarChar(255)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz()
+  attempts   Int       @default(0)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz()
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Drainer/lookup index — we always want "most recent unconsumed token
+  // for this user" which is (userId, consumedAt, createdAt DESC).
+  @@index([userId, consumedAt, createdAt])
+  @@map("email_verification_tokens")
 }
 
 // ─── ISF Filings ───────────────────────────────────────────

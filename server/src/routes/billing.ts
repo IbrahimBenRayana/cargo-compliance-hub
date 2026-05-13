@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import Stripe from 'stripe';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
 import { getStripe, stripeConfigured } from '../services/stripe.js';
 import { notify } from '../services/notifications.js';
 import { env } from '../config/env.js';
@@ -240,7 +241,7 @@ router.use(authMiddleware);
 // POST /api/v1/billing/checkout-session
 // Body: { planId: string, successUrl?: string, cancelUrl?: string }
 // Returns: { url: string, sessionId: string }
-router.post('/checkout-session', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/checkout-session', requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
   if (!stripeConfigured()) {
     res.status(503).json({ error: 'Billing not configured. Contact support.' });
     return;

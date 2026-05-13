@@ -1,6 +1,7 @@
 import { Router, type Response } from 'express';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
 import { ccClient } from '../services/customscity.js';
 import { ccApiLimiter } from '../middleware/rateLimiter.js';
 import {
@@ -495,7 +496,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
 // ── POST /:id/send — Transmit to CC ────────────────────
 
-router.post('/:id/send', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
   const doc = await prisma.abiDocument.findFirst({

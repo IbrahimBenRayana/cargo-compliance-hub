@@ -58,6 +58,20 @@ async function apiFetch<T = any>(
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({ error: response.statusText }));
+    // Email-verification gate: server returned 403 with code='email_not_verified'.
+    // The frontend's ProtectedRoute already redirects on app load, but a stale
+    // tab whose user state hasn't refreshed could still call a sensitive route.
+    // Bounce to /verify-email with the current path as the redirect target.
+    if (
+      response.status === 403 &&
+      errorBody?.code === 'email_not_verified' &&
+      typeof window !== 'undefined' &&
+      !window.location.pathname.startsWith('/verify-email')
+    ) {
+      const intent = window.location.pathname + window.location.search;
+      window.location.href = `/verify-email?redirect=${encodeURIComponent(intent)}`;
+      throw new Error('Email verification required');
+    }
     const error = new Error(errorBody.error || `HTTP ${response.status}`);
     (error as any).status = response.status;
     (error as any).body = errorBody;
@@ -126,6 +140,30 @@ export const authApi = {
 
   me() {
     return apiFetch<any>('/api/v1/auth/me');
+  },
+
+  verifyEmailState() {
+    return apiFetch<{
+      emailVerified: boolean;
+      email: string;
+      canResend: boolean;
+      cooldownRemainingSec: number;
+      codeLength: number;
+    }>('/api/v1/auth/verify-email/state');
+  },
+
+  verifyEmailResend() {
+    return apiFetch<{ ok: boolean; alreadyVerified?: boolean; cooldownSec?: number; expiresInMin?: number }>(
+      '/api/v1/auth/verify-email/resend',
+      { method: 'POST' },
+    );
+  },
+
+  verifyEmailConfirm(code: string) {
+    return apiFetch<{ ok: boolean }>(
+      '/api/v1/auth/verify-email/confirm',
+      { method: 'POST', body: JSON.stringify({ code }) },
+    );
   },
 };
 
