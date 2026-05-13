@@ -87,8 +87,6 @@ export default function OnboardingPage() {
           name: companyName.trim() || undefined,
           iorNumber: iorNumber.trim() || undefined,
           einNumber: einNumber.trim() || undefined,
-          phone: phone.trim() || undefined,
-          website: website.trim() || undefined,
         });
         toast.success('Company profile saved');
       } catch {
@@ -122,15 +120,15 @@ export default function OnboardingPage() {
 
   // ─── Render ─────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-950 dark:to-slate-950">
       {/* Top bar */}
-      <div className="border-b bg-white/80 backdrop-blur-sm">
+      <div className="border-b border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Ship className="h-7 w-7 text-blue-600" />
-            <span className="text-lg font-bold tracking-tight">MyCargoLens</span>
+            <Ship className="h-7 w-7 text-primary" />
+            <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-50">MyCargoLens</span>
           </div>
-          <Badge variant="secondary" className="text-xs">Setup Wizard</Badge>
+          <Badge variant="secondary" className="text-[10px] uppercase tracking-[0.1em] font-semibold">Setup</Badge>
         </div>
       </div>
 
@@ -144,10 +142,10 @@ export default function OnboardingPage() {
             return (
               <div key={s.id} className="flex items-center">
                 <div className={cn(
-                  'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300',
-                  isActive && 'bg-blue-600 text-white shadow-md shadow-blue-200',
-                  isCompleted && 'bg-emerald-100 text-emerald-700',
-                  !isActive && !isCompleted && 'bg-gray-100 text-gray-400',
+                  'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300',
+                  isActive && 'bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/20 dark:ring-amber-400/30',
+                  isCompleted && 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 ring-1 ring-emerald-200/60 dark:ring-emerald-500/20',
+                  !isActive && !isCompleted && 'bg-slate-100 text-slate-400 dark:bg-slate-900 dark:text-slate-500',
                 )}>
                   {isCompleted ? (
                     <CheckCircle2 className="h-3.5 w-3.5" />
@@ -159,7 +157,7 @@ export default function OnboardingPage() {
                 {i < STEPS.length - 1 && (
                   <ChevronRight className={cn(
                     'h-4 w-4 mx-1',
-                    isCompleted ? 'text-emerald-400' : 'text-gray-300',
+                    isCompleted ? 'text-emerald-400 dark:text-emerald-500' : 'text-slate-300 dark:text-slate-700',
                   )} />
                 )}
               </div>
@@ -169,11 +167,11 @@ export default function OnboardingPage() {
 
         {/* ─── Step 0: Company Profile ────────────────────── */}
         {step === 0 && (
-          <Card className="animate-fade-in-up shadow-lg border-0 shadow-gray-200/50">
+          <Card className="animate-fade-in-up border border-slate-200 dark:border-slate-800 shadow-sm dark:bg-slate-900/40">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3 mb-1">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
-                  <Building2 className="h-5 w-5 text-white" />
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_8px_20px_-10px_rgba(245,158,11,0.5)] flex items-center justify-center">
+                  <Building2 className="h-5 w-5 text-amber-950" />
                 </div>
                 <div>
                   <CardTitle className="text-xl">Welcome! Let's set up your company</CardTitle>
@@ -244,7 +242,7 @@ export default function OnboardingPage() {
 
         {/* ─── Step 1: API Connection ─────────────────────── */}
         {step === 1 && (
-          <Card className="animate-fade-in-up shadow-lg border-0 shadow-gray-200/50">
+          <Card className="animate-fade-in-up border border-slate-200 dark:border-slate-800 shadow-sm dark:bg-slate-900/40">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3 mb-1">
                 <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md">
@@ -257,12 +255,12 @@ export default function OnboardingPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-5">
-                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-blue-800">
+              <div className="rounded-xl bg-amber-50/60 dark:bg-amber-500/[0.06] border border-amber-200/60 dark:border-amber-500/20 p-5">
+                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-amber-900 dark:text-amber-300">
                   <Globe className="h-4 w-4" />
                   How it works
                 </h4>
-                <p className="text-sm text-blue-700 leading-relaxed">
+                <p className="text-sm text-amber-900/80 dark:text-amber-200/80 leading-relaxed">
                   MyCargoLens connects to the <strong>CBP Filing Gateway</strong> to electronically submit your ISF filings
                   to U.S. Customs & Border Protection (CBP). Your API credentials are configured in the server
                   environment — click below to verify the connection.
@@ -321,11 +319,11 @@ export default function OnboardingPage() {
 
         {/* ─── Step 2: Get Started ────────────────────────── */}
         {step === 2 && (
-          <Card className="animate-fade-in-up shadow-lg border-0 shadow-gray-200/50">
+          <Card className="animate-fade-in-up border border-slate-200 dark:border-slate-800 shadow-sm dark:bg-slate-900/40">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3 mb-1">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md">
-                  <FileText className="h-5 w-5 text-white" />
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_8px_20px_-10px_rgba(245,158,11,0.5)] flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-amber-950" />
                 </div>
                 <div>
                   <CardTitle className="text-xl">You're almost ready!</CardTitle>
@@ -336,43 +334,44 @@ export default function OnboardingPage() {
             <CardContent className="space-y-5">
               <div className="grid gap-4">
                 <button
-                  onClick={async () => {
-                    await handleNext();
-                    navigate('/shipments/new', { replace: true });
+                  onClick={() => {
+                    handleNext();
+                    // Will navigate to new filing after onboarding completes
+                    setTimeout(() => navigate('/shipments/new', { replace: true }), 300);
                   }}
-                  className="flex items-start gap-4 p-5 rounded-xl border-2 border-transparent hover:border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all text-left group"
+                  className="flex items-start gap-4 p-5 rounded-xl border border-amber-200/60 dark:border-amber-500/20 bg-amber-50/60 dark:bg-amber-500/[0.05] hover:bg-amber-50 dark:hover:bg-amber-500/[0.08] hover:border-amber-300 dark:hover:border-amber-500/30 transition-colors duration-200 cursor-pointer text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
-                  <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                    <FileText className="h-6 w-6 text-white" />
+                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_8px_20px_-10px_rgba(245,158,11,0.5)] flex items-center justify-center flex-shrink-0">
+                    <FileText className="h-6 w-6 text-amber-950" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-base mb-1">Create your first ISF filing</h3>
+                    <h3 className="font-semibold text-base mb-1 text-slate-900 dark:text-slate-50">Create your first ISF filing</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
                       Jump right in and create an ISF-10 or ISF-5 filing with our step-by-step wizard.
                       Perfect if you have a shipment ready to file.
                     </p>
                   </div>
-                  <ArrowRight className="h-5 w-5 text-blue-400 mt-1 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-1 flex-shrink-0 group-hover:translate-x-0.5 transition-transform duration-200 motion-reduce:transform-none" />
                 </button>
 
                 <button
                   onClick={async () => {
                     await handleNext();
-                    navigate('/', { replace: true });
+                    setTimeout(() => navigate('/', { replace: true }), 300);
                   }}
-                  className="flex items-start gap-4 p-5 rounded-xl border-2 border-transparent hover:border-gray-200 bg-gray-50 hover:bg-gray-100 transition-all text-left group"
+                  className="flex items-start gap-4 p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-200 cursor-pointer text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
-                  <div className="h-12 w-12 rounded-xl bg-gray-600 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                    <Globe className="h-6 w-6 text-white" />
+                  <div className="h-12 w-12 rounded-xl bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700 flex items-center justify-center flex-shrink-0">
+                    <Globe className="h-6 w-6 text-slate-600 dark:text-slate-300" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-base mb-1">Explore the dashboard first</h3>
+                    <h3 className="font-semibold text-base mb-1 text-slate-900 dark:text-slate-50">Explore the dashboard first</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
                       Take a look around the platform — browse the dashboard, check compliance tools,
                       and get familiar before creating your first filing.
                     </p>
                   </div>
-                  <ArrowRight className="h-5 w-5 text-gray-400 mt-1 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="h-5 w-5 text-slate-400 mt-1 flex-shrink-0 group-hover:translate-x-0.5 transition-transform duration-200 motion-reduce:transform-none" />
                 </button>
               </div>
             </CardContent>
@@ -381,12 +380,12 @@ export default function OnboardingPage() {
 
         {/* ─── Step 3: Done ───────────────────────────────── */}
         {step === 3 && (
-          <Card className="animate-fade-in-up shadow-lg border-0 shadow-gray-200/50 text-center">
+          <Card className="animate-fade-in-up border border-slate-200 dark:border-slate-800 shadow-sm dark:bg-slate-900/40 text-center">
             <CardContent className="py-14">
-              <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 shadow-lg shadow-emerald-200 mb-6">
-                <PartyPopper className="h-10 w-10 text-white" />
+              <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_12px_36px_-12px_rgba(245,158,11,0.55)] mb-6">
+                <PartyPopper className="h-10 w-10 text-amber-950" />
               </div>
-              <h2 className="text-2xl font-black mb-2">You're all set! 🎉</h2>
+              <h2 className="text-2xl font-semibold mb-2 text-slate-900 dark:text-slate-50">You're all set</h2>
               <p className="text-muted-foreground max-w-md mx-auto mb-8">
                 Your organization is configured and ready to go. Start filing ISFs,
                 invite team members, and manage your compliance from one place.
