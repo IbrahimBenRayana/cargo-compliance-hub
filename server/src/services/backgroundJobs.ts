@@ -34,8 +34,10 @@ let lastStatusPoll: Date | null = null;
 let lastDeadlineCheck: Date | null = null;
 let statusPollStats = { checked: 0, updated: 0, errors: 0 };
 
-// Stale-filing dedup is still in-memory (low risk — only advisory notifications)
-const sentStaleAlerts = new Set<string>();
+// Stale-filing dedup is delegated to the dispatcher's persistent dedupeKey
+// (Notification.dedupeKey is @unique), so it survives restarts and concurrent
+// callers. The previous in-memory Set re-fired the same alert on every restart,
+// which produced "No CBP Response" notifications for filings 7+ weeks old.
 
 // ─── 1. STATUS POLLING JOB ────────────────────────────────
 
@@ -291,7 +293,7 @@ async function checkDeadlines(): Promise<void> {
         filing.orgId,
         filing.id,
         'deadline_overdue',
-        'OVERDUE: Filing deadline passed 🚨',
+        'Filing deadline overdue',
         `ISF filing ${bol} deadline has PASSED. Submit immediately to avoid CBP penalties ($5,000-$10,000).`,
         { dedupeKey, linkUrl: `/shipments/${filing.id}`, metadata: { bolNumber: bol } },
       );
@@ -315,14 +317,22 @@ async function checkDeadlines(): Promise<void> {
 
 async function checkStaleFilings(): Promise<void> {
   try {
-    const staleThreshold = new Date(Date.now() - 72 * 60 * 60 * 1000); // 72h ago
+    // Alert window: submitted between 14 days and 72 hours ago. The lower bound
+    // (72h) is the "CBP should have responded by now" threshold; the upper bound
+    // (14d) is the "user has clearly given up — stop nagging them" cap. Older
+    // filings either got resolved offline or were abandoned; either way more
+    // automated nags don't help.
+    const now = Date.now();
+    const staleThreshold  = new Date(now - 72 * 60 * 60 * 1000);
+    const maxAgeThreshold = new Date(now - 14 * 24 * 60 * 60 * 1000);
 
     const staleFilings = await prisma.filing.findMany({
       where: {
         status: 'submitted',
         submittedAt: {
           not: null,
-          lt: staleThreshold,
+          lt:  staleThreshold,
+          gte: maxAgeThreshold,
         },
       },
       select: {
@@ -335,20 +345,20 @@ async function checkStaleFilings(): Promise<void> {
     });
 
     for (const filing of staleFilings) {
-      const alertKey = `${filing.id}_stale`;
-      if (sentStaleAlerts.has(alertKey)) continue;
-
       const bol = filing.houseBol || filing.masterBol || filing.id.slice(0, 8);
-      const hoursAgo = Math.round((Date.now() - filing.submittedAt!.getTime()) / (1000 * 60 * 60));
+      const hoursAgo = Math.round((now - filing.submittedAt!.getTime()) / (1000 * 60 * 60));
 
+      // dedupeKey is globally @unique on Notification, so notify() short-circuits
+      // on the second-and-Nth call for the same filing — no matter the restart,
+      // no matter the concurrent caller. One "stale" alert per filing, ever.
       await notifyOrgUsers(
         filing.orgId,
         filing.id,
         'filing_stale',
-        'No CBP Response ⚠️',
-        `ISF filing ${bol} was submitted ${hoursAgo}h ago but no CBP response received. Please check the filing status.`
+        'No CBP Response',
+        `ISF filing ${bol} was submitted ${hoursAgo}h ago but no CBP response received. Please check the filing status.`,
+        { dedupeKey: `${filing.id}_stale` },
       );
-      sentStaleAlerts.add(alertKey);
 
       logger.warn({ bol, hoursAgo }, '[Jobs:StaleCheck] No CBP response for filing');
     }
