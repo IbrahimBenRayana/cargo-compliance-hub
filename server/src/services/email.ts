@@ -116,9 +116,12 @@ function wrapTemplate(body: string): string {
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 24px 32px;">
-              <h1 style="margin:0; color:#fff; font-size:22px; font-weight:700; letter-spacing:-0.3px;">
-                📦 MyCargoLens
+              <h1 style="margin:0; color:#fff; font-size:20px; font-weight:600; letter-spacing:-0.2px;">
+                MyCargoLens
               </h1>
+              <p style="margin:4px 0 0; color:rgba(255,255,255,0.78); font-size:12px; letter-spacing:0.04em;">
+                ISF compliance platform
+              </p>
             </td>
           </tr>
           <!-- Body -->
@@ -206,7 +209,7 @@ export async function sendFilingAcceptedEmail(params: {
   const dashboardUrl = `${env.FRONTEND_URL}/shipments/${params.filingId}`;
 
   const body = `
-    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing Accepted ✅</h2>
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing accepted</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
       Your ISF filing <strong>${params.bolNumber}</strong> has been <strong style="color:#16a34a;">accepted</strong> by U.S. Customs and Border Protection.
     </p>
@@ -219,7 +222,7 @@ export async function sendFilingAcceptedEmail(params: {
 
   return sendMail({
     to: params.to,
-    subject: `✅ ISF Filing Accepted — ${params.bolNumber}`,
+    subject: `ISF filing accepted — ${params.bolNumber}`,
     html: wrapTemplate(body),
   });
 }
@@ -236,7 +239,7 @@ export async function sendFilingRejectedEmail(params: {
   const dashboardUrl = `${env.FRONTEND_URL}/shipments/${params.filingId}`;
 
   const body = `
-    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing Rejected ❌</h2>
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing rejected</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
       Your ISF filing <strong>${params.bolNumber}</strong> has been <strong style="color:#dc2626;">rejected</strong> by U.S. Customs and Border Protection.
     </p>
@@ -252,7 +255,7 @@ export async function sendFilingRejectedEmail(params: {
 
   return sendMail({
     to: params.to,
-    subject: `❌ ISF Filing Rejected — ${params.bolNumber}`,
+    subject: `ISF filing rejected — ${params.bolNumber}`,
     html: wrapTemplate(body),
   });
 }
@@ -268,16 +271,19 @@ export async function sendDeadlineWarningEmail(params: {
 }): Promise<boolean> {
   const dashboardUrl = `${env.FRONTEND_URL}/shipments/${params.filingId}`;
 
-  const urgency = params.hoursRemaining <= 24 ? '🔴' : params.hoursRemaining <= 48 ? '🟡' : '🟠';
+  const urgencyLabel = params.hoursRemaining <= 24 ? 'Urgent' : params.hoursRemaining <= 48 ? 'Soon'   : 'Reminder';
   const urgencyColor = params.hoursRemaining <= 24 ? '#dc2626' : params.hoursRemaining <= 48 ? '#d97706' : '#ea580c';
+  const urgencyBg    = params.hoursRemaining <= 24 ? '#fef2f2' : params.hoursRemaining <= 48 ? '#fffbeb' : '#fff7ed';
+
+  const pill = `<span style="display:inline-block; padding:3px 9px; margin-right:8px; font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:${urgencyColor}; background:${urgencyBg}; border:1px solid ${urgencyColor}33; border-radius:999px; vertical-align:middle;">${urgencyLabel}</span>`;
 
   const body = `
-    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">${urgency} Filing Deadline Approaching</h2>
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">${pill}Filing deadline approaching</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
       ISF filing <strong>${params.bolNumber}</strong> must be submitted within
       <strong style="color:${urgencyColor};">${params.hoursRemaining} hours</strong>.
     </p>
-    <div style="margin:0 0 16px; padding:12px 16px; background:#fffbeb; border-left:4px solid ${urgencyColor}; border-radius:4px;">
+    <div style="margin:0 0 16px; padding:12px 16px; background:${urgencyBg}; border-left:4px solid ${urgencyColor}; border-radius:4px;">
       <p style="margin:0; font-size:14px; color:#92400e;">
         ISF filings must be submitted at least 24 hours before cargo is loaded onto a vessel destined for the United States. Late filings may result in penalties.
       </p>
@@ -287,7 +293,7 @@ export async function sendDeadlineWarningEmail(params: {
 
   return sendMail({
     to: params.to,
-    subject: `${urgency} Deadline in ${params.hoursRemaining}h — ISF Filing ${params.bolNumber}`,
+    subject: `${urgencyLabel}: deadline in ${params.hoursRemaining}h — ISF filing ${params.bolNumber}`,
     html: wrapTemplate(body),
   });
 }
@@ -304,7 +310,7 @@ export async function sendFilingSubmittedEmail(params: {
   const dashboardUrl = `${env.FRONTEND_URL}/shipments/${params.filingId}`;
 
   const body = `
-    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing Submitted 🚀</h2>
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing submitted</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
       <strong>${params.submitterName}</strong> has submitted ISF filing <strong>${params.bolNumber}</strong> to CBP.
     </p>
@@ -316,7 +322,7 @@ export async function sendFilingSubmittedEmail(params: {
 
   return sendMail({
     to: params.to,
-    subject: `🚀 ISF Filing Submitted — ${params.bolNumber}`,
+    subject: `ISF filing submitted — ${params.bolNumber}`,
     html: wrapTemplate(body),
   });
 }
@@ -332,7 +338,7 @@ export async function sendWelcomeEmail(params: {
   const dashboardUrl = `${env.FRONTEND_URL}/dashboard`;
 
   const body = `
-    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Welcome to MyCargoLens, ${params.firstName}! 🎉</h2>
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Welcome to MyCargoLens, ${params.firstName}.</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
       Your account for <strong>${params.organizationName}</strong> has been created. You're all set to start managing ISF 10+2 filings.
     </p>
@@ -360,7 +366,7 @@ export async function sendWelcomeEmail(params: {
  */
 export async function sendTestEmail(to: string): Promise<boolean> {
   const body = `
-    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Email Configuration Test ✅</h2>
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Email configuration test</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
       If you're reading this, your MyCargoLens email integration is working correctly.
     </p>
@@ -371,7 +377,7 @@ export async function sendTestEmail(to: string): Promise<boolean> {
 
   return sendMail({
     to,
-    subject: '✅ MyCargoLens Email Test — Connection Successful',
+    subject: 'MyCargoLens email test — connection successful',
     html: wrapTemplate(body),
   });
 }
@@ -401,10 +407,13 @@ interface RenderedEmail {
   html: string;
 }
 
+// Severity is communicated via the banner color/border, not glyphs. Keeping
+// the prefix map for future label-only use (e.g., "Action needed:") if we
+// want one — for now it's empty for every level so subjects stay clean.
 const SEVERITY_PREFIX: Record<RenderableNotification['severity'], string> = {
   info:     '',
-  warning:  '⚠ ',
-  critical: '🔴 ',
+  warning:  '',
+  critical: '',
 };
 
 const SEVERITY_BANNER_BG: Record<RenderableNotification['severity'], string> = {
@@ -481,13 +490,13 @@ function renderFilingSubmitted(n: RenderableNotification): RenderedEmail {
   const bol = meta(n, 'bolNumber') ?? 'unknown';
   const dashboardUrl = n.linkUrl ? `${env.FRONTEND_URL}${n.linkUrl}` : env.FRONTEND_URL;
   const body = `
-    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing Submitted 🚀</h2>
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing submitted</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
       Your ISF filing <strong>${bol}</strong> has been submitted to U.S. Customs and Border Protection. We'll let you know as soon as we hear back.
     </p>
     ${buttonHtml('View Filing', dashboardUrl)}
   `;
-  return { subject: `🚀 ISF Filing Submitted — ${bol}`, html: wrapTemplate(body) };
+  return { subject: `ISF filing submitted — ${bol}`, html: wrapTemplate(body) };
 }
 
 function renderFilingAccepted(n: RenderableNotification): RenderedEmail {
@@ -495,7 +504,7 @@ function renderFilingAccepted(n: RenderableNotification): RenderedEmail {
   const cbpTxn = meta(n, 'cbpTransactionId');
   const dashboardUrl = n.linkUrl ? `${env.FRONTEND_URL}${n.linkUrl}` : env.FRONTEND_URL;
   const body = `
-    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing Accepted ✅</h2>
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing accepted</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
       Your ISF filing <strong>${bol}</strong> has been <strong style="color:#16a34a;">accepted</strong> by U.S. Customs and Border Protection.
     </p>
@@ -505,7 +514,7 @@ function renderFilingAccepted(n: RenderableNotification): RenderedEmail {
     </table>
     ${buttonHtml('View Filing Details', dashboardUrl)}
   `;
-  return { subject: `✅ ISF Filing Accepted — ${bol}`, html: wrapTemplate(body) };
+  return { subject: `ISF filing accepted — ${bol}`, html: wrapTemplate(body) };
 }
 
 function renderFilingRejected(n: RenderableNotification): RenderedEmail {
@@ -513,7 +522,7 @@ function renderFilingRejected(n: RenderableNotification): RenderedEmail {
   const reason = meta(n, 'reason');
   const dashboardUrl = n.linkUrl ? `${env.FRONTEND_URL}${n.linkUrl}` : env.FRONTEND_URL;
   const body = `
-    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing Rejected ❌</h2>
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Filing rejected</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
       Your ISF filing <strong>${bol}</strong> has been <strong style="color:#dc2626;">rejected</strong> by U.S. Customs and Border Protection.
     </p>
@@ -526,21 +535,24 @@ function renderFilingRejected(n: RenderableNotification): RenderedEmail {
     </p>
     ${buttonHtml('Review Filing', dashboardUrl)}
   `;
-  return { subject: `❌ ISF Filing Rejected — ${bol}`, html: wrapTemplate(body) };
+  return { subject: `ISF filing rejected — ${bol}`, html: wrapTemplate(body) };
 }
 
 function renderDeadlineWarning(n: RenderableNotification): RenderedEmail {
   const bol = meta(n, 'bolNumber') ?? 'unknown';
   const hours = metaNum(n, 'hoursRemaining') ?? 0;
   const dashboardUrl = n.linkUrl ? `${env.FRONTEND_URL}${n.linkUrl}` : env.FRONTEND_URL;
-  const urgency = hours <= 24 ? '🚨 URGENT' : hours <= 48 ? '⏰ Soon' : '📅 Reminder';
+  const urgencyLabel = hours <= 24 ? 'Urgent' : hours <= 48 ? 'Soon' : 'Reminder';
+  const urgencyColor = hours <= 24 ? '#dc2626' : hours <= 48 ? '#d97706' : '#ea580c';
+  const urgencyBg    = hours <= 24 ? '#fef2f2' : hours <= 48 ? '#fffbeb' : '#fff7ed';
+  const pill = `<span style="display:inline-block; padding:3px 9px; margin-right:8px; font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:${urgencyColor}; background:${urgencyBg}; border:1px solid ${urgencyColor}33; border-radius:999px; vertical-align:middle;">${urgencyLabel}</span>`;
   const body = `
-    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">${urgency}: Filing Deadline in ${hours}h</h2>
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">${pill}Filing deadline in ${hours}h</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
       Your ISF filing <strong>${bol}</strong> deadline is in <strong>${hours} hours</strong>.
       Submit soon to avoid CBP penalties ($5,000–$10,000).
     </p>
     ${buttonHtml('Open Filing', dashboardUrl)}
   `;
-  return { subject: `${urgency}: ISF Deadline in ${hours}h — ${bol}`, html: wrapTemplate(body) };
+  return { subject: `${urgencyLabel}: ISF deadline in ${hours}h — ${bol}`, html: wrapTemplate(body) };
 }

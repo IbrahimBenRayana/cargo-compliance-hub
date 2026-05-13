@@ -171,23 +171,47 @@ export async function notify(event: NotifyEvent): Promise<void> {
     //
     // createManyAndReturn gives us back the inserted ids so we can
     // chain delivery rows onto them in a single round-trip.
-    const created = await prisma.notification.createManyAndReturn({
-      data: audienceUserIds.map((userId, i) => ({
-        userId,
-        orgId:         event.audience.orgId,
-        filingId:      event.filingId ?? null,
-        abiDocumentId: event.abiDocumentId ?? null,
-        type:          event.kind,
-        severity,
-        title:         event.title,
-        message:       event.message ?? null,
-        linkUrl:       event.linkUrl ?? null,
-        metadata,
-        dedupeKey:     i === 0 ? (event.dedupeKey ?? null) : null,
-      })),
-      skipDuplicates: true,
-      select: { id: true, userId: true },
-    });
+    // Race-safety: only row[0] carries the dedupeKey (rows 1..N use null since
+    // Notification.dedupeKey is globally @unique and a single dispatch = one
+    // semantic event). We deliberately omit `skipDuplicates` here: if two
+    // callers race past the pre-check above with the same dedupeKey, Postgres
+    // rejects the whole INSERT atomically with P2002 — we catch it and no-op.
+    //
+    // With skipDuplicates=true the losing caller would silently insert rows 1..N
+    // (their null dedupeKey doesn't conflict), producing duplicate notifications
+    // + duplicate email deliveries. That was the root cause of "same email
+    // arriving 3 times in a row".
+    let created: Array<{ id: string; userId: string }>;
+    try {
+      created = await prisma.notification.createManyAndReturn({
+        data: audienceUserIds.map((userId, i) => ({
+          userId,
+          orgId:         event.audience.orgId,
+          filingId:      event.filingId ?? null,
+          abiDocumentId: event.abiDocumentId ?? null,
+          type:          event.kind,
+          severity,
+          title:         event.title,
+          message:       event.message ?? null,
+          linkUrl:       event.linkUrl ?? null,
+          metadata,
+          dedupeKey:     i === 0 ? (event.dedupeKey ?? null) : null,
+        })),
+        select: { id: true, userId: true },
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        logger.debug(
+          { kind: event.kind, dedupeKey: event.dedupeKey },
+          '[Notifications] Deduped (concurrent dispatch lost the race)',
+        );
+        return;
+      }
+      throw err;
+    }
 
     // Phase 6: enqueue email deliveries. Skip users with email opt-out.
     if (created.length > 0) {
