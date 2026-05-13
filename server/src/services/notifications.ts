@@ -242,7 +242,12 @@ async function enqueueEmailDeliveries(
   }
 
   if (deliveries.length === 0) return;
-  await prisma.notificationDelivery.createMany({ data: deliveries });
+  // skipDuplicates pairs with the @@unique([notificationId, recipient, channel])
+  // constraint added in migration 5. If a duplicate enqueue ever happens
+  // (e.g. dispatcher retry path), the dup row is silently skipped instead of
+  // throwing — the original delivery still wins and the user gets exactly
+  // one email.
+  await prisma.notificationDelivery.createMany({ data: deliveries, skipDuplicates: true });
 }
 
 /**
