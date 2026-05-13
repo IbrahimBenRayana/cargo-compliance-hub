@@ -7,8 +7,14 @@ import { env } from '../config/env.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
-import { sendWelcomeEmail } from '../services/email.js';
+import { sendWelcomeEmail, sendVerificationCodeEmail } from '../services/email.js';
 import { notify } from '../services/notifications.js';
+import {
+  requestVerificationCode,
+  confirmVerificationCode,
+  getResendState,
+  VERIFICATION_CONSTANTS,
+} from '../services/emailVerification.js';
 
 const router = Router();
 
@@ -114,7 +120,12 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
           firstName: data.firstName,
           lastName: data.lastName,
           role,
-          emailVerified: true, // Skip email verification for MVP
+          // New accounts start unverified — a 6-digit code is sent below and
+          // the frontend gates writes (filing submit, ABI submit, billing
+          // checkout) on emailVerified=true via the requireVerifiedEmail
+          // middleware. Existing accounts pre-dating this rollout are not
+          // affected (they're already true in the DB).
+          emailVerified: false,
         },
       });
 
@@ -143,6 +154,7 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
         firstName: result.user.firstName,
         lastName: result.user.lastName,
         role: result.user.role,
+        emailVerified: result.user.emailVerified,
         organization: {
           id: result.org.id,
           name: result.org.name,
@@ -152,6 +164,28 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
       accessToken,
       refreshToken,
     });
+
+    // Fire-and-forget: issue + email a fresh 6-digit verification code.
+    // bypassCooldown because this is the very first request post-signup;
+    // a normal cooldown check would always pass anyway (no prior tokens
+    // exist) but being explicit avoids a roundtrip and a possible race.
+    (async () => {
+      try {
+        const { code, expiresAt } = await requestVerificationCode(
+          result.user.id,
+          { bypassCooldown: true },
+        );
+        const expiresInMin = Math.max(1, Math.round((expiresAt.getTime() - Date.now()) / 60_000));
+        await sendVerificationCodeEmail({
+          to: result.user.email,
+          firstName: result.user.firstName,
+          code,
+          expiresInMin,
+        });
+      } catch {
+        // Non-fatal — the user can hit /resend from the verify page.
+      }
+    })();
 
     // Audit log (fire-and-forget)
     const meta = getRequestMeta(req);
@@ -368,6 +402,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promi
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
+    emailVerified: user.emailVerified,
     organization: {
       id: user.organization.id,
       name: user.organization.name,
@@ -377,5 +412,121 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promi
     },
   });
 });
+
+// ─── Email verification endpoints ────────────────────────────────────
+// All three require an authenticated session — the user signs up, gets an
+// access token, then lands on /verify-email and exchanges its code. The
+// requireVerifiedEmail middleware separately gates sensitive *write* paths
+// (filing submit, ABI submit, billing checkout) so the user isn't stuck.
+
+const verifyConfirmSchema = z.object({
+  code: z.string().min(4).max(10).regex(/^\d+$/, 'Code must be digits only'),
+});
+
+// POST /api/v1/auth/verify-email/resend — issue a fresh code, email it.
+// Rate-limited by the service via per-user 60s cooldown; on top of that
+// authLimiter caps to 10/min/IP for spam prevention.
+router.post('/verify-email/resend', authLimiter, authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { id: true, email: true, firstName: true, emailVerified: true },
+  });
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  if (user.emailVerified) {
+    res.json({ ok: true, alreadyVerified: true });
+    return;
+  }
+
+  try {
+    const { code, expiresAt } = await requestVerificationCode(user.id);
+    const expiresInMin = Math.max(1, Math.round((expiresAt.getTime() - Date.now()) / 60_000));
+    sendVerificationCodeEmail({
+      to: user.email,
+      firstName: user.firstName,
+      code,
+      expiresInMin,
+    }).catch(() => { /* swallow — user can hit resend again */ });
+    res.json({ ok: true, cooldownSec: 60, expiresInMin });
+  } catch (err: any) {
+    if (err?.code === 'COOLDOWN') {
+      res.status(429).json({
+        error: err.message,
+        cooldownRemainingSec: err.cooldownRemainingSec,
+      });
+      return;
+    }
+    throw err;
+  }
+});
+
+// GET /api/v1/auth/verify-email/state — quick check used by the UI to drive
+// the resend-countdown without hitting the resend endpoint speculatively.
+router.get('/verify-email/state', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { emailVerified: true, email: true },
+  });
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  const state = await getResendState(req.user!.id);
+  res.json({
+    emailVerified: user.emailVerified,
+    email: user.email,
+    canResend: state.canResend,
+    cooldownRemainingSec: state.cooldownRemainingSec,
+    codeLength: VERIFICATION_CONSTANTS.CODE_LENGTH,
+  });
+});
+
+// POST /api/v1/auth/verify-email/confirm — submit the 6-digit code.
+router.post('/verify-email/confirm', authLimiter, authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = verifyConfirmSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid code format', details: parsed.error.flatten() });
+    return;
+  }
+
+  const result = await confirmVerificationCode(req.user!.id, parsed.data.code);
+  if (result.ok) {
+    // Audit trail — we want to know exactly when a user verified, from where.
+    const meta = getRequestMeta(req);
+    writeAuditLog({
+      orgId: req.user!.orgId, userId: req.user!.id,
+      action: 'user.email_verified', entityType: 'user', entityId: req.user!.id,
+      newValue: { verifiedAt: new Date().toISOString() },
+      ...meta,
+    });
+    res.json({ ok: true });
+    return;
+  }
+
+  // Map service reasons to user-friendly HTTP responses. We deliberately use
+  // 400 for everything except "rate-locked" (429) so the UI can render a
+  // single inline error string and the actionable subset comes via
+  // `attemptsRemaining` when present.
+  const status = result.reason === 'locked' ? 429 : 400;
+  res.status(status).json({
+    error: humanReasonFor(result.reason),
+    reason: result.reason,
+    attemptsRemaining: result.attemptsRemaining,
+  });
+});
+
+function humanReasonFor(reason: ConfirmReason): string {
+  switch (reason) {
+    case 'expired':         return 'This code has expired. Request a new one.';
+    case 'locked':          return 'Too many incorrect attempts. Request a new code to continue.';
+    case 'no_active_token': return 'No active verification code. Request a new one to continue.';
+    case 'invalid':
+    default:                return 'That code is not correct. Please try again.';
+  }
+}
+
+type ConfirmReason = 'invalid' | 'expired' | 'locked' | 'no_active_token' | undefined;
 
 export default router;

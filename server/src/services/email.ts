@@ -382,6 +382,75 @@ export async function sendTestEmail(to: string): Promise<boolean> {
   });
 }
 
+/**
+ * Email Verification — 6-digit one-time code (Stripe/Linear/Vercel pattern).
+ *
+ * The code itself is the primary affordance; we also include a one-click
+ * verify link as a fallback so users who can't easily type into the app
+ * (e.g. signed up on mobile, opens email on desktop) still have a path.
+ *
+ * Body deliberately avoids emoji and uses a high-contrast monospace block
+ * for the digits — calm, professional, scans well in dark-mode inboxes.
+ */
+export async function sendVerificationCodeEmail(params: {
+  to: string;
+  firstName?: string | null;
+  code: string;
+  expiresInMin: number;
+}): Promise<boolean> {
+  const verifyUrl = `${env.FRONTEND_URL}/verify-email?code=${encodeURIComponent(params.code)}`;
+  // Split the code into 3+3 for legibility — same trick Stripe uses.
+  const codeFormatted = `${params.code.slice(0, 3)}&nbsp;&nbsp;${params.code.slice(3)}`;
+  const greeting = params.firstName ? `Hi ${params.firstName},` : 'Hi there,';
+
+  const body = `
+    <h2 style="margin:0 0 12px; font-size:20px; font-weight:600; color:#0f172a;">Verify your email address</h2>
+    <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#475569;">
+      ${greeting} thanks for joining MyCargoLens. Enter the verification code below to confirm your email and finish setting up your account.
+    </p>
+
+    <!-- Code block -->
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 24px; border-collapse:separate;">
+      <tr>
+        <td style="
+          padding:20px 32px;
+          background:#f8fafc;
+          border:1px solid #e2e8f0;
+          border-radius:10px;
+          text-align:center;
+        ">
+          <div style="font-size:11px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#64748b; margin-bottom:8px;">
+            Verification code
+          </div>
+          <div style="font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size:32px; font-weight:600; letter-spacing:0.18em; color:#0f172a; line-height:1;">
+            ${codeFormatted}
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:0 0 20px; font-size:14px; line-height:1.6; color:#475569; text-align:center;">
+      This code expires in <strong>${params.expiresInMin} minutes</strong>.
+    </p>
+
+    <p style="margin:0 0 8px; font-size:13px; line-height:1.6; color:#64748b; text-align:center;">
+      Or click the button below to verify in one tap:
+    </p>
+    ${buttonHtml('Verify email', verifyUrl)}
+
+    <hr style="margin:28px 0 16px; border:none; border-top:1px solid #e2e8f0;" />
+    <p style="margin:0; font-size:12px; line-height:1.6; color:#94a3b8;">
+      If you didn't sign up for MyCargoLens, you can safely ignore this email — no account will be created without confirming this code.
+    </p>
+  `;
+
+  return sendMail({
+    to: params.to,
+    subject: `Your MyCargoLens verification code: ${params.code}`,
+    html: wrapTemplate(body),
+  });
+}
+
 // ─── Phase 6: Generic notification renderer ──────────────────────────
 // Used by the delivery worker to render any notification into a sendable
 // email. Delegates to the existing specialized templates for the four

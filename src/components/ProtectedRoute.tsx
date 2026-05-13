@@ -16,7 +16,7 @@ export function ProtectedRoute() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-blue-600" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -33,11 +33,32 @@ export function ProtectedRoute() {
     return <Navigate to={loginUrl} replace />;
   }
 
-  // If onboarding not completed and not already on onboarding page, redirect
+  // Email verification gate — sits BEFORE the onboarding redirect so a new
+  // signup verifies first, then sets up their company. We whitelist
+  // /verify-email itself so the user can actually reach the page; we also
+  // whitelist /logout-adjacent paths implicitly (login is unauthenticated,
+  // so it's already past). The server-side requireVerifiedEmail middleware
+  // is the load-bearing gate — this is just UX so the user doesn't see
+  // 403s mid-flow.
+  if (
+    user && user.emailVerified === false &&
+    location.pathname !== '/verify-email'
+  ) {
+    const intended = location.pathname + location.search;
+    const verifyUrl = intended && intended !== '/'
+      ? `/verify-email?redirect=${encodeURIComponent(intended)}`
+      : '/verify-email';
+    return <Navigate to={verifyUrl} replace />;
+  }
+
+  // If onboarding not completed and not already on onboarding page, redirect.
+  // Also let /verify-email through so unverified-with-incomplete-onboarding
+  // users hit the verify gate first (handled above) and aren't bounced here.
   if (
     user?.organization &&
     user.organization.onboardingCompleted === false &&
-    location.pathname !== '/onboarding'
+    location.pathname !== '/onboarding' &&
+    location.pathname !== '/verify-email'
   ) {
     return <Navigate to="/onboarding" replace />;
   }

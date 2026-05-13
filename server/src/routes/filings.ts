@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
 import { ccClient, mapFilingToCC, mapFilingToISF5CC, mapFilingToCCPayload } from '../services/customscity.js';
 import { validateFiling, isValidTransition, getAllowedTransitions, ValidationResult } from '../services/validation.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
@@ -333,7 +334,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 });
 
 // ─── POST /api/v1/filings/:id/submit — Submit to CBP ──────
-router.post('/:id/submit', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
   const filing = await prisma.filing.findFirst({
     where: { id: paramId(req), orgId: req.user!.orgId },
   });

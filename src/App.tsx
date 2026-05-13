@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
+import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import UpgradePage from "@/pages/UpgradePage";
 import UpgradeSuccessPage from "@/pages/UpgradeSuccessPage";
@@ -53,6 +54,11 @@ const App = () => (
 
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
+              {/* Email verification — full-page, no sidebar. Must live inside
+                  ProtectedRoute (auth required) but ProtectedRoute itself
+                  whitelists this path so an unverified user can reach it. */}
+              <Route path="/verify-email" element={<ErrorBoundary><VerifyEmailPage /></ErrorBoundary>} />
+
               {/* Onboarding — full-page, no sidebar */}
               <Route path="/onboarding" element={<ErrorBoundary><OnboardingPage /></ErrorBoundary>} />
 
