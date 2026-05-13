@@ -273,6 +273,12 @@ model NotificationDelivery {
   // Worker drain index. Prefix order matches the WHERE clause.
   @@index([status, nextAttemptAt])
   @@index([notificationId])
+  // Defense-in-depth: a single (notification, recipient, channel) tuple must
+  // never appear twice. The dispatcher dedupes via Notification.dedupeKey,
+  // but if that ever fails (or a caller forgets to pass one), this constraint
+  // stops a duplicate email at the DB layer. Paired with `skipDuplicates`
+  // in enqueueEmailDeliveries.
+  @@unique([notificationId, recipient, channel])
   @@map("notification_deliveries")
 }
 
