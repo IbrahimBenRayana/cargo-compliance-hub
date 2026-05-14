@@ -1224,6 +1224,30 @@ export interface PgaLookupResponse {
   source: { source: string; lastUpdated: string; note: string };
 }
 
+export interface ActionItem {
+  id: string;
+  kind: 'deadline' | 'rejection' | 'uflpa' | 'psc' | 'liquidation' | 'bulk-fix';
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  context: string;
+  filingId?: string;
+  bol?: string;
+  timestamp: number;
+  isNew: boolean;
+  actions: Array<{
+    label: string;
+    href?: string;
+    kind?: 'open' | 'submit' | 'coach' | 'edit' | 'snooze';
+  }>;
+}
+
+export interface ActionQueueResponse {
+  score: number | null;
+  stats: { awaitingCbp: number; withIssues: number; highRisk: number };
+  actionQueue: ActionItem[];
+  counts: { total: number; critical: number; high: number; medium: number };
+}
+
 export interface LiquidationTracked {
   filingId: string;
   bol: string;
@@ -1253,6 +1277,9 @@ export const complianceApi = {
     return apiFetch<{ total: number; tracked: LiquidationTracked[] }>(
       '/api/v1/compliance/liquidation-tracker',
     );
+  },
+  actionQueue() {
+    return apiFetch<ActionQueueResponse>('/api/v1/compliance/action-queue');
   },
   /**
    * Stream a rejection-coach response. Returns an async iterable of text

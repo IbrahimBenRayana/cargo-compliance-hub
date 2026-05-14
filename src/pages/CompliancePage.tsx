@@ -1,30 +1,32 @@
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Sparkles, ShieldCheck, Activity, BookOpen, Archive } from 'lucide-react';
+import { Sparkles, ShieldCheck, BookOpen, Archive, Activity } from 'lucide-react';
 import { complianceApi } from '@/api/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { HealthTab } from '@/components/compliance/HealthTab';
+import { OverviewTab } from '@/components/compliance/OverviewTab';
 import { RiskTab } from '@/components/compliance/RiskTab';
 import { RecordsTab } from '@/components/compliance/RecordsTab';
+import { RejectionCoachDrawer } from '@/components/compliance/RejectionCoachDrawer';
 
 /**
- * Compliance Center — top-level page with four tabs:
- *   • Health        — score + rejection trend + top issues + KPIs
+ * Compliance Center — top-level page.
+ *
+ * Tabs:
+ *   • Overview      — score + 3-stat strip + action queue (this is the
+ *                     "what needs my attention right now" surface)
  *   • Risk          — UFLPA scan + PGA lookup + 5106 self-check
- *   • Classification — placeholder for v2 (HTS standalone, FTA preference, ADD/CVD)
+ *   • Classification — placeholder for v2 (HTS, ADD/CVD, FTA preference)
  *   • Records       — liquidation tracker + protest deadlines
  *
- * Tab selection is URL-synced via ?tab=… so the page is deep-linkable
- * from notifications / emails / dashboards.
- *
- * The AI Coach feature toggles based on /compliance/ai-status — if the
- * server has no AI_API_KEY, the AI badge in the header reads "AI off"
- * and AI buttons elsewhere in the app are hidden.
+ * The AI Coach drawer lives at the page level so any tab can trigger it.
+ * Overview rows + Risk/Records details all flow through the same instance.
+ * URL-synced via ?tab=… for deep-link from notifications/emails.
  */
 export default function CompliancePage() {
   const [search, setSearch] = useSearchParams();
-  const active = (search.get('tab') ?? 'health') as TabId;
+  const active = (search.get('tab') ?? 'overview') as TabId;
 
   const { data: aiStatus } = useQuery({
     queryKey: ['compliance', 'ai-status'],
@@ -32,11 +34,33 @@ export default function CompliancePage() {
     staleTime: 5 * 60_000,
   });
 
+  // Cross-tab counter — total open items in the action queue.
+  // Surfaced as a subtle badge next to the Overview tab label so users
+  // know there's work waiting even if they're on another tab.
+  const { data: queueData } = useQuery({
+    queryKey: ['compliance', 'action-queue'],
+    queryFn: () => complianceApi.actionQueue(),
+    staleTime: 60_000,
+  });
+
+  // Page-level AI Coach drawer state. Any child component can call
+  // openAiCoach(filingId, mode) to slide it in.
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [coachFilingId, setCoachFilingId] = useState<string | null>(null);
+  const [coachMode, setCoachMode] = useState<'rejection' | 'draft-review'>('draft-review');
+  function openAiCoach(filingId: string, mode: 'rejection' | 'draft-review') {
+    setCoachFilingId(filingId);
+    setCoachMode(mode);
+    setCoachOpen(true);
+  }
+
   function setTab(t: TabId) {
     const next = new URLSearchParams(search);
     next.set('tab', t);
     setSearch(next, { replace: true });
   }
+
+  const actionCount = queueData?.counts.total ?? 0;
 
   return (
     <div className="space-y-5">
@@ -48,10 +72,10 @@ export default function CompliancePage() {
             Compliance Center
           </div>
           <h1 className="text-[28px] font-semibold leading-tight text-slate-900 dark:text-slate-50">
-            Your CBP compliance health, at a glance.
+            Your CBP compliance, at a glance.
           </h1>
           <p className="text-[13.5px] text-slate-600 dark:text-slate-400 mt-1 max-w-xl">
-            Health metrics, risk surfaces, and post-acceptance tracking for every shipment your team imports into the United States.
+            Health score, prioritised action queue, and post-acceptance tracking for every shipment your team imports into the United States.
           </p>
         </div>
 
@@ -72,20 +96,28 @@ export default function CompliancePage() {
       {/* Tabs */}
       <Tabs value={active} onValueChange={(v) => setTab(v as TabId)} className="space-y-4">
         <TabsList className="bg-transparent p-0 h-auto border-b border-slate-200 dark:border-slate-800 w-full justify-start rounded-none gap-1">
-          {TABS.map((t) => (
-            <TabsTrigger
-              key={t.id}
-              value={t.id}
-              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-4 py-2.5 text-[13px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
-            >
-              <t.icon className="h-3.5 w-3.5 mr-1.5" />
-              {t.label}
-            </TabsTrigger>
-          ))}
+          {TABS.map((t) => {
+            const isOverview = t.id === 'overview';
+            return (
+              <TabsTrigger
+                key={t.id}
+                value={t.id}
+                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-4 py-2.5 text-[13px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+              >
+                <t.icon className="h-3.5 w-3.5 mr-1.5" />
+                {t.label}
+                {isOverview && actionCount > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 text-[10px] font-bold tabular-nums px-1.5 min-w-[18px] h-[18px]">
+                    {actionCount > 99 ? '99+' : actionCount}
+                  </span>
+                )}
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
 
-        <TabsContent value="health" className="mt-4">
-          <HealthTab />
+        <TabsContent value="overview" className="mt-4">
+          <OverviewTab onOpenAiCoach={openAiCoach} />
         </TabsContent>
         <TabsContent value="risk" className="mt-4">
           <RiskTab />
@@ -97,16 +129,24 @@ export default function CompliancePage() {
           <RecordsTab />
         </TabsContent>
       </Tabs>
+
+      {/* Page-level AI Coach drawer */}
+      <RejectionCoachDrawer
+        open={coachOpen}
+        onOpenChange={setCoachOpen}
+        mode={coachMode}
+        filingId={coachFilingId}
+      />
     </div>
   );
 }
 
 // ─── Tabs config ─────────────────────────────────────────────────────
 
-type TabId = 'health' | 'risk' | 'classification' | 'records';
+type TabId = 'overview' | 'risk' | 'classification' | 'records';
 
 const TABS: Array<{ id: TabId; label: string; icon: React.FC<{ className?: string }> }> = [
-  { id: 'health',         label: 'Health',          icon: Activity },
+  { id: 'overview',       label: 'Overview',        icon: Activity },
   { id: 'risk',           label: 'Risk & Watch',    icon: ShieldCheck },
   { id: 'classification', label: 'Classification',  icon: BookOpen },
   { id: 'records',        label: 'Records',         icon: Archive },
