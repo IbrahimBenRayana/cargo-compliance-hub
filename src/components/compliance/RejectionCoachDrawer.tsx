@@ -1,26 +1,66 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, RefreshCw, Plane } from 'lucide-react';
 import { complianceApi } from '@/api/client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 
 /**
- * AI Rejection Coach — slides in from the right, streams a plain-English
- * explanation + numbered fix steps for the rejected filing.
+ * AI Coach drawer — slides in from the right, streams a GPT-4o response.
  *
- * Reads the response chunk-by-chunk via the SSE generator on
- * complianceApi.rejectionCoach. Renders progressively so the user sees
- * tokens land as they're written — same UX pattern as ChatGPT/Claude/etc.
+ * Two modes:
+ *   • mode="rejection"    — explains why CBP rejected a filing + fix steps.
+ *                           Source: /compliance/rejection-coach
+ *   • mode="draft-review" — pre-flight review of an in-flight filing
+ *                           (draft / submitted / on-hold) — surfaces
+ *                           rule-based issues + UFLPA/PGA risks + AI
+ *                           suggestions. Source: /compliance/draft-review
+ *
+ * Same SSE protocol on both; same render path. Only the header copy and
+ * the API method differ.
  */
+
+type CoachMode = 'rejection' | 'draft-review';
+
+interface CoachConfig {
+  eyebrow: string;
+  title:   string;
+  description: string;
+  fetch:   (filingId: string) => AsyncGenerator<string, void, void>;
+  loadingText: string;
+  HeroIcon: typeof Sparkles;
+}
+
+const CONFIGS: Record<CoachMode, CoachConfig> = {
+  'rejection': {
+    eyebrow:     'AI Compliance Coach',
+    title:       'What went wrong + how to fix it',
+    description: "Plain-English explanation of CBP's rejection, with numbered next steps. Generated from the filing's data — no copies are stored by the AI provider.",
+    fetch:       (id) => complianceApi.rejectionCoach(id),
+    loadingText: 'Analysing rejection…',
+    HeroIcon:    Sparkles,
+  },
+  'draft-review': {
+    eyebrow:     'AI Pre-Flight Review',
+    title:       'Will this filing clear CBP?',
+    description: 'Scans every field plus UFLPA + PGA risks and surfaces what to fix before you submit. Combines rule-based checks with AI judgment.',
+    fetch:       (id) => complianceApi.draftReview(id),
+    loadingText: 'Reviewing draft…',
+    HeroIcon:    Plane,
+  },
+};
+
 export function RejectionCoachDrawer({
   open,
   onOpenChange,
   filingId,
+  mode = 'rejection',
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   filingId: string | null;
+  mode?: CoachMode;
 }) {
+  const cfg = CONFIGS[mode];
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
@@ -35,7 +75,7 @@ export function RejectionCoachDrawer({
 
     (async () => {
       try {
-        for await (const chunk of complianceApi.rejectionCoach(filingId)) {
+        for await (const chunk of cfg.fetch(filingId)) {
           if (abortRef.current) return;
           setText((t) => t + chunk);
         }
@@ -55,19 +95,18 @@ export function RejectionCoachDrawer({
     return () => {
       abortRef.current = true;
     };
-  }, [open, filingId]);
+  }, [open, filingId, mode, cfg]);
 
   function regenerate() {
     if (!filingId) return;
     abortRef.current = true;
-    // Re-run by toggling state cheaply.
     setText('');
     setError(null);
     setStreaming(true);
     abortRef.current = false;
     (async () => {
       try {
-        for await (const chunk of complianceApi.rejectionCoach(filingId)) {
+        for await (const chunk of cfg.fetch(filingId)) {
           if (abortRef.current) return;
           setText((t) => t + chunk);
         }
@@ -79,6 +118,8 @@ export function RejectionCoachDrawer({
     })();
   }
 
+  const HeroIcon = cfg.HeroIcon;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -89,17 +130,17 @@ export function RejectionCoachDrawer({
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-b from-amber-50/60 to-transparent dark:from-amber-400/[0.06]">
           <div className="flex items-center gap-2 mb-1">
             <div className="h-7 w-7 rounded-md bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 flex items-center justify-center">
-              <Sparkles className="h-3.5 w-3.5 text-amber-950" strokeWidth={2.5} />
+              <HeroIcon className="h-3.5 w-3.5 text-amber-950" strokeWidth={2.5} />
             </div>
             <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-400">
-              AI Compliance Coach
+              {cfg.eyebrow}
             </span>
           </div>
           <SheetTitle className="text-[18px] font-semibold leading-tight text-slate-900 dark:text-slate-50">
-            What went wrong + how to fix it
+            {cfg.title}
           </SheetTitle>
           <SheetDescription className="text-[12.5px] text-slate-600 dark:text-slate-400 mt-1">
-            Plain-English explanation of CBP's rejection, with numbered next steps. Generated from the filing's data — no copies are stored by the AI provider.
+            {cfg.description}
           </SheetDescription>
         </SheetHeader>
 
@@ -119,7 +160,7 @@ export function RejectionCoachDrawer({
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-[12.5px] text-slate-500 dark:text-slate-400">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Analysing rejection…
+                {cfg.loadingText}
               </div>
               <div className="space-y-1.5">
                 {[0, 1, 2].map((i) => (

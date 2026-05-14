@@ -545,6 +545,9 @@ export default function ShipmentDetails() {
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [planLimit, setPlanLimit] = useState<{ current: number; limit: number } | null>(null);
   const [coachOpen, setCoachOpen] = useState(false);
+  // Drawer can render in two modes: rejection (for rejected) or draft-review
+  // (for in-flight). One drawer instance + state controls both.
+  const [coachMode, setCoachMode] = useState<'rejection' | 'draft-review'>('rejection');
   // Surface the AI Coach button only when the server has AI configured.
   const aiStatusQuery = useQuery({
     queryKey: ['compliance', 'ai-status'],
@@ -749,6 +752,18 @@ export default function ShipmentDetails() {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* AI pre-flight review — surfaces UFLPA/PGA risks + rule-based issues
+              + AI suggestions before submit. Available for any in-flight filing. */}
+          {aiStatusQuery.data?.enabled
+            && (['draft', 'submitted', 'pending_cbp', 'on_hold'] as const).includes(filing.status as any) && (
+            <Button
+              variant="outline"
+              className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-500/30 dark:text-amber-300 dark:hover:bg-amber-500/10"
+              onClick={() => { setCoachMode('draft-review'); setCoachOpen(true); }}
+            >
+              <Sparkles className="h-4 w-4" /> AI Pre-Flight Review
+            </Button>
+          )}
           {(filing.status === 'draft' || filing.status === 'rejected') && (
             <Button variant="outline" className="gap-1.5" asChild>
               <Link to={`/shipments/${filing.id}/edit`}><Pencil className="h-4 w-4" /> Edit</Link>
@@ -978,7 +993,7 @@ export default function ShipmentDetails() {
                   variant="outline"
                   size="sm"
                   className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-500/30 dark:text-amber-300 dark:hover:bg-amber-500/10"
-                  onClick={() => setCoachOpen(true)}
+                  onClick={() => { setCoachMode('rejection'); setCoachOpen(true); }}
                 >
                   <Sparkles className="h-3.5 w-3.5" /> Ask AI Coach
                 </Button>
@@ -995,10 +1010,13 @@ export default function ShipmentDetails() {
         />
       )}
 
-      {/* AI Rejection Coach drawer — streaming OpenAI response */}
+      {/* AI Coach drawer — streaming OpenAI response. Renders in either
+          "rejection" mode (explains a rejection) or "draft-review" mode
+          (pre-flights an in-flight filing). One drawer instance + state. */}
       <RejectionCoachDrawer
         open={coachOpen}
         onOpenChange={setCoachOpen}
+        mode={coachMode}
         filingId={filing.id}
       />
 
