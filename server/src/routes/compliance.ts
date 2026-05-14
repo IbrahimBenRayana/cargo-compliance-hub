@@ -234,12 +234,13 @@ router.get('/liquidation-tracker', async (req: AuthRequest, res: Response): Prom
   });
 
   const tracked = filings.map((f) => {
+    // computeLiquidation returns { entryDate, estimatedLiquidationAt, ... }
+    // already, so we don't re-set entryDate ourselves — would shadow & confuse.
     const dates = computeLiquidation(f.acceptedAt!);
     return {
       filingId: f.id,
       bol: f.houseBol || f.masterBol || f.id.slice(0, 8),
       filingType: f.filingType,
-      entryDate: f.acceptedAt,
       ...dates,
     };
   });
