@@ -52,7 +52,7 @@ function UflpaScanCard() {
   }
 
   return (
-    <Card className="border-slate-200 dark:border-slate-800">
+    <Card className="rounded-2xl border-slate-200 dark:border-slate-800">
       <CardContent className="p-5">
         <div className="flex items-center gap-2 mb-1">
           <ShieldAlert className="h-4 w-4 text-rose-500" />
@@ -164,7 +164,7 @@ function PgaLookupCard() {
   });
 
   return (
-    <Card className="border-slate-200 dark:border-slate-800">
+    <Card className="rounded-2xl border-slate-200 dark:border-slate-800">
       <CardContent className="p-5">
         <div className="flex items-center gap-2 mb-1">
           <Search className="h-4 w-4 text-slate-500" />
@@ -231,7 +231,7 @@ function FiveOneSixCard() {
   const formatted = isValid ? `${normalized.slice(0, 2)}-${normalized.slice(2)}` : ein;
 
   return (
-    <Card className="border-slate-200 dark:border-slate-800">
+    <Card className="rounded-2xl border-slate-200 dark:border-slate-800">
       <CardContent className="p-5">
         <div className="flex items-center gap-2 mb-1">
           <Building2 className="h-4 w-4 text-slate-500" />

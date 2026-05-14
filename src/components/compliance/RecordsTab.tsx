@@ -125,7 +125,7 @@ function LiquidationTable({ tracked }: { tracked: LiquidationTracked[] }) {
 
   if (tracked.length === 0) {
     return (
-      <Card className="border-slate-200 dark:border-slate-800">
+      <Card className="rounded-2xl border-slate-200 dark:border-slate-800">
         <CardContent className="p-10 text-center">
           <Archive className="h-8 w-8 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
           <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -140,7 +140,7 @@ function LiquidationTable({ tracked }: { tracked: LiquidationTracked[] }) {
   }
 
   return (
-    <Card className="border-slate-200 dark:border-slate-800 overflow-hidden">
+    <Card className="rounded-2xl border-slate-200 dark:border-slate-800 overflow-hidden">
       <CardContent className="p-0">
         <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">

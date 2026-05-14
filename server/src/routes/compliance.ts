@@ -328,6 +328,12 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
     timestamp: number;
     /** When true the frontend pulses the dot to signal "new". */
     isNew: boolean;
+    /** Per-filing compliance score 0–100 from validateFiling (rejected counts
+     *  as 100% loss → score 0). null when the item isn't tied to a filing. */
+    score: number | null;
+    /** Best-effort origin info — used to enrich the row visually. */
+    originCompany: string | null;
+    originCountry: string | null;
     /** Suggested next-steps the UI can render as buttons. */
     actions: Array<{
       label: string;
@@ -338,6 +344,55 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
 
   const items: ActionItem[] = [];
   const FIVE_MIN = 5 * 60 * 1000;
+
+  // ── Per-filing enrichment helpers ─────────────────────────────────
+  // Compute these once per filing so every action item referencing the
+  // same filing gets the same metadata without redundant work.
+
+  /** Compliance score: rejected = 0; otherwise (1 - criticalCount/totalIssues) * 100,
+   *  bounded to 0-100. Filings with no detectable issues score 100. */
+  function scoreFiling(f: typeof filings[number]): number {
+    if (f.status === 'rejected') return 0;
+    const r = validateFiling(f as any);
+    if (r.errors.length === 0) return 100;
+    // Each critical = -20; warning = -5; info = -1. Clamp 0-100.
+    const penalty = r.criticalCount * 20 + r.warningCount * 5 + r.infoCount * 1;
+    return Math.max(0, Math.min(100, 100 - penalty));
+  }
+
+  /** Pull the manufacturer name + country. Fallback to seller / first
+   *  commodity origin so we always have *something* to show. */
+  function originOf(f: typeof filings[number]): { company: string | null; country: string | null } {
+    const partyName = (p: unknown): string | null => {
+      if (!p || typeof p !== 'object') return null;
+      const name = (p as Record<string, unknown>).name;
+      return typeof name === 'string' && name.trim() ? name.trim() : null;
+    };
+    const partyCountry = (p: unknown): string | null => {
+      if (!p || typeof p !== 'object') return null;
+      const c = (p as Record<string, unknown>).country;
+      return typeof c === 'string' && c.trim() ? c.trim().toUpperCase().slice(0, 2) : null;
+    };
+    const company = partyName(f.manufacturer) ?? partyName(f.seller);
+    let country = partyCountry(f.manufacturer) ?? partyCountry(f.seller);
+    if (!country && Array.isArray(f.commodities) && f.commodities.length > 0) {
+      const co = (f.commodities[0] as Record<string, unknown>)?.countryOfOrigin;
+      if (typeof co === 'string' && co.trim()) country = co.trim().toUpperCase().slice(0, 2);
+    }
+    return { company, country };
+  }
+
+  /** Per-filing cache so the same filing isn't enriched 3x when it has
+   *  multiple action items pointing at it (e.g. UFLPA + deadline). */
+  const enrichmentCache = new Map<string, { score: number; company: string | null; country: string | null }>();
+  function enrich(f: typeof filings[number]) {
+    const cached = enrichmentCache.get(f.id);
+    if (cached) return cached;
+    const { company, country } = originOf(f);
+    const next = { score: scoreFiling(f), company, country };
+    enrichmentCache.set(f.id, next);
+    return next;
+  }
 
   // 1. ISF deadlines — submitted-by clock is estimatedDeparture - 24h.
   //    Anything within 72h of that cutoff is an action item.
@@ -350,6 +405,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
     const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
     const severity: ActionItem['severity'] =
       hoursToCutoff <= 24 ? 'critical' : hoursToCutoff <= 48 ? 'high' : 'medium';
+    const en = enrich(f);
     items.push({
       id: `deadline:${f.id}`,
       kind: 'deadline',
@@ -363,6 +419,9 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       bol,
       timestamp: f.createdAt.getTime(),
       isNew: now - f.createdAt.getTime() < FIVE_MIN,
+      score: en.score,
+      originCompany: en.company,
+      originCountry: en.country,
       actions: [
         { label: 'Open',     kind: 'open',  href: `/shipments/${f.id}` },
         { label: 'AI coach', kind: 'coach' },
@@ -375,6 +434,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
     if (f.status !== 'rejected') continue;
     const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
     const ts = f.rejectedAt?.getTime() ?? f.createdAt.getTime();
+    const en = enrich(f);
     items.push({
       id: `rejection:${f.id}`,
       kind: 'rejection',
@@ -385,6 +445,9 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       bol,
       timestamp: ts,
       isNew: now - ts < FIVE_MIN,
+      score: en.score,
+      originCompany: en.company,
+      originCountry: en.country,
       actions: [
         { label: 'Open',     kind: 'open',  href: `/shipments/${f.id}` },
         { label: 'AI coach', kind: 'coach' },
@@ -397,6 +460,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
     if (!['draft', 'submitted', 'pending_cbp', 'on_hold'].includes(f.status)) continue;
     const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
     const risk = assessUflpaRisk(f as any);
+    const en = enrich(f);
     items.push({
       id: `uflpa:${f.id}`,
       kind: 'uflpa',
@@ -407,6 +471,9 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       bol,
       timestamp: f.createdAt.getTime(),
       isNew: false,
+      score: en.score,
+      originCompany: en.company,
+      originCountry: en.country,
       actions: [
         { label: 'Open',     kind: 'open',  href: `/shipments/${f.id}` },
         { label: 'AI coach', kind: 'coach' },
@@ -422,6 +489,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
     if (liq.status !== 'psc-window-open') continue;
     if (liq.daysUntilPscDeadline > 14) continue;
     const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
+    const en = enrich(f);
     items.push({
       id: `psc:${f.id}`,
       kind: 'psc',
@@ -432,6 +500,9 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       bol,
       timestamp: f.acceptedAt.getTime(),
       isNew: false,
+      score: en.score,
+      originCompany: en.company,
+      originCountry: en.country,
       actions: [
         { label: 'Open', kind: 'open', href: `/shipments/${f.id}` },
       ],
@@ -445,6 +516,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
     if (liq.status !== 'awaiting-liquidation') continue;
     if (liq.daysUntilLiquidation > 14 || liq.daysUntilLiquidation < 0) continue;
     const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
+    const en = enrich(f);
     items.push({
       id: `liquidation:${f.id}`,
       kind: 'liquidation',
@@ -455,6 +527,9 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       bol,
       timestamp: f.acceptedAt.getTime(),
       isNew: false,
+      score: en.score,
+      originCompany: en.company,
+      originCountry: en.country,
       actions: [
         { label: 'Open', kind: 'open', href: `/shipments/${f.id}` },
       ],
@@ -487,6 +562,9 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       context: `"${reason}" — fix once, apply to ${filingIds.length} filings.`,
       timestamp: now,
       isNew: false,
+      score: null,            // bulk-fix isn't a single filing
+      originCompany: null,
+      originCountry: null,
       actions: [
         { label: 'View affected', kind: 'open', href: `/shipments?status=rejected` },
       ],

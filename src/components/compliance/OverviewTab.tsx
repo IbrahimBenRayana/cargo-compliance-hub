@@ -3,8 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
-  ArrowRight, ArrowUpRight, Sparkles, ChevronDown, ChevronRight,
-  Clock, Inbox, ListChecks, ShieldCheck,
+  ArrowRight, ArrowUpRight, Sparkles, ChevronDown,
+  Clock, Inbox, ListChecks, ShieldCheck, Building2, RotateCcw,
 } from 'lucide-react';
 import {
   complianceApi,
@@ -76,10 +76,17 @@ export function OverviewTab({ onOpenAiCoach }: OverviewTabProps) {
     setSnoozed(next);
     writeSnoozed(next);
   }
+  function unsnoozeAll() {
+    setSnoozed(new Map());
+    writeSnoozed(new Map());
+  }
 
-  const visible = useMemo(() => {
-    if (!data) return [] as ActionItem[];
-    return data.actionQueue.filter((it) => !snoozed.has(it.id));
+  const { visible, snoozedItems } = useMemo(() => {
+    if (!data) return { visible: [] as ActionItem[], snoozedItems: [] as ActionItem[] };
+    return {
+      visible:      data.actionQueue.filter((it) => !snoozed.has(it.id)),
+      snoozedItems: data.actionQueue.filter((it) =>  snoozed.has(it.id)),
+    };
   }, [data, snoozed]);
 
   if (isLoading || !data) return <OverviewSkeleton />;
@@ -88,6 +95,39 @@ export function OverviewTab({ onOpenAiCoach }: OverviewTabProps) {
     <div className="space-y-6">
       <ScoreHero data={data} />
       <ActionQueue items={visible} onSnooze={snooze} onOpenAiCoach={onOpenAiCoach} />
+      {snoozedItems.length > 0 && (
+        <SnoozedPanel count={snoozedItems.length} onUnsnoozeAll={unsnoozeAll} />
+      )}
+    </div>
+  );
+}
+
+// ─── Snoozed panel ──────────────────────────────────────────────────
+
+function SnoozedPanel({
+  count,
+  onUnsnoozeAll,
+}: {
+  count: number;
+  onUnsnoozeAll: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30 px-4 py-3 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-[12.5px]">
+        <Clock className="h-3.5 w-3.5 shrink-0" />
+        <span>
+          <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">{count}</span>{' '}
+          {count === 1 ? 'item' : 'items'} snoozed for 24h
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={onUnsnoozeAll}
+        className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11.5px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors duration-200"
+      >
+        <RotateCcw className="h-3 w-3" />
+        Un-snooze all
+      </button>
     </div>
   );
 }
@@ -315,10 +355,10 @@ function ActionRow({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full px-6 py-3.5 flex items-center gap-3 text-left cursor-pointer focus:outline-none focus-visible:bg-slate-50 dark:focus-visible:bg-slate-900/40"
+        className="w-full px-6 py-3.5 flex items-start gap-3 text-left cursor-pointer focus:outline-none focus-visible:bg-slate-50 dark:focus-visible:bg-slate-900/40"
       >
         {/* Severity dot — single pulse if new */}
-        <span className="relative flex h-2 w-2 shrink-0 mt-1.5">
+        <span className="relative flex h-2 w-2 shrink-0 mt-2">
           {item.isNew && !reduceMotion && (
             <span className={cn('absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping', sev.dot)} />
           )}
@@ -326,6 +366,7 @@ function ActionRow({
         </span>
 
         <div className="flex-1 min-w-0">
+          {/* Top line: title + isNew chip + score badge (right) */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[13.5px] font-semibold text-slate-900 dark:text-slate-50 leading-tight">
               {item.title}
@@ -335,15 +376,35 @@ function ActionRow({
                 New
               </Badge>
             )}
+            <span className="flex-1" />
+            {item.score !== null && <ScoreChip score={item.score} />}
           </div>
-          <p className={cn('mt-0.5 text-[12px] leading-relaxed truncate', open && 'whitespace-normal', 'text-slate-600 dark:text-slate-400')}>
+
+          {/* Middle line: origin metadata — company + country */}
+          {(item.originCompany || item.originCountry) && (
+            <div className="mt-1 flex items-center gap-2 flex-wrap text-[11.5px] text-slate-500 dark:text-slate-400">
+              {item.originCompany && (
+                <span className="inline-flex items-center gap-1 max-w-[280px] truncate">
+                  <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
+                  <span className="truncate">{item.originCompany}</span>
+                </span>
+              )}
+              {item.originCompany && item.originCountry && (
+                <span className="text-slate-300 dark:text-slate-700">·</span>
+              )}
+              {item.originCountry && <CountryChip code={item.originCountry} />}
+            </div>
+          )}
+
+          {/* Bottom line: 1-line context */}
+          <p className={cn('mt-1 text-[12px] leading-relaxed truncate', open && 'whitespace-normal', 'text-slate-600 dark:text-slate-400')}>
             {item.context}
           </p>
         </div>
 
         <ChevronDown
           className={cn(
-            'h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200',
+            'h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 mt-1',
             open && 'rotate-180',
           )}
         />
@@ -422,6 +483,37 @@ function EmptyActionQueue() {
         </Link>.
       </p>
     </section>
+  );
+}
+
+// ─── Score chip + country chip ──────────────────────────────────────
+
+function ScoreChip({ score }: { score: number }) {
+  const tone =
+    score >= 90 ? { bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-300', ring: 'ring-emerald-200/60 dark:ring-emerald-500/20' }
+    : score >= 70 ? { bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-700 dark:text-amber-300', ring: 'ring-amber-200/60 dark:ring-amber-500/20' }
+    : { bg: 'bg-rose-50 dark:bg-rose-500/10', text: 'text-rose-700 dark:text-rose-300', ring: 'ring-rose-200/60 dark:ring-rose-500/20' };
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 tabular-nums',
+        'text-[11px] font-semibold leading-none',
+        tone.bg, tone.text, tone.ring,
+      )}
+      title={`Compliance score for this filing: ${score}/100`}
+    >
+      <span>{score}</span>
+      <span className="text-[9px] font-medium opacity-60">/100</span>
+    </span>
+  );
+}
+
+function CountryChip({ code }: { code: string }) {
+  // ISO-2 chip — small, restrained, monospace. No flag emoji (per app convention).
+  return (
+    <span className="inline-flex items-center font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/40 uppercase tracking-wider">
+      {code}
+    </span>
   );
 }
 

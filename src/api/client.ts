@@ -1234,6 +1234,12 @@ export interface ActionItem {
   bol?: string;
   timestamp: number;
   isNew: boolean;
+  /** Per-filing compliance score 0–100. null for bulk-fix items. */
+  score: number | null;
+  /** Manufacturer / seller name. null when unknown. */
+  originCompany: string | null;
+  /** ISO-2 country (e.g. "CN", "IN"). null when unknown. */
+  originCountry: string | null;
   actions: Array<{
     label: string;
     href?: string;
