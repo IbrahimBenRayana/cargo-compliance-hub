@@ -144,8 +144,15 @@ async function pollSubmittedFilings(): Promise<void> {
               data: {
                 status: newStatus,
                 acceptedAt: newStatus === 'accepted' ? new Date() : undefined,
-                rejectedAt: newStatus === 'rejected' ? new Date() : undefined,
-                rejectionReason: rejectionReason ?? undefined,
+                // Clear rejection metadata when CBP accepts — otherwise the
+                // "previous rejection" panel keeps surfacing stale text on
+                // accepted filings. History stays in FilingStatusHistory.
+                rejectedAt: newStatus === 'accepted' ? null
+                  : newStatus === 'rejected' ? new Date()
+                  : undefined,
+                rejectionReason: newStatus === 'accepted' ? null
+                  : newStatus === 'rejected' ? (rejectionReason ?? undefined)
+                  : undefined,
                 cbpTransactionId: isfTxnNumber ?? filing.cbpTransactionId ?? undefined,
               },
             });
