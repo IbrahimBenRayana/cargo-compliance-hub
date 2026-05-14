@@ -26,6 +26,21 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().default(''),
   STRIPE_PUBLISHABLE_KEY: z.string().default(''),
+  // AI provider — Compliance Center features. All optional with sensible
+  // defaults; server boots fine without them (graceful degradation via
+  // services/ai.ts). When AI_API_KEY is unset the /ai-status endpoint
+  // reports disabled and the UI hides AI buttons.
+  AI_ASSESSMENT_ENABLED:    z.coerce.boolean().default(false),
+  AI_PROVIDER:              z.enum(['openai']).default('openai'),
+  AI_MODEL:                 z.string().default('gpt-4o-mini'),
+  AI_API_KEY:               z.string().default(''),
+  AI_MAX_TOKENS:            z.coerce.number().int().positive().default(2048),
+  AI_TEMPERATURE:           z.coerce.number().min(0).max(2).default(0.3),
+  // Per-user daily call cap. Resets at UTC midnight.
+  AI_RATE_LIMIT_PER_USER:   z.coerce.number().int().positive().default(50),
+  // When true, sets OpenAI's `store: false` flag so prompts can't enter
+  // their training corpus (zero-retention policy for trade data).
+  AI_DISABLE_TRAINING_DATA: z.coerce.boolean().default(true),
 });
 
 const parsed = envSchema.safeParse(process.env);

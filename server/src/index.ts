@@ -9,6 +9,7 @@ import { prisma } from './config/database.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import authRoutes from './routes/auth.js';
+import complianceRoutes from './routes/compliance.js';
 import filingRoutes from './routes/filings.js';
 import submissionLogRoutes from './routes/submissionLogs.js';
 import notificationRoutes from './routes/notifications.js';
@@ -90,6 +91,7 @@ app.use('/api/v1/billing', billingRoutes);
 app.use('/api/v1/manifest-queries', manifestQueryRoutes);
 app.use('/api/v1/abi-documents', abiDocumentsRoutes);
 app.use('/api/v1/duty-calculation', dutyCalculationRoutes);
+app.use('/api/v1/compliance', complianceRoutes);
 
 // ─── Background Jobs Endpoints ────────────────────────────
 // GET job status + POST manual trigger (for admin/testing)
