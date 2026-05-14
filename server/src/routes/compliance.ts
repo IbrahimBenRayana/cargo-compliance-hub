@@ -349,15 +349,31 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
   // Compute these once per filing so every action item referencing the
   // same filing gets the same metadata without redundant work.
 
-  /** Compliance score: rejected = 0; otherwise (1 - criticalCount/totalIssues) * 100,
-   *  bounded to 0-100. Filings with no detectable issues score 100. */
+  /**
+   * Compliance score per filing (0–100). Goals of the formula:
+   *   • Definitive states bypass the validator:
+   *     - rejected → 0   (CBP said no, no nuance)
+   *     - accepted / amended → 100 (CBP said yes; warnings here are noise)
+   *   • In-flight filings (draft / submitted / pending_cbp / on_hold) get a
+   *     graduated score from validateFiling output, with a floor of 10 so
+   *     the user always sees a number (not a zero wall when a draft is
+   *     mid-fill).
+   *
+   * Penalty weights (tuned so a typical mid-draft ISF lands in the 50–80
+   * band, not the floor):
+   *   critical: −8   warning: −2   info: −0.5
+   *
+   * Previous formula used −20/−5/−1 which floored almost every draft to 0
+   * and confused users — they couldn't tell the difference between "almost
+   * ready" and "barely started." Tighter weights restore the dynamic range.
+   */
   function scoreFiling(f: typeof filings[number]): number {
     if (f.status === 'rejected') return 0;
+    if (f.status === 'accepted' || f.status === 'amended') return 100;
     const r = validateFiling(f as any);
     if (r.errors.length === 0) return 100;
-    // Each critical = -20; warning = -5; info = -1. Clamp 0-100.
-    const penalty = r.criticalCount * 20 + r.warningCount * 5 + r.infoCount * 1;
-    return Math.max(0, Math.min(100, 100 - penalty));
+    const penalty = r.criticalCount * 8 + r.warningCount * 2 + r.infoCount * 0.5;
+    return Math.max(10, Math.min(100, Math.round(100 - penalty)));
   }
 
   /** Pull the manufacturer name + country. Fallback to seller / first
