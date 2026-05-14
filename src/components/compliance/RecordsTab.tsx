@@ -110,6 +110,19 @@ function OverviewTile({
 // ─── Table ──────────────────────────────────────────────────────────
 
 function LiquidationTable({ tracked }: { tracked: LiquidationTracked[] }) {
+  // Sort: most-urgent PSC deadlines first, then days until liquidation.
+  // useMemo before any early return so the hook order stays stable across renders.
+  const sorted = useMemo(
+    () =>
+      [...tracked].sort((a, b) => {
+        const order = { 'psc-window-open': 0, 'awaiting-liquidation': 1, 'liquidated': 2, 'pending': 3 };
+        const cmp = order[a.status] - order[b.status];
+        if (cmp !== 0) return cmp;
+        return a.daysUntilLiquidation - b.daysUntilLiquidation;
+      }),
+    [tracked],
+  );
+
   if (tracked.length === 0) {
     return (
       <Card className="border-slate-200 dark:border-slate-800">
@@ -125,18 +138,6 @@ function LiquidationTable({ tracked }: { tracked: LiquidationTracked[] }) {
       </Card>
     );
   }
-
-  // Sort: most-urgent PSC deadlines first, then days until liquidation.
-  const sorted = useMemo(
-    () =>
-      [...tracked].sort((a, b) => {
-        const order = { 'psc-window-open': 0, 'awaiting-liquidation': 1, 'liquidated': 2, 'pending': 3 };
-        const cmp = order[a.status] - order[b.status];
-        if (cmp !== 0) return cmp;
-        return a.daysUntilLiquidation - b.daysUntilLiquidation;
-      }),
-    [tracked],
-  );
 
   return (
     <Card className="border-slate-200 dark:border-slate-800 overflow-hidden">
