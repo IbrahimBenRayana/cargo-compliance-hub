@@ -24,6 +24,7 @@ import { lookupPgaFlags, lookupMetadata as pgaMeta } from '../services/complianc
 import { assessUflpaRisk } from '../services/compliance/uflpa.js';
 import { computeLiquidation } from '../services/compliance/liquidation.js';
 import { parseRejectionReason } from '../services/errorTranslator.js';
+import { validateFiling } from '../services/validation.js';
 import logger from '../config/logger.js';
 
 const router = Router();
@@ -355,6 +356,173 @@ Do NOT include any preamble ("Sure, I can help!"), AI disclaimer, or fluff. Star
     res.write('event: done\ndata: {}\n\n');
   } catch (err: any) {
     logger.error({ err: err.message }, '[Compliance] rejection-coach stream failed');
+    if (err?.code === 'ai_rate_limited') {
+      res.write(`event: error\ndata: ${JSON.stringify({
+        error: err.message,
+        code: 'ai_rate_limited',
+        callsToday: err.callsToday,
+        dailyLimit: err.dailyLimit,
+      })}\n\n`);
+    } else {
+      res.write(`event: error\ndata: ${JSON.stringify({
+        error: 'AI request failed. Please try again in a moment.',
+        code: 'ai_error',
+      })}\n\n`);
+    }
+  } finally {
+    res.end();
+  }
+});
+
+// ─── POST /draft-review (SSE) ────────────────────────────────────────
+// AI pre-flight review for in-flight filings (draft / submitted / on_hold).
+// Pulls the filing, runs the deterministic rule-based validator + UFLPA
+// risk + PGA lookups (cheap, signal-rich) and feeds ALL of it to GPT-4o
+// so the model can prioritise + explain in plain English. Output is the
+// same SSE shape as /rejection-coach so the frontend reuses one drawer.
+
+const draftReviewSchema = z.object({ filingId: z.string().uuid() });
+
+router.post('/draft-review', authLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = draftReviewSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'filingId required' });
+    return;
+  }
+
+  const filing = await prisma.filing.findFirst({
+    where: { id: parsed.data.filingId, orgId: req.user!.orgId },
+  });
+  if (!filing) {
+    res.status(404).json({ error: 'Filing not found' });
+    return;
+  }
+  // Only meaningful for in-flight filings. Accepted/rejected/cancelled go
+  // through the rejection-coach (or have no review value).
+  const inFlight: ReadonlySet<string> = new Set(['draft', 'submitted', 'pending_cbp', 'on_hold']);
+  if (!inFlight.has(filing.status)) {
+    res.status(400).json({
+      error: 'AI pre-flight review is only available for draft, submitted, or on-hold filings.',
+    });
+    return;
+  }
+
+  if (!ai.isConfigured()) {
+    res.status(503).json({ error: 'AI features are not configured.', code: 'ai_unavailable' });
+    return;
+  }
+
+  // Build the analytical context. We deliberately give the model both the
+  // raw filing fields AND the rule-based validator's structured output —
+  // the latter is what makes responses actionable (not just "the field is
+  // empty" but "field X is required for ISF-10 because $reason").
+  const ruleResult = validateFiling(filing as any);
+  const uflpaRisk = assessUflpaRisk(filing as any);
+  const commodities = (filing.commodities as any[] | null | undefined) ?? [];
+  const pgaPerCommodity = commodities.slice(0, 8).map((c: any) => ({
+    hts:   c?.htsCode ?? null,
+    description: c?.description ?? null,
+    origin: c?.countryOfOrigin ?? null,
+    pga:   c?.htsCode ? lookupPgaFlags(c.htsCode) : [],
+  }));
+
+  // Sanitised view of the filing we send to the model — strip ids, refresh
+  // tokens, encrypted fields. Anything that wouldn't pass a SOC-2 review.
+  const sanitised: Record<string, unknown> = {
+    filingType: filing.filingType,
+    status:     filing.status,
+    masterBol:  filing.masterBol,
+    houseBol:   filing.houseBol,
+    bondType:   filing.bondType,
+    scacCode:   filing.scacCode,
+    vesselName: filing.vesselName,
+    voyageNumber: filing.voyageNumber,
+    foreignPortOfUnlading: filing.foreignPortOfUnlading,
+    placeOfDelivery:       filing.placeOfDelivery,
+    estimatedDeparture:    filing.estimatedDeparture,
+    estimatedArrival:      filing.estimatedArrival,
+    importerName:   filing.importerName,
+    importerNumber: filing.importerNumber,
+    consigneeName:  filing.consigneeName,
+    consigneeNumber: filing.consigneeNumber,
+    consigneeAddress: filing.consigneeAddress,
+    manufacturer:   filing.manufacturer,
+    seller:         filing.seller,
+    buyer:          filing.buyer,
+    shipToParty:    filing.shipToParty,
+    consolidator:   filing.consolidator,
+    containerStuffingLocation: filing.containerStuffingLocation,
+    commodities,
+    containers:     filing.containers,
+  };
+
+  const userPrompt = `
+You are pre-flighting a US customs filing for an importer before they submit it to CBP. Your job is to spot problems they can fix NOW, so the filing doesn't get rejected.
+
+═══ FILING DATA ═══
+${JSON.stringify(sanitised, null, 2)}
+
+═══ DETERMINISTIC RULE-BASED ISSUES (from validator) ═══
+Score: ${ruleResult.score}/100
+Critical: ${ruleResult.criticalCount} | Warning: ${ruleResult.warningCount} | Info: ${ruleResult.infoCount}
+
+${ruleResult.errors.length > 0
+    ? ruleResult.errors
+        .map((e, i) => `${i + 1}. [${e.severity}] ${e.field}: ${e.message}`)
+        .join('\n')
+    : 'No rule-based issues detected.'}
+
+═══ UFLPA RISK ═══
+Severity: ${uflpaRisk.severity}
+Reasons: ${uflpaRisk.reasons.join('; ') || 'none'}
+
+═══ PGA FLAGS PER COMMODITY ═══
+${pgaPerCommodity
+    .map((c) =>
+      `HTS ${c.hts ?? '—'} (${c.description ?? '—'}, origin ${c.origin ?? '—'}): ${
+        c.pga.length === 0 ? 'no PGA flag' : c.pga.map((p) => `${p.agency} — ${p.action}`).join('; ')
+      }`,
+    )
+    .join('\n')}
+
+═══ YOUR OUTPUT ═══
+Format your response in markdown with these sections (skip a section if it has nothing to say):
+
+**1. Will-reject issues** — anything CBP will almost certainly bounce. Map to rule-based critical errors first, then add anything else you spot.
+
+**2. Likely-to-reject risks** — things that often trip CBP but aren't deterministic (origin/party mismatches, HTS that's been recently scrutinized, PGA flags missing required certs, etc.).
+
+**3. Improvements** — fields that are valid but suboptimal (vague descriptions, missing optional but-helpful fields, descriptions that could be more specific).
+
+**4. UFLPA / forced labor exposure** — if the UFLPA assessment is elevated or high, name the supply chain docs the importer should compile BEFORE the filing leaves port.
+
+**5. PGA action items** — for each flagged commodity, what permit/notice the importer needs.
+
+Be concrete and brief. Refer to the filing's actual values when relevant ("Master BOL 'MAEU…' looks like an SCAC-prefix" not "your BOL"). Use numbered or bulleted lists, not paragraphs.
+  `.trim();
+
+  res.set({
+    'Content-Type':      'text/event-stream',
+    'Cache-Control':     'no-cache, no-transform',
+    'Connection':        'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders();
+
+  try {
+    const chunks = ai.stream({
+      userId: req.user!.id,
+      systemPrompt:
+        'You are a senior US customs compliance specialist who has spent 20 years filing ISFs and ABI entries. You read draft filings like a CBP officer would — looking for the patterns that get filings rejected or delayed. Your guidance is tight, no-fluff, and immediately actionable.',
+      userPrompt,
+      maxTokens: 3000,  // bump above default — pre-flight reviews are longer
+    });
+    for await (const chunk of chunks) {
+      res.write(`data: ${JSON.stringify({ delta: chunk })}\n\n`);
+    }
+    res.write('event: done\ndata: {}\n\n');
+  } catch (err: any) {
+    logger.error({ err: err.message, filingId: filing.id }, '[Compliance] draft-review stream failed');
     if (err?.code === 'ai_rate_limited') {
       res.write(`event: error\ndata: ${JSON.stringify({
         error: err.message,

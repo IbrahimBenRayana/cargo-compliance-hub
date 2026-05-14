@@ -1259,8 +1259,20 @@ export const complianceApi = {
    * deltas. Caller renders each chunk as it arrives. The stream is SSE
    * with `data: {"delta":"..."}` chunks ending in `event: done`.
    */
-  async *rejectionCoach(filingId: string): AsyncGenerator<string, void, void> {
-    const res = await fetch(`${API_BASE}/api/v1/compliance/rejection-coach`, {
+  rejectionCoach(filingId: string): AsyncGenerator<string, void, void> {
+    return streamCoach('/api/v1/compliance/rejection-coach', filingId);
+  },
+  /**
+   * Pre-flight AI review for a draft / submitted / on-hold filing.
+   * Same SSE protocol as rejectionCoach — the drawer is shared.
+   */
+  draftReview(filingId: string): AsyncGenerator<string, void, void> {
+    return streamCoach('/api/v1/compliance/draft-review', filingId);
+  },
+};
+
+async function* streamCoach(path: string, filingId: string): AsyncGenerator<string, void, void> {
+    const res = await fetch(`${API_BASE}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1308,5 +1320,4 @@ export const complianceApi = {
         }
       }
     }
-  },
-};
+}
