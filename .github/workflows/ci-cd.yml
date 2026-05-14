@@ -246,16 +246,19 @@ jobs:
             # compose file needs the placeholders so it can pull from .env.
             if [ -f docker-compose.yml ]; then
               if ! grep -qE '^[[:space:]]+AI_API_KEY:' docker-compose.yml; then
-                cat > /tmp/ai_compose_block <<'BLOCK'
-      AI_ASSESSMENT_ENABLED:    ${AI_ASSESSMENT_ENABLED:-false}
-      AI_PROVIDER:              ${AI_PROVIDER:-openai}
-      AI_MODEL:                 ${AI_MODEL:-gpt-4o-mini}
-      AI_API_KEY:               ${AI_API_KEY:-}
-      AI_MAX_TOKENS:            ${AI_MAX_TOKENS:-2048}
-      AI_TEMPERATURE:           ${AI_TEMPERATURE:-0.3}
-      AI_RATE_LIMIT_PER_USER:   ${AI_RATE_LIMIT_PER_USER:-50}
-      AI_DISABLE_TRAINING_DATA: ${AI_DISABLE_TRAINING_DATA:-true}
-BLOCK
+                # printf-per-line keeps every script line at the YAML block's
+                # indent. Single-quoted strings preserve ${...} placeholders
+                # so they reach docker-compose unexpanded.
+                printf '%s\n' \
+                  '      AI_ASSESSMENT_ENABLED:    ${AI_ASSESSMENT_ENABLED:-false}' \
+                  '      AI_PROVIDER:              ${AI_PROVIDER:-openai}' \
+                  '      AI_MODEL:                 ${AI_MODEL:-gpt-4o-mini}' \
+                  '      AI_API_KEY:               ${AI_API_KEY:-}' \
+                  '      AI_MAX_TOKENS:            ${AI_MAX_TOKENS:-2048}' \
+                  '      AI_TEMPERATURE:           ${AI_TEMPERATURE:-0.3}' \
+                  '      AI_RATE_LIMIT_PER_USER:   ${AI_RATE_LIMIT_PER_USER:-50}' \
+                  '      AI_DISABLE_TRAINING_DATA: ${AI_DISABLE_TRAINING_DATA:-true}' \
+                  > /tmp/ai_compose_block
                 # Anchor on EMAIL_FROM_NAME — the last env var in the existing
                 # server.environment block. `sed r FILE` reads & appends after match.
                 cp docker-compose.yml docker-compose.yml.bak
