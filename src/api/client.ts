@@ -1226,7 +1226,7 @@ export interface PgaLookupResponse {
 
 export interface ActionItem {
   id: string;
-  kind: 'deadline' | 'rejection' | 'uflpa' | 'psc' | 'liquidation' | 'bulk-fix';
+  kind: 'deadline' | 'rejection' | 'uflpa' | 'psc' | 'liquidation' | 'bulk-fix' | 'draft_review';
   severity: 'critical' | 'high' | 'medium' | 'low';
   title: string;
   context: string;
@@ -1236,6 +1236,9 @@ export interface ActionItem {
   isNew: boolean;
   /** Per-filing compliance score 0–100. null for bulk-fix items. */
   score: number | null;
+  /** Current filing status (draft / submitted / rejected / accepted / etc.).
+   *  Surfaced as a status badge on the card. undefined for bulk-fix. */
+  status?: string;
   /** Manufacturer / seller name. null when unknown. */
   originCompany: string | null;
   /** ISO-2 country (e.g. "CN", "IN"). null when unknown. */

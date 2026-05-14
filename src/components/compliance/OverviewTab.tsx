@@ -275,7 +275,7 @@ function StatTile({
   );
 }
 
-// ─── ActionQueue ─────────────────────────────────────────────────────
+// ─── ActionQueue (card grid) ─────────────────────────────────────────
 
 function ActionQueue({
   items,
@@ -289,23 +289,23 @@ function ActionQueue({
   if (items.length === 0) return <EmptyActionQueue />;
 
   return (
-    <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden">
-      <header className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+    <section>
+      <header className="flex items-center justify-between gap-3 mb-3">
         <div>
           <h2 className="text-[14px] font-semibold text-slate-900 dark:text-slate-50">
-            Action queue
+            Filings needing attention
           </h2>
           <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
-            Sorted by urgency. Snooze pushes an item out for 24 hours.
+            Sorted by urgency. Click a card to expand · Snooze pushes it out 24 hours.
           </p>
         </div>
-        <Badge variant="outline" className="tabular-nums text-[11px] font-semibold">
+        <Badge variant="outline" className="tabular-nums text-[11px] font-semibold shrink-0">
           {items.length} {items.length === 1 ? 'item' : 'items'}
         </Badge>
       </header>
-      <ol className="divide-y divide-slate-200 dark:divide-slate-800">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {items.map((it, idx) => (
-          <ActionRow
+          <ActionCard
             key={it.id}
             item={it}
             index={idx}
@@ -313,7 +313,7 @@ function ActionQueue({
             onOpenAiCoach={onOpenAiCoach}
           />
         ))}
-      </ol>
+      </div>
     </section>
   );
 }
@@ -325,7 +325,7 @@ const SEV_STYLES: Record<ActionItem['severity'], { dot: string; ring: string; la
   low:      { dot: 'bg-slate-400',  ring: 'ring-slate-400/30',  label: 'text-slate-700 dark:text-slate-300' },
 };
 
-function ActionRow({
+function ActionCard({
   item,
   index,
   onSnooze,
@@ -336,132 +336,154 @@ function ActionRow({
   onSnooze: (id: string) => void;
   onOpenAiCoach: (filingId: string, mode: 'rejection' | 'draft-review') => void;
 }) {
-  const [open, setOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const sev = SEV_STYLES[item.severity];
 
-  // "Mode" for the AI coach button — rejection items get the rejection
-  // coach, everything else gets the pre-flight reviewer.
+  // AI coach mode — rejected → rejection coach; everything else → pre-flight.
   const coachMode: 'rejection' | 'draft-review' =
     item.kind === 'rejection' ? 'rejection' : 'draft-review';
 
+  // Top-left accent line tone — visual signal of urgency without dominating
+  // the card. Sits flush with the left edge, 3px wide.
+  const accent =
+    item.severity === 'critical' ? 'bg-rose-500'
+    : item.severity === 'high'   ? 'bg-rose-400'
+    : item.severity === 'medium' ? 'bg-amber-500'
+    :                              'bg-slate-300';
+
   return (
-    <motion.li
+    <motion.article
       initial={reduceMotion ? false : { opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.3), ease: 'easeOut' }}
-      className="group transition-colors duration-200 hover:bg-slate-50/60 dark:hover:bg-slate-900/40"
+      className="group relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:border-slate-300 dark:hover:border-slate-700 transition-colors duration-200"
     >
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full px-6 py-3.5 flex items-start gap-3 text-left cursor-pointer focus:outline-none focus-visible:bg-slate-50 dark:focus-visible:bg-slate-900/40"
-      >
-        {/* Severity dot — single pulse if new */}
-        <span className="relative flex h-2 w-2 shrink-0 mt-2">
-          {item.isNew && !reduceMotion && (
-            <span className={cn('absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping', sev.dot)} />
+      {/* Left accent bar */}
+      <span className={cn('absolute left-0 top-0 bottom-0 w-1', accent)} aria-hidden />
+
+      <div className="pl-5 pr-5 py-4">
+        {/* Top row: donut + title + status badge */}
+        <div className="flex items-start gap-4">
+          {item.score !== null ? (
+            <ScoreDonut score={item.score} pulse={item.isNew && !reduceMotion} />
+          ) : (
+            <BulkFixIcon />
           )}
-          <span className={cn('relative inline-flex h-2 w-2 rounded-full ring-2', sev.dot, sev.ring)} />
-        </span>
 
-        <div className="flex-1 min-w-0">
-          {/* Top line: title + isNew chip + score badge (right) */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[13.5px] font-semibold text-slate-900 dark:text-slate-50 leading-tight">
-              {item.title}
-            </span>
-            {item.isNew && (
-              <Badge variant="outline" className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10">
-                New
-              </Badge>
-            )}
-            <span className="flex-1" />
-            {item.score !== null && <ScoreChip score={item.score} />}
-          </div>
-
-          {/* Middle line: origin metadata — company + country */}
-          {(item.originCompany || item.originCountry) && (
-            <div className="mt-1 flex items-center gap-2 flex-wrap text-[11.5px] text-slate-500 dark:text-slate-400">
-              {item.originCompany && (
-                <span className="inline-flex items-center gap-1 max-w-[280px] truncate">
-                  <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
-                  <span className="truncate">{item.originCompany}</span>
-                </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-[13.5px] font-semibold text-slate-900 dark:text-slate-50 leading-tight truncate">
+                {item.title}
+              </h3>
+              {item.isNew && (
+                <Badge variant="outline" className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10">
+                  New
+                </Badge>
               )}
-              {item.originCompany && item.originCountry && (
-                <span className="text-slate-300 dark:text-slate-700">·</span>
-              )}
-              {item.originCountry && <CountryChip code={item.originCountry} />}
             </div>
-          )}
+            {item.status && <StatusPill status={item.status} className="mt-1.5" />}
 
-          {/* Bottom line: 1-line context */}
-          <p className={cn('mt-1 text-[12px] leading-relaxed truncate', open && 'whitespace-normal', 'text-slate-600 dark:text-slate-400')}>
-            {item.context}
-          </p>
+            {/* Origin row — company + country chip */}
+            {(item.originCompany || item.originCountry) && (
+              <div className="mt-2 flex items-center gap-2 flex-wrap text-[11.5px] text-slate-500 dark:text-slate-400">
+                {item.originCompany && (
+                  <span className="inline-flex items-center gap-1 max-w-full min-w-0">
+                    <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
+                    <span className="truncate">{item.originCompany}</span>
+                  </span>
+                )}
+                {item.originCountry && <CountryChip code={item.originCountry} />}
+              </div>
+            )}
+          </div>
         </div>
 
-        <ChevronDown
-          className={cn(
-            'h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 mt-1',
-            open && 'rotate-180',
-          )}
-        />
-      </button>
+        {/* Context */}
+        <p className="mt-3 text-[12.5px] leading-relaxed text-slate-600 dark:text-slate-400">
+          {item.context}
+        </p>
 
-      {open && (
-        <motion.div
-          initial={reduceMotion ? false : { opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="px-6 pb-4 -mt-1"
-        >
-          <div className="pl-5 flex items-center gap-2 flex-wrap">
-            {item.actions.map((a, i) => {
-              if (a.kind === 'open' && a.href) {
-                return (
-                  <Link
-                    key={i}
-                    to={a.href}
-                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11.5px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors duration-200"
-                  >
-                    {a.label} <ArrowRight className="h-3 w-3" />
-                  </Link>
-                );
-              }
-              if (a.kind === 'coach' && item.filingId) {
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenAiCoach(item.filingId!, coachMode);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-md border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 text-[11.5px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/15 transition-colors duration-200"
-                  >
-                    <Sparkles className="h-3 w-3" /> {a.label}
-                  </button>
-                );
-              }
-              return null;
-            })}
-            <span className="flex-1" />
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSnooze(item.id);
-              }}
-              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11.5px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200"
-            >
-              <Clock className="h-3 w-3" /> Snooze 24h
-            </button>
-          </div>
-        </motion.div>
+        {/* Actions footer */}
+        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2 flex-wrap">
+          {item.actions.map((a, i) => {
+            if (a.kind === 'open' && a.href) {
+              return (
+                <Link
+                  key={i}
+                  to={a.href}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11.5px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors duration-200"
+                >
+                  {a.label} <ArrowRight className="h-3 w-3" />
+                </Link>
+              );
+            }
+            if (a.kind === 'coach' && item.filingId) {
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => onOpenAiCoach(item.filingId!, coachMode)}
+                  className="inline-flex items-center gap-1 rounded-md border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 text-[11.5px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/15 transition-colors duration-200"
+                >
+                  <Sparkles className="h-3 w-3" /> {a.label}
+                </button>
+              );
+            }
+            return null;
+          })}
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={() => onSnooze(item.id)}
+            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11.5px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200"
+            title="Hide this card for 24 hours"
+          >
+            <Clock className="h-3 w-3" /> Snooze
+          </button>
+        </div>
+      </div>
+
+      {/* Sev pulse echo — single pulse for new items, behind the accent bar */}
+      {item.isNew && !reduceMotion && (
+        <span className={cn('absolute left-0 top-0 bottom-0 w-1 opacity-60 animate-pulse', sev.dot)} aria-hidden />
       )}
-    </motion.li>
+    </motion.article>
+  );
+}
+
+// ─── Status pill (filing status badge on the card) ──────────────────
+
+function StatusPill({ status, className }: { status: string; className?: string }) {
+  const map: Record<string, { label: string; bg: string; text: string; ring: string }> = {
+    rejected:    { label: 'Rejected',     bg: 'bg-rose-50 dark:bg-rose-500/10',       text: 'text-rose-700 dark:text-rose-300',       ring: 'ring-rose-200/60 dark:ring-rose-500/20' },
+    draft:       { label: 'Draft',        bg: 'bg-slate-50 dark:bg-slate-500/10',     text: 'text-slate-700 dark:text-slate-300',     ring: 'ring-slate-200 dark:ring-slate-700' },
+    submitted:   { label: 'Submitted',    bg: 'bg-blue-50 dark:bg-blue-500/10',       text: 'text-blue-700 dark:text-blue-300',       ring: 'ring-blue-200/60 dark:ring-blue-500/20' },
+    pending_cbp: { label: 'Pending CBP',  bg: 'bg-blue-50 dark:bg-blue-500/10',       text: 'text-blue-700 dark:text-blue-300',       ring: 'ring-blue-200/60 dark:ring-blue-500/20' },
+    on_hold:     { label: 'On Hold',      bg: 'bg-amber-50 dark:bg-amber-500/10',     text: 'text-amber-700 dark:text-amber-300',     ring: 'ring-amber-200/60 dark:ring-amber-500/20' },
+    accepted:    { label: 'Accepted',     bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-300', ring: 'ring-emerald-200/60 dark:ring-emerald-500/20' },
+    amended:     { label: 'Amended',      bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-300', ring: 'ring-emerald-200/60 dark:ring-emerald-500/20' },
+    cancelled:   { label: 'Cancelled',    bg: 'bg-slate-50 dark:bg-slate-500/10',     text: 'text-slate-500 dark:text-slate-400',     ring: 'ring-slate-200 dark:ring-slate-700' },
+  };
+  const cfg = map[status] ?? { label: status, bg: 'bg-slate-50 dark:bg-slate-500/10', text: 'text-slate-700 dark:text-slate-300', ring: 'ring-slate-200 dark:ring-slate-700' };
+  return (
+    <span className={cn(
+      'inline-flex items-center px-1.5 py-0.5 rounded ring-1',
+      'text-[10px] font-semibold uppercase tracking-[0.06em]',
+      cfg.bg, cfg.text, cfg.ring,
+      className,
+    )}>
+      {cfg.label}
+    </span>
+  );
+}
+
+// ─── BulkFixIcon (placeholder for items without a score, e.g. bulk-fix) ──
+
+function BulkFixIcon() {
+  return (
+    <div className="h-12 w-12 rounded-full bg-rose-50 dark:bg-rose-500/10 ring-1 ring-rose-200/60 dark:ring-rose-500/20 flex items-center justify-center shrink-0">
+      <ListChecks className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+    </div>
   );
 }
 
@@ -486,25 +508,79 @@ function EmptyActionQueue() {
   );
 }
 
-// ─── Score chip + country chip ──────────────────────────────────────
+// ─── Score donut + country chip ─────────────────────────────────────
 
-function ScoreChip({ score }: { score: number }) {
+/**
+ * Small SVG donut showing the compliance score 0–100 with the percentage
+ * in the middle. Stroke is color-toned by score tier (emerald ≥80 / amber ≥50
+ * / rose <50). Animates the arc on first mount only (skipped if
+ * prefers-reduced-motion).
+ */
+function ScoreDonut({ score, pulse = false }: { score: number; pulse?: boolean }) {
+  const reduceMotion = useReducedMotion();
+  // Animate stroke on mount only.
+  const [drawn, setDrawn] = useState(reduceMotion ? score : 0);
+  const hasAnimated = useRef(false);
+  useEffect(() => {
+    if (hasAnimated.current || reduceMotion) {
+      setDrawn(score);
+      return;
+    }
+    hasAnimated.current = true;
+    const duration = 700;
+    const start = performance.now();
+    let raf = 0;
+    const step = (t: number) => {
+      const p = Math.min(1, (t - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDrawn(Math.round(score * eased));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [score, reduceMotion]);
+
+  const size = 48;
+  const stroke = 5;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c - (Math.max(0, Math.min(100, drawn)) / 100) * c;
+
   const tone =
-    score >= 90 ? { bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-300', ring: 'ring-emerald-200/60 dark:ring-emerald-500/20' }
-    : score >= 70 ? { bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-700 dark:text-amber-300', ring: 'ring-amber-200/60 dark:ring-amber-500/20' }
-    : { bg: 'bg-rose-50 dark:bg-rose-500/10', text: 'text-rose-700 dark:text-rose-300', ring: 'ring-rose-200/60 dark:ring-rose-500/20' };
+    score >= 80 ? { stroke: 'stroke-emerald-500 dark:stroke-emerald-400', text: 'text-emerald-700 dark:text-emerald-300' }
+    : score >= 50 ? { stroke: 'stroke-amber-500 dark:stroke-amber-400',  text: 'text-amber-700 dark:text-amber-300' }
+    :              { stroke: 'stroke-rose-500 dark:stroke-rose-400',    text: 'text-rose-700 dark:text-rose-300' };
+
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 tabular-nums',
-        'text-[11px] font-semibold leading-none',
-        tone.bg, tone.text, tone.ring,
-      )}
-      title={`Compliance score for this filing: ${score}/100`}
-    >
-      <span>{score}</span>
-      <span className="text-[9px] font-medium opacity-60">/100</span>
-    </span>
+    <div className={cn('relative shrink-0', pulse && 'animate-pulse')} title={`Compliance score: ${score}/100`}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        {/* Track */}
+        <circle
+          cx={size / 2} cy={size / 2} r={r}
+          className="stroke-slate-200 dark:stroke-slate-800"
+          strokeWidth={stroke}
+          fill="none"
+        />
+        {/* Progress */}
+        <circle
+          cx={size / 2} cy={size / 2} r={r}
+          className={cn(tone.stroke, 'transition-[stroke-dashoffset] duration-700 ease-out')}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          fill="none"
+        />
+      </svg>
+      <div className={cn(
+        'absolute inset-0 flex items-center justify-center font-semibold tabular-nums leading-none',
+        'text-[12px]',
+        tone.text,
+      )}>
+        {drawn}
+        <span className="text-[8px] font-medium ml-0.5 opacity-60">%</span>
+      </div>
+    </div>
   );
 }
 
