@@ -7,6 +7,7 @@ import { Filing, getPartyName, getFirstCommodity, ShipmentStatus } from '@/types
 import { StatusBadge } from '@/components/StatusBadge';
 import { LifecycleWidget } from '@/components/LifecycleWidget';
 import { PlanLimitModal } from '@/components/PlanLimitModal';
+import { RejectionDetailsCard } from '@/components/RejectionDetailsCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -955,151 +956,30 @@ export default function ShipmentDetails() {
         </CardContent>
       </Card>
 
-      {/* Rejection details — with translated error display */}
+      {/* Rejection details — extracted to RejectionDetailsCard for reuse + legacy [object Object] cleanup */}
       {filing.status === 'rejected' && filing.rejectionReason && (
-        <Card className="border-red-200 dark:border-red-900/40 opacity-0 animate-fade-in-up" style={{ animationDelay: '250ms', animationFillMode: 'forwards' }}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-                <CardTitle className="text-sm font-semibold text-red-700 dark:text-red-400">Rejection Details</CardTitle>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                  <Link to={`/shipments/${filing.id}/edit`}><Pencil className="h-3.5 w-3.5" /> Edit & Fix</Link>
-                </Button>
-                <Button size="sm" className="gap-1.5" onClick={handleResubmit} disabled={submitFiling.isPending}>
-                  {submitFiling.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                  Resubmit
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Try to parse translated errors from the rejection reason */}
-            {(() => {
-              // Try to parse structured rejection data (JSON with summary + errors)
-              let validationErrors: any[] = [];
-              let summaryText = filing.rejectionReason || '';
-
-              try {
-                const parsed = JSON.parse(filing.rejectionReason || '');
-                if (parsed.errors && Array.isArray(parsed.errors)) {
-                  validationErrors = parsed.errors;
-                  summaryText = parsed.summary || '';
-                }
-              } catch {
-                // Not JSON — use raw rejection reason as-is
-              }
-
-              // Also check the filing object for inline validationErrors (from submit response)
-              if (validationErrors.length === 0 && (filing as any).validationErrors) {
-                validationErrors = (filing as any).validationErrors;
-              }
-
-              // If still no structured errors, try to parse CBP disposition codes from raw text
-              if (validationErrors.length === 0 && summaryText) {
-                const cbpCodes: Record<string, { message: string; fix: string; severity: string }> = {
-                  'S75': { message: 'A party entity (manufacturer, seller, or buyer) is not recognized in the CBP system.', fix: 'Verify the party name, address, and country exactly match what is registered with CBP. In the test environment, this is expected with sample data.', severity: 'critical' },
-                  'S17': { message: 'The Importer Number (EIN) is not registered with CBP.', fix: 'Enter a valid EIN that is registered with CBP for customs filing. Format: XX-XXXXXXX.', severity: 'critical' },
-                  'SA7': { message: 'No continuous customs bond is on file with CBP for this importer.', fix: 'A valid continuous bond must be on file with CBP. Contact your surety company or customs broker.', severity: 'critical' },
-                  'S18': { message: 'The ISF filer is not registered with CBP.', fix: 'The ISF filer EIN must be registered with CBP as an authorized filer.', severity: 'critical' },
-                  'S10': { message: 'There is a data discrepancy in the filing.', fix: 'Review all fields for accuracy and correct any errors.', severity: 'critical' },
-                  'S76': { message: 'A party entity identifier does not match CBP records.', fix: 'Verify party details exactly match CBP registration.', severity: 'critical' },
-                };
-
-                // Split by comma and try to match CBP codes
-                const parts = summaryText.split(/[,;]+/).map((s: string) => s.trim()).filter(Boolean);
-                for (const part of parts) {
-                  const codeMatch = part.match(/^([A-Z][A-Z0-9]{1,3})\s+(.+)/i);
-                  if (codeMatch) {
-                    const code = codeMatch[1];
-                    const known = cbpCodes[code];
-                    if (known) {
-                      // Extract extra context like "- Party: CN"
-                      const extra = part.replace(/^[A-Z][A-Z0-9]{1,3}\s+[A-Z\s]+/i, '').replace(/^[\s\-:]+/, '').trim();
-                      validationErrors.push({
-                        field: code,
-                        fieldLabel: `CBP Code ${code}`,
-                        message: known.message + (extra ? ` (${extra})` : ''),
-                        fix: known.fix,
-                        severity: known.severity,
-                      });
-                    } else if (part.match(/ISF\s+REJECTED/i)) {
-                      validationErrors.push({
-                        field: 'ISF',
-                        fieldLabel: 'ISF Status',
-                        message: 'The ISF filing was rejected by CBP due to the errors listed above.',
-                        fix: 'Fix all the errors above, then resubmit.',
-                        severity: 'critical',
-                      });
-                    } else {
-                      validationErrors.push({
-                        field: code,
-                        fieldLabel: `CBP Code ${code}`,
-                        message: `${codeMatch[2]}`,
-                        fix: 'Review and correct the filing based on this CBP response.',
-                        severity: 'warning',
-                      });
-                    }
-                  }
-                }
-              }
-
-              if (validationErrors.length > 0) {
-                return (
-                  <div className="space-y-2">
-                    {validationErrors.map((err: any, i: number) => (
-                      <div key={i} className="rounded-lg border border-red-200/60 dark:border-red-900/30 bg-red-50/30 dark:bg-red-950/10 p-3 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className={cn(
-                            'text-[10px] font-bold uppercase',
-                            err.severity === 'critical' ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-400' :
-                            err.severity === 'warning' ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/40 dark:text-amber-400' :
-                            'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/40 dark:text-blue-400',
-                          )}>
-                            {err.severity || 'error'}
-                          </Badge>
-                          <span className="text-sm font-semibold text-foreground">{err.fieldLabel || err.field}</span>
-                        </div>
-                        <p className="text-sm text-red-700 dark:text-red-400">{err.message}</p>
-                        {err.fix && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <span className="font-medium text-primary">💡 Fix:</span> {err.fix}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                );
-              }
-
-              // Fallback: show raw rejection reason
-              return (
-                <div className="rounded-lg bg-red-50/50 dark:bg-red-950/20 border border-red-200/50 dark:border-red-900/30 p-3">
-                  <p className="text-sm text-red-700 dark:text-red-400 whitespace-pre-wrap">{summaryText || filing.rejectionReason}</p>
-                </div>
-              );
-            })()}
-          </CardContent>
-        </Card>
+        <RejectionDetailsCard
+          reason={filing.rejectionReason}
+          variant="current"
+          actions={
+            <>
+              <Button variant="outline" size="sm" className="gap-1.5" asChild>
+                <Link to={`/shipments/${filing.id}/edit`}><Pencil className="h-3.5 w-3.5" /> Edit & Fix</Link>
+              </Button>
+              <Button size="sm" className="gap-1.5" onClick={handleResubmit} disabled={submitFiling.isPending}>
+                {submitFiling.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                Resubmit
+              </Button>
+            </>
+          }
+        />
       )}
 
-      {/* Non-rejected filing rejection reason (e.g. historical) */}
+
+      {/* Historical rejection (filing later succeeded). Same renderer; the
+          variant flag tones the wording + adds a "kept for reference" subhead. */}
       {filing.status !== 'rejected' && filing.rejectionReason && (
-        <Card className="border-red-200 dark:border-red-900/40 opacity-0 animate-fade-in-up" style={{ animationDelay: '250ms', animationFillMode: 'forwards' }}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-              <CardTitle className="text-sm font-semibold text-red-700 dark:text-red-400">Previous Rejection Details</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg bg-red-50/50 dark:bg-red-950/20 border border-red-200/50 dark:border-red-900/30 p-3">
-              <p className="text-sm text-red-700 dark:text-red-400 whitespace-pre-wrap">{filing.rejectionReason}</p>
-            </div>
-          </CardContent>
-        </Card>
+        <RejectionDetailsCard reason={filing.rejectionReason} variant="previous" />
       )}
 
       {/* Data sections */}

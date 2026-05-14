@@ -24,6 +24,25 @@ import { Filing } from '@/types/shipment';
 import { Button } from '@/components/ui/button';
 import { Check, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { parseRejectionReason } from '@/components/RejectionDetailsCard';
+
+/** One-line label for the lifecycle stage when a filing is rejected.
+ *  Picks the cleanest signal in this order:
+ *    1. parsed.summary  (e.g. "BOLValidations: BOL Numbers already exist: MAEU…")
+ *    2. parsed.errors[0].message  (first user-friendly error)
+ *    3. parsed.fallbackRaw  (plain-text rejection with [object Object] cleaned out)
+ *    4. 'Rejected'
+ *  Truncates to 80 chars so it fits the stage card width. */
+function rejectionOneLiner(reason: string | null | undefined): string {
+  if (!reason) return 'Rejected';
+  const parsed = parseRejectionReason(reason);
+  const candidate =
+    parsed.summary?.trim() ||
+    parsed.errors[0]?.message?.trim() ||
+    parsed.fallbackRaw?.trim() ||
+    'Rejected';
+  return candidate.length > 80 ? candidate.slice(0, 77) + '…' : candidate;
+}
 
 // ─── ExpandableDetail — long status text with show-more/less ────────
 
@@ -139,7 +158,7 @@ export function computeShipmentLifecycle(args: {
     : filing.status === 'submitted' ? 'At CBP'
     : filing.status === 'pending_cbp' ? 'At CBP'
     : filing.status === 'on_hold' ? 'On hold'
-    : filing.status === 'rejected' ? (filing.rejectionReason || 'Rejected') : filing.status === 'accepted' ? 'Accepted by CBP'
+    : filing.status === 'rejected' ? rejectionOneLiner(filing.rejectionReason) : filing.status === 'accepted' ? 'Accepted by CBP'
     : filing.status === 'cancelled' ? 'Cancelled'
     : filing.status === 'amended' ? 'Amended'
     : filing.status;
