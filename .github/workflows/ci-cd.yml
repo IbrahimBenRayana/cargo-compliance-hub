@@ -183,14 +183,56 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           NEW_TAG: ${{ github.sha }}
+          # AI provider env vars — sourced from GitHub repo secrets, written
+          # into /opt/mycargolens/.env at the start of the deploy script so the
+          # server container picks them up on the upcoming `docker compose up`.
+          # Provider-agnostic naming: AI_PROVIDER chooses the backend (openai,
+          # anthropic, etc.) and AI_API_KEY is the matching credential.
+          AI_ASSESSMENT_ENABLED:    ${{ secrets.AI_ASSESSMENT_ENABLED }}
+          AI_PROVIDER:              ${{ secrets.AI_PROVIDER }}
+          AI_MODEL:                 ${{ secrets.AI_MODEL }}
+          AI_API_KEY:               ${{ secrets.AI_API_KEY }}
+          AI_MAX_TOKENS:            ${{ secrets.AI_MAX_TOKENS }}
+          AI_TEMPERATURE:           ${{ secrets.AI_TEMPERATURE }}
+          AI_RATE_LIMIT_PER_USER:   ${{ secrets.AI_RATE_LIMIT_PER_USER }}
+          AI_DISABLE_TRAINING_DATA: ${{ secrets.AI_DISABLE_TRAINING_DATA }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: NEW_TAG
+          envs: NEW_TAG,AI_ASSESSMENT_ENABLED,AI_PROVIDER,AI_MODEL,AI_API_KEY,AI_MAX_TOKENS,AI_TEMPERATURE,AI_RATE_LIMIT_PER_USER,AI_DISABLE_TRAINING_DATA
           script: |
             set -euo pipefail
             cd /opt/mycargolens
+
+            # ── Sync AI_* env vars from GitHub Secrets into the VPS .env ──
+            # Idempotent upsert: replace the line if it already exists, append
+            # if it doesn't. Only touches lines prefixed with AI_ so other
+            # secrets (CC_*, STRIPE_*, etc.) are never modified. Empty values
+            # from secrets are skipped so a misconfigured secret can't wipe a
+            # working line.
+            upsert_env() {
+              local key="$1" val="$2"
+              [ -z "$val" ] && return 0
+              if grep -q "^${key}=" .env; then
+                # Use a delimiter unlikely in API keys; escape only the
+                # replacement-side backslashes & ampersands.
+                local escaped
+                escaped=$(printf '%s' "$val" | sed -e 's/[\\&|]/\\&/g')
+                sed -i "s|^${key}=.*|${key}=${escaped}|" .env
+              else
+                printf '%s=%s\n' "$key" "$val" >> .env
+              fi
+            }
+            upsert_env AI_ASSESSMENT_ENABLED    "$AI_ASSESSMENT_ENABLED"
+            upsert_env AI_PROVIDER              "$AI_PROVIDER"
+            upsert_env AI_MODEL                 "$AI_MODEL"
+            upsert_env AI_API_KEY               "$AI_API_KEY"
+            upsert_env AI_MAX_TOKENS            "$AI_MAX_TOKENS"
+            upsert_env AI_TEMPERATURE           "$AI_TEMPERATURE"
+            upsert_env AI_RATE_LIMIT_PER_USER   "$AI_RATE_LIMIT_PER_USER"
+            upsert_env AI_DISABLE_TRAINING_DATA "$AI_DISABLE_TRAINING_DATA"
+            echo "▶ AI_* env synced from GitHub Secrets"
 
             # ── Capture currently-deployed tags (rollback targets) ─────────
             OLD_TAG=$(grep '^IMAGE_TAG=' .env | cut -d= -f2)
