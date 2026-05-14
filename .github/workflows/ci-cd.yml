@@ -234,6 +234,44 @@ jobs:
             upsert_env AI_DISABLE_TRAINING_DATA "$AI_DISABLE_TRAINING_DATA"
             echo "▶ AI_* env synced from GitHub Secrets"
 
+            # ── Patch docker-compose.yml to forward AI_* into the server ──
+            # The VPS compose has an `environment:` block under the server
+            # service that enumerates which env vars get into the container.
+            # If AI_API_KEY isn't enumerated, the container never sees it
+            # even though it's in .env. We insert the AI_* lines after the
+            # EMAIL_FROM_NAME line ONCE (idempotent — grep guard prevents
+            # re-inserts on subsequent deploys).
+            #
+            # Heredoc uses 'BLOCK' (quoted) so ${...} stays literal — the
+            # compose file needs the placeholders so it can pull from .env.
+            if [ -f docker-compose.yml ]; then
+              if ! grep -qE '^[[:space:]]+AI_API_KEY:' docker-compose.yml; then
+                # printf-per-line keeps every script line at the YAML block's
+                # indent. Single-quoted strings preserve ${...} placeholders
+                # so they reach docker-compose unexpanded.
+                printf '%s\n' \
+                  '      AI_ASSESSMENT_ENABLED:    ${AI_ASSESSMENT_ENABLED:-false}' \
+                  '      AI_PROVIDER:              ${AI_PROVIDER:-openai}' \
+                  '      AI_MODEL:                 ${AI_MODEL:-gpt-4o-mini}' \
+                  '      AI_API_KEY:               ${AI_API_KEY:-}' \
+                  '      AI_MAX_TOKENS:            ${AI_MAX_TOKENS:-2048}' \
+                  '      AI_TEMPERATURE:           ${AI_TEMPERATURE:-0.3}' \
+                  '      AI_RATE_LIMIT_PER_USER:   ${AI_RATE_LIMIT_PER_USER:-50}' \
+                  '      AI_DISABLE_TRAINING_DATA: ${AI_DISABLE_TRAINING_DATA:-true}' \
+                  > /tmp/ai_compose_block
+                # Anchor on EMAIL_FROM_NAME — the last env var in the existing
+                # server.environment block. `sed r FILE` reads & appends after match.
+                cp docker-compose.yml docker-compose.yml.bak
+                sed -i '/^      EMAIL_FROM_NAME:/r /tmp/ai_compose_block' docker-compose.yml
+                rm -f /tmp/ai_compose_block
+                echo "▶ Patched docker-compose.yml — AI_* env vars now forwarded into server container"
+              else
+                echo "▶ docker-compose.yml already enumerates AI_* — skipping patch"
+              fi
+            else
+              echo "⚠ docker-compose.yml not found at /opt/mycargolens — skipping AI compose patch"
+            fi
+
             # ── Capture currently-deployed tags (rollback targets) ─────────
             OLD_TAG=$(grep '^IMAGE_TAG=' .env | cut -d= -f2)
             OLD_LANDING_TAG=$(grep '^LANDING_IMAGE_TAG=' .env | cut -d= -f2 || echo "latest")
