@@ -252,6 +252,278 @@ router.get('/liquidation-tracker', async (req: AuthRequest, res: Response): Prom
   });
 });
 
+// ─── GET /action-queue ───────────────────────────────────────────────
+// The Compliance Center "Overview" hero is an inbox of actionable items
+// ranked by urgency. This endpoint aggregates ALL sources of action a US
+// importer should know about RIGHT NOW:
+//
+//   1. ISF deadline imminent  — filings due within 72h, not yet submitted
+//   2. CBP rejection           — every currently-rejected filing
+//   3. UFLPA high/elevated     — supply-chain risk to triage
+//   4. PSC window closing      — accepted filings within 14d of PSC deadline
+//   5. Liquidation soon        — accepted filings within 14d of liquidation
+//   6. Bulk-fix opportunity    — N≥3 recent rejections sharing a root cause
+//
+// Each item has a stable `id` so the frontend can persist snooze/dismiss
+// state in localStorage without server-side tables (kept lean for v1).
+
+router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<void> => {
+  const orgId = req.user!.orgId;
+  const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+
+  // Pull every filing relevant to the action queue. Bounded to last 180d
+  // since older filings rarely produce live actions.
+  const window = new Date(now - 180 * DAY);
+  const filings = await prisma.filing.findMany({
+    where: { orgId, createdAt: { gte: window } },
+    select: {
+      id: true,
+      filingType: true,
+      status: true,
+      masterBol: true,
+      houseBol: true,
+      createdAt: true,
+      submittedAt: true,
+      acceptedAt: true,
+      rejectedAt: true,
+      rejectionReason: true,
+      estimatedDeparture: true,
+      manufacturer: true,
+      seller: true,
+      buyer: true,
+      shipToParty: true,
+      consigneeAddress: true,
+      commodities: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // Above-the-fold stats — these power the 3 quick stats next to the score.
+  const awaitingCbp = filings.filter((f) => f.status === 'submitted').length;
+  // "Issues" means: rejected, on-hold, or draft with deadline within 7d.
+  const sevenDaysOut = new Date(now + 7 * DAY);
+  const withIssues = filings.filter((f) =>
+    f.status === 'rejected' ||
+    f.status === 'on_hold' ||
+    (f.status === 'draft' && f.estimatedDeparture && f.estimatedDeparture <= sevenDaysOut),
+  ).length;
+
+  // High-risk: every filing whose UFLPA assessment is 'high'. (Elevated is
+  // surfaced inside Risk tab but not counted as headline urgency.)
+  const highRiskFilings = filings.filter((f) => assessUflpaRisk(f as any).severity === 'high');
+  const highRisk = highRiskFilings.length;
+
+  // ── Build action items ────────────────────────────────────────────
+
+  type ActionItem = {
+    id: string;
+    kind: 'deadline' | 'rejection' | 'uflpa' | 'psc' | 'liquidation' | 'bulk-fix';
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    title: string;
+    context: string;
+    filingId?: string;
+    bol?: string;
+    /** ms-since-epoch — used to sort newest-first within severity bucket. */
+    timestamp: number;
+    /** When true the frontend pulses the dot to signal "new". */
+    isNew: boolean;
+    /** Suggested next-steps the UI can render as buttons. */
+    actions: Array<{
+      label: string;
+      href?: string;
+      kind?: 'open' | 'submit' | 'coach' | 'edit' | 'snooze';
+    }>;
+  };
+
+  const items: ActionItem[] = [];
+  const FIVE_MIN = 5 * 60 * 1000;
+
+  // 1. ISF deadlines — submitted-by clock is estimatedDeparture - 24h.
+  //    Anything within 72h of that cutoff is an action item.
+  for (const f of filings) {
+    if (f.status !== 'draft') continue;
+    if (!f.estimatedDeparture) continue;
+    const cutoff = new Date(f.estimatedDeparture).getTime() - 24 * 60 * 60 * 1000;
+    const hoursToCutoff = (cutoff - now) / (60 * 60 * 1000);
+    if (hoursToCutoff < -24 || hoursToCutoff > 72) continue;
+    const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
+    const severity: ActionItem['severity'] =
+      hoursToCutoff <= 24 ? 'critical' : hoursToCutoff <= 48 ? 'high' : 'medium';
+    items.push({
+      id: `deadline:${f.id}`,
+      kind: 'deadline',
+      severity,
+      title:
+        hoursToCutoff <= 0
+          ? `ISF deadline passed — ${bol}`
+          : `ISF deadline in ${Math.round(hoursToCutoff)}h — ${bol}`,
+      context: `Vessel departs ${new Date(f.estimatedDeparture).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. Submit before cutoff to avoid CBP penalty.`,
+      filingId: f.id,
+      bol,
+      timestamp: f.createdAt.getTime(),
+      isNew: now - f.createdAt.getTime() < FIVE_MIN,
+      actions: [
+        { label: 'Open',     kind: 'open',  href: `/shipments/${f.id}` },
+        { label: 'AI coach', kind: 'coach' },
+      ],
+    });
+  }
+
+  // 2. Currently-rejected filings — each is an action item.
+  for (const f of filings) {
+    if (f.status !== 'rejected') continue;
+    const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
+    const ts = f.rejectedAt?.getTime() ?? f.createdAt.getTime();
+    items.push({
+      id: `rejection:${f.id}`,
+      kind: 'rejection',
+      severity: 'critical',
+      title: `Rejected by CBP — ${bol}`,
+      context: 'Edit the filing, fix the issues, and resubmit. The AI coach can explain what went wrong.',
+      filingId: f.id,
+      bol,
+      timestamp: ts,
+      isNew: now - ts < FIVE_MIN,
+      actions: [
+        { label: 'Open',     kind: 'open',  href: `/shipments/${f.id}` },
+        { label: 'AI coach', kind: 'coach' },
+      ],
+    });
+  }
+
+  // 3. UFLPA risk — surface high-severity inflight filings.
+  for (const f of highRiskFilings) {
+    if (!['draft', 'submitted', 'pending_cbp', 'on_hold'].includes(f.status)) continue;
+    const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
+    const risk = assessUflpaRisk(f as any);
+    items.push({
+      id: `uflpa:${f.id}`,
+      kind: 'uflpa',
+      severity: 'high',
+      title: `High UFLPA risk — ${bol}`,
+      context: risk.reasons[0] ?? 'Supply-chain documentation required before clearance.',
+      filingId: f.id,
+      bol,
+      timestamp: f.createdAt.getTime(),
+      isNew: false,
+      actions: [
+        { label: 'Open',     kind: 'open',  href: `/shipments/${f.id}` },
+        { label: 'AI coach', kind: 'coach' },
+      ],
+    });
+  }
+
+  // 4. PSC deadlines — Post-Summary Correction windows about to close.
+  //    Accepted/amended filings with PSC deadline ≤ 14 days away.
+  for (const f of filings) {
+    if (!['accepted', 'amended'].includes(f.status) || !f.acceptedAt) continue;
+    const liq = computeLiquidation(f.acceptedAt);
+    if (liq.status !== 'psc-window-open') continue;
+    if (liq.daysUntilPscDeadline > 14) continue;
+    const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
+    items.push({
+      id: `psc:${f.id}`,
+      kind: 'psc',
+      severity: liq.daysUntilPscDeadline <= 7 ? 'high' : 'medium',
+      title: `PSC window closes in ${liq.daysUntilPscDeadline}d — ${bol}`,
+      context: 'File a Post-Summary Correction within the window, or accept the current duty assessment.',
+      filingId: f.id,
+      bol,
+      timestamp: f.acceptedAt.getTime(),
+      isNew: false,
+      actions: [
+        { label: 'Open', kind: 'open', href: `/shipments/${f.id}` },
+      ],
+    });
+  }
+
+  // 5. Liquidation imminent — entries whose 314-day liquidation is ≤14d.
+  for (const f of filings) {
+    if (!['accepted', 'amended'].includes(f.status) || !f.acceptedAt) continue;
+    const liq = computeLiquidation(f.acceptedAt);
+    if (liq.status !== 'awaiting-liquidation') continue;
+    if (liq.daysUntilLiquidation > 14 || liq.daysUntilLiquidation < 0) continue;
+    const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
+    items.push({
+      id: `liquidation:${f.id}`,
+      kind: 'liquidation',
+      severity: 'medium',
+      title: `Liquidation in ${liq.daysUntilLiquidation}d — ${bol}`,
+      context: 'After liquidation you have 180 days to file a protest if the duty assessment is contested.',
+      filingId: f.id,
+      bol,
+      timestamp: f.acceptedAt.getTime(),
+      isNew: false,
+      actions: [
+        { label: 'Open', kind: 'open', href: `/shipments/${f.id}` },
+      ],
+    });
+  }
+
+  // 6. Bulk-fix detector — 3+ recent rejections sharing the same parsed
+  //    rejection-summary string indicates the importer is making one
+  //    repeating mistake. Surface as a single grouped item.
+  const reasonGroups = new Map<string, string[]>();
+  for (const f of filings) {
+    if (f.status !== 'rejected' || !f.rejectionReason) continue;
+    const parsed = parseRejectionReason(f.rejectionReason);
+    const key =
+      parsed.summary?.trim() ||
+      parsed.errors[0]?.message?.trim() ||
+      parsed.fallbackRaw?.trim();
+    if (!key) continue;
+    const truncated = key.length > 60 ? key.slice(0, 57) + '…' : key;
+    if (!reasonGroups.has(truncated)) reasonGroups.set(truncated, []);
+    reasonGroups.get(truncated)!.push(f.id);
+  }
+  for (const [reason, filingIds] of reasonGroups.entries()) {
+    if (filingIds.length < 3) continue;
+    items.push({
+      id: `bulk-fix:${Buffer.from(reason).toString('base64').slice(0, 16)}`,
+      kind: 'bulk-fix',
+      severity: 'high',
+      title: `${filingIds.length} filings share the same rejection`,
+      context: `"${reason}" — fix once, apply to ${filingIds.length} filings.`,
+      timestamp: now,
+      isNew: false,
+      actions: [
+        { label: 'View affected', kind: 'open', href: `/shipments?status=rejected` },
+      ],
+    });
+  }
+
+  // Sort: critical → high → medium → low; within bucket, newest first.
+  const SEV_ORDER: Record<ActionItem['severity'], number> = { critical: 0, high: 1, medium: 2, low: 3 };
+  items.sort((a, b) => {
+    const c = SEV_ORDER[a.severity] - SEV_ORDER[b.severity];
+    if (c !== 0) return c;
+    return b.timestamp - a.timestamp;
+  });
+
+  // ── Score ─────────────────────────────────────────────────────────
+  // Simple: (1 - rejected/total) * 100, clipped. Returns null if no data.
+  const totalRecent = filings.length;
+  const rejectedRecent = filings.filter((f) => f.status === 'rejected').length;
+  const score = totalRecent > 0 ? Math.round(((totalRecent - rejectedRecent) / totalRecent) * 100) : null;
+
+  res.json({
+    score,
+    stats: {
+      awaitingCbp,
+      withIssues,
+      highRisk,
+    },
+    actionQueue: items,
+    counts: {
+      total: items.length,
+      critical: items.filter((i) => i.severity === 'critical').length,
+      high:     items.filter((i) => i.severity === 'high').length,
+      medium:   items.filter((i) => i.severity === 'medium').length,
+    },
+  });
+});
+
 // ─── POST /rejection-coach (SSE) ─────────────────────────────────────
 // Streams an AI explanation + numbered fix steps for a rejected filing.
 // On the wire: `data: <chunk>\n\n` per token, ending with `event: done\n\n`.
