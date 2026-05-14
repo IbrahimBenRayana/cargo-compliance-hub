@@ -523,7 +523,10 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
     // Determine status: if ISF-5 (sent during create), success is based on createResult
     const sendOk = wasSentDuringCreate ? true : (sendResult!.status < 400);
 
-    // Update filing status
+    // Update filing status. When transitioning OUT of 'rejected' (i.e. user
+    // resubmitted a previously-rejected filing and the submit succeeded), we
+    // explicitly clear rejectionReason + rejectedAt so stale rejection text
+    // doesn't keep appearing as "Previous rejection" on the now-accepted view.
     const newStatus = sendOk ? 'submitted' : 'rejected';
     const updatedFiling = await prisma.filing.update({
       where: { id: filing.id },
@@ -531,8 +534,12 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
         status: newStatus,
         ccFilingId: ccFilingId ?? null,
         submittedAt: newStatus === 'submitted' ? new Date() : undefined,
-        rejectedAt: newStatus === 'rejected' ? new Date() : undefined,
-        rejectionReason: newStatus === 'rejected' ? JSON.stringify(sendResult?.data ?? createResult.data) : undefined,
+        // On rejection: stamp the new metadata. On success (submitted): clear
+        // both fields so we don't carry forward a prior cycle's leftovers.
+        rejectedAt: newStatus === 'rejected' ? new Date() : null,
+        rejectionReason: newStatus === 'rejected'
+          ? JSON.stringify(sendResult?.data ?? createResult.data)
+          : null,
       },
     });
 
@@ -1067,8 +1074,15 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
         data: {
           status: newStatus,
           acceptedAt: newStatus === 'accepted' ? new Date() : undefined,
-          rejectedAt: newStatus === 'rejected' ? new Date() : undefined,
-          rejectionReason: rejectionReason ?? undefined,
+          // Acceptance clears any prior rejection metadata so the detail page
+          // stops surfacing stale "previous rejection" text. History is
+          // preserved in FilingStatusHistory.
+          rejectedAt: newStatus === 'accepted' ? null
+            : newStatus === 'rejected' ? new Date()
+            : undefined,
+          rejectionReason: newStatus === 'accepted' ? null
+            : newStatus === 'rejected' ? (rejectionReason ?? undefined)
+            : undefined,
           cbpTransactionId: isfTxnNumber ?? filing.cbpTransactionId ?? undefined,
         },
       });
@@ -1174,8 +1188,14 @@ router.post('/check-all-statuses', ccApiLimiter, async (req: AuthRequest, res: R
           data: {
             status: newStatus,
             acceptedAt: newStatus === 'accepted' ? new Date() : undefined,
-            rejectedAt: newStatus === 'rejected' ? new Date() : undefined,
-            rejectionReason: newStatus === 'rejected' ? (matchingDoc?.lastEvent?.codeDescription || 'Rejected by CBP') : undefined,
+            // Clear rejection metadata when CBP accepts — see /check-status
+            // handler above for the rationale.
+            rejectedAt: newStatus === 'accepted' ? null
+              : newStatus === 'rejected' ? new Date()
+              : undefined,
+            rejectionReason: newStatus === 'accepted' ? null
+              : newStatus === 'rejected' ? (matchingDoc?.lastEvent?.codeDescription || 'Rejected by CBP')
+              : undefined,
             cbpTransactionId: matchingDoc?.ISFTransactionNumber ?? filing.cbpTransactionId ?? undefined,
           },
         });

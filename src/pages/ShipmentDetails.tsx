@@ -976,9 +976,15 @@ export default function ShipmentDetails() {
       )}
 
 
-      {/* Historical rejection (filing later succeeded). Same renderer; the
-          variant flag tones the wording + adds a "kept for reference" subhead. */}
-      {filing.status !== 'rejected' && filing.rejectionReason && (
+      {/* Historical rejection — only meaningful while the filing is still
+          in flight (user is mid-recovery: editing a draft, awaiting CBP on
+          a resubmit, on hold). For terminal-success states (accepted) the
+          rejection history is noise and contradicts the green status badge,
+          so we hide it. Backend also nulls rejectionReason on accept now
+          (see routes/filings.ts + backgroundJobs.ts), so this also guards
+          against legacy filings whose data wasn't cleaned up. */}
+      {(['draft', 'submitted', 'pending_cbp', 'on_hold'] as const).includes(filing.status as any)
+        && filing.rejectionReason && (
         <RejectionDetailsCard reason={filing.rejectionReason} variant="previous" />
       )}
 
