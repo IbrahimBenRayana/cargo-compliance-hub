@@ -318,7 +318,9 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
 
   type ActionItem = {
     id: string;
-    kind: 'deadline' | 'rejection' | 'uflpa' | 'psc' | 'liquidation' | 'bulk-fix';
+    kind: 'deadline' | 'rejection' | 'uflpa' | 'psc' | 'liquidation' | 'bulk-fix' | 'draft_review';
+    /** Current filing status — surfaced as a badge on the card. */
+    status?: string;
     severity: 'critical' | 'high' | 'medium' | 'low';
     title: string;
     context: string;
@@ -349,15 +351,32 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
   // Compute these once per filing so every action item referencing the
   // same filing gets the same metadata without redundant work.
 
-  /** Compliance score: rejected = 0; otherwise (1 - criticalCount/totalIssues) * 100,
-   *  bounded to 0-100. Filings with no detectable issues score 100. */
+  /**
+   * Compliance score per filing (0–100) — represents DATA QUALITY,
+   * independent of CBP's decision.
+   *
+   * Rationale: the previous "rejected → 0" shortcut made every rejected
+   * filing look identical. But a rejection can happen for many reasons —
+   * bond not on file, party identity mismatch, etc. — that have nothing
+   * to do with the data the user entered. A rejected filing with clean
+   * data should score high; a sloppy draft with 10 missing fields should
+   * score low. Treating them with the same lens (validateFiling) lets the
+   * user see "this rejection has clean data — the issue is external" vs
+   * "this rejection has obvious data issues — fix those first."
+   *
+   * Weights:
+   *   • Accepted / amended → 100 (CBP signed off)
+   *   • All other statuses → validateFiling-based:
+   *        100 − 8·critical − 2·warning − 0.5·info, clipped to [10, 100]
+   *   • The reject STATUS is surfaced separately as a card badge, so the
+   *     user always knows what CBP said.
+   */
   function scoreFiling(f: typeof filings[number]): number {
-    if (f.status === 'rejected') return 0;
+    if (f.status === 'accepted' || f.status === 'amended') return 100;
     const r = validateFiling(f as any);
     if (r.errors.length === 0) return 100;
-    // Each critical = -20; warning = -5; info = -1. Clamp 0-100.
-    const penalty = r.criticalCount * 20 + r.warningCount * 5 + r.infoCount * 1;
-    return Math.max(0, Math.min(100, 100 - penalty));
+    const penalty = r.criticalCount * 8 + r.warningCount * 2 + r.infoCount * 0.5;
+    return Math.max(10, Math.min(100, Math.round(100 - penalty)));
   }
 
   /** Pull the manufacturer name + country. Fallback to seller / first
@@ -420,6 +439,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       timestamp: f.createdAt.getTime(),
       isNew: now - f.createdAt.getTime() < FIVE_MIN,
       score: en.score,
+      status: f.status,
       originCompany: en.company,
       originCountry: en.country,
       actions: [
@@ -446,6 +466,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       timestamp: ts,
       isNew: now - ts < FIVE_MIN,
       score: en.score,
+      status: f.status,
       originCompany: en.company,
       originCountry: en.country,
       actions: [
@@ -472,6 +493,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       timestamp: f.createdAt.getTime(),
       isNew: false,
       score: en.score,
+      status: f.status,
       originCompany: en.company,
       originCountry: en.country,
       actions: [
@@ -501,6 +523,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       timestamp: f.acceptedAt.getTime(),
       isNew: false,
       score: en.score,
+      status: f.status,
       originCompany: en.company,
       originCountry: en.country,
       actions: [
@@ -528,6 +551,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       timestamp: f.acceptedAt.getTime(),
       isNew: false,
       score: en.score,
+      status: f.status,
       originCompany: en.company,
       originCountry: en.country,
       actions: [
@@ -563,10 +587,50 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       timestamp: now,
       isNew: false,
       score: null,            // bulk-fix isn't a single filing
+      status: undefined,
       originCompany: null,
       originCountry: null,
       actions: [
         { label: 'View affected', kind: 'open', href: `/shipments?status=rejected` },
+      ],
+    });
+  }
+
+  // 7. Draft review — surface EVERY draft that doesn't already appear in
+  //    the queue via a higher-priority kind (deadline / uflpa / etc.).
+  //    Severity ladder: critical if data-quality score <50, high if <75,
+  //    medium otherwise — so the user sees high-issue drafts near the
+  //    top and tidy-ish drafts further down.
+  const alreadyQueued = new Set(items.filter((i) => i.filingId).map((i) => i.filingId!));
+  for (const f of filings) {
+    if (f.status !== 'draft') continue;
+    if (alreadyQueued.has(f.id)) continue;
+    const en = enrich(f);
+    const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
+    const severity: ActionItem['severity'] =
+      en.score < 50 ? 'critical' : en.score < 75 ? 'high' : 'medium';
+    items.push({
+      id: `draft:${f.id}`,
+      kind: 'draft_review',
+      severity,
+      title: `Draft — ${bol}`,
+      context:
+        en.score < 50
+          ? 'Many required fields are missing. Open to continue editing.'
+          : en.score < 75
+          ? 'In progress — a few fields still need attention before submit.'
+          : 'Looking clean. Run the AI pre-flight before submitting.',
+      filingId: f.id,
+      bol,
+      timestamp: f.createdAt.getTime(),
+      isNew: now - f.createdAt.getTime() < FIVE_MIN,
+      score: en.score,
+      status: f.status,
+      originCompany: en.company,
+      originCountry: en.country,
+      actions: [
+        { label: 'Open',     kind: 'open',  href: `/shipments/${f.id}` },
+        { label: 'AI coach', kind: 'coach' },
       ],
     });
   }
