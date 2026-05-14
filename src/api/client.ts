@@ -1178,3 +1178,135 @@ export const abiDocumentsApi = {
     });
   },
 };
+
+// ─── Compliance Center API ────────────────────────────────
+
+export interface AiStatusResponse {
+  enabled: boolean;
+  provider?: 'openai';
+  model?: string;
+  dailyLimit?: number;
+  callsToday?: number;
+  reason?: string;
+}
+
+export interface HealthSummary {
+  score: number | null;
+  totals: { all: number; accepted: number; rejected: number };
+  weeklyTrend: Array<{ weekStart: string; total: number; rejected: number }>;
+  topReasons: Array<{ reason: string; count: number }>;
+  deadlineAdherence: { rate: number | null; onTime: number; trackable: number };
+  recentRejectedFilings: Array<{ id: string; rejectedAt: string | null }>;
+}
+
+export interface UflpaScanResponse {
+  scanned: number;
+  counts: { high: number; elevated: number; low: number };
+  flagged: Array<{
+    filingId: string;
+    bol: string;
+    status: string;
+    createdAt: string;
+    risk: {
+      severity: 'high' | 'elevated' | 'low';
+      reasons: string[];
+      origin?: { city?: string; state?: string; country?: string };
+      htsMatches: string[];
+      recommendation: string;
+    };
+  }>;
+}
+
+export interface PgaLookupResponse {
+  hts: string;
+  matched: boolean;
+  flags: Array<{ agency: string; name: string; action: string }>;
+  source: { source: string; lastUpdated: string; note: string };
+}
+
+export interface LiquidationTracked {
+  filingId: string;
+  bol: string;
+  filingType: string;
+  entryDate: string;
+  estimatedLiquidationAt: string;
+  pscDeadline: string;
+  daysUntilLiquidation: number;
+  daysUntilPscDeadline: number;
+  status: 'pending' | 'psc-window-open' | 'awaiting-liquidation' | 'liquidated';
+}
+
+export const complianceApi = {
+  aiStatus() {
+    return apiFetch<AiStatusResponse>('/api/v1/compliance/ai-status');
+  },
+  healthSummary() {
+    return apiFetch<HealthSummary>('/api/v1/compliance/health-summary');
+  },
+  uflpaScan() {
+    return apiFetch<UflpaScanResponse>('/api/v1/compliance/risk/uflpa');
+  },
+  pgaLookup(hts: string) {
+    return apiFetch<PgaLookupResponse>(`/api/v1/compliance/pga-lookup?hts=${encodeURIComponent(hts)}`);
+  },
+  liquidationTracker() {
+    return apiFetch<{ total: number; tracked: LiquidationTracked[] }>(
+      '/api/v1/compliance/liquidation-tracker',
+    );
+  },
+  /**
+   * Stream a rejection-coach response. Returns an async iterable of text
+   * deltas. Caller renders each chunk as it arrives. The stream is SSE
+   * with `data: {"delta":"..."}` chunks ending in `event: done`.
+   */
+  async *rejectionCoach(filingId: string): AsyncGenerator<string, void, void> {
+    const res = await fetch(`${API_BASE}/api/v1/compliance/rejection-coach`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ filingId }),
+    });
+    if (!res.ok || !res.body) {
+      const errBody = await res.json().catch(() => ({ error: 'AI request failed' }));
+      const e = new Error(errBody.error || `HTTP ${res.status}`);
+      (e as any).status = res.status;
+      (e as any).body = errBody;
+      throw e;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop() ?? '';
+      for (const ev of events) {
+        const lines = ev.split('\n');
+        let eventName = 'message';
+        let dataLine = '';
+        for (const l of lines) {
+          if (l.startsWith('event: ')) eventName = l.slice(7).trim();
+          else if (l.startsWith('data: ')) dataLine += l.slice(6);
+        }
+        if (eventName === 'done') return;
+        if (eventName === 'error') {
+          let parsed: any = {};
+          try { parsed = JSON.parse(dataLine); } catch { /* ignore */ }
+          throw Object.assign(new Error(parsed.error || 'AI stream error'), { code: parsed.code });
+        }
+        if (dataLine) {
+          try {
+            const parsed = JSON.parse(dataLine);
+            if (typeof parsed.delta === 'string') yield parsed.delta;
+          } catch {
+            // ignore malformed line
+          }
+        }
+      }
+    }
+  },
+};

@@ -540,6 +540,59 @@ export function translateRejectionReason(reason: string): TranslatedError[] {
 }
 
 /**
+ * Parse a stored rejectionReason into the structured shape the Compliance
+ * Center + frontend RejectionDetailsCard both consume. Mirrors the frontend
+ * parser at src/components/RejectionDetailsCard.tsx but lives on the server
+ * so routes can use the same model without duplicating regex/cleanup logic.
+ */
+export interface ParsedRejection {
+  summary?: string;
+  errors: Array<{
+    field?: string;
+    fieldLabel?: string;
+    message: string;
+    fix?: string;
+    severity: 'critical' | 'warning' | 'info';
+  }>;
+  fallbackRaw?: string;
+}
+
+function cleanLegacy(s: string | undefined): string | undefined {
+  if (!s) return s;
+  const cleaned = s
+    .replace(/\s*Original error:\s*\[object Object\]\s*\.?/gi, '')
+    .replace(/\s*\[object Object\]\s*/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return cleaned && cleaned !== '.' && cleaned !== ':' && cleaned !== '-' ? cleaned : undefined;
+}
+
+export function parseRejectionReason(raw: string | null | undefined): ParsedRejection {
+  if (!raw) return { errors: [] };
+
+  // Shape 1: JSON envelope { summary, errors: [...] }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+      const errors = parsed.errors.map((e: any) => ({
+        field:      e.field,
+        fieldLabel: cleanLegacy(e.fieldLabel) ?? cleanLegacy(e.field) ?? 'CBP validation',
+        message:    cleanLegacy(e.message) ?? cleanLegacy(e.originalMessage) ?? 'CBP flagged an issue with this field.',
+        fix:        cleanLegacy(e.fix),
+        severity:   (e.severity === 'critical' || e.severity === 'warning' || e.severity === 'info' ? e.severity : 'warning') as 'critical' | 'warning' | 'info',
+      }));
+      return { errors, summary: cleanLegacy(parsed.summary) };
+    }
+  } catch {
+    // Not JSON — fall through.
+  }
+
+  // Shape 2: plain text. Strip artifacts; return as fallbackRaw.
+  const cleaned = cleanLegacy(raw);
+  return { errors: [], fallbackRaw: cleaned ?? 'A rejection was recorded but no detail was captured.' };
+}
+
+/**
  * Sanitize an error message to remove internal API provider names.
  * Replaces "CustomsCity" and similar references with neutral terms.
  */

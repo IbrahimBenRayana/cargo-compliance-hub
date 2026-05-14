@@ -8,6 +8,9 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { LifecycleWidget } from '@/components/LifecycleWidget';
 import { PlanLimitModal } from '@/components/PlanLimitModal';
 import { RejectionDetailsCard } from '@/components/RejectionDetailsCard';
+import { RejectionCoachDrawer } from '@/components/compliance/RejectionCoachDrawer';
+import { complianceApi } from '@/api/client';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -541,6 +544,13 @@ export default function ShipmentDetails() {
   const [templateName, setTemplateName] = useState('');
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [planLimit, setPlanLimit] = useState<{ current: number; limit: number } | null>(null);
+  const [coachOpen, setCoachOpen] = useState(false);
+  // Surface the AI Coach button only when the server has AI configured.
+  const aiStatusQuery = useQuery({
+    queryKey: ['compliance', 'ai-status'],
+    queryFn: () => complianceApi.aiStatus(),
+    staleTime: 5 * 60_000,
+  });
 
   // Document upload state
   const { data: docsData, isLoading: docsLoading } = useFilingDocuments(id);
@@ -963,6 +973,16 @@ export default function ShipmentDetails() {
           variant="current"
           actions={
             <>
+              {aiStatusQuery.data?.enabled && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-500/30 dark:text-amber-300 dark:hover:bg-amber-500/10"
+                  onClick={() => setCoachOpen(true)}
+                >
+                  <Sparkles className="h-3.5 w-3.5" /> Ask AI Coach
+                </Button>
+              )}
               <Button variant="outline" size="sm" className="gap-1.5" asChild>
                 <Link to={`/shipments/${filing.id}/edit`}><Pencil className="h-3.5 w-3.5" /> Edit & Fix</Link>
               </Button>
@@ -974,6 +994,13 @@ export default function ShipmentDetails() {
           }
         />
       )}
+
+      {/* AI Rejection Coach drawer — streaming OpenAI response */}
+      <RejectionCoachDrawer
+        open={coachOpen}
+        onOpenChange={setCoachOpen}
+        filingId={filing.id}
+      />
 
 
       {/* Historical rejection — only meaningful while the filing is still
