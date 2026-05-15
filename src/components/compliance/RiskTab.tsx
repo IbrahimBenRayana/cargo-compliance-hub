@@ -6,7 +6,6 @@ import {
   ChevronDown, Loader2,
 } from 'lucide-react';
 import { complianceApi } from '@/api/client';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,21 +47,34 @@ function UflpaScanCard() {
   });
 
   if (isLoading || !data) {
-    return <Skeleton className="h-44 rounded-xl" />;
+    return <Skeleton className="h-44 rounded-2xl" />;
   }
 
   return (
-    <Card className="rounded-2xl border-slate-200 dark:border-slate-800">
-      <CardContent className="p-5">
-        <div className="flex items-center gap-2 mb-1">
-          <ShieldAlert className="h-4 w-4 text-rose-500" />
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            UFLPA Risk Scan
-          </h3>
+    <article className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
+      {/* Subtle rose wash at top — UFLPA is the highest-stakes scan on the page */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-24 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse 60% 100% at 50% 0%, hsl(0 84% 60% / 0.08), transparent 70%)',
+        }}
+      />
+      <div className="relative p-6">
+        <div className="flex items-start gap-4 mb-5">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-rose-400 to-rose-600 ring-1 ring-rose-300/60 dark:ring-rose-400/40 shadow-[0_8px_20px_-10px_rgba(244,63,94,0.5)] flex items-center justify-center shrink-0">
+            <ShieldAlert className="h-5 w-5 text-rose-50" strokeWidth={2.5} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-50">
+              UFLPA Risk Scan
+            </h3>
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Forced-labor exposure across your last 90 days of filings — Xinjiang origin signals + UFLPA priority HTS chapters.
+            </p>
+          </div>
         </div>
-        <p className="text-[12px] text-slate-500 dark:text-slate-400 mb-4">
-          Forced-labor exposure across your last 90 days of filings — Xinjiang origin signals + UFLPA priority HTS chapters
-        </p>
 
         {/* Severity counts */}
         <div className="grid grid-cols-3 gap-2 mb-4">
@@ -92,8 +104,8 @@ function UflpaScanCard() {
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </article>
   );
 }
 
@@ -164,17 +176,21 @@ function PgaLookupCard() {
   });
 
   return (
-    <Card className="rounded-2xl border-slate-200 dark:border-slate-800">
-      <CardContent className="p-5">
-        <div className="flex items-center gap-2 mb-1">
-          <Search className="h-4 w-4 text-slate-500" />
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            PGA Flag Lookup
-          </h3>
+    <article className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
+      <div className="p-6">
+        <div className="flex items-start gap-4 mb-4">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 ring-1 ring-blue-300/60 dark:ring-blue-400/40 shadow-[0_8px_20px_-10px_rgba(59,130,246,0.5)] flex items-center justify-center shrink-0">
+            <Search className="h-5 w-5 text-blue-50" strokeWidth={2.5} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-50">
+              PGA Flag Lookup
+            </h3>
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Which agencies require notice or permit for this HTS at the port?
+            </p>
+          </div>
         </div>
-        <p className="text-[12px] text-slate-500 dark:text-slate-400 mb-3">
-          Which agencies require notice or permit for this HTS at the port?
-        </p>
         <Input
           value={hts}
           onChange={(e) => setHts(e.target.value)}
@@ -217,8 +233,8 @@ function PgaLookupCard() {
             </ul>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </article>
   );
 }
 
@@ -231,17 +247,21 @@ function FiveOneSixCard() {
   const formatted = isValid ? `${normalized.slice(0, 2)}-${normalized.slice(2)}` : ein;
 
   return (
-    <Card className="rounded-2xl border-slate-200 dark:border-slate-800">
-      <CardContent className="p-5">
-        <div className="flex items-center gap-2 mb-1">
-          <Building2 className="h-4 w-4 text-slate-500" />
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            CBP Form 5106 — Importer Identity
-          </h3>
+    <article className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
+      <div className="p-6">
+        <div className="flex items-start gap-4 mb-4">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 ring-1 ring-slate-400/60 dark:ring-slate-500/40 shadow-[0_8px_20px_-10px_rgba(71,85,105,0.5)] flex items-center justify-center shrink-0">
+            <Building2 className="h-5 w-5 text-slate-50" strokeWidth={2.5} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-50">
+              CBP Form 5106 — Importer Identity
+            </h3>
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Verify your EIN format. CBP rejects filings whose IOR is not on file with this form.
+            </p>
+          </div>
         </div>
-        <p className="text-[12px] text-slate-500 dark:text-slate-400 mb-3">
-          Verify your EIN is in the correct format. CBP rejects filings whose IOR is not on file with this form.
-        </p>
         <Input
           value={ein}
           onChange={(e) => setEin(e.target.value)}
@@ -282,8 +302,8 @@ function FiveOneSixCard() {
             Download CBP Form 5106 <ArrowRight className="h-3 w-3" />
           </a>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </article>
   );
 }
 

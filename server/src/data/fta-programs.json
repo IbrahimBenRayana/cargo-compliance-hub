@@ -1,0 +1,128 @@
+{
+  "_meta": {
+    "source": "USTR — active free trade agreements + preference programs as of 2026",
+    "lastUpdated": "2026-05-15",
+    "note": "Eligibility is a TWO-step check: (1) the country must be a member of the program, (2) the specific HTS code must qualify under the program's rules of origin. This data covers step 1 only — step 2 requires the importer to verify rules-of-origin compliance with their supplier. The 'covers' field summarises typical HTS scope; not a substitute for the program's eligibility tables."
+  },
+  "programs": {
+    "USMCA": {
+      "fullName": "United States-Mexico-Canada Agreement",
+      "countries": ["MX", "CA"],
+      "covers": "Most goods — requires Certificate of Origin and compliance with annex rules of origin (regional value content, tariff shift, or de minimis).",
+      "claimCode": "S",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/united-states-mexico-canada-agreement"
+    },
+    "GSP": {
+      "fullName": "Generalized System of Preferences",
+      "countries": ["IN", "TH", "ID", "PH", "BR", "AR", "EC", "PY", "TN", "GE", "JO", "KH", "LA", "MM", "NP", "BD", "PK", "FJ", "MN", "VU", "WS"],
+      "covers": "~5,000 product categories — eligible HTS list maintained by USTR. Requires GSP Form A or origin declaration. NOTE: GSP expired in Dec 2020 and has not yet been renewed by Congress; if renewed, claims may be retroactive.",
+      "claimCode": "A",
+      "link": "https://ustr.gov/issue-areas/preference-programs/generalized-system-preferences-gsp"
+    },
+    "AGOA": {
+      "fullName": "African Growth and Opportunity Act",
+      "countries": ["AO", "BJ", "BW", "BF", "CV", "TD", "KM", "CG", "CI", "DJ", "ER", "ET", "GA", "GM", "GH", "GN", "KE", "LS", "LR", "MG", "MW", "ML", "MR", "MU", "MZ", "NA", "NE", "NG", "RW", "ST", "SN", "SC", "SL", "ZA", "TZ", "TG", "UG", "ZM"],
+      "covers": "Apparel + most non-textile goods. Stricter rules for apparel (third-country fabric provisions). Renewed through 2025; check for current eligibility status by country.",
+      "claimCode": "D",
+      "link": "https://ustr.gov/issue-areas/trade-development/preference-programs/african-growth-and-opportunity-act-agoa"
+    },
+    "CBI / CBTPA": {
+      "fullName": "Caribbean Basin Initiative / Caribbean Basin Trade Partnership Act",
+      "countries": ["AG", "BB", "BZ", "DM", "GD", "GY", "HT", "JM", "MS", "KN", "LC", "VC", "TT", "BS"],
+      "covers": "Most goods + apparel under CBTPA. Multiple program codes — check USTR for the right code per product.",
+      "claimCode": "E",
+      "link": "https://ustr.gov/issue-areas/preference-programs/caribbean-basin-initiative-cbi"
+    },
+    "Israel FTA": {
+      "fullName": "United States-Israel Free Trade Agreement",
+      "countries": ["IL"],
+      "covers": "Most goods — duty-free with 35% regional value content rule.",
+      "claimCode": "IL",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/israel-fta"
+    },
+    "Jordan FTA": {
+      "fullName": "United States-Jordan Free Trade Agreement",
+      "countries": ["JO"],
+      "covers": "All goods phased to duty-free.",
+      "claimCode": "JO",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/jordan-fta"
+    },
+    "Korea FTA": {
+      "fullName": "United States-Korea Free Trade Agreement (KORUS)",
+      "countries": ["KR"],
+      "covers": "Nearly all goods duty-free post-phase-in (2026). Requires Certificate of Origin.",
+      "claimCode": "KR",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/korus-fta"
+    },
+    "Australia FTA": {
+      "fullName": "United States-Australia Free Trade Agreement",
+      "countries": ["AU"],
+      "covers": "Most goods duty-free. Certificate of Origin (no specific form) required.",
+      "claimCode": "AU",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/australian-fta"
+    },
+    "Singapore FTA": {
+      "fullName": "United States-Singapore Free Trade Agreement",
+      "countries": ["SG"],
+      "covers": "All goods duty-free.",
+      "claimCode": "SG",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/singapore-fta"
+    },
+    "Chile FTA": {
+      "fullName": "United States-Chile Free Trade Agreement",
+      "countries": ["CL"],
+      "covers": "All goods duty-free.",
+      "claimCode": "CL",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/chile-fta"
+    },
+    "CAFTA-DR": {
+      "fullName": "Central America-Dominican Republic FTA",
+      "countries": ["CR", "DO", "SV", "GT", "HN", "NI"],
+      "covers": "Most goods phased to duty-free.",
+      "claimCode": "P",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/cafta-dr-dominican-republic-central-america-fta"
+    },
+    "Peru TPA": {
+      "fullName": "United States-Peru Trade Promotion Agreement",
+      "countries": ["PE"],
+      "covers": "Most goods duty-free.",
+      "claimCode": "PE",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/peru-tpa"
+    },
+    "Colombia TPA": {
+      "fullName": "United States-Colombia Trade Promotion Agreement",
+      "countries": ["CO"],
+      "covers": "Most goods duty-free post-phase-in.",
+      "claimCode": "CO",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/colombia-fta"
+    },
+    "Panama TPA": {
+      "fullName": "United States-Panama Trade Promotion Agreement",
+      "countries": ["PA"],
+      "covers": "Most goods duty-free.",
+      "claimCode": "PA",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/panama-tpa"
+    },
+    "Morocco FTA": {
+      "fullName": "United States-Morocco Free Trade Agreement",
+      "countries": ["MA"],
+      "covers": "Most goods phased to duty-free.",
+      "claimCode": "MA",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/morocco-fta"
+    },
+    "Bahrain FTA": {
+      "fullName": "United States-Bahrain Free Trade Agreement",
+      "countries": ["BH"],
+      "covers": "Most goods duty-free.",
+      "claimCode": "BH",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/bahrain-fta"
+    },
+    "Oman FTA": {
+      "fullName": "United States-Oman Free Trade Agreement",
+      "countries": ["OM"],
+      "covers": "Most goods duty-free.",
+      "claimCode": "OM",
+      "link": "https://ustr.gov/trade-agreements/free-trade-agreements/oman-fta"
+    }
+  }
+}

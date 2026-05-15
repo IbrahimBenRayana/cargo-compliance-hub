@@ -1257,6 +1257,45 @@ export interface ActionQueueResponse {
   counts: { total: number; critical: number; high: number; medium: number };
 }
 
+export interface HtsClassificationResponse {
+  matched: boolean;
+  message?: string;
+  primary: { hts: string; description: string } | null;
+  explanation: string | null;
+  alternatives: Array<{ hts: string; description: string }>;
+}
+
+export interface AddCvdOrder {
+  case: string;
+  type: 'AD' | 'CVD' | 'ADCVD';
+  country: string;
+  product: string;
+  htsPrefixes: string[];
+  note: string;
+}
+
+export interface AddCvdLookupResponse {
+  query: string;
+  matched: boolean;
+  orders: AddCvdOrder[];
+  source: { source: string; lastUpdated: string; note: string; termsKey: Record<string, string> };
+}
+
+export interface FtaProgramMatch {
+  key: string;
+  fullName: string;
+  covers: string;
+  claimCode: string;
+  link: string;
+}
+
+export interface FtaPreferenceResponse {
+  country: string;
+  matched: boolean;
+  programs: FtaProgramMatch[];
+  source: { source: string; lastUpdated: string; note: string };
+}
+
 export interface LiquidationTracked {
   filingId: string;
   bol: string;
@@ -1289,6 +1328,22 @@ export const complianceApi = {
   },
   actionQueue() {
     return apiFetch<ActionQueueResponse>('/api/v1/compliance/action-queue');
+  },
+  classifyHts(description: string) {
+    return apiFetch<HtsClassificationResponse>('/api/v1/compliance/classify-hts', {
+      method: 'POST',
+      body: JSON.stringify({ description }),
+    });
+  },
+  addCvdLookup(q: string) {
+    return apiFetch<AddCvdLookupResponse>(
+      `/api/v1/compliance/add-cvd-lookup?q=${encodeURIComponent(q)}`,
+    );
+  },
+  ftaPreference(country: string) {
+    return apiFetch<FtaPreferenceResponse>(
+      `/api/v1/compliance/fta-preference?country=${encodeURIComponent(country)}`,
+    );
   },
   /**
    * Stream a rejection-coach response. Returns an async iterable of text
