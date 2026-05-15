@@ -1051,6 +1051,86 @@ router.get('/fta-preference', (req: AuthRequest, res: Response): void => {
   });
 });
 
+// ─── GET /filings/:id/score-history ──────────────────────────────────
+// Score trajectory for a single filing, derived from FilingStatusHistory.
+// We map each status transition to a status-band score so the user can
+// see how the filing went draft → rejected → amended over time. The
+// validation-driven nuance ("100 - 8·critical − 2·warning") isn't captured
+// historically because we don't store snapshots of the filing data at
+// each status; that's a future enhancement.
+
+function statusBandScore(status: string): number {
+  switch (status) {
+    case 'draft':      return 70;
+    case 'submitted':  return 85;
+    case 'on_hold':    return 70;
+    case 'rejected':   return 25;
+    case 'accepted':   return 100;
+    case 'amended':    return 95;
+    case 'cancelled':  return 50;
+    default:           return 60;
+  }
+}
+
+router.get('/filings/:id/score-history', async (req: AuthRequest, res: Response): Promise<void> => {
+  const rawId = req.params.id;
+  const filingId = typeof rawId === 'string' ? rawId : '';
+  if (!filingId || !/^[0-9a-f-]{36}$/i.test(filingId)) {
+    res.status(400).json({ error: 'Invalid filing id' });
+    return;
+  }
+
+  // Org scope: confirm the filing belongs to the requesting user's org.
+  const filing = await prisma.filing.findFirst({
+    where: { id: filingId, orgId: req.user!.orgId },
+    select: { id: true, status: true, createdAt: true },
+  });
+  if (!filing) {
+    res.status(404).json({ error: 'Filing not found' });
+    return;
+  }
+
+  const history = await prisma.filingStatusHistory.findMany({
+    where: { filingId },
+    orderBy: { createdAt: 'asc' },
+    select: { status: true, message: true, createdAt: true },
+  });
+
+  // Always seed with the filing's creation as the first point so the line
+  // starts at "draft" even if no status row was written on creation.
+  const seeded = history.length > 0 && history[0]!.createdAt.getTime() <= filing.createdAt.getTime() + 1000
+    ? history
+    : [{ status: 'draft', message: null as string | null, createdAt: filing.createdAt }, ...history];
+
+  const points = seeded.map((h) => ({
+    at:      h.createdAt.toISOString(),
+    status:  h.status,
+    score:   statusBandScore(h.status),
+    message: h.message,
+  }));
+
+  // Also append a "now" point at the current status so the line ends at
+  // today's value (the action queue donut).
+  const last = points[points.length - 1];
+  const nowScore = statusBandScore(filing.status);
+  if (!last || last.status !== filing.status || nowScore !== last.score) {
+    points.push({
+      at:      new Date().toISOString(),
+      status:  filing.status,
+      score:   nowScore,
+      message: null,
+    });
+  }
+
+  res.json({
+    filingId,
+    currentScore:   nowScore,
+    currentStatus:  filing.status,
+    points,
+    note: 'Scores are status-band approximations. Validation-driven score detail is captured live in the action queue.',
+  });
+});
+
 // ─── GET /health-narrative ───────────────────────────────────────────
 // One-sentence AI summary of the org's current compliance state. Used at
 // the top of the Compliance Center as a "morning brief" — lead with the

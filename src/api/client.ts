@@ -1199,6 +1199,21 @@ export interface HealthSummary {
   recentRejectedFilings: Array<{ id: string; rejectedAt: string | null }>;
 }
 
+export interface ScoreHistoryPoint {
+  at:      string;
+  status:  string;
+  score:   number;
+  message: string | null;
+}
+
+export interface ScoreHistoryResponse {
+  filingId:      string;
+  currentScore:  number;
+  currentStatus: string;
+  points:        ScoreHistoryPoint[];
+  note:          string;
+}
+
 export interface HealthNarrativeResponse {
   narrative: string;
   model: string | null;
@@ -1330,6 +1345,9 @@ export const complianceApi = {
   },
   healthNarrative() {
     return apiFetch<HealthNarrativeResponse>('/api/v1/compliance/health-narrative');
+  },
+  scoreHistory(filingId: string) {
+    return apiFetch<ScoreHistoryResponse>(`/api/v1/compliance/filings/${encodeURIComponent(filingId)}/score-history`);
   },
   healthSummary() {
     return apiFetch<HealthSummary>('/api/v1/compliance/health-summary');
