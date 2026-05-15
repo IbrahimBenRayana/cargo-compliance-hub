@@ -23,6 +23,9 @@ import * as ai from '../services/ai.js';
 import { lookupPgaFlags, lookupMetadata as pgaMeta } from '../services/compliance/pgaFlags.js';
 import { assessUflpaRisk } from '../services/compliance/uflpa.js';
 import { computeLiquidation } from '../services/compliance/liquidation.js';
+import { lookupAddCvd, getAddCvdMeta } from '../services/compliance/addCvd.js';
+import { lookupFtaForCountry, getFtaMeta } from '../services/compliance/fta.js';
+import { ccClient } from '../services/customscity.js';
 import { parseRejectionReason } from '../services/errorTranslator.js';
 import { validateFiling } from '../services/validation.js';
 import logger from '../config/logger.js';
@@ -953,6 +956,99 @@ Be concrete and brief. Refer to the filing's actual values when relevant ("Maste
   } finally {
     res.end();
   }
+});
+
+// ─── Classification tab endpoints ────────────────────────────────────
+
+// POST /classify-hts — standalone HTS classifier wrapper around CC's
+// /api/ht-classification. Takes a free-text product description, returns
+// the best HTS match + alternative suggestions + GRI-style explanation.
+const classifyHtsSchema = z.object({
+  description: z.string().min(3).max(500),
+});
+
+router.post('/classify-hts', authLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = classifyHtsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Description must be 3-500 characters' });
+    return;
+  }
+  try {
+    const result = await ccClient.classifyHTS(parsed.data.description.trim());
+    const raw = result.data as any;
+    const item = raw?.items?.[0];
+    if (!item) {
+      res.json({ matched: false, message: 'No classification returned. Try a more specific description.' });
+      return;
+    }
+    // Coherence check — CC flags vague inputs.
+    const coherence = item?.classifierResponse?.coherence_validation;
+    if (coherence && !coherence.is_coherent) {
+      res.json({
+        matched: false,
+        message: coherence.explanation || 'Description too vague — add material, function, or industry context.',
+      });
+      return;
+    }
+    // Primary recommendation.
+    const cr = item.classifierResponse ?? {};
+    const primaryHts: string | null = cr.selected_hts ?? item.classification?.hts ?? null;
+    const explanation: string | null = cr.explanation ?? null;
+    const alternatives: Array<{ hts: string; description: string }> =
+      Array.isArray(cr.hts_review_result?.recomendations)
+        ? cr.hts_review_result.recomendations
+            .filter((r: any) => r?.hts && r?.description)
+            .map((r: any) => ({ hts: String(r.hts), description: String(r.description) }))
+        : [];
+    res.json({
+      matched: !!primaryHts,
+      primary: primaryHts
+        ? { hts: primaryHts, description: item.classification?.name ?? item.description ?? '' }
+        : null,
+      explanation,
+      alternatives,
+    });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, '[Compliance] classify-hts failed');
+    res.status(502).json({ error: 'Classifier upstream failed. Please try again.' });
+  }
+});
+
+// GET /add-cvd-lookup?q=...  — seed-data lookup of active Commerce orders.
+const addCvdQuery = z.object({ q: z.string().min(1).max(100) });
+
+router.get('/add-cvd-lookup', (req: AuthRequest, res: Response): void => {
+  const parsed = addCvdQuery.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Query parameter `q` required (HTS, country, or text)' });
+    return;
+  }
+  const orders = lookupAddCvd(parsed.data.q);
+  res.json({
+    query: parsed.data.q,
+    matched: orders.length > 0,
+    orders,
+    source: getAddCvdMeta(),
+  });
+});
+
+// GET /fta-preference?country=XX — programs that include the country
+// (step 1 of eligibility; rules-of-origin is on the importer).
+const ftaQuery = z.object({ country: z.string().min(2).max(2) });
+
+router.get('/fta-preference', (req: AuthRequest, res: Response): void => {
+  const parsed = ftaQuery.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Query parameter `country` required (ISO-2 code)' });
+    return;
+  }
+  const programs = lookupFtaForCountry(parsed.data.country);
+  res.json({
+    country: parsed.data.country.toUpperCase(),
+    matched: programs.length > 0,
+    programs,
+    source: getFtaMeta(),
+  });
 });
 
 export default router;

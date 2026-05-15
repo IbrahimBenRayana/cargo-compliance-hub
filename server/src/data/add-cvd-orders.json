@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "source": "U.S. Department of Commerce — Enforcement & Compliance, active AD/CVD orders (curated subset)",
+    "lastUpdated": "2026-05-15",
+    "note": "Not exhaustive — Commerce maintains ~600 active orders. Seed covers the highest-volume import categories for v1. Each entry lists HTS prefixes that the order targets; the user must verify their specific 10-digit HTS lands in the order. Cash deposit rates vary by exporter — link out to Commerce ACE for the live rate table.",
+    "termsKey": {
+      "AD":  "Anti-dumping duty",
+      "CVD": "Countervailing duty",
+      "ADCVD": "Both AD and CVD apply"
+    }
+  },
+  "orders": [
+    { "case": "A-570-979",  "type": "AD",    "country": "CN", "product": "Crystalline silicon photovoltaic cells",       "htsPrefixes": ["8541.43"], "note": "Solar cells / modules — frequent enforcement target" },
+    { "case": "C-570-980",  "type": "CVD",   "country": "CN", "product": "Crystalline silicon photovoltaic cells",       "htsPrefixes": ["8541.43"], "note": "Paired with A-570-979" },
+    { "case": "A-570-053",  "type": "AD",    "country": "CN", "product": "Truck and bus tires",                          "htsPrefixes": ["4011.20"], "note": "" },
+    { "case": "A-201-805",  "type": "AD",    "country": "MX", "product": "Steel concrete reinforcing bar (rebar)",       "htsPrefixes": ["7213.10", "7214.20", "7228.30"], "note": "" },
+    { "case": "A-570-026",  "type": "AD",    "country": "CN", "product": "Carbon and certain alloy steel wire rod",      "htsPrefixes": ["7213.91", "7213.99", "7227.20"], "note": "" },
+    { "case": "A-570-893",  "type": "AD",    "country": "CN", "product": "Frozen warmwater shrimp",                      "htsPrefixes": ["0306.17", "1605.21", "1605.29"], "note": "" },
+    { "case": "A-560-832",  "type": "AD",    "country": "ID", "product": "Frozen warmwater shrimp",                      "htsPrefixes": ["0306.17", "1605.21"], "note": "" },
+    { "case": "A-560-815",  "type": "AD",    "country": "IN", "product": "Frozen warmwater shrimp",                      "htsPrefixes": ["0306.17", "1605.21"], "note": "" },
+    { "case": "A-570-863",  "type": "AD",    "country": "CN", "product": "Honey",                                        "htsPrefixes": ["0409.00"], "note": "" },
+    { "case": "A-570-831",  "type": "AD",    "country": "CN", "product": "Fresh garlic",                                 "htsPrefixes": ["0703.20"], "note": "" },
+    { "case": "A-570-983",  "type": "AD",    "country": "CN", "product": "Drawn stainless steel sinks",                  "htsPrefixes": ["7324.10"], "note": "" },
+    { "case": "A-570-893",  "type": "AD",    "country": "CN", "product": "Carbon steel butt-weld pipe fittings",         "htsPrefixes": ["7307.93"], "note": "" },
+    { "case": "A-570-067",  "type": "AD",    "country": "CN", "product": "Aluminum extrusions",                          "htsPrefixes": ["7604.21", "7604.29", "7608.20", "7609.00"], "note": "Frequent self-certification audits" },
+    { "case": "A-588-869",  "type": "AD",    "country": "JP", "product": "Welded line pipe",                             "htsPrefixes": ["7305.11", "7305.12"], "note": "" },
+    { "case": "A-580-868",  "type": "AD",    "country": "KR", "product": "Cold-rolled steel flat products",              "htsPrefixes": ["7209.15", "7209.16", "7209.17"], "note": "" },
+    { "case": "A-552-805",  "type": "AD",    "country": "VN", "product": "Frozen fish fillets (catfish)",                "htsPrefixes": ["0304.62"], "note": "" },
+    { "case": "A-583-852",  "type": "AD",    "country": "TW", "product": "Carbon steel cut-to-length plate",             "htsPrefixes": ["7208.40", "7208.51", "7208.52"], "note": "" },
+    { "case": "A-570-016",  "type": "AD",    "country": "CN", "product": "Magnesia carbon bricks",                       "htsPrefixes": ["6815.91"], "note": "" },
+    { "case": "A-570-918",  "type": "AD",    "country": "CN", "product": "Steel wire garment hangers",                   "htsPrefixes": ["7326.20"], "note": "" },
+    { "case": "C-570-919",  "type": "CVD",   "country": "CN", "product": "Steel wire garment hangers",                   "htsPrefixes": ["7326.20"], "note": "Paired with A-570-918" },
+    { "case": "A-549-823",  "type": "AD",    "country": "TH", "product": "Steel rebar",                                  "htsPrefixes": ["7213.10", "7214.20"], "note": "" },
+    { "case": "A-570-088",  "type": "AD",    "country": "CN", "product": "Quartz surface products",                      "htsPrefixes": ["6810.99"], "note": "" }
+  ]
+}

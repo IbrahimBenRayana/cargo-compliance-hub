@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Archive, Calendar, Clock, FileText, ArrowRight } from 'lucide-react';
 import { complianceApi, type LiquidationTracked } from '@/api/client';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -125,31 +124,33 @@ function LiquidationTable({ tracked }: { tracked: LiquidationTracked[] }) {
 
   if (tracked.length === 0) {
     return (
-      <Card className="rounded-2xl border-slate-200 dark:border-slate-800">
-        <CardContent className="p-10 text-center">
-          <Archive className="h-8 w-8 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
-          <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300 mb-1">
-            No accepted entries yet
-          </p>
-          <p className="text-[12px] text-slate-500 dark:text-slate-400">
-            Once CBP accepts an entry, its liquidation countdown will appear here.
-          </p>
-        </CardContent>
-      </Card>
+      <article className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-10 text-center">
+        <Archive className="h-8 w-8 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
+        <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300 mb-1">
+          No accepted entries yet
+        </p>
+        <p className="text-[12px] text-slate-500 dark:text-slate-400">
+          Once CBP accepts an entry, its liquidation countdown will appear here.
+        </p>
+      </article>
     );
   }
 
   return (
-    <Card className="rounded-2xl border-slate-200 dark:border-slate-800 overflow-hidden">
-      <CardContent className="p-0">
-        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+    <article className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden">
+      <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex items-start gap-4">
+        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 dark:from-slate-600 dark:to-slate-800 ring-1 ring-slate-500/40 shadow-[0_8px_20px_-10px_rgba(15,23,42,0.5)] flex items-center justify-center shrink-0">
+          <Archive className="h-5 w-5 text-slate-50" strokeWidth={2.5} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-50">
             Liquidation tracker
           </h3>
           <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
-            Sorted by urgency. PSC = Post-Summary Correction (270d); liquidation = entry finalization (314d)
+            Sorted by urgency. PSC = Post-Summary Correction (270d); liquidation = entry finalization (314d).
           </p>
         </div>
+      </div>
         <div className="overflow-x-auto">
           <table className="w-full text-[12.5px]">
             <thead className="bg-slate-50/50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800">
@@ -169,8 +170,7 @@ function LiquidationTable({ tracked }: { tracked: LiquidationTracked[] }) {
             </tbody>
           </table>
         </div>
-      </CardContent>
-    </Card>
+    </article>
   );
 }
 

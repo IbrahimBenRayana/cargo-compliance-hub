@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { OverviewTab } from '@/components/compliance/OverviewTab';
 import { RiskTab } from '@/components/compliance/RiskTab';
 import { RecordsTab } from '@/components/compliance/RecordsTab';
+import { ClassificationTab } from '@/components/compliance/ClassificationTab';
 import { RejectionCoachDrawer } from '@/components/compliance/RejectionCoachDrawer';
 
 /**
@@ -123,7 +124,7 @@ export default function CompliancePage() {
           <RiskTab />
         </TabsContent>
         <TabsContent value="classification" className="mt-4">
-          <ClassificationPlaceholder />
+          <ClassificationTab />
         </TabsContent>
         <TabsContent value="records" className="mt-4">
           <RecordsTab />
@@ -152,23 +153,3 @@ const TABS: Array<{ id: TabId; label: string; icon: React.FC<{ className?: strin
   { id: 'records',        label: 'Records',         icon: Archive },
 ];
 
-// ─── Classification placeholder ─────────────────────────────────────
-
-function ClassificationPlaceholder() {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/20 px-10 py-16 text-center">
-      <div className="mx-auto h-14 w-14 rounded-full bg-amber-100 dark:bg-amber-500/15 ring-1 ring-amber-200 dark:ring-amber-500/30 flex items-center justify-center mb-4">
-        <BookOpen className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-      </div>
-      <h3 className="text-[16px] font-semibold text-slate-900 dark:text-slate-50 mb-1.5">
-        Classification & Rules — coming next
-      </h3>
-      <p className="text-[13px] text-slate-600 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-        Standalone HTS classifier, ADD/CVD lookup against Commerce's active orders list, and FTA preference calculator (USMCA, GSP). Building this next.
-      </p>
-      <Badge variant="outline" className="mt-4 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
-        In development
-      </Badge>
-    </div>
-  );
-}
