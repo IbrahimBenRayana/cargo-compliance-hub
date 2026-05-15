@@ -9,6 +9,7 @@ import { LifecycleWidget } from '@/components/LifecycleWidget';
 import { PlanLimitModal } from '@/components/PlanLimitModal';
 import { RejectionDetailsCard } from '@/components/RejectionDetailsCard';
 import { RejectionCoachDrawer } from '@/components/compliance/RejectionCoachDrawer';
+import { ScoreHistoryCard } from '@/components/compliance/ScoreHistoryCard';
 import { complianceApi } from '@/api/client';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -980,6 +981,9 @@ export default function ShipmentDetails() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Compliance score trajectory — status-band derived from FilingStatusHistory */}
+      <ScoreHistoryCard filingId={filing.id} />
 
       {/* Rejection details — extracted to RejectionDetailsCard for reuse + legacy [object Object] cleanup */}
       {filing.status === 'rejected' && filing.rejectionReason && (
