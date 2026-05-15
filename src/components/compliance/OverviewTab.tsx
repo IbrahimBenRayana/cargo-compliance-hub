@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowRight, ArrowUpRight, Sparkles, ChevronDown,
-  Clock, Inbox, ListChecks, ShieldCheck, Building2, RotateCcw,
+  Clock, Inbox, ListChecks, ShieldCheck, Building2, RotateCcw, RefreshCw,
 } from 'lucide-react';
 import {
   complianceApi,
   type ActionItem,
   type ActionQueueResponse,
+  type HealthNarrativeResponse,
 } from '@/api/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -93,12 +94,82 @@ export function OverviewTab({ onOpenAiCoach }: OverviewTabProps) {
 
   return (
     <div className="space-y-6">
+      <HealthBrief />
       <ScoreHero data={data} />
       <ActionQueue items={visible} onSnooze={snooze} onOpenAiCoach={onOpenAiCoach} />
       {snoozedItems.length > 0 && (
         <SnoozedPanel count={snoozedItems.length} onUnsnoozeAll={unsnoozeAll} />
       )}
     </div>
+  );
+}
+
+// ─── Health Brief (AI 1-line summary) ────────────────────────────────
+
+function HealthBrief() {
+  const qc = useQueryClient();
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['compliance', 'health-narrative'],
+    queryFn: () => complianceApi.healthNarrative(),
+    staleTime: 5 * 60_000,
+  });
+
+  if (isLoading) {
+    return <Skeleton className="h-[58px] rounded-2xl" />;
+  }
+  if (!data) return null;
+
+  return <HealthBriefCard data={data} refreshing={isFetching} onRefresh={() => qc.invalidateQueries({ queryKey: ['compliance', 'health-narrative'] })} />;
+}
+
+function HealthBriefCard({
+  data, refreshing, onRefresh,
+}: {
+  data: HealthNarrativeResponse;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const isAi = !!data.model;
+  return (
+    <article className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
+      {/* Subtle gold→transparent wash from the right — the brief is AI-attributed, so we lean amber */}
+      <div
+        aria-hidden
+        className="absolute inset-y-0 right-0 w-[55%] pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse 75% 100% at 100% 50%, hsl(43 96% 56% / 0.07), transparent 70%)',
+        }}
+      />
+      <div className="relative px-5 py-3.5 flex items-center gap-4">
+        <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_8px_20px_-10px_rgba(245,158,11,0.5)] flex items-center justify-center shrink-0">
+          <Sparkles className="h-[18px] w-[18px] text-amber-950" strokeWidth={2.5} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-amber-700 dark:text-amber-400 mb-0.5">
+            Today's brief
+            {isAi ? (
+              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 normal-case tracking-normal">· AI-generated</span>
+            ) : (
+              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 normal-case tracking-normal">· rules-based</span>
+            )}
+          </div>
+          <p className="text-[13.5px] text-slate-800 dark:text-slate-100 leading-relaxed truncate sm:whitespace-normal">
+            {data.narrative}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
+          aria-label="Regenerate today's brief"
+          title="Regenerate"
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
+        </button>
+      </div>
+    </article>
   );
 }
 

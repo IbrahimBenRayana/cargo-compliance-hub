@@ -1051,4 +1051,158 @@ router.get('/fta-preference', (req: AuthRequest, res: Response): void => {
   });
 });
 
+// ─── GET /health-narrative ───────────────────────────────────────────
+// One-sentence AI summary of the org's current compliance state. Used at
+// the top of the Compliance Center as a "morning brief" — lead with the
+// most urgent thing the user should know about. Cached per-org for 5min
+// to keep AI spend bounded; falls back to a rule-based line when AI is
+// disabled.
+
+interface NarrativeSignals {
+  drafts:           number;
+  rejected:         number;
+  uflpaHigh:        number;
+  uflpaElevated:    number;
+  pscClosingSoon:   number;
+  liquidatingSoon:  number;
+  awaitingCbp:      number;
+}
+
+const narrativeCache = new Map<string, { narrative: string; model: string | null; signals: NarrativeSignals; generatedAt: number }>();
+const NARRATIVE_TTL_MS = 5 * 60_000;
+
+function ruleBasedNarrative(s: NarrativeSignals): string {
+  // Severity-ordered fallback so we still ship a useful line when AI is off.
+  if (s.rejected > 0) {
+    return `${s.rejected} filing${s.rejected === 1 ? '' : 's'} rejected by CBP — open the action queue to start corrections.`;
+  }
+  if (s.uflpaHigh > 0) {
+    return `${s.uflpaHigh} high-risk UFLPA filing${s.uflpaHigh === 1 ? '' : 's'} needs evidence of origin before clearance.`;
+  }
+  if (s.pscClosingSoon > 0) {
+    return `${s.pscClosingSoon} PSC deadline${s.pscClosingSoon === 1 ? '' : 's'} closing within 14 days — file corrections soon.`;
+  }
+  if (s.drafts > 0) {
+    return `${s.drafts} draft${s.drafts === 1 ? '' : 's'} waiting on you. Run an AI pre-flight check before submitting.`;
+  }
+  if (s.uflpaElevated > 0) {
+    return `${s.uflpaElevated} filing${s.uflpaElevated === 1 ? '' : 's'} flagged as UFLPA-elevated — worth a quick review.`;
+  }
+  if (s.liquidatingSoon > 0) {
+    return `${s.liquidatingSoon} entr${s.liquidatingSoon === 1 ? 'y is' : 'ies are'} liquidating within 14 days — confirm duties paid.`;
+  }
+  if (s.awaitingCbp > 0) {
+    return `${s.awaitingCbp} filing${s.awaitingCbp === 1 ? '' : 's'} submitted and awaiting CBP response — nothing else needs you right now.`;
+  }
+  return 'Inbox is clear — no rejections, no UFLPA hits, no deadlines closing this week.';
+}
+
+router.get('/health-narrative', async (req: AuthRequest, res: Response): Promise<void> => {
+  const orgId = req.user!.orgId;
+  const userId = req.user!.id;
+
+  // Serve cached narrative if fresh.
+  const cached = narrativeCache.get(orgId);
+  if (cached && Date.now() - cached.generatedAt < NARRATIVE_TTL_MS) {
+    res.json({
+      narrative:   cached.narrative,
+      model:       cached.model,
+      signals:     cached.signals,
+      generatedAt: new Date(cached.generatedAt).toISOString(),
+      cached:      true,
+    });
+    return;
+  }
+
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const window180 = new Date(now - 180 * DAY);
+
+  // Pull the same data the dashboard sees so the narrative matches what
+  // the user is staring at. Bounded to 180 days.
+  const filings = await prisma.filing.findMany({
+    where: { orgId, createdAt: { gte: window180 } },
+    select: {
+      id: true,
+      filingType: true,
+      status: true,
+      submittedAt: true,
+      acceptedAt: true,
+      masterBol: true,
+      houseBol: true,
+      manufacturer: true,
+      seller: true,
+      shipToParty: true,
+      buyer: true,
+      consigneeAddress: true,
+      commodities: true,
+    },
+  });
+
+  let drafts = 0, rejected = 0, awaitingCbp = 0;
+  let uflpaHigh = 0, uflpaElevated = 0;
+  let pscClosingSoon = 0, liquidatingSoon = 0;
+  for (const f of filings) {
+    if (f.status === 'draft') drafts++;
+    else if (f.status === 'rejected') rejected++;
+    else if (f.status === 'submitted' || f.status === 'on_hold') awaitingCbp++;
+
+    const risk = assessUflpaRisk(f as any);
+    if (risk.severity === 'high') uflpaHigh++;
+    else if (risk.severity === 'elevated') uflpaElevated++;
+
+    if (f.status === 'accepted' && f.acceptedAt) {
+      const liq = computeLiquidation(new Date(f.acceptedAt));
+      if (liq.daysUntilPscDeadline >= 0 && liq.daysUntilPscDeadline <= 14) pscClosingSoon++;
+      if (liq.daysUntilLiquidation >= 0 && liq.daysUntilLiquidation <= 14) liquidatingSoon++;
+    }
+  }
+
+  const signals: NarrativeSignals = {
+    drafts, rejected, uflpaHigh, uflpaElevated, pscClosingSoon, liquidatingSoon, awaitingCbp,
+  };
+
+  // Try AI; fall back to rule-based on any failure or when disabled.
+  let narrative = ruleBasedNarrative(signals);
+  let model: string | null = null;
+  const aiStatus = ai.getStatus(userId);
+  if (aiStatus.enabled) {
+    try {
+      const completion = await ai.complete({
+        userId,
+        systemPrompt:
+          'You are a calm, senior US customs-broker assistant. Given today\'s compliance signals, write EXACTLY ONE sentence (≤ 140 characters) summarising the importer\'s state. Lead with the most urgent thing. Plain English, no jargon, no emojis, no markdown. If nothing is urgent, say so honestly. Never invent numbers — use only the signals provided.',
+        userPrompt:
+          `Signals (all integers):\n` +
+          `- drafts awaiting submission: ${drafts}\n` +
+          `- filings rejected by CBP: ${rejected}\n` +
+          `- UFLPA high-risk filings: ${uflpaHigh}\n` +
+          `- UFLPA elevated filings: ${uflpaElevated}\n` +
+          `- accepted entries with PSC window closing in ≤14 days: ${pscClosingSoon}\n` +
+          `- accepted entries liquidating in ≤14 days: ${liquidatingSoon}\n` +
+          `- submitted filings awaiting CBP response: ${awaitingCbp}\n\n` +
+          `Write the one-sentence summary now.`,
+        temperature: 0.3,
+        maxTokens: 80,
+      });
+      const cleaned = completion.trim().replace(/^["']|["']$/g, '').replace(/\s+/g, ' ');
+      if (cleaned && cleaned.length <= 200) {
+        narrative = cleaned;
+        model = aiStatus.model ?? null;
+      }
+    } catch (err) {
+      logger.warn({ err, orgId }, '[health-narrative] AI generation failed, using rule-based fallback');
+    }
+  }
+
+  narrativeCache.set(orgId, { narrative, model, signals, generatedAt: now });
+  res.json({
+    narrative,
+    model,
+    signals,
+    generatedAt: new Date(now).toISOString(),
+    cached: false,
+  });
+});
+
 export default router;

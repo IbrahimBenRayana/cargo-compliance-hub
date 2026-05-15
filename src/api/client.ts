@@ -1199,6 +1199,22 @@ export interface HealthSummary {
   recentRejectedFilings: Array<{ id: string; rejectedAt: string | null }>;
 }
 
+export interface HealthNarrativeResponse {
+  narrative: string;
+  model: string | null;
+  signals: {
+    drafts:          number;
+    rejected:        number;
+    uflpaHigh:       number;
+    uflpaElevated:   number;
+    pscClosingSoon:  number;
+    liquidatingSoon: number;
+    awaitingCbp:     number;
+  };
+  generatedAt: string;
+  cached: boolean;
+}
+
 export interface UflpaScanResponse {
   scanned: number;
   counts: { high: number; elevated: number; low: number };
@@ -1311,6 +1327,9 @@ export interface LiquidationTracked {
 export const complianceApi = {
   aiStatus() {
     return apiFetch<AiStatusResponse>('/api/v1/compliance/ai-status');
+  },
+  healthNarrative() {
+    return apiFetch<HealthNarrativeResponse>('/api/v1/compliance/health-narrative');
   },
   healthSummary() {
     return apiFetch<HealthSummary>('/api/v1/compliance/health-summary');
