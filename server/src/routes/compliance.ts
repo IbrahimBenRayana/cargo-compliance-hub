@@ -17,13 +17,14 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import * as ai from '../services/ai.js';
 import { lookupPgaFlags, lookupMetadata as pgaMeta } from '../services/compliance/pgaFlags.js';
 import { assessUflpaRisk } from '../services/compliance/uflpa.js';
 import { computeLiquidation } from '../services/compliance/liquidation.js';
-import { lookupAddCvd, getAddCvdMeta } from '../services/compliance/addCvd.js';
+import { lookupAddCvd, getAddCvdMeta, invalidateAddCvdCache } from '../services/compliance/addCvd.js';
+import { syncFromFederalRegister } from '../services/compliance/addCvdSync.js';
 import { lookupFtaForCountry, getFtaMeta } from '../services/compliance/fta.js';
 import { ccClient } from '../services/customscity.js';
 import { parseRejectionReason } from '../services/errorTranslator.js';
@@ -1017,13 +1018,13 @@ router.post('/classify-hts', authLimiter, async (req: AuthRequest, res: Response
 // GET /add-cvd-lookup?q=...  — seed-data lookup of active Commerce orders.
 const addCvdQuery = z.object({ q: z.string().min(1).max(100) });
 
-router.get('/add-cvd-lookup', (req: AuthRequest, res: Response): void => {
+router.get('/add-cvd-lookup', async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = addCvdQuery.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: 'Query parameter `q` required (HTS, country, or text)' });
     return;
   }
-  const orders = lookupAddCvd(parsed.data.q);
+  const orders = await lookupAddCvd(parsed.data.q);
   res.json({
     query: parsed.data.q,
     matched: orders.length > 0,
@@ -1318,6 +1319,67 @@ router.get('/health-narrative', async (req: AuthRequest, res: Response): Promise
     generatedAt: new Date(now).toISOString(),
     cached: false,
   });
+});
+
+// ─── Admin: ADD/CVD candidate review ─────────────────────────────────
+// Federal Register sync writes pending candidates; admins inspect, fill
+// in case # + HTS prefixes, then promote to active (or dismiss).
+
+router.post('/admin/add-cvd/sync', requireRole('admin', 'owner'), async (_req: AuthRequest, res: Response): Promise<void> => {
+  const result = await syncFromFederalRegister();
+  invalidateAddCvdCache();
+  res.json(result);
+});
+
+router.get('/admin/add-cvd/pending', requireRole('admin', 'owner'), async (_req: AuthRequest, res: Response): Promise<void> => {
+  const rows = await prisma.addCvdOrder.findMany({
+    where:   { status: 'pending' },
+    orderBy: { sourceDate: 'desc' },
+  });
+  res.json({ count: rows.length, candidates: rows });
+});
+
+const promoteSchema = z.object({
+  case:        z.string().min(1).max(50),
+  htsPrefixes: z.array(z.string().min(1).max(20)).max(20).optional(),
+  note:        z.string().max(500).optional(),
+});
+
+router.post('/admin/add-cvd/pending/:id/approve', requireRole('admin', 'owner'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = typeof req.params.id === 'string' ? req.params.id : '';
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+  const parsed = promoteSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'case is required (string)', details: parsed.error.flatten() });
+    return;
+  }
+  const updated = await prisma.addCvdOrder.update({
+    where: { id },
+    data: {
+      status:      'active',
+      case:        parsed.data.case,
+      htsPrefixes: parsed.data.htsPrefixes ?? [],
+      ...(parsed.data.note !== undefined ? { note: parsed.data.note } : {}),
+    },
+  });
+  invalidateAddCvdCache();
+  res.json(updated);
+});
+
+router.post('/admin/add-cvd/pending/:id/dismiss', requireRole('admin', 'owner'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = typeof req.params.id === 'string' ? req.params.id : '';
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+  const updated = await prisma.addCvdOrder.update({
+    where: { id },
+    data:  { status: 'dismissed' },
+  });
+  res.json(updated);
 });
 
 export default router;

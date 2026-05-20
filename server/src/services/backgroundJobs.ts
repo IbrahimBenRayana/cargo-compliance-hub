@@ -26,6 +26,8 @@ import {
 } from './notifications.js';
 import { drainEmailDeliveries } from './notificationDeliveryWorker.js';
 import { recordScoreSnapshot, triggerForStatus } from './compliance/scoreSnapshot.js';
+import { syncFromFederalRegister } from './compliance/addCvdSync.js';
+import { invalidateAddCvdCache } from './compliance/addCvd.js';
 
 // ─── Job State ─────────────────────────────────────────────
 
@@ -382,6 +384,7 @@ let statusPollTask: ScheduledTask | null = null;
 let deadlineTask: ScheduledTask | null = null;
 let staleCheckTask: ScheduledTask | null = null;
 let deliveryDrainTask: ScheduledTask | null = null;
+let addCvdSyncTask: ScheduledTask | null = null;
 
 export function startBackgroundJobs(): void {
   logger.info('[Jobs] Starting background job scheduler');
@@ -409,6 +412,19 @@ export function startBackgroundJobs(): void {
   });
   logger.info('[Jobs] Email delivery drain scheduled — every 30 seconds');
 
+  // Daily ADD/CVD sync from the Federal Register. New candidates land
+  // with status='pending' for admin review. Runs at 04:00 UTC so it
+  // happens during the lowest-traffic window for North American users.
+  addCvdSyncTask = cron.schedule('0 4 * * *', () => {
+    syncFromFederalRegister()
+      .then((result) => {
+        if (result.inserted > 0) invalidateAddCvdCache();
+        logger.info({ result }, '[Jobs:AddCvdSync] Done');
+      })
+      .catch(err => logger.error({ err }, '[Jobs:AddCvdSync] Unhandled'));
+  });
+  logger.info('[Jobs] ADD/CVD Federal Register sync scheduled — daily at 04:00 UTC');
+
   setTimeout(() => {
     checkDeadlines().catch(err => logger.error({ err }, '[Jobs:Deadlines] Initial check error'));
   }, 5000);
@@ -422,6 +438,7 @@ export function stopBackgroundJobs(): void {
   deadlineTask?.stop();
   staleCheckTask?.stop();
   deliveryDrainTask?.stop();
+  addCvdSyncTask?.stop();
   statusPollTask = null;
   deadlineTask = null;
   staleCheckTask = null;
