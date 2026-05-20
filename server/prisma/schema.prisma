@@ -172,6 +172,7 @@ model Filing {
   organization    Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
   createdBy       User                  @relation("FilingCreator", fields: [createdById], references: [id])
   statusHistory   FilingStatusHistory[]
+  scoreSnapshots  FilingScoreSnapshot[]
   submissionLogs  SubmissionLog[]
   notifications   Notification[]
   documents       FilingDocument[]
@@ -201,6 +202,28 @@ model FilingStatusHistory {
 
   @@index([filingId])
   @@map("filing_status_history")
+}
+
+// ─── Filing Score Snapshots ────────────────────────────────
+// Captures the compliance score at every scoring event (creation,
+// submission, rejection, acceptance, amendment, manual recompute) so
+// the per-filing score-history endpoint can show validation-driven
+// trajectories instead of flat status-band approximations.
+model FilingScoreSnapshot {
+  id             String   @id @default(uuid()) @db.Uuid
+  filingId       String   @map("filing_id") @db.Uuid
+  score          Int
+  status         String   @db.VarChar(30)
+  criticalCount  Int      @default(0) @map("critical_count")
+  warningCount   Int      @default(0) @map("warning_count")
+  infoCount      Int      @default(0) @map("info_count")
+  triggerEvent   String   @map("trigger_event") @db.VarChar(40)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  filing Filing @relation(fields: [filingId], references: [id], onDelete: Cascade)
+
+  @@index([filingId, createdAt])
+  @@map("filing_score_snapshots")
 }
 
 // ─── Submission Logs (API call audit trail) ────────────────

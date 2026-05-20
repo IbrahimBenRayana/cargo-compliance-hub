@@ -1200,10 +1200,14 @@ export interface HealthSummary {
 }
 
 export interface ScoreHistoryPoint {
-  at:      string;
-  status:  string;
-  score:   number;
-  message: string | null;
+  at:           string;
+  status:       string;
+  score:        number;
+  message:      string | null;
+  /** Present when source === 'snapshots' — explains why the score changed. */
+  triggerEvent?: string;
+  /** Validation breakdown — only included on snapshot points. */
+  breakdown?:    { critical: number; warning: number; info: number };
 }
 
 export interface ScoreHistoryResponse {
@@ -1211,6 +1215,8 @@ export interface ScoreHistoryResponse {
   currentScore:  number;
   currentStatus: string;
   points:        ScoreHistoryPoint[];
+  /** 'snapshots' = validation-driven; 'status-bands' = legacy derivation. */
+  source?:       'snapshots' | 'status-bands';
   note:          string;
 }
 

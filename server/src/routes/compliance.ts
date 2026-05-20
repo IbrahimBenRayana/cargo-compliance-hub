@@ -1090,6 +1090,40 @@ router.get('/filings/:id/score-history', async (req: AuthRequest, res: Response)
     return;
   }
 
+  // Prefer true score snapshots (validation-driven) when present.
+  // Fall back to status-band derivation for filings that pre-date the
+  // snapshot feature so legacy filings still render a useful trajectory.
+  const snapshots = await prisma.filingScoreSnapshot.findMany({
+    where: { filingId },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      score: true, status: true, triggerEvent: true,
+      criticalCount: true, warningCount: true, infoCount: true,
+      createdAt: true,
+    },
+  });
+
+  if (snapshots.length > 0) {
+    const points = snapshots.map((s) => ({
+      at:           s.createdAt.toISOString(),
+      status:       s.status,
+      score:        s.score,
+      message:      null as string | null,
+      triggerEvent: s.triggerEvent,
+      breakdown:    { critical: s.criticalCount, warning: s.warningCount, info: s.infoCount },
+    }));
+    res.json({
+      filingId,
+      currentScore:   points[points.length - 1]!.score,
+      currentStatus:  filing.status,
+      points,
+      source:         'snapshots',
+      note:           'Scores reflect validation breakdown at each scoring event.',
+    });
+    return;
+  }
+
+  // Legacy derivation path.
   const history = await prisma.filingStatusHistory.findMany({
     where: { filingId },
     orderBy: { createdAt: 'asc' },
@@ -1127,6 +1161,7 @@ router.get('/filings/:id/score-history', async (req: AuthRequest, res: Response)
     currentScore:   nowScore,
     currentStatus:  filing.status,
     points,
+    source:         'status-bands',
     note: 'Scores are status-band approximations. Validation-driven score detail is captured live in the action queue.',
   });
 });
