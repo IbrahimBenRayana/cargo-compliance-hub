@@ -23,6 +23,7 @@ import billingRoutes from './routes/billing.js';
 import manifestQueryRoutes from './routes/manifestQuery.js';
 import abiDocumentsRoutes from './routes/abiDocuments.js';
 import dutyCalculationRoutes from './routes/dutyCalculation.js';
+import trackingRoutes from './routes/tracking.js';
 import { startBackgroundJobs, stopBackgroundJobs, getJobStatus, pollSubmittedFilings, checkDeadlines } from './services/backgroundJobs.js';
 import { startNotificationStream, stopNotificationStream } from './services/notificationStream.js';
 import { verifyEmailConnection } from './services/email.js';
@@ -92,6 +93,7 @@ app.use('/api/v1/manifest-queries', manifestQueryRoutes);
 app.use('/api/v1/abi-documents', abiDocumentsRoutes);
 app.use('/api/v1/duty-calculation', dutyCalculationRoutes);
 app.use('/api/v1/compliance', complianceRoutes);
+app.use('/api/v1/tracking', trackingRoutes);
 
 // ─── Background Jobs Endpoints ────────────────────────────
 // GET job status + POST manual trigger (for admin/testing)

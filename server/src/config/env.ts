@@ -15,6 +15,11 @@ const envSchema = z.object({
   CC_API_BASE_URL: z.string().default('https://api-cert.customscity.com'),
   CC_API_TOKEN: z.string().optional(),
   CC_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
+  // Terminal 49 — container tracking. Optional; the feature self-disables
+  // when TERMINAL49_API_KEY is blank (the /tracking/status route reports
+  // disabled and the UI hides the page).
+  TERMINAL49_API_BASE_URL: z.string().default('https://api.terminal49.com/v2'),
+  TERMINAL49_API_KEY:      z.string().default(''),
   // Email (Azure Communication Services SMTP)
   EMAIL_HOST: z.string().default('smtp.azurecomm.net'),
   EMAIL_PORT: z.coerce.number().default(587),

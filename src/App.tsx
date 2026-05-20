@@ -24,6 +24,8 @@ import ABIDocumentsListPage from "@/pages/ABIDocumentsListPage";
 import ABIDocumentDetailPage from "@/pages/ABIDocumentDetailPage";
 import ABIDocumentWizard from "@/pages/ABIDocumentWizard";
 import IntegrationsApi from "@/pages/IntegrationsApi";
+import TrackingPage from "@/pages/TrackingPage";
+import TrackingDetailPage from "@/pages/TrackingDetailPage";
 import SubmissionLogs from "@/pages/SubmissionLogs";
 import SettingsPage from "@/pages/SettingsPage";
 import TeamPage from "@/pages/TeamPage";
@@ -75,6 +77,8 @@ const App = () => (
                 <Route path="/shipments/:id" element={<ErrorBoundary><ShipmentDetails /></ErrorBoundary>} />
                 <Route path="/shipments/:id/edit" element={<ErrorBoundary><ShipmentWizard /></ErrorBoundary>} />
                 <Route path="/compliance" element={<ErrorBoundary><CompliancePage /></ErrorBoundary>} />
+                <Route path="/tracking" element={<ErrorBoundary><TrackingPage /></ErrorBoundary>} />
+                <Route path="/tracking/:id" element={<ErrorBoundary><TrackingDetailPage /></ErrorBoundary>} />
                 <Route path="/manifest-query" element={<ErrorBoundary><ManifestQueryPage /></ErrorBoundary>} />
                 <Route path="/duty-calculator" element={<ErrorBoundary><DutyCalculatorPage /></ErrorBoundary>} />
                 <Route path="/abi-documents" element={<ErrorBoundary><ABIDocumentsListPage /></ErrorBoundary>} />
