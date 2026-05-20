@@ -7,6 +7,7 @@ import { ccClient, mapFilingToCC, mapFilingToISF5CC, mapFilingToCCPayload } from
 import { validateFiling, isValidTransition, getAllowedTransitions, ValidationResult } from '../services/validation.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { notifyFilingSubmitted, notifyFilingRejected, notifyFilingAmended, notifyFilingCancelled, notifyApiError } from '../services/notifications.js';
+import { recordScoreSnapshot, triggerForStatus } from '../services/compliance/scoreSnapshot.js';
 import { filingMutationLimiter, ccApiLimiter } from '../middleware/rateLimiter.js';
 import { translateValidationErrors, translateCBPRejection, sanitizeErrorMessage } from '../services/errorTranslator.js';
 
@@ -180,6 +181,9 @@ router.post('/', filingMutationLimiter, async (req: AuthRequest, res: Response):
       newValue: { filingType: data.filingType, masterBol: data.masterBol },
       ...meta,
     });
+
+    // Seed the score-history trajectory with a 'created' snapshot.
+    await recordScoreSnapshot(filing.id, 'created');
 
     res.status(201).json(filing);
   } catch (err) {
@@ -448,6 +452,7 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
           changedById: req.user!.id,
         },
       });
+      await recordScoreSnapshot(filing.id, 'rejected');
 
       res.status(422).json({
         error: 'Filing was rejected due to validation errors. Please review and correct the issues below.',
@@ -478,6 +483,7 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
           changedById: req.user!.id,
         },
       });
+      await recordScoreSnapshot(filing.id, 'rejected');
 
       res.status(400).json({
         error: 'The filing was rejected by the CBP filing system. Please review your data and try again.',
@@ -554,6 +560,7 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
         changedById: req.user!.id,
       },
     });
+    await recordScoreSnapshot(filing.id, triggerForStatus(newStatus));
 
     res.json({
       filing: updatedFiling,
@@ -729,6 +736,7 @@ router.post('/:id/amend', ccApiLimiter, async (req: AuthRequest, res: Response):
         changedById: req.user!.id,
       },
     });
+    await recordScoreSnapshot(filing.id, 'amended');
 
     const meta = getRequestMeta(req);
     writeAuditLog({
@@ -835,6 +843,7 @@ router.post('/:id/cancel', filingMutationLimiter, async (req: AuthRequest, res: 
       changedById: req.user!.id,
     },
   });
+  await recordScoreSnapshot(filing.id, 'cancelled');
 
   const meta = getRequestMeta(req);
   writeAuditLog({
@@ -1092,6 +1101,7 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
         ? (() => { try { return JSON.parse(rejectionReason || '{}').summary; } catch { return rejectionReason; } })()
         : undefined;
 
+      await recordScoreSnapshot(filing.id, triggerForStatus(newStatus));
       await prisma.filingStatusHistory.create({
         data: {
           filingId: filing.id,
@@ -1209,6 +1219,7 @@ router.post('/check-all-statuses', ccApiLimiter, async (req: AuthRequest, res: R
             changedById: req.user!.id,
           },
         });
+        await recordScoreSnapshot(filing.id, triggerForStatus(newStatus));
 
         results.push({
           filingId: filing.id,
@@ -1303,6 +1314,8 @@ router.post('/:id/duplicate', filingMutationLimiter, async (req: AuthRequest, re
     newValue: { sourceFilingId: filing.id, filingType: filing.filingType },
     ...meta,
   });
+
+  await recordScoreSnapshot(duplicated.id, 'created');
 
   res.status(201).json(duplicated);
 });
@@ -1437,6 +1450,7 @@ router.post('/bulk-submit', filingMutationLimiter, ccApiLimiter, async (req: Aut
             changedById: req.user!.id,
           },
         });
+        await recordScoreSnapshot(filing.id, 'submitted');
 
         await notifyFilingSubmitted(req.user!.orgId, req.user!.id, filing.id, filing.houseBol || filing.masterBol || '');
 

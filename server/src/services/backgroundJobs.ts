@@ -25,6 +25,7 @@ import {
   notifyOrgUsers,
 } from './notifications.js';
 import { drainEmailDeliveries } from './notificationDeliveryWorker.js';
+import { recordScoreSnapshot, triggerForStatus } from './compliance/scoreSnapshot.js';
 
 // ─── Job State ─────────────────────────────────────────────
 
@@ -170,6 +171,7 @@ async function pollSubmittedFilings(): Promise<void> {
                 changedById: filing.createdById,
               },
             });
+            await recordScoreSnapshot(filing.id, triggerForStatus(newStatus));
 
             await prisma.submissionLog.create({
               data: {

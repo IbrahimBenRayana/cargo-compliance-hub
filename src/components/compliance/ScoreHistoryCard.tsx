@@ -176,6 +176,20 @@ function EventTicker({ points }: { points: ScoreHistoryPoint[] }) {
             </span>
             <span className="text-slate-700 dark:text-slate-300 tabular-nums w-12 shrink-0">{p.score}/100</span>
             <span className={cn('font-semibold tabular-nums w-10 shrink-0', deltaColor)}>{deltaLabel}</span>
+            {/* Snapshot enrichment: validation breakdown shown inline when available */}
+            {p.breakdown && (p.breakdown.critical + p.breakdown.warning + p.breakdown.info) > 0 && (
+              <span className="inline-flex items-center gap-1 text-[10.5px] font-mono text-slate-500 dark:text-slate-400 shrink-0">
+                {p.breakdown.critical > 0 && (
+                  <span className="text-rose-600 dark:text-rose-400">{p.breakdown.critical}c</span>
+                )}
+                {p.breakdown.warning > 0 && (
+                  <span className="text-amber-700 dark:text-amber-400">{p.breakdown.warning}w</span>
+                )}
+                {p.breakdown.info > 0 && (
+                  <span className="text-slate-500 dark:text-slate-400">{p.breakdown.info}i</span>
+                )}
+              </span>
+            )}
             {p.message && (
               <span className="text-slate-500 dark:text-slate-400 truncate">{p.message}</span>
             )}
