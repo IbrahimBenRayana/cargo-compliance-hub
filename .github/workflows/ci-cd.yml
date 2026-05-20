@@ -196,11 +196,15 @@ jobs:
           AI_TEMPERATURE:           ${{ secrets.AI_TEMPERATURE }}
           AI_RATE_LIMIT_PER_USER:   ${{ secrets.AI_RATE_LIMIT_PER_USER }}
           AI_DISABLE_TRAINING_DATA: ${{ secrets.AI_DISABLE_TRAINING_DATA }}
+          # Terminal 49 (Container Tracking). Optional — the server self-disables
+          # the feature when the key is blank.
+          TERMINAL49_API_BASE_URL:  ${{ secrets.TERMINAL49_API_BASE_URL }}
+          TERMINAL49_API_KEY:       ${{ secrets.TERMINAL49_API_KEY }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: NEW_TAG,AI_ASSESSMENT_ENABLED,AI_PROVIDER,AI_MODEL,AI_API_KEY,AI_MAX_TOKENS,AI_TEMPERATURE,AI_RATE_LIMIT_PER_USER,AI_DISABLE_TRAINING_DATA
+          envs: NEW_TAG,AI_ASSESSMENT_ENABLED,AI_PROVIDER,AI_MODEL,AI_API_KEY,AI_MAX_TOKENS,AI_TEMPERATURE,AI_RATE_LIMIT_PER_USER,AI_DISABLE_TRAINING_DATA,TERMINAL49_API_BASE_URL,TERMINAL49_API_KEY
           script: |
             set -euo pipefail
             cd /opt/mycargolens
@@ -232,7 +236,9 @@ jobs:
             upsert_env AI_TEMPERATURE           "$AI_TEMPERATURE"
             upsert_env AI_RATE_LIMIT_PER_USER   "$AI_RATE_LIMIT_PER_USER"
             upsert_env AI_DISABLE_TRAINING_DATA "$AI_DISABLE_TRAINING_DATA"
-            echo "▶ AI_* env synced from GitHub Secrets"
+            upsert_env TERMINAL49_API_BASE_URL  "$TERMINAL49_API_BASE_URL"
+            upsert_env TERMINAL49_API_KEY       "$TERMINAL49_API_KEY"
+            echo "▶ AI_* + TERMINAL49_* env synced from GitHub Secrets"
 
             # ── Patch docker-compose.yml to forward AI_* into the server ──
             # The VPS compose has an `environment:` block under the server
@@ -258,6 +264,8 @@ jobs:
                   '      AI_TEMPERATURE:           ${AI_TEMPERATURE:-0.3}' \
                   '      AI_RATE_LIMIT_PER_USER:   ${AI_RATE_LIMIT_PER_USER:-50}' \
                   '      AI_DISABLE_TRAINING_DATA: ${AI_DISABLE_TRAINING_DATA:-true}' \
+                  '      TERMINAL49_API_BASE_URL:  ${TERMINAL49_API_BASE_URL:-https://api.terminal49.com/v2}' \
+                  '      TERMINAL49_API_KEY:       ${TERMINAL49_API_KEY:-}' \
                   > /tmp/ai_compose_block
                 # Anchor on EMAIL_FROM_NAME — the last env var in the existing
                 # server.environment block. `sed r FILE` reads & appends after match.

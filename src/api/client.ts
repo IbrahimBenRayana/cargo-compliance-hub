@@ -636,6 +636,134 @@ export const billingApi = {
 export type BillingSubscription = Awaited<ReturnType<typeof billingApi.subscription>>;
 
 // ─── Manifest Query API ───────────────────────────────────
+// ─── Container Tracking (Terminal 49) ─────────────────────
+
+export interface TrackedContainerSnapshot {
+  id: string;
+  number: string;
+  equipmentType: string | null;
+  equipmentLength: number | null;
+  equipmentHeight: string | null;
+  sealNumber: string | null;
+  currentStatus: string | null;
+  availableForPickup: boolean | null;
+  pickupLfd: string | null;
+  holdsAtPodTerminal: Array<{ name: string; status: string; description?: string }>;
+  feesAtPodTerminal: Array<{ type: string; amount: number; currency_code?: string }>;
+  locationAtPodTerminal: string | null;
+}
+
+export interface TrackedShipmentSnapshot {
+  id: string;
+  billOfLadingNumber: string | null;
+  normalizedNumber: string | null;
+  shippingLineScac: string | null;
+  shippingLineName: string | null;
+  shippingLineShortName: string | null;
+  customerName: string | null;
+  portOfLadingLocode: string | null;
+  portOfLadingName: string | null;
+  portOfDischargeLocode: string | null;
+  portOfDischargeName: string | null;
+  destinationLocode: string | null;
+  destinationName: string | null;
+  podVesselName: string | null;
+  podVesselImo: string | null;
+  podVoyageNumber: string | null;
+  polEtdAt: string | null;
+  polAtdAt: string | null;
+  podEtaAt: string | null;
+  podOriginalEtaAt: string | null;
+  podAtaAt: string | null;
+  destinationEtaAt: string | null;
+  destinationAtaAt: string | null;
+  polTimezone: string | null;
+  podTimezone: string | null;
+  destinationTimezone: string | null;
+  lineTrackingLastSucceededAt: string | null;
+  lineTrackingStoppedAt: string | null;
+  lineTrackingStoppedReason: string | null;
+  refNumbers: string[];
+  tags: string[];
+  containers: TrackedContainerSnapshot[];
+}
+
+export interface TrackedShipment {
+  id: string;
+  orgId: string;
+  createdById: string;
+  filingId: string | null;
+  t49TrackingRequestId: string | null;
+  t49ShipmentId: string | null;
+  requestType: 'bill_of_lading' | 'booking_number' | 'container';
+  requestNumber: string;
+  scac: string;
+  status: 'pending' | 'tracking' | 'failed' | 'stopped';
+  failedReason: string | null;
+  shippingLineName: string | null;
+  portOfLadingName: string | null;
+  portOfDischargeName: string | null;
+  destinationName: string | null;
+  podVesselName: string | null;
+  polEtdAt: string | null;
+  polAtdAt: string | null;
+  podEtaAt: string | null;
+  podAtaAt: string | null;
+  destinationEtaAt: string | null;
+  destinationAtaAt: string | null;
+  hasHolds: boolean;
+  earliestPickupLfd: string | null;
+  shipmentSnapshot: TrackedShipmentSnapshot | null;
+  lastSyncedAt: string | null;
+  syncError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const trackingApi = {
+  status() {
+    return apiFetch<{ enabled: boolean; baseUrl: string }>('/api/v1/tracking/status');
+  },
+
+  list(params?: { status?: TrackedShipment['status']; filingId?: string; q?: string; limit?: number }) {
+    const qs = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== '') qs.set(k, String(v));
+      });
+    }
+    const s = qs.toString();
+    return apiFetch<{ trackedShipments: TrackedShipment[] }>(`/api/v1/tracking${s ? `?${s}` : ''}`);
+  },
+
+  create(data: {
+    requestType: TrackedShipment['requestType'];
+    requestNumber: string;
+    scac: string;
+    filingId?: string;
+    refNumbers?: string[];
+  }) {
+    return apiFetch<{ trackedShipment: TrackedShipment }>('/api/v1/tracking', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  get(id: string) {
+    return apiFetch<{ trackedShipment: TrackedShipment }>(`/api/v1/tracking/${id}`);
+  },
+
+  refresh(id: string) {
+    return apiFetch<{ trackedShipment: TrackedShipment }>(`/api/v1/tracking/${id}/refresh`, {
+      method: 'POST',
+    });
+  },
+
+  remove(id: string) {
+    return apiFetch<{ success: true }>(`/api/v1/tracking/${id}`, { method: 'DELETE' });
+  },
+};
+
 export const manifestQueryApi = {
   create(data: {
     bolNumber: string;

@@ -36,6 +36,7 @@ model Organization {
   filingUsage     FilingUsage[]
   manifestQueries ManifestQuery[]
   abiDocuments    AbiDocument[]
+  trackedShipments TrackedShipment[]
 
   @@map("organizations")
 }
@@ -71,6 +72,7 @@ model User {
   manifestQueries        ManifestQuery[]
   abiDocuments           AbiDocument[]
   emailVerificationTokens EmailVerificationToken[]
+  trackedShipments       TrackedShipment[]
 
   @@index([orgId])
   @@index([email])
@@ -178,6 +180,7 @@ model Filing {
   documents       FilingDocument[]
   manifestQueries ManifestQuery[]
   abiDocuments    AbiDocument[]
+  trackedShipments TrackedShipment[]
 
   @@index([orgId])
   @@index([status])
@@ -623,4 +626,73 @@ model AbiDocument {
   @@index([entryNumber])
   @@index([orgId, createdAt])
   @@map("abi_documents")
+}
+
+// ─── Container Tracking (Terminal 49) ─────────────────────
+// Persists a tracking request against the Terminal 49 API + a cached
+// snapshot of the resolved shipment (so list views don't have to fan out
+// to T49). The snapshot is refreshed on demand (manual /refresh) and —
+// in Phase 2 — by webhook ingestion.
+//
+//   status lifecycle:
+//     pending           → POST /tracking_requests accepted, T49 still
+//                         fetching from the carrier
+//     tracking          → tracking_request.succeeded; shipment + containers
+//                         resolved and cached in shipmentSnapshot
+//     failed            → tracking_request.failed (see failedReason)
+//     stopped           → line_tracking_stopped_at populated by T49
+model TrackedShipment {
+  id                   String  @id @default(uuid()) @db.Uuid
+  orgId                String  @map("org_id") @db.Uuid
+  createdById          String  @map("created_by") @db.Uuid
+  filingId             String? @map("filing_id") @db.Uuid
+
+  // Terminal 49 identifiers
+  t49TrackingRequestId String? @map("t49_tracking_request_id") @db.VarChar(100)
+  t49ShipmentId        String? @map("t49_shipment_id") @db.VarChar(100)
+
+  // Request inputs
+  requestType   String  @map("request_type") @db.VarChar(20)
+  requestNumber String  @map("request_number") @db.VarChar(100)
+  scac          String  @db.VarChar(10)
+
+  // Lifecycle
+  status       String  @default("pending") @db.VarChar(20)
+  failedReason String? @map("failed_reason")
+
+  // Cached snapshot fields (denormalized for list filters / sort)
+  shippingLineName    String?   @map("shipping_line_name") @db.VarChar(255)
+  portOfLadingName    String?   @map("port_of_lading_name") @db.VarChar(255)
+  portOfDischargeName String?   @map("port_of_discharge_name") @db.VarChar(255)
+  destinationName     String?   @map("destination_name") @db.VarChar(255)
+  podVesselName       String?   @map("pod_vessel_name") @db.VarChar(255)
+  polEtdAt            DateTime? @map("pol_etd_at") @db.Timestamptz()
+  polAtdAt            DateTime? @map("pol_atd_at") @db.Timestamptz()
+  podEtaAt            DateTime? @map("pod_eta_at") @db.Timestamptz()
+  podAtaAt            DateTime? @map("pod_ata_at") @db.Timestamptz()
+  destinationEtaAt    DateTime? @map("destination_eta_at") @db.Timestamptz()
+  destinationAtaAt    DateTime? @map("destination_ata_at") @db.Timestamptz()
+  hasHolds            Boolean   @default(false) @map("has_holds")
+  earliestPickupLfd   DateTime? @map("earliest_pickup_lfd") @db.Timestamptz()
+
+  // Full ShipmentSummary (JSON serialized) — drives the detail view.
+  shipmentSnapshot Json? @map("shipment_snapshot")
+
+  // Sync metadata
+  lastSyncedAt DateTime? @map("last_synced_at") @db.Timestamptz()
+  syncError    String?   @map("sync_error")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation(fields: [createdById], references: [id])
+  filing       Filing?      @relation(fields: [filingId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([orgId, status])
+  @@index([orgId, createdAt])
+  @@index([filingId])
+  @@unique([orgId, t49ShipmentId])
+  @@map("tracked_shipments")
 }
