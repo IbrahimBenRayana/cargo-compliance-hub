@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
@@ -69,6 +69,24 @@ export function OverviewTab({ onOpenAiCoach }: OverviewTabProps) {
     staleTime: 60_000,
   });
 
+  // ?focus=<actionItemId> deep-link from notifications — keep it in state
+  // so it survives one render after we clear the URL param (otherwise
+  // ActionCard never sees a non-null focusId).
+  const [params, setParams] = useSearchParams();
+  const initialFocus = params.get('focus');
+  const [focusId, setFocusId] = useState<string | null>(initialFocus);
+  useEffect(() => {
+    if (!initialFocus) return;
+    // Clear the param once consumed so refreshes don't re-pulse.
+    const next = new URLSearchParams(params);
+    next.delete('focus');
+    setParams(next, { replace: true });
+    // Drop focusId after the pulse animation has had time to play.
+    const t = setTimeout(() => setFocusId(null), 3500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFocus]);
+
   const [snoozed, setSnoozed] = useState<Map<string, number>>(() => readSnoozed());
 
   function snooze(id: string) {
@@ -96,7 +114,7 @@ export function OverviewTab({ onOpenAiCoach }: OverviewTabProps) {
     <div className="space-y-6">
       <HealthBrief />
       <ScoreHero data={data} />
-      <ActionQueue items={visible} onSnooze={snooze} onOpenAiCoach={onOpenAiCoach} />
+      <ActionQueue items={visible} focusId={focusId} onSnooze={snooze} onOpenAiCoach={onOpenAiCoach} />
       {snoozedItems.length > 0 && (
         <SnoozedPanel count={snoozedItems.length} onUnsnoozeAll={unsnoozeAll} />
       )}
@@ -350,10 +368,12 @@ function StatTile({
 
 function ActionQueue({
   items,
+  focusId,
   onSnooze,
   onOpenAiCoach,
 }: {
   items: ActionItem[];
+  focusId: string | null;
   onSnooze: (id: string) => void;
   onOpenAiCoach: (filingId: string, mode: 'rejection' | 'draft-review') => void;
 }) {
@@ -380,6 +400,7 @@ function ActionQueue({
             key={it.id}
             item={it}
             index={idx}
+            isFocused={focusId === it.id}
             onSnooze={onSnooze}
             onOpenAiCoach={onOpenAiCoach}
           />
@@ -399,16 +420,31 @@ const SEV_STYLES: Record<ActionItem['severity'], { dot: string; ring: string; la
 function ActionCard({
   item,
   index,
+  isFocused,
   onSnooze,
   onOpenAiCoach,
 }: {
   item: ActionItem;
   index: number;
+  isFocused: boolean;
   onSnooze: (id: string) => void;
   onOpenAiCoach: (filingId: string, mode: 'rejection' | 'draft-review') => void;
 }) {
   const reduceMotion = useReducedMotion();
   const sev = SEV_STYLES[item.severity];
+  const cardRef = useRef<HTMLElement | null>(null);
+
+  // Notification deep-link: when this card matches ?focus=<id>, scroll it
+  // into view + apply a pulse class so the user immediately sees what
+  // their notification was about.
+  useEffect(() => {
+    if (!isFocused || !cardRef.current) return;
+    // Schedule scroll on next frame so layout is settled.
+    const raf = requestAnimationFrame(() => {
+      cardRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isFocused, reduceMotion]);
 
   // AI coach mode — rejected → rejection coach; everything else → pre-flight.
   const coachMode: 'rejection' | 'draft-review' =
@@ -424,10 +460,15 @@ function ActionCard({
 
   return (
     <motion.article
+      ref={cardRef as React.RefObject<HTMLElement>}
       initial={reduceMotion ? false : { opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.3), ease: 'easeOut' }}
-      className="group relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:border-slate-300 dark:hover:border-slate-700 transition-colors duration-200"
+      className={cn(
+        'group relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:border-slate-300 dark:hover:border-slate-700 transition-colors duration-200',
+        // ?focus=<id> pulse — fades in/out via Tailwind animate-mcl-focus-pulse
+        isFocused && 'mcl-focus-pulse',
+      )}
     >
       {/* Left accent bar */}
       <span className={cn('absolute left-0 top-0 bottom-0 w-1', accent)} aria-hidden />
