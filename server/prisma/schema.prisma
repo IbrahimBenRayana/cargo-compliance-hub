@@ -226,6 +226,33 @@ model FilingScoreSnapshot {
   @@map("filing_score_snapshots")
 }
 
+// ─── ADD/CVD Orders ────────────────────────────────────────
+// Anti-Dumping / Countervailing Duty orders maintained by Commerce.
+// Originally a JSON seed bundled with the server; moved to DB so the
+// list can be refreshed by the Federal Register sync cron without
+// requiring a redeploy. status='active' is the live list users see;
+// 'pending' = discovered by sync, awaiting admin review; 'dismissed'
+// = manually rejected.
+model AddCvdOrder {
+  id           String    @id @default(uuid()) @db.Uuid
+  case         String    @db.VarChar(50)
+  type         String    @db.VarChar(10) // AD | CVD | ADCVD
+  country      String    @db.VarChar(10) // ISO-2
+  product      String    @db.Text
+  htsPrefixes  String[]  @map("hts_prefixes") @db.Text
+  note         String?   @db.Text
+  status       String    @default("active") @db.VarChar(20)
+  source       String    @default("manual") @db.VarChar(40)
+  sourceUrl    String?   @map("source_url") @db.Text
+  sourceDate   DateTime? @map("source_date") @db.Timestamptz()
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([status])
+  @@index([country])
+  @@map("add_cvd_orders")
+}
+
 // ─── Submission Logs (API call audit trail) ────────────────
 model SubmissionLog {
   id             String   @id @default(uuid()) @db.Uuid
