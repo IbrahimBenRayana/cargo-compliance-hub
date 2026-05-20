@@ -276,8 +276,33 @@ jobs:
               else
                 echo "▶ docker-compose.yml already enumerates AI_* — skipping patch"
               fi
+
+              # ── Terminal 49 env vars (separate guard) ──
+              # The AI_* guard above is skipped on every deploy after the very
+              # first one, so we can't piggyback on it. Independent grep here
+              # so TERMINAL49_* lands the first time without disturbing the
+              # already-patched AI_* block.
+              if ! grep -qE '^[[:space:]]+TERMINAL49_API_KEY:' docker-compose.yml; then
+                printf '%s\n' \
+                  '      TERMINAL49_API_BASE_URL:  ${TERMINAL49_API_BASE_URL:-https://api.terminal49.com/v2}' \
+                  '      TERMINAL49_API_KEY:       ${TERMINAL49_API_KEY:-}' \
+                  > /tmp/t49_compose_block
+                cp docker-compose.yml docker-compose.yml.bak
+                # Anchor on AI_DISABLE_TRAINING_DATA (the last AI_* line) so
+                # the T49 lines sit immediately after the AI block. Fall back
+                # to EMAIL_FROM_NAME if AI_* was never patched (fresh box).
+                if grep -qE '^[[:space:]]+AI_DISABLE_TRAINING_DATA:' docker-compose.yml; then
+                  sed -i '/^      AI_DISABLE_TRAINING_DATA:/r /tmp/t49_compose_block' docker-compose.yml
+                else
+                  sed -i '/^      EMAIL_FROM_NAME:/r /tmp/t49_compose_block' docker-compose.yml
+                fi
+                rm -f /tmp/t49_compose_block
+                echo "▶ Patched docker-compose.yml — TERMINAL49_* env vars now forwarded into server container"
+              else
+                echo "▶ docker-compose.yml already enumerates TERMINAL49_* — skipping patch"
+              fi
             else
-              echo "⚠ docker-compose.yml not found at /opt/mycargolens — skipping AI compose patch"
+              echo "⚠ docker-compose.yml not found at /opt/mycargolens — skipping compose patches"
             fi
 
             # ── Capture currently-deployed tags (rollback targets) ─────────
