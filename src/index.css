@@ -219,6 +219,23 @@
     .animate-tile-in { animation: none; opacity: 1; transform: none; }
   }
 
+  /* ── Compliance Center focus pulse ──
+     When a notification deep-links to ?focus=<actionItemId>, the
+     matching ActionCard gets this class for ~3s — a soft amber halo
+     fades in/out so the user immediately sees what their click was
+     about. Inset ring on the card itself; no layout shift. */
+  .mcl-focus-pulse {
+    animation: mcl-focus-pulse 1.25s ease-out 3;
+  }
+  @keyframes mcl-focus-pulse {
+    0%   { box-shadow: 0 0 0 0   hsl(43 96% 56% / 0.0),    0 0 0 0 hsl(43 96% 56% / 0.0); }
+    40%  { box-shadow: 0 0 0 4px hsl(43 96% 56% / 0.18),   0 0 32px 0 hsl(43 96% 56% / 0.22); }
+    100% { box-shadow: 0 0 0 0   hsl(43 96% 56% / 0.0),    0 0 0 0 hsl(43 96% 56% / 0.0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mcl-focus-pulse { animation: none; }
+  }
+
   /* ── Glass morphism ── */
   .glass {
     background: hsl(var(--card) / 0.75);

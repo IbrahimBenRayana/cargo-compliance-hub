@@ -354,6 +354,17 @@ export async function notifyOrgUsers(
 
 const filingLink = (filingId: string) => `/shipments/${filingId}`;
 
+/**
+ * Deep-link to the Compliance Center action queue with a focus hint.
+ * The Overview tab reads ?focus=<kind>:<filingId> and scrolls/pulses
+ * the matching ActionCard so a notification click lands the user on
+ * the exact item that needs attention.
+ *
+ * Mirror of the ActionItem.id format produced by GET /api/v1/compliance/action-queue.
+ */
+const complianceFocusLink = (filingId: string, focusKind: 'rejection' | 'uflpa' | 'psc' | 'liquidation' | 'deadline' | 'draft_review') =>
+  `/compliance?tab=overview&focus=${focusKind}:${filingId}`;
+
 export async function notifyFilingSubmitted(orgId: string, userId: string, filingId: string, bolNumber: string): Promise<void> {
   const ref = bolNumber || filingId.slice(0, 8);
   // Pull the submitter's name into metadata so the worker can render the
@@ -409,7 +420,10 @@ export async function notifyFilingRejected(orgId: string, filingId: string, bolN
     audience: { orgId, roles: ['OPERATOR', 'ADMIN', 'OWNER'] },
     title:    'Filing Rejected',
     message:  `ISF filing ${ref} was rejected by CBP.${reason ? ` Reason: ${reason}` : ''}`,
-    linkUrl:  filingLink(filingId),
+    // Deep-link into the Compliance Center action queue (the triage surface)
+    // rather than the filing detail page — the queue is where rejections
+    // get fixed, with AI coach + bulk-fix discovery right there.
+    linkUrl:  complianceFocusLink(filingId, 'rejection'),
     metadata: { bolNumber: ref, reason: reason ?? null },
     filingId,
   });
