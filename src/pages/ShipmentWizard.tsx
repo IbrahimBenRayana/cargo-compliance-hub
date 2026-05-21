@@ -771,7 +771,12 @@ export default function ShipmentWizard() {
     const commodities: CommodityInfo[] = form.commodities
       .filter(c => c.htsCode.trim())
       .map(c => ({
-        htsCode: c.htsCode.replace(/[\.\-\s]/g, '').slice(0, 6),
+        // Store the FULL HTS as the user entered it (digits only — strip
+        // dots/dashes/spaces). CC needs the 6-digit form, but that
+        // truncation happens at the CC mapper, not here — so the full
+        // 10-digit code is preserved in our DB and is available for the
+        // duty calculator's filing-prefill flow.
+        htsCode: c.htsCode.replace(/[\.\-\s]/g, ''),
         description: c.description || undefined,
         countryOfOrigin: c.countryOfOrigin,
         quantity: c.quantity ? Number(c.quantity) : undefined,
