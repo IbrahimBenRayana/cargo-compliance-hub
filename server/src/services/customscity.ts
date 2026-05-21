@@ -937,7 +937,11 @@ export function mapFilingToCC(filing: any): CCDocumentCreatePayload {
     weightUOM:              c.weight?.unit ?? c.weightUnit ?? 'K',
     description:            c.description ?? '',
     countryOfOrigin:        c.countryOfOrigin ?? '',
-    'commodityHTS-6Number': c.htsCode ?? c.htsNumber ?? c.commodityHTS6Number ?? '',
+    // CC's `commodityHTS-6Number` field is — by name and validator —
+    // strictly the 6-digit HS prefix. Strip separators and clamp to 6
+    // digits regardless of what's in our DB (we store the full 10
+    // digits so the duty calculator can reuse them).
+    'commodityHTS-6Number': String(c.htsCode ?? c.htsNumber ?? c.commodityHTS6Number ?? '').replace(/\D/g, '').slice(0, 6),
     lineItem:               idx + 1,
   }));
 
@@ -1214,7 +1218,11 @@ export function mapFilingToISF5CC(filing: any): CCDocumentCreatePayload {
     weightUOM:              c.weight?.unit ?? c.weightUnit ?? 'K',
     description:            c.description ?? '',
     countryOfOrigin:        c.countryOfOrigin ?? '',
-    'commodityHTS-6Number': c.htsCode ?? c.htsNumber ?? c.commodityHTS6Number ?? '',
+    // CC's `commodityHTS-6Number` field is — by name and validator —
+    // strictly the 6-digit HS prefix. Strip separators and clamp to 6
+    // digits regardless of what's in our DB (we store the full 10
+    // digits so the duty calculator can reuse them).
+    'commodityHTS-6Number': String(c.htsCode ?? c.htsNumber ?? c.commodityHTS6Number ?? '').replace(/\D/g, '').slice(0, 6),
     lineItem:               idx + 1,
   }));
 
