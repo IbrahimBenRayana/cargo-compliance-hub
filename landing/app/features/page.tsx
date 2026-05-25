@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { FeaturesPageClient } from "./features-client";
+import { FeaturesClient } from "./features-client";
 
 export const metadata: Metadata = {
   title: "Features",
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function FeaturesPage() {
-  return <FeaturesPageClient />;
+  return <FeaturesClient />;
 }

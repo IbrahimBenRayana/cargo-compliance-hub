@@ -448,6 +448,295 @@ export function HeroScene({ className }: HeroSceneProps) {
         {/* Cloud 2 — smaller */}
         <path d="M 220 38 Q 220 31 228 31 Q 230 26 236 26 Q 244 26 244 32 Q 250 32 250 38 Z" />
       </motion.g>
+
+      {/* ── LAYER 5: Feature callouts — small badges floating around the
+              ship that show every product surface, not just ISF.
+
+           Each is a small rounded rect with a 1-2 word label + tiny visual.
+           Positions chosen so they don't overlap the ship or clipboard. */}
+
+      {/* AI Coach chip — middle-left of the canvas */}
+      <motion.g variants={fadeInVariant(1.8)}>
+        <motion.g
+          animate={{ y: [0, -4, 0] }}
+          transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 2.6 }}
+        >
+          <rect
+            x="50"
+            y="140"
+            width="92"
+            height="30"
+            rx="8"
+            fill="currentColor"
+            fillOpacity="0.04"
+            strokeWidth="1.5"
+          />
+          {/* Bot dot */}
+          <circle cx="64" cy="155" r="3.5" fill={GOLD} stroke="none" />
+          <text
+            x="74"
+            y="159"
+            fontSize="9"
+            fontFamily="ui-sans-serif, sans-serif"
+            fontWeight="600"
+            stroke="none"
+            fill="currentColor"
+            fillOpacity="0.78"
+          >
+            AI Coach
+          </text>
+          {/* Tiny streaming dots */}
+          {[0, 1, 2].map((i) => (
+            <motion.circle
+              key={i}
+              cx={118 + i * 6}
+              cy="158"
+              r="1.4"
+              fill={GOLD}
+              stroke="none"
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{
+                duration: 1.2,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 2.6 + i * 0.18,
+              }}
+            />
+          ))}
+        </motion.g>
+      </motion.g>
+
+      {/* Compliance score donut — top-right corner */}
+      <motion.g variants={scaleInVariant(2.0)}>
+        <motion.g
+          animate={{ y: [0, -3, 0] }}
+          transition={{ duration: 5.2, repeat: Infinity, ease: "easeInOut", delay: 2.8 }}
+        >
+          {/* Background card */}
+          <rect
+            x="468"
+            y="50"
+            width="78"
+            height="44"
+            rx="8"
+            fill="currentColor"
+            fillOpacity="0.04"
+            strokeWidth="1.5"
+          />
+          {/* Tiny donut track */}
+          <circle
+            cx="486"
+            cy="72"
+            r="11"
+            fill="none"
+            stroke="currentColor"
+            strokeOpacity="0.15"
+            strokeWidth="3"
+          />
+          {/* Animated arc */}
+          <motion.circle
+            cx="486"
+            cy="72"
+            r="11"
+            fill="none"
+            stroke={GOLD}
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray="69.1"
+            strokeDashoffset="69.1"
+            transform="rotate(-90 486 72)"
+            animate={{ strokeDashoffset: 9.7 }}
+            transition={{ duration: 1.3, delay: 2.4, ease: [0.16, 1, 0.3, 1] }}
+          />
+          {/* Label "Compliance" + number */}
+          <text
+            x="504"
+            y="65"
+            fontSize="7"
+            fontFamily="ui-sans-serif, sans-serif"
+            fontWeight="700"
+            letterSpacing="0.8"
+            stroke="none"
+            fill="currentColor"
+            fillOpacity="0.6"
+          >
+            COMPLIANCE
+          </text>
+          <text
+            x="504"
+            y="82"
+            fontSize="12"
+            fontFamily="ui-sans-serif, sans-serif"
+            fontWeight="700"
+            stroke="none"
+            fill="currentColor"
+          >
+            86
+          </text>
+        </motion.g>
+      </motion.g>
+
+      {/* ADD/CVD sync badge — right side, mid-height */}
+      <motion.g variants={fadeInVariant(2.2)}>
+        <motion.g
+          animate={{ y: [0, -3, 0] }}
+          transition={{ duration: 5.8, repeat: Infinity, ease: "easeInOut", delay: 3.0 }}
+        >
+          <rect
+            x="450"
+            y="200"
+            width="92"
+            height="26"
+            rx="6"
+            fill="currentColor"
+            fillOpacity="0.04"
+            strokeWidth="1.5"
+          />
+          {/* Pulsing green dot */}
+          <circle cx="462" cy="213" r="2.5" fill="hsl(160 84% 39%)" stroke="none">
+            <animate
+              attributeName="opacity"
+              values="0.4;1;0.4"
+              dur="1.8s"
+              repeatCount="indefinite"
+              begin="3s"
+            />
+          </circle>
+          <text
+            x="472"
+            y="217"
+            fontSize="8"
+            fontFamily="ui-monospace, monospace"
+            fontWeight="600"
+            stroke="none"
+            fill="currentColor"
+            fillOpacity="0.78"
+          >
+            ADD/CVD synced
+          </text>
+        </motion.g>
+      </motion.g>
+
+      {/* UFLPA flag — left side, mid-height */}
+      <motion.g variants={fadeInVariant(2.0)}>
+        <motion.g
+          animate={{ y: [0, -3, 0] }}
+          transition={{ duration: 5.4, repeat: Infinity, ease: "easeInOut", delay: 3.1 }}
+        >
+          <rect
+            x="20"
+            y="200"
+            width="86"
+            height="26"
+            rx="6"
+            fill="currentColor"
+            fillOpacity="0.04"
+            strokeWidth="1.5"
+          />
+          {/* Rose dot to denote risk inbox */}
+          <circle cx="32" cy="213" r="2.5" fill="hsl(0 72% 56%)" stroke="none" />
+          <text
+            x="42"
+            y="217"
+            fontSize="8"
+            fontFamily="ui-sans-serif, sans-serif"
+            fontWeight="600"
+            stroke="none"
+            fill="currentColor"
+            fillOpacity="0.78"
+          >
+            UFLPA risk
+          </text>
+        </motion.g>
+      </motion.g>
+
+      {/* HTS classifier hint — bottom-left, below ship's bow */}
+      <motion.g variants={fadeInVariant(2.4)}>
+        <motion.g
+          animate={{ y: [0, -3, 0] }}
+          transition={{ duration: 6.2, repeat: Infinity, ease: "easeInOut", delay: 3.3 }}
+        >
+          <rect
+            x="48"
+            y="400"
+            width="100"
+            height="26"
+            rx="6"
+            fill="currentColor"
+            fillOpacity="0.04"
+            strokeWidth="1.5"
+          />
+          {/* Tiny "hash" mark */}
+          <text
+            x="60"
+            y="417"
+            fontSize="9"
+            fontFamily="ui-monospace, monospace"
+            fontWeight="700"
+            stroke="none"
+            fill={GOLD}
+          >
+            HTS
+          </text>
+          <text
+            x="80"
+            y="417"
+            fontSize="8"
+            fontFamily="ui-monospace, monospace"
+            fontWeight="600"
+            stroke="none"
+            fill="currentColor"
+            fillOpacity="0.7"
+          >
+            6115.96.60
+          </text>
+        </motion.g>
+      </motion.g>
+
+      {/* Liquidation clock badge — right of HTS */}
+      <motion.g variants={fadeInVariant(2.6)}>
+        <motion.g
+          animate={{ y: [0, -3, 0] }}
+          transition={{ duration: 5.6, repeat: Infinity, ease: "easeInOut", delay: 3.5 }}
+        >
+          <rect
+            x="408"
+            y="400"
+            width="120"
+            height="26"
+            rx="6"
+            fill="currentColor"
+            fillOpacity="0.04"
+            strokeWidth="1.5"
+          />
+          {/* Mini clock face */}
+          <circle cx="422" cy="413" r="5" fill="none" strokeWidth="1.4" />
+          {/* Clock hand pointing to ~3 o'clock */}
+          <motion.line
+            x1="422"
+            y1="413"
+            x2="426"
+            y2="413"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            animate={{ rotate: 360 }}
+            style={{ transformOrigin: "422px 413px" }}
+            transition={{ duration: 14, repeat: Infinity, ease: "linear", delay: 3.2 }}
+          />
+          <text
+            x="434"
+            y="417"
+            fontSize="8"
+            fontFamily="ui-monospace, monospace"
+            fontWeight="600"
+            stroke="none"
+            fill="currentColor"
+            fillOpacity="0.78"
+          >
+            314-day clock
+          </text>
+        </motion.g>
+      </motion.g>
     </motion.svg>
   );
 }
