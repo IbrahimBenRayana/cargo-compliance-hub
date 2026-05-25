@@ -9,6 +9,7 @@ import { ContactScene } from "@/components/illustrations/contact-scene";
 
 type SubjectOption =
   | ""
+  | "Demo request"
   | "General inquiry"
   | "Technical support"
   | "Enterprise inquiry"
@@ -186,6 +187,7 @@ export default function ContactPage() {
                     className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                   >
                     <option value="">Select a topic…</option>
+                    <option value="Demo request">Demo request</option>
                     <option value="General inquiry">General inquiry</option>
                     <option value="Technical support">Technical support</option>
                     <option value="Enterprise inquiry">Enterprise inquiry</option>

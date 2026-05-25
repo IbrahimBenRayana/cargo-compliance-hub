@@ -2,8 +2,10 @@
 
 @layer base {
   :root {
-    /* Light — Warm White + Deep Navy */
-    --background: 220 25% 97%;
+    /* Light — Tinted neutral + Deep Navy. Slightly darker than pure white so
+       cards have somewhere to "lift" toward and the whole page feels less
+       brightly bleached. */
+    --background: 220 22% 93%;
     --foreground: 222 47% 8%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 8%;
@@ -11,10 +13,10 @@
     --popover-foreground: 222 47% 8%;
     --primary: 222 47% 22%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 20% 93%;
+    --secondary: 220 20% 89%;
     --secondary-foreground: 222 47% 15%;
-    --muted: 220 20% 93%;
-    --muted-foreground: 220 14% 44%;
+    --muted: 220 20% 88%;
+    --muted-foreground: 220 14% 40%;
     --accent: 43 96% 56%;
     --accent-foreground: 222 47% 8%;
     --destructive: 0 72% 51%;
@@ -89,6 +91,15 @@
   --shadow-card: 0 1px 3px 0 hsl(var(--foreground) / 0.04), 0 4px 8px -2px hsl(var(--foreground) / 0.06);
   --shadow-card-hover: 0 4px 6px -1px hsl(var(--foreground) / 0.06), 0 12px 20px -4px hsl(var(--foreground) / 0.08), 0 0 0 1px hsl(var(--border));
   --shadow-gold: 0 0 0 1px hsl(43 96% 56% / 0.15), 0 0 16px hsl(43 96% 56% / 0.2), 0 0 32px hsl(43 96% 56% / 0.08);
+
+  /* Motion tokens — used by Framer Motion `ease` arrays and CSS transitions */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 150ms;
+  --dur-mid: 350ms;
+  --dur-slow: 700ms;
 }
 
 @layer base {
@@ -167,6 +178,34 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+  /* One-shot sheen sweep across the gold-gradient word on mount.
+     Uses an animated 200%-wide gradient so the highlight band glides through. */
+  .shimmer-on-mount {
+    background: linear-gradient(
+      100deg,
+      hsl(43 96% 62%) 0%,
+      hsl(38 92% 50%) 30%,
+      hsl(48 100% 80%) 50%,
+      hsl(38 92% 50%) 70%,
+      hsl(43 96% 62%) 100%
+    );
+    background-size: 220% 100%;
+    background-position: 100% 0;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer-sweep 1800ms cubic-bezier(0.16, 1, 0.3, 1) 1100ms 1 both;
+  }
+  @keyframes shimmer-sweep {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -20% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .shimmer-on-mount {
+      animation: none;
+      background-position: 50% 0;
+    }
   }
   .text-gradient-navy {
     background: linear-gradient(135deg, hsl(222 47% 22%) 0%, hsl(222 47% 35%) 100%);

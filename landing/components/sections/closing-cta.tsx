@@ -1,80 +1,100 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
-import { motion, MotionConfig } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
+const EASE_OUT_QUART = [0.25, 1, 0.5, 1] as const;
+
+const HEADLINE_BEFORE = "Start filing in";
+const HEADLINE_HIGHLIGHT = "90 seconds.";
 
 export function ClosingCta() {
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  const inView = useInView(ref, { once: true, amount: 0.3 });
+
+  const words: { text: string; highlight: boolean }[] = [
+    ...HEADLINE_BEFORE.split(" ").map((w) => ({ text: w, highlight: false })),
+    ...HEADLINE_HIGHLIGHT.split(" ").map((w) => ({ text: w, highlight: true })),
+  ];
+
   return (
-    <MotionConfig reducedMotion="user">
-      <section
-        className="relative py-24 md:py-32 overflow-hidden"
-        style={{
-          background: `
-            radial-gradient(ellipse 60% 40% at 50% -10%, hsl(43 96% 56% / 0.12) 0%, transparent 65%),
-            radial-gradient(at 15% 15%, hsl(220 70% 55% / 0.07) 0px, transparent 55%),
-            radial-gradient(at 85% 80%, hsl(43 96% 56% / 0.05) 0px, transparent 55%),
-            radial-gradient(at 50% 0%, hsl(220 70% 30% / 0.06) 0px, transparent 60%),
-            hsl(var(--background))
-          `,
-        }}
-      >
-        {/* Subtle top gold glow line */}
+    <section className="dark relative bg-[hsl(220_22%_18%)] py-24 md:py-32 text-[hsl(210_40%_96%)]">
+      <Container>
         <div
-          aria-hidden
-          className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-px"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent 0%, hsl(43 96% 56% / 0.4) 50%, transparent 100%)",
-          }}
-        />
-
-        <Container>
-          <motion.div
-            initial={{ opacity: 0, y: 28 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="flex flex-col items-center text-center max-w-3xl mx-auto"
+          ref={ref}
+          className="mx-auto flex max-w-3xl flex-col items-center text-center"
+        >
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={inView ? { opacity: 1 } : undefined}
+            transition={{ duration: 0.5 }}
+            className="mb-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
           >
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-4">
-              Get Started
-            </span>
+            Ready when you are
+          </motion.p>
 
-            <h2 className="text-4xl md:text-6xl font-semibold tracking-tight text-foreground mb-5 leading-[1.1]">
-              Start filing in{" "}
-              <span className="text-gradient-gold">90 seconds.</span>
-            </h2>
+          <h2 className="mb-5 text-4xl font-semibold leading-[1.05] tracking-tight text-foreground md:text-6xl">
+            <motion.span
+              initial="hidden"
+              animate={inView ? "visible" : undefined}
+              variants={{
+                hidden: {},
+                visible: {
+                  transition: { staggerChildren: 0.06, delayChildren: 0.1 },
+                },
+              }}
+              className="inline"
+            >
+              {words.map((word, i) => (
+                <motion.span
+                  key={i}
+                  variants={{
+                    hidden: { opacity: 0, y: 12 },
+                    visible: {
+                      opacity: 1,
+                      y: 0,
+                      transition: { duration: 0.5, ease: EASE_OUT_QUART },
+                    },
+                  }}
+                  className={
+                    word.highlight
+                      ? "mr-[0.22em] inline-block text-gradient-gold"
+                      : "mr-[0.22em] inline-block"
+                  }
+                >
+                  {word.text}
+                </motion.span>
+              ))}
+            </motion.span>
+          </h2>
 
-            <p className="text-lg text-muted-foreground mb-10 max-w-xl leading-relaxed">
-              No credit card. No sales calls. Free forever plan with 2 filings
-              per month.
-            </p>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={inView ? { opacity: 1 } : undefined}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="mb-10 text-base text-muted-foreground md:text-lg"
+          >
+            No credit card. No sales calls. Cancel anytime.
+          </motion.p>
 
-            <div className="flex flex-col sm:flex-row items-center gap-3 mb-8">
-              <Button variant="gold" size="lg" asChild>
-                <a href="https://app.mycargolens.com/register">Start free</a>
-              </Button>
-              <Button variant="outline" size="lg" asChild>
-                <Link href="/contact">Talk to sales</Link>
-              </Button>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              Questions? Email{" "}
-              <a
-                href="mailto:support@mycargolens.com"
-                className="underline underline-offset-4 hover:text-foreground transition-colors"
-              >
-                support@mycargolens.com
-              </a>
-            </p>
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={inView ? { opacity: 1, y: 0 } : undefined}
+            transition={{ duration: 0.5, delay: 0.55, ease: EASE_OUT_QUART }}
+            className="flex flex-col items-center gap-3 sm:flex-row"
+          >
+            <Button variant="gold" size="lg" asChild>
+              <a href="https://app.mycargolens.com/register">Start free</a>
+            </Button>
+            <Button variant="outline" size="lg" asChild>
+              <Link href="/contact">Talk to founders</Link>
+            </Button>
           </motion.div>
-        </Container>
-      </section>
-    </MotionConfig>
+        </div>
+      </Container>
+    </section>
   );
 }

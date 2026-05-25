@@ -2,7 +2,17 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Menu, X, Ship, BarChart3, Users, ChevronDown, ArrowRight } from "lucide-react";
+import {
+  Menu,
+  X,
+  Ship,
+  BarChart3,
+  Sparkles,
+  ListChecks,
+  Bot,
+  ChevronDown,
+  ArrowRight,
+} from "lucide-react";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,39 +22,51 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-const featuresDropdownItems = [
+const platformDropdownItems = [
   {
     icon: Ship,
-    title: "ISF Filing",
-    description: "ISF 10+2 and ISF-5 for ocean cargo",
-    href: "/features/isf-filing",
+    title: "Filings",
+    description: "ISF-10, ISF-5, ABI Entry, bulk, templates",
+    href: "/platform/filings",
   },
   {
     icon: BarChart3,
-    title: "Compliance",
-    description: "Filing scores and audit readiness",
-    href: "/features/compliance",
+    title: "Compliance Center",
+    description: "Action queue, UFLPA, ADD/CVD, liquidation",
+    href: "/platform/compliance",
   },
   {
-    icon: Users,
-    title: "Team Management",
-    description: "Multi-user, multi-org workspaces",
-    href: "/features/team",
+    icon: Bot,
+    title: "AI",
+    description: "Today's brief, rejection coach, HTS classifier",
+    href: "/platform/ai",
+  },
+  {
+    icon: ListChecks,
+    title: "Lifecycle",
+    description: "Timeline, score history, PDF export",
+    href: "/platform/lifecycle",
+  },
+  {
+    icon: Sparkles,
+    title: "Automation",
+    description: "CBP polling, Federal Register sync, alerts",
+    href: "/platform/automation",
   },
 ];
 
 const topLevelLinks = [
   { label: "Pricing", href: "/pricing" },
+  { label: "Solutions", href: "/solutions" },
   { label: "About", href: "/about" },
-  { label: "Contact", href: "/contact" },
 ];
 
 export function Nav() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const [featuresOpen, setFeaturesOpen] = React.useState(false);
-  const [mobileFeaturesOpen, setMobileFeaturesOpen] = React.useState(false);
+  const [platformOpen, setPlatformOpen] = React.useState(false);
+  const [mobilePlatformOpen, setMobilePlatformOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
-  const featuresTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const platformTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
     const handleScroll = () => {
@@ -56,13 +78,13 @@ export function Nav() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleFeaturesMouseEnter = () => {
-    if (featuresTimeout.current) clearTimeout(featuresTimeout.current);
-    setFeaturesOpen(true);
+  const handlePlatformMouseEnter = () => {
+    if (platformTimeout.current) clearTimeout(platformTimeout.current);
+    setPlatformOpen(true);
   };
 
-  const handleFeaturesMouseLeave = () => {
-    featuresTimeout.current = setTimeout(() => setFeaturesOpen(false), 120);
+  const handlePlatformMouseLeave = () => {
+    platformTimeout.current = setTimeout(() => setPlatformOpen(false), 120);
   };
 
   return (
@@ -84,21 +106,21 @@ export function Nav() {
 
             {/* Desktop center links */}
             <ul className="hidden md:flex items-center gap-1">
-              {/* Features with dropdown */}
+              {/* Platform with dropdown */}
               <li
                 className="relative"
-                onMouseEnter={handleFeaturesMouseEnter}
-                onMouseLeave={handleFeaturesMouseLeave}
+                onMouseEnter={handlePlatformMouseEnter}
+                onMouseLeave={handlePlatformMouseLeave}
               >
                 <button
                   className="flex items-center gap-1 px-4 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary transition-colors"
-                  onClick={() => setFeaturesOpen((v) => !v)}
-                  aria-expanded={featuresOpen}
+                  onClick={() => setPlatformOpen((v) => !v)}
+                  aria-expanded={platformOpen}
                   aria-haspopup="true"
                 >
-                  Features
+                  Platform
                   <motion.span
-                    animate={{ rotate: featuresOpen ? 180 : 0 }}
+                    animate={{ rotate: platformOpen ? 180 : 0 }}
                     transition={{ duration: 0.2, ease: EASE }}
                     className="flex items-center"
                   >
@@ -107,25 +129,25 @@ export function Nav() {
                 </button>
 
                 <AnimatePresence>
-                  {featuresOpen && (
+                  {platformOpen && (
                     <motion.div
                       initial={{ opacity: 0, y: -8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
                       transition={{ duration: 0.2, ease: EASE }}
-                      className="absolute top-full left-0 mt-2 border border-border/40 rounded-xl shadow-[0_8px_30px_-4px_hsl(var(--foreground)/0.12),0_0_0_1px_hsl(var(--border)/0.6)] min-w-[320px] overflow-hidden bg-[hsl(var(--card)/0.96)] backdrop-blur-2xl backdrop-saturate-150"
-                      onMouseEnter={handleFeaturesMouseEnter}
-                      onMouseLeave={handleFeaturesMouseLeave}
+                      className="absolute top-full left-0 mt-2 border border-border/40 rounded-xl shadow-[0_8px_30px_-4px_hsl(var(--foreground)/0.12),0_0_0_1px_hsl(var(--border)/0.6)] min-w-[340px] overflow-hidden bg-[hsl(var(--card)/0.96)] backdrop-blur-2xl backdrop-saturate-150"
+                      onMouseEnter={handlePlatformMouseEnter}
+                      onMouseLeave={handlePlatformMouseLeave}
                     >
-                      {/* All Features row */}
+                      {/* All Features overview row */}
                       <Link
                         href="/features"
                         className="flex items-center justify-between px-4 py-3.5 hover:bg-secondary/60 transition-colors border-b border-border/40 group"
-                        onClick={() => setFeaturesOpen(false)}
+                        onClick={() => setPlatformOpen(false)}
                       >
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-0.5">
-                            All Features
+                            All features
                           </p>
                           <p className="text-sm text-foreground font-medium">
                             Overview of every capability
@@ -137,16 +159,16 @@ export function Nav() {
                         />
                       </Link>
 
-                      {/* Individual feature items */}
+                      {/* Individual platform items */}
                       <div className="py-1.5">
-                        {featuresDropdownItems.map((item) => {
+                        {platformDropdownItems.map((item) => {
                           const Icon = item.icon;
                           return (
                             <Link
                               key={item.href}
                               href={item.href}
                               className="flex items-start gap-3 px-4 py-3 hover:bg-secondary/60 transition-colors"
-                              onClick={() => setFeaturesOpen(false)}
+                              onClick={() => setPlatformOpen(false)}
                             >
                               <div className="w-8 h-8 rounded-lg bg-gold/15 flex items-center justify-center text-gold-dark dark:text-gold flex-shrink-0 mt-0.5">
                                 <Icon size={16} />
@@ -207,15 +229,15 @@ export function Nav() {
           {mobileOpen && (
             <div className="md:hidden pb-4 border-t border-border/60 pt-3">
               <ul className="flex flex-col gap-1 mb-4">
-                {/* Features expandable */}
+                {/* Platform expandable */}
                 <li>
                   <button
                     className="w-full flex items-center justify-between px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary transition-colors"
-                    onClick={() => setMobileFeaturesOpen((v) => !v)}
+                    onClick={() => setMobilePlatformOpen((v) => !v)}
                   >
-                    <span>Features</span>
+                    <span>Platform</span>
                     <motion.span
-                      animate={{ rotate: mobileFeaturesOpen ? 180 : 0 }}
+                      animate={{ rotate: mobilePlatformOpen ? 180 : 0 }}
                       transition={{ duration: 0.2, ease: EASE }}
                       className="flex items-center"
                     >
@@ -224,7 +246,7 @@ export function Nav() {
                   </button>
 
                   <AnimatePresence>
-                    {mobileFeaturesOpen && (
+                    {mobilePlatformOpen && (
                       <motion.ul
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
@@ -239,10 +261,10 @@ export function Nav() {
                             onClick={() => setMobileOpen(false)}
                           >
                             <ArrowRight size={13} className="flex-shrink-0" />
-                            All Features
+                            All features
                           </Link>
                         </li>
-                        {featuresDropdownItems.map((item) => {
+                        {platformDropdownItems.map((item) => {
                           const Icon = item.icon;
                           return (
                             <li key={item.href}>
