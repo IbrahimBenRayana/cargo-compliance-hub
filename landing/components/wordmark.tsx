@@ -14,44 +14,28 @@ export function Wordmark({ className }: WordmarkProps) {
       )}
       aria-label="MyCargoLens"
     >
-      {/* Geometric mark: stacked navy + gold chevrons */}
+      {/* 6-blade camera aperture (iris diaphragm) with gold hex opening.
+          The lens metaphor: many things → the one item that matters now. */}
       <svg
         width="28"
         height="28"
-        viewBox="0 0 28 28"
-        fill="none"
+        viewBox="0 0 32 32"
         aria-hidden="true"
         xmlns="http://www.w3.org/2000/svg"
+        className="text-[hsl(222_47%_22%)] dark:text-[hsl(43_96%_70%)]"
       >
-        {/* Navy chevron (top) */}
+        {/* Six blades, alternating tones for iris depth */}
+        <path d="M 30 16 L 23 3.88 L 16 10.5 L 20.76 13.25 Z" fill="currentColor" />
+        <path d="M 23 3.88 L 9 3.88 L 11.24 13.25 L 16 10.5 Z" fill="currentColor" fillOpacity="0.75" />
+        <path d="M 9 3.88 L 2 16 L 11.24 18.75 L 11.24 13.25 Z" fill="currentColor" />
+        <path d="M 2 16 L 9 28.12 L 16 21.5 L 11.24 18.75 Z" fill="currentColor" fillOpacity="0.75" />
+        <path d="M 9 28.12 L 23 28.12 L 20.76 18.75 L 16 21.5 Z" fill="currentColor" />
+        <path d="M 23 28.12 L 30 16 L 20.76 13.25 L 20.76 18.75 Z" fill="currentColor" fillOpacity="0.75" />
+        {/* Gold hex aperture at the center — the only gold accent */}
         <path
-          d="M4 9L14 4L24 9"
-          stroke="hsl(222 47% 22%)"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="dark:stroke-[hsl(210_40%_80%)]"
+          d="M 20.76 13.25 L 16 10.5 L 11.24 13.25 L 11.24 18.75 L 16 21.5 L 20.76 18.75 Z"
+          fill="hsl(43 96% 56%)"
         />
-        {/* Gold chevron (middle) */}
-        <path
-          d="M4 14.5L14 9.5L24 14.5"
-          stroke="hsl(43 96% 56%)"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {/* Navy chevron (bottom, lighter) */}
-        <path
-          d="M4 20L14 15L24 20"
-          stroke="hsl(222 47% 22%)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeOpacity="0.35"
-          className="dark:stroke-[hsl(210_40%_80%)]"
-        />
-        {/* Gold accent dot */}
-        <circle cx="14" cy="24.5" r="1.75" fill="hsl(43 96% 56%)" />
       </svg>
 
       {/* Wordmark text */}

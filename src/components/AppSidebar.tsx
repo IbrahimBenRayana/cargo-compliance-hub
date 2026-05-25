@@ -1,4 +1,5 @@
 import { LayoutDashboard, Ship, Shield, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator, Container } from 'lucide-react';
+import { LogoMark } from '@/components/LogoMark';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -121,19 +122,13 @@ export function AppSidebar() {
             collapsed ? 'justify-center' : 'gap-3',
           )}
         >
-          {/* Logo mark — smaller when collapsed so it fits inside the 3rem (48px) rail */}
-          <div
-            className={cn(
-              'relative rounded-xl shrink-0 flex items-center justify-center',
-              'bg-gradient-to-br from-amber-400 to-amber-600',
-              'shadow-lg shadow-amber-500/25 ring-1 ring-amber-300/20',
-              'transition-all duration-200',
-              collapsed ? 'h-8 w-8' : 'h-9 w-9',
-            )}
-          >
-            <Ship className={cn('text-amber-950', collapsed ? 'h-4 w-4' : 'h-[18px] w-[18px]')} />
-            <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-transparent to-white/15 pointer-events-none" />
-          </div>
+          {/* Logo mark — 6-blade aperture, sized for collapsed vs expanded rail */}
+          <LogoMark
+            size={collapsed ? 28 : 32}
+            className="text-[hsl(43_96%_70%)]"
+          />
+          {/* Old gold-tile + Ship icon retired in favor of the aperture mark.
+              The sidebar bg is dark-navy in both modes, so we tint the mark gold. */}
 
           {!collapsed && (
             <div className="flex flex-col min-w-0">

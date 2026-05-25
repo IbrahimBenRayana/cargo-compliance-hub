@@ -2,6 +2,7 @@ import { motion, MotionConfig } from 'framer-motion';
 import { Shield, Lock, Zap } from 'lucide-react';
 import { LoginScene } from './illustrations/login-scene';
 import { RegisterScene } from './illustrations/register-scene';
+import { LogoMark } from '@/components/LogoMark';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -98,24 +99,8 @@ export function AuthBrandPanel({ variant = 'login' }: AuthBrandPanelProps) {
 
         {/* ── Wordmark — top left ── */}
         <div className="absolute top-8 left-8 flex items-center gap-2.5 z-10">
-          {/* Gold chevron mark */}
-          <svg width="24" height="24" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-            <path
-              d="M12 16 L24 26 L36 16"
-              stroke="hsl(43, 96%, 56%)"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M12 24 L24 34 L36 24"
-              stroke="hsl(43, 96%, 56%)"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity="0.55"
-            />
-          </svg>
+          {/* Brand mark — aperture, tinted light for contrast on dark panel */}
+          <LogoMark size={24} className="text-white/90" />
           <span
             className="text-base font-semibold tracking-tight"
             style={{ color: 'rgba(255,255,255,0.92)' }}
