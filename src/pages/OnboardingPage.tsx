@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi, integrationsApi, organizationApi } from '@/api/client';
 import { useAuthStore } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { LogoMark } from '@/components/LogoMark';
 import { cn } from '@/lib/utils';
 import {
   Building2, Plug, FileText, PartyPopper, ArrowRight, ArrowLeft,
@@ -125,7 +126,7 @@ export default function OnboardingPage() {
       <div className="border-b border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Ship className="h-7 w-7 text-primary" />
+            <LogoMark size={28} className="text-[hsl(222_47%_22%)] dark:text-[hsl(43_96%_70%)]" />
             <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-50">MyCargoLens</span>
           </div>
           <Badge variant="secondary" className="text-[10px] uppercase tracking-[0.1em] font-semibold">Setup</Badge>

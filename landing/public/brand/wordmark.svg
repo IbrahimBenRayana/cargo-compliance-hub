@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 32" width="200" height="32">
+  
+  <g>
+    <path d="M 30 16 L 23 3.88 L 16 10.5 L 20.76 13.25 Z" fill="hsl(222, 47%, 22%)"></path>
+    <path d="M 23 3.88 L 9 3.88 L 11.24 13.25 L 16 10.5 Z" fill="hsl(222, 47%, 16%)"></path>
+    <path d="M 9 3.88 L 2 16 L 11.24 18.75 L 11.24 13.25 Z" fill="hsl(222, 47%, 22%)"></path>
+    <path d="M 2 16 L 9 28.12 L 16 21.5 L 11.24 18.75 Z" fill="hsl(222, 47%, 16%)"></path>
+    <path d="M 9 28.12 L 23 28.12 L 20.76 18.75 L 16 21.5 Z" fill="hsl(222, 47%, 22%)"></path>
+    <path d="M 23 28.12 L 30 16 L 20.76 13.25 L 20.76 18.75 Z" fill="hsl(222, 47%, 16%)"></path>
+    <path d="M 20.76 13.25 L 16 10.5 L 11.24 13.25 L 11.24 18.75 L 16 21.5 L 20.76 18.75 Z" fill="hsl(43, 96%, 56%)"></path>
+  </g>
+  
+  <text x="40" y="22" font-family="Inter, ui-sans-serif, sans-serif" font-size="17" font-weight="600" letter-spacing="-0.17" fill="hsl(222, 47%, 22%)">MyCargoLens</text>
+</svg>
