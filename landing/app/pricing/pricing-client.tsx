@@ -1,26 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import * as React from "react";
+import { animate, motion, useMotionValue, useTransform } from "framer-motion";
 import { Check, Layers, Sparkles, Wallet, Zap } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
 import { SeverityPill } from "@/components/ui/severity-pill";
+import { cn } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const GOLD = "hsl(43 96% 56%)";
 const EMERALD = "hsl(160 84% 39%)";
 
 /**
- * Pricing hero — three floating tier cards arranged with the middle one
- * scaled up. No bg box; gold glow + bobbing motion.
+ * Pricing hero — a stylized "shopping decision" composition. Three tier
+ * tablets fanned out, the featured Grower tier rising, an animated gold
+ * spotlight tracking across it, a counting "$49" big number, a tiny bar
+ * chart suggesting filing volume → price, and an arrow nudging toward
+ * the recommended pick. More dynamic + sells the "this is the one" feel.
  */
 function PricingHeroIllustration() {
+  // Animated counting price for the featured tier
+  const animatedPrice = useMotionValue(0);
+  const displayPrice = useTransform(animatedPrice, (v) => `$${Math.round(v)}`);
+  React.useEffect(() => {
+    const controls = animate(animatedPrice, 49, {
+      duration: 1.4,
+      delay: 0.6,
+      ease: EASE,
+    });
+    return controls.stop;
+  }, [animatedPrice]);
+
   const tiers = [
-    { x: 50, y: 110, w: 110, h: 150, tag: "STARTER", price: "$0", per: "free", scale: 0.92, delay: 0 },
-    { x: 184, y: 80, w: 130, h: 200, tag: "GROWER", price: "$49", per: "/mo", scale: 1.0, delay: 0.15, featured: true },
-    { x: 338, y: 110, w: 110, h: 150, tag: "SCALE", price: "$149", per: "/mo", scale: 0.92, delay: 0.3 },
+    { x: 36, y: 144, w: 110, h: 156, tag: "STARTER", price: "$0", per: "free", rotate: -6, delay: 0 },
+    { x: 178, y: 80, w: 138, h: 222, tag: "GROWER", price: "$49", per: "/mo", rotate: 0, delay: 0.15, featured: true },
+    { x: 340, y: 144, w: 110, h: 156, tag: "SCALE", price: "$149", per: "/mo", rotate: 6, delay: 0.3 },
   ];
 
   return (
@@ -39,118 +56,261 @@ function PricingHeroIllustration() {
     >
       <defs>
         <radialGradient id="pr-glow" cx="50%" cy="50%" r="55%">
-          <stop offset="0%" stopColor={GOLD} stopOpacity="0.16" />
+          <stop offset="0%" stopColor={GOLD} stopOpacity="0.20" />
           <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
         </radialGradient>
+        <linearGradient id="pr-featured-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={GOLD} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={GOLD} stopOpacity="0.04" />
+        </linearGradient>
+        <linearGradient id="pr-spotlight" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="white" stopOpacity="0" />
+          <stop offset="50%" stopColor="white" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="white" stopOpacity="0" />
+        </linearGradient>
+        <clipPath id="pr-grower-clip">
+          <rect x="178" y="80" width="138" height="222" rx="12" />
+        </clipPath>
       </defs>
-      <ellipse cx="240" cy="180" rx="210" ry="140" fill="url(#pr-glow)" stroke="none" />
+      <ellipse cx="240" cy="190" rx="220" ry="150" fill="url(#pr-glow)" stroke="none" />
 
-      {tiers.map((t) => (
-        <motion.g
-          key={t.tag}
-          variants={{
-            hidden: { opacity: 0, y: 14, scale: t.scale * 0.95 },
-            visible: {
-              opacity: 1,
-              y: 0,
-              scale: t.scale,
-              transition: { duration: 0.6, ease: EASE, delay: t.delay },
-            },
-          }}
-        >
+      {/* Side tablets — STARTER (left) and SCALE (right), slightly tilted */}
+      {tiers
+        .filter((t) => !t.featured)
+        .map((t) => (
           <motion.g
-            animate={{ y: [0, -3, 0] }}
-            transition={{ duration: 5 + t.delay, repeat: Infinity, ease: "easeInOut", delay: t.delay }}
+            key={t.tag}
+            variants={{
+              hidden: { opacity: 0, y: 14, rotate: t.rotate * 1.8 },
+              visible: {
+                opacity: 1,
+                y: 0,
+                rotate: t.rotate,
+                transition: { duration: 0.65, ease: EASE, delay: t.delay },
+              },
+            }}
+            style={{ transformOrigin: `${t.x + t.w / 2}px ${t.y + t.h / 2}px` }}
           >
-            {t.featured && (
-              <motion.rect
-                x={t.x - 4}
-                y={t.y - 4}
-                width={t.w + 8}
-                height={t.h + 8}
-                rx="14"
-                stroke={GOLD}
-                strokeOpacity="0.4"
-                fill="none"
-                animate={{ opacity: [0.5, 0.9, 0.5] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            <motion.g
+              animate={{ y: [0, -2.5, 0] }}
+              transition={{ duration: 5 + t.delay, repeat: Infinity, ease: "easeInOut", delay: t.delay }}
+            >
+              <rect
+                x={t.x}
+                y={t.y}
+                width={t.w}
+                height={t.h}
+                rx="12"
+                fill="currentColor"
+                fillOpacity="0.04"
+                strokeOpacity="0.5"
               />
-            )}
-            <rect
-              x={t.x}
-              y={t.y}
-              width={t.w}
-              height={t.h}
-              rx="10"
-              fill={t.featured ? `${GOLD}14` : "currentColor"}
-              fillOpacity={t.featured ? undefined : 0.04}
-              stroke={t.featured ? GOLD : "currentColor"}
-              strokeOpacity={t.featured ? 0.8 : 0.55}
-            />
-            <text
-              x={t.x + t.w / 2}
-              y={t.y + 22}
-              textAnchor="middle"
-              fontSize="9"
-              fontFamily="ui-sans-serif, sans-serif"
-              fontWeight="700"
-              letterSpacing="1.2"
-              fill={t.featured ? GOLD : "currentColor"}
-              fillOpacity={t.featured ? 1 : 0.6}
-              stroke="none"
-            >
-              {t.tag}
-            </text>
-            <line x1={t.x + 16} y1={t.y + 32} x2={t.x + t.w - 16} y2={t.y + 32} strokeOpacity="0.3" />
-            <text
-              x={t.x + t.w / 2}
-              y={t.y + 70}
-              textAnchor="middle"
-              fontSize="22"
-              fontFamily="ui-sans-serif, sans-serif"
-              fontWeight="700"
-              fill="currentColor"
-              stroke="none"
-            >
-              {t.price}
-            </text>
-            <text
-              x={t.x + t.w / 2}
-              y={t.y + 86}
-              textAnchor="middle"
-              fontSize="9"
-              fontFamily="ui-sans-serif, sans-serif"
-              fontWeight="500"
-              fill="currentColor"
-              fillOpacity="0.55"
-              stroke="none"
-            >
-              {t.per}
-            </text>
-            {[100, 116, 132].map((dy, i) => (
-              <g key={dy}>
-                <circle cx={t.x + 18} cy={t.y + dy} r="2" fill={t.featured ? GOLD : EMERALD} stroke="none" />
-                <line
-                  x1={t.x + 26}
-                  y1={t.y + dy}
-                  x2={t.x + t.w - 16 - i * 4}
-                  y2={t.y + dy}
-                  strokeOpacity="0.45"
-                />
-              </g>
-            ))}
+              <text
+                x={t.x + t.w / 2}
+                y={t.y + 22}
+                textAnchor="middle"
+                fontSize="9"
+                fontFamily="ui-sans-serif, sans-serif"
+                fontWeight="700"
+                letterSpacing="1.4"
+                fill="currentColor"
+                fillOpacity="0.55"
+                stroke="none"
+              >
+                {t.tag}
+              </text>
+              <line x1={t.x + 16} y1={t.y + 32} x2={t.x + t.w - 16} y2={t.y + 32} strokeOpacity="0.25" />
+              <text
+                x={t.x + t.w / 2}
+                y={t.y + 70}
+                textAnchor="middle"
+                fontSize="22"
+                fontFamily="ui-sans-serif, sans-serif"
+                fontWeight="700"
+                fill="currentColor"
+                stroke="none"
+              >
+                {t.price}
+              </text>
+              <text
+                x={t.x + t.w / 2}
+                y={t.y + 86}
+                textAnchor="middle"
+                fontSize="9"
+                fontFamily="ui-sans-serif, sans-serif"
+                fontWeight="500"
+                fill="currentColor"
+                fillOpacity="0.55"
+                stroke="none"
+              >
+                {t.per}
+              </text>
+              {[104, 120, 136].map((dy, i) => (
+                <g key={dy}>
+                  <circle cx={t.x + 18} cy={t.y + dy} r="2" fill={EMERALD} stroke="none" />
+                  <line
+                    x1={t.x + 26}
+                    y1={t.y + dy}
+                    x2={t.x + t.w - 16 - i * 4}
+                    y2={t.y + dy}
+                    strokeOpacity="0.35"
+                  />
+                </g>
+              ))}
+            </motion.g>
           </motion.g>
-        </motion.g>
-      ))}
+        ))}
 
+      {/* === GROWER (featured) — raised, with halo + spotlight + counting price === */}
+      <motion.g
+        variants={{
+          hidden: { opacity: 0, y: 24, scale: 0.94 },
+          visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.7, ease: EASE, delay: 0.2 } },
+        }}
+        style={{ transformOrigin: "247px 191px" }}
+      >
+        <motion.g
+          animate={{ y: [0, -4, 0] }}
+          transition={{ duration: 4.2, repeat: Infinity, ease: "easeInOut" }}
+        >
+          {/* Outer pulse halo */}
+          <motion.rect
+            x="170"
+            y="72"
+            width="154"
+            height="238"
+            rx="14"
+            stroke={GOLD}
+            strokeOpacity="0.45"
+            fill="none"
+            animate={{ opacity: [0.4, 0.85, 0.4] }}
+            transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+          />
+          {/* Card body w/ gold gradient fill */}
+          <rect x="178" y="80" width="138" height="222" rx="12" fill="url(#pr-featured-fill)" stroke={GOLD} strokeWidth="2" />
+
+          {/* Animated diagonal spotlight sweeping across the card every ~6s */}
+          <motion.g clipPath="url(#pr-grower-clip)">
+            <motion.rect
+              x="-60"
+              y="80"
+              width="120"
+              height="222"
+              fill="url(#pr-spotlight)"
+              animate={{ x: [-60, 360] }}
+              transition={{ duration: 5.5, repeat: Infinity, repeatDelay: 1.5, ease: "easeInOut", delay: 1 }}
+            />
+          </motion.g>
+
+          {/* "Most popular" pill */}
+          <rect x="200" y="62" width="94" height="20" rx="10" fill={GOLD} />
+          <text x="247" y="76" textAnchor="middle" fontSize="9" fontFamily="ui-sans-serif, sans-serif" fontWeight="700" letterSpacing="0.6" fill="hsl(35, 90%, 18%)" stroke="none">
+            MOST POPULAR
+          </text>
+
+          {/* Tag */}
+          <text x="247" y="106" textAnchor="middle" fontSize="10" fontFamily="ui-sans-serif, sans-serif" fontWeight="800" letterSpacing="1.6" fill={GOLD} stroke="none">
+            GROWER
+          </text>
+          <line x1="194" y1="116" x2="300" y2="116" stroke={GOLD} strokeOpacity="0.35" />
+
+          {/* Big counting price */}
+          <motion.text
+            x="247"
+            y="172"
+            textAnchor="middle"
+            fontSize="36"
+            fontFamily="ui-sans-serif, sans-serif"
+            fontWeight="800"
+            fill="currentColor"
+            stroke="none"
+          >
+            {displayPrice}
+          </motion.text>
+          <text x="247" y="190" textAnchor="middle" fontSize="10" fontFamily="ui-sans-serif, sans-serif" fontWeight="500" fill="currentColor" fillOpacity="0.55" stroke="none">
+            per month
+          </text>
+
+          {/* Feature lines */}
+          {[208, 226, 244, 262, 280].map((dy, i) => (
+            <motion.g
+              key={dy}
+              initial={{ opacity: 0, x: -4 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.9 + i * 0.1 }}
+            >
+              <circle cx="196" cy={dy} r="2.5" fill={GOLD} stroke="none" />
+              <line x1="206" y1={dy} x2={300 - (i % 2) * 14} y2={dy} strokeOpacity="0.45" />
+            </motion.g>
+          ))}
+        </motion.g>
+      </motion.g>
+
+      {/* Mini bar chart at top-right suggesting volume → price scaling */}
       <motion.g
         variants={{
           hidden: { opacity: 0 },
-          visible: { opacity: 1, transition: { duration: 0.5, delay: 1 } },
+          visible: { opacity: 1, transition: { duration: 0.6, delay: 0.7 } },
         }}
       >
-        <circle cx="60" cy="316" r="2.5" fill={EMERALD} stroke="none" />
-        <text x="72" y="320" fontSize="8.5" fontFamily="ui-monospace, monospace" fontWeight="600" fill="currentColor" fillOpacity="0.55" stroke="none">
+        {[
+          { x: 376, h: 8, color: EMERALD },
+          { x: 386, h: 14, color: EMERALD },
+          { x: 396, h: 22, color: GOLD },
+          { x: 406, h: 18, color: EMERALD },
+          { x: 416, h: 28, color: GOLD },
+          { x: 426, h: 24, color: EMERALD },
+          { x: 436, h: 34, color: GOLD },
+        ].map((bar, i) => (
+          <motion.rect
+            key={bar.x}
+            x={bar.x}
+            y={42 - bar.h + 32}
+            width="6"
+            height={bar.h}
+            rx="1"
+            fill={bar.color}
+            initial={{ scaleY: 0 }}
+            animate={{ scaleY: 1 }}
+            transition={{ duration: 0.5, delay: 0.9 + i * 0.06, ease: EASE }}
+            style={{ transformOrigin: `${bar.x + 3}px ${74}px` }}
+          />
+        ))}
+        <text x="404" y="84" textAnchor="middle" fontSize="7" fontFamily="ui-monospace, monospace" fontWeight="600" fill="currentColor" fillOpacity="0.55" stroke="none">
+          FILINGS / MO
+        </text>
+      </motion.g>
+
+      {/* Arrow pointing at the recommended tier */}
+      <motion.g
+        variants={{
+          hidden: { opacity: 0, y: -6 },
+          visible: { opacity: 1, y: 0, transition: { duration: 0.5, delay: 1.4 } },
+        }}
+      >
+        <motion.g
+          animate={{ y: [0, 3, 0] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <path d="M 247 36 L 247 56" stroke={GOLD} strokeWidth="2" />
+          <path d="M 240 50 L 247 58 L 254 50" stroke={GOLD} strokeWidth="2" fill="none" />
+          <text x="278" y="46" fontSize="9" fontFamily="ui-sans-serif, sans-serif" fontWeight="700" letterSpacing="0.8" fill={GOLD} stroke="none">
+            start here
+          </text>
+        </motion.g>
+      </motion.g>
+
+      {/* Footer stamp */}
+      <motion.g
+        variants={{
+          hidden: { opacity: 0 },
+          visible: { opacity: 1, transition: { duration: 0.5, delay: 1.6 } },
+        }}
+      >
+        <circle cx="60" cy="338" r="2.5" fill={EMERALD} stroke="none">
+          <animate attributeName="opacity" values="1;0.3;1" dur="1.6s" repeatCount="indefinite" />
+        </circle>
+        <text x="72" y="342" fontSize="8.5" fontFamily="ui-monospace, monospace" fontWeight="600" fill="currentColor" fillOpacity="0.55" stroke="none">
           no credit card · cancel anytime
         </text>
       </motion.g>
@@ -234,28 +394,67 @@ const TIERS: Tier[] = [
   },
 ];
 
-const COMPARE_ROWS: {
+type CompareRow = {
   feature: string;
   starter: string | boolean;
   grower: string | boolean;
   scale: string | boolean;
-}[] = [
-  { feature: "Monthly filings included", starter: "2", grower: "25", scale: "100" },
-  { feature: "Overage rate", starter: "—", grower: "$2/filing", scale: "$1/filing" },
-  { feature: "ISF-10 / ISF-5 / Entry / In-Bond", starter: true, grower: true, scale: true },
-  { feature: "AI Coach (rejection mode)", starter: true, grower: true, scale: true },
-  { feature: "AI Pre-flight (before submit)", starter: false, grower: true, scale: true },
-  { feature: "Action queue + Today's brief", starter: true, grower: true, scale: true },
-  { feature: "Templates + bulk submit", starter: false, grower: true, scale: true },
-  { feature: "UFLPA Risk Inbox", starter: false, grower: true, scale: true },
-  { feature: "ADD/CVD daily sync (Fed Register)", starter: false, grower: true, scale: true },
-  { feature: "FTA Preference Calculator (17)", starter: false, grower: false, scale: true },
-  { feature: "Liquidation pipeline (314-day clock)", starter: false, grower: false, scale: true },
-  { feature: "Manifest queries by MBOL", starter: false, grower: false, scale: true },
-  { feature: "Users", starter: "1", grower: "Up to 5", scale: "Unlimited" },
-  { feature: "Email notifications", starter: false, grower: true, scale: true },
-  { feature: "Audit log export (CSV)", starter: false, grower: false, scale: true },
-  { feature: "Priority support", starter: false, grower: false, scale: true },
+};
+
+type CompareGroup = {
+  id: string;
+  label: string;
+  rows: CompareRow[];
+};
+
+const COMPARE_GROUPS: CompareGroup[] = [
+  {
+    id: "limits",
+    label: "Limits & billing",
+    rows: [
+      { feature: "Monthly filings included", starter: "2", grower: "25", scale: "100" },
+      { feature: "Overage rate", starter: "—", grower: "$2/filing", scale: "$1/filing" },
+      { feature: "Users", starter: "1", grower: "Up to 5", scale: "Unlimited" },
+    ],
+  },
+  {
+    id: "filings",
+    label: "Filing types",
+    rows: [
+      { feature: "ISF-10 / ISF-5 / Entry / In-Bond", starter: true, grower: true, scale: true },
+      { feature: "Templates + bulk submit", starter: false, grower: true, scale: true },
+      { feature: "Manifest queries by MBOL", starter: false, grower: false, scale: true },
+    ],
+  },
+  {
+    id: "ai",
+    label: "AI",
+    rows: [
+      { feature: "AI Coach (rejection mode)", starter: true, grower: true, scale: true },
+      { feature: "AI Pre-flight (before submit)", starter: false, grower: true, scale: true },
+      { feature: "Today's AI brief", starter: true, grower: true, scale: true },
+    ],
+  },
+  {
+    id: "compliance",
+    label: "Compliance Center",
+    rows: [
+      { feature: "Action queue + Today's brief", starter: true, grower: true, scale: true },
+      { feature: "UFLPA Risk Inbox", starter: false, grower: true, scale: true },
+      { feature: "ADD/CVD daily sync (Fed Register)", starter: false, grower: true, scale: true },
+      { feature: "FTA Preference Calculator (17)", starter: false, grower: false, scale: true },
+      { feature: "Liquidation pipeline (314-day clock)", starter: false, grower: false, scale: true },
+    ],
+  },
+  {
+    id: "ops",
+    label: "Team & operations",
+    rows: [
+      { feature: "Email notifications", starter: false, grower: true, scale: true },
+      { feature: "Audit log export (CSV)", starter: false, grower: false, scale: true },
+      { feature: "Priority support", starter: false, grower: false, scale: true },
+    ],
+  },
 ];
 
 const FAQ = [
@@ -281,62 +480,167 @@ const FAQ = [
   },
 ];
 
-function TierCard({ tier }: { tier: Tier }) {
+function TierCard({ tier, index }: { tier: Tier; index: number }) {
+  // The featured tier gets a subtle radial gradient + thicker accent +
+  // an animated topline that sweeps once on entry.
   return (
     <motion.li
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 22 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: 0.6, ease: EASE }}
-      className={
+      transition={{ duration: 0.65, ease: EASE, delay: index * 0.08 }}
+      className={cn(
+        "group relative overflow-hidden rounded-2xl p-7 transition-all duration-300",
         tier.featured
-          ? "relative rounded-2xl border-2 border-gold bg-card p-6 shadow-gold ring-1 ring-gold/20"
-          : "rounded-2xl border border-border/60 bg-card p-6"
-      }
-    >
-      {tier.featured && (
-        <div className="absolute -top-3 left-6">
-          <SeverityPill tone="amber">Most popular</SeverityPill>
-        </div>
+          ? "border-2 border-gold bg-card ring-1 ring-gold/15 shadow-gold lg:-mt-4 lg:mb-4 lg:scale-[1.03]"
+          : "border border-border/60 bg-card hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-card-hover",
       )}
-      <h3 className="text-lg font-semibold text-foreground mb-1">{tier.name}</h3>
-      <p className="text-sm text-muted-foreground mb-5">{tier.blurb}</p>
+    >
+      {/* Featured tier: subtle radial gradient + animated top accent line */}
+      {tier.featured && (
+        <>
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10"
+            style={{
+              background:
+                "radial-gradient(ellipse 100% 80% at 50% 0%, hsl(43 96% 56% / 0.10) 0%, transparent 70%)",
+            }}
+          />
+          <motion.span
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold to-transparent"
+            initial={{ scaleX: 0 }}
+            whileInView={{ scaleX: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 1.1, ease: EASE, delay: 0.3 }}
+          />
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+            <SeverityPill tone="amber" className="shadow-card">
+              <Sparkles size={11} className="-ml-0.5" />
+              <span>Most popular</span>
+            </SeverityPill>
+          </div>
+        </>
+      )}
 
-      <div className="flex items-baseline gap-1.5 mb-1">
-        <span className="text-4xl font-semibold tabular-nums text-foreground">{tier.price}</span>
-        <span className="text-sm text-muted-foreground">{tier.per}</span>
+      {/* Header */}
+      <div className="mb-5">
+        <h3
+          className={cn(
+            "mb-1.5 text-xl font-semibold tracking-tight",
+            tier.featured && "text-foreground",
+          )}
+        >
+          {tier.name}
+        </h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">{tier.blurb}</p>
       </div>
-      <div className="text-[12px] font-mono tabular-nums text-muted-foreground mb-5">
-        {tier.filingsIncluded} <span className="opacity-60">· {tier.overage}</span>
+
+      {/* Price block */}
+      <div
+        className={cn(
+          "mb-6 rounded-xl border px-4 py-4",
+          tier.featured
+            ? "border-gold/30 bg-gold/[0.06]"
+            : "border-border/50 bg-background/40",
+        )}
+      >
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[44px] font-semibold leading-none tracking-tight tabular-nums text-foreground">
+            {tier.price}
+          </span>
+          <span className="text-sm text-muted-foreground">{tier.per}</span>
+        </div>
+        <div className="mt-2 flex items-center gap-2 text-[11.5px] font-mono tabular-nums">
+          <span
+            className={cn(
+              "rounded-md px-1.5 py-0.5 font-semibold",
+              tier.featured
+                ? "bg-gold/15 text-gold-dark dark:text-gold"
+                : "bg-secondary text-foreground/75",
+            )}
+          >
+            {tier.filingsIncluded}
+          </span>
+          <span className="text-muted-foreground/70">{tier.overage}</span>
+        </div>
       </div>
 
       <Button
         variant={tier.featured ? "gold" : "outline"}
         size="lg"
-        className="w-full mb-6"
+        className="mb-6 w-full"
         asChild
       >
         <a href={tier.ctaHref}>{tier.cta}</a>
       </Button>
 
+      {/* Feature list */}
       <ul className="space-y-2.5">
-        {tier.features.map((f) => (
-          <li key={f} className="flex items-start gap-2 text-[13px] text-foreground/85">
-            <Check size={14} strokeWidth={2.5} className="mt-0.5 text-gold-dark dark:text-gold shrink-0" />
-            <span>{f}</span>
-          </li>
+        {tier.features.map((f, i) => (
+          <motion.li
+            key={f}
+            initial={{ opacity: 0, x: -4 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 0.35, delay: 0.1 + i * 0.04 }}
+            className="flex items-start gap-2.5 text-[13px] text-foreground/85"
+          >
+            <span
+              className={cn(
+                "mt-0.5 grid size-4 shrink-0 place-items-center rounded-full",
+                tier.featured ? "bg-gold/20 text-gold-dark dark:text-gold" : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+              )}
+            >
+              <Check size={10} strokeWidth={3} />
+            </span>
+            <span className="leading-snug">{f}</span>
+          </motion.li>
         ))}
       </ul>
     </motion.li>
   );
 }
 
-function CellValue({ value }: { value: string | boolean }) {
-  if (value === true)
-    return <Check size={15} strokeWidth={2.5} className="mx-auto text-gold-dark dark:text-gold" />;
-  if (value === false)
-    return <span className="mx-auto block w-fit text-muted-foreground/40">—</span>;
-  return <span className="font-mono text-[12px] tabular-nums">{value}</span>;
+function CellValue({
+  value,
+  featured = false,
+}: {
+  value: string | boolean;
+  featured?: boolean;
+}) {
+  if (value === true) {
+    return (
+      <span
+        className={cn(
+          "mx-auto grid size-6 place-items-center rounded-full",
+          featured
+            ? "bg-gold/20 text-gold-dark ring-1 ring-gold/30 dark:text-gold"
+            : "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+        )}
+      >
+        <Check size={12} strokeWidth={3} />
+      </span>
+    );
+  }
+  if (value === false) {
+    return (
+      <span className="mx-auto block w-fit text-muted-foreground/35" aria-label="not included">
+        —
+      </span>
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "font-mono text-[12px] tabular-nums",
+        featured && "font-semibold text-foreground",
+      )}
+    >
+      {value}
+    </span>
+  );
 }
 
 export function PricingPageClient() {
@@ -353,8 +657,8 @@ export function PricingPageClient() {
       {/* TIER CARDS */}
       <SectionShell tone="default">
         <ul className="grid gap-6 md:grid-cols-3 items-start">
-          {TIERS.map((t) => (
-            <TierCard key={t.id} tier={t} />
+          {TIERS.map((t, i) => (
+            <TierCard key={t.id} tier={t} index={i} />
           ))}
         </ul>
 
@@ -377,34 +681,101 @@ export function PricingPageClient() {
       </SectionShell>
 
       {/* COMPARISON */}
-      <SectionShell tone="muted" eyebrow="Compare every feature" title="Side by side.">
-        <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="border-b border-border/60">
-                <th className="text-left p-4 font-semibold opacity-80">Feature</th>
-                {TIERS.map((t) => (
-                  <th key={t.id} className="text-center p-4 font-semibold">
-                    <div>{t.name}</div>
-                    <div className="text-[11px] font-mono font-normal opacity-60 tabular-nums">
-                      {t.price}
-                      {t.per !== "forever" && <span className="opacity-60"> {t.per}</span>}
-                    </div>
+      <SectionShell
+        tone="muted"
+        eyebrow="Compare every feature"
+        title="Side by side."
+        intro="Grouped by category so you can scan for the capabilities that matter to you."
+      >
+        <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card shadow-card-hover">
+          {/* Subtle gold halo behind the Grower column on lg+ */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-1/2 hidden w-[33.333%] -translate-x-1/2 lg:block"
+            style={{
+              background:
+                "linear-gradient(180deg, hsl(43 96% 56% / 0.06) 0%, transparent 70%)",
+            }}
+          />
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-border/60 bg-card/80 backdrop-blur-sm">
+                  <th className="sticky left-0 z-10 bg-card/80 p-5 text-left">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-50">
+                      Feature
+                    </span>
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {COMPARE_ROWS.map((row, i) => (
-                <tr key={row.feature} className={i % 2 ? "bg-background/40" : ""}>
-                  <td className="p-3 px-4 opacity-85">{row.feature}</td>
-                  <td className="p-3 px-4 text-center"><CellValue value={row.starter} /></td>
-                  <td className="p-3 px-4 text-center bg-gold/5"><CellValue value={row.grower} /></td>
-                  <td className="p-3 px-4 text-center"><CellValue value={row.scale} /></td>
+                  {TIERS.map((t) => (
+                    <th key={t.id} className="p-5 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <span
+                          className={cn(
+                            "text-[10px] font-semibold uppercase tracking-[0.18em]",
+                            t.featured ? "text-gold-dark dark:text-gold" : "opacity-55",
+                          )}
+                        >
+                          {t.name}
+                          {t.featured && (
+                            <span className="ml-1.5 inline-flex translate-y-[-1px] items-center align-middle">
+                              <Sparkles size={10} />
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={cn(
+                            "font-mono text-[11.5px] tabular-nums",
+                            t.featured ? "font-semibold" : "opacity-65",
+                          )}
+                        >
+                          {t.price}
+                          {t.per !== "forever" && (
+                            <span className="opacity-60"> {t.per}</span>
+                          )}
+                        </span>
+                      </div>
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {COMPARE_GROUPS.map((group) => (
+                  <React.Fragment key={group.id}>
+                    {/* Group header row */}
+                    <tr className="bg-secondary/40">
+                      <th
+                        colSpan={4}
+                        className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] opacity-55"
+                      >
+                        {group.label}
+                      </th>
+                    </tr>
+                    {/* Group rows */}
+                    {group.rows.map((row) => (
+                      <tr
+                        key={row.feature}
+                        className="group/row border-t border-border/40 transition-colors hover:bg-secondary/30"
+                      >
+                        <td className="px-5 py-3 text-[13px] opacity-90 group-hover/row:opacity-100">
+                          {row.feature}
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          <CellValue value={row.starter} />
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          <CellValue value={row.grower} featured />
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          <CellValue value={row.scale} />
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </SectionShell>
 
