@@ -490,33 +490,44 @@ function TierCard({ tier, index }: { tier: Tier; index: number }) {
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.65, ease: EASE, delay: index * 0.08 }}
       className={cn(
-        "group relative overflow-hidden rounded-2xl p-7 transition-all duration-300",
+        "group relative rounded-2xl p-7 transition-all duration-300",
+        // overflow-visible (default) lets the "Most popular" badge sit
+        // above the top edge. We bound the internal gradient layer to
+        // the card's rounded box with its own overflow-hidden span.
         tier.featured
           ? "border-2 border-gold bg-card ring-1 ring-gold/15 shadow-gold lg:-mt-4 lg:mb-4 lg:scale-[1.03]"
           : "border border-border/60 bg-card hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-card-hover",
       )}
     >
-      {/* Featured tier: subtle radial gradient + animated top accent line */}
+      {/* Featured tier: subtle radial gradient + animated top accent line.
+          Both effects live inside a clipped wrapper so they respect the
+          card's rounded corners; the badge sits OUTSIDE that wrapper so
+          it can sit above the top edge. */}
       {tier.featured && (
         <>
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-0 -z-10"
-            style={{
-              background:
-                "radial-gradient(ellipse 100% 80% at 50% 0%, hsl(43 96% 56% / 0.10) 0%, transparent 70%)",
-            }}
-          />
-          <motion.span
-            aria-hidden
-            className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold to-transparent"
-            initial={{ scaleX: 0 }}
-            whileInView={{ scaleX: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 1.1, ease: EASE, delay: 0.3 }}
-          />
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-            <SeverityPill tone="amber" className="shadow-card">
+            className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-2xl"
+          >
+            <span
+              aria-hidden
+              className="absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse 100% 80% at 50% 0%, hsl(43 96% 56% / 0.10) 0%, transparent 70%)",
+              }}
+            />
+            <motion.span
+              aria-hidden
+              className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold to-transparent"
+              initial={{ scaleX: 0 }}
+              whileInView={{ scaleX: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 1.1, ease: EASE, delay: 0.3 }}
+            />
+          </span>
+          <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2">
+            <SeverityPill tone="amber" className="shadow-card-hover">
               <Sparkles size={11} className="-ml-0.5" />
               <span>Most popular</span>
             </SeverityPill>
