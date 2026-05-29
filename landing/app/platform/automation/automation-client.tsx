@@ -22,7 +22,11 @@ function AutomationHeroIllustration() {
     { cx: 100, cy: 110, label: "5 min", sub: "CBP poll", rotationDur: 4, delay: 0 },
     { cx: 240, cy: 110, label: "1 h", sub: "Deadlines", rotationDur: 8, delay: 0.3 },
     { cx: 380, cy: 110, label: "6 h", sub: "Stale check", rotationDur: 14, delay: 0.6 },
-    { cx: 240, cy: 270, label: "04:00 UTC", sub: "Fed Register", rotationDur: 22, delay: 0.9 },
+    // Bottom clock was at cy=270, putting its sub-label at y=342 — only
+    // 4px above the y=346 heartbeat strip, so the two texts collided.
+    // Lifting to cy=244 leaves the labels at y=302/316, ~30px of breathing
+    // room above the strip. Connector line below was shortened to match.
+    { cx: 240, cy: 244, label: "04:00 UTC", sub: "Fed Register", rotationDur: 22, delay: 0.9 },
   ];
 
   return (
@@ -58,7 +62,7 @@ function AutomationHeroIllustration() {
       >
         <line x1="138" y1="110" x2="202" y2="110" />
         <line x1="278" y1="110" x2="342" y2="110" />
-        <line x1="240" y1="148" x2="240" y2="232" />
+        <line x1="240" y1="148" x2="240" y2="206" />
       </motion.g>
 
       {/* === Four clocks ============================================= */}
