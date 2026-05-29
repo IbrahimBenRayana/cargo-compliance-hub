@@ -70,12 +70,22 @@ function AboutHeroIllustration() {
         />
       ))}
 
-      {/* Slow-rotating outer ring with 3 gold dots = our 3 principles */}
-      <motion.g
-        animate={{ rotate: 360 }}
-        transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-        style={{ transformOrigin: "240px 180px" }}
-      >
+      {/* Slow-rotating outer ring with 3 gold dots = our 3 principles.
+          Framer-motion's `rotate` on an SVG <g> orbits the element's
+          bounding-box centre — for our three dots that pivot sits ~30px
+          above (240,180), so the dots drift off the outer ring as the
+          animation runs. SMIL animateTransform with an explicit rotate
+          centre is the SVG-native way to pin the pivot exactly to
+          (240,180) — no transform-origin guesswork. */}
+      <g>
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 240 180"
+          to="360 240 180"
+          dur="60s"
+          repeatCount="indefinite"
+        />
         {[0, 120, 240].map((deg) => {
           const rad = (deg - 90) * (Math.PI / 180);
           const x = 240 + Math.cos(rad) * 120;
@@ -90,7 +100,7 @@ function AboutHeroIllustration() {
             </g>
           );
         })}
-      </motion.g>
+      </g>
 
       {/* Static labels at outer-ring positions */}
       {[
