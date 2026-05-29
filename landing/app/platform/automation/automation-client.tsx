@@ -114,23 +114,29 @@ function AutomationHeroIllustration() {
             const y2 = c.cy + Math.sin(rad) * 26;
             return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} strokeOpacity="0.6" />;
           })}
-          {/* Rotating hand */}
-          <motion.line
+          {/* Rotating hand — SMIL animateTransform pins the rotation centre
+              to (c.cx, c.cy). framer-motion's `rotate` orbits the element's
+              bounding-box centre (here: c.cx, c.cy - 11), which makes the
+              hand swing wildly off the dial instead of sweeping like a real
+              clock. SVG's native rotate-with-centre fixes the pivot exactly. */}
+          <line
             x1={c.cx}
             y1={c.cy}
             x2={c.cx}
             y2={c.cy - 22}
             stroke={GOLD}
             strokeWidth="2.5"
-            animate={{ rotate: 360 }}
-            transition={{
-              duration: c.rotationDur,
-              repeat: Infinity,
-              ease: "linear",
-              delay: c.delay,
-            }}
-            style={{ transformOrigin: `${c.cx}px ${c.cy}px` }}
-          />
+          >
+            <animateTransform
+              attributeName="transform"
+              type="rotate"
+              from={`0 ${c.cx} ${c.cy}`}
+              to={`360 ${c.cx} ${c.cy}`}
+              dur={`${c.rotationDur}s`}
+              repeatCount="indefinite"
+              begin={`${c.delay}s`}
+            />
+          </line>
           {/* Center hub */}
           <circle cx={c.cx} cy={c.cy} r="3.5" fill={GOLD} stroke="none" />
           {/* Cadence label */}
