@@ -7,7 +7,6 @@ import { Check, Layers, Sparkles, Wallet, Zap } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
-import { SeverityPill } from "@/components/ui/severity-pill";
 import { cn } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -189,7 +188,10 @@ function PricingHeroIllustration() {
           {/* Card body w/ gold gradient fill */}
           <rect x="178" y="80" width="138" height="222" rx="12" fill="url(#pr-featured-fill)" stroke={GOLD} strokeWidth="2" />
 
-          {/* Animated diagonal spotlight sweeping across the card every ~6s */}
+          {/* Animated diagonal spotlight sweeping across the card every ~6s.
+              stroke="none" is required: the parent <svg> sets
+              stroke="currentColor", which would otherwise render the rect
+              edges as a hard dark vertical line that travels with the sweep. */}
           <motion.g clipPath="url(#pr-grower-clip)">
             <motion.rect
               x="-60"
@@ -197,6 +199,7 @@ function PricingHeroIllustration() {
               width="120"
               height="222"
               fill="url(#pr-spotlight)"
+              stroke="none"
               animate={{ x: [-60, 360] }}
               transition={{ duration: 5.5, repeat: Infinity, repeatDelay: 1.5, ease: "easeInOut", delay: 1 }}
             />
@@ -526,11 +529,14 @@ function TierCard({ tier, index }: { tier: Tier; index: number }) {
               transition={{ duration: 1.1, ease: EASE, delay: 0.3 }}
             />
           </span>
+          {/* Opaque pill — sits on top of the card's gold border, so its
+              background must be fully solid (not translucent) so the border
+              underneath isn't visible through it. */}
           <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2">
-            <SeverityPill tone="amber" className="shadow-card-hover">
+            <span className="inline-flex items-center justify-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10.5px] font-semibold text-amber-800 ring-1 ring-amber-500/40 shadow-card-hover dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-400/40">
               <Sparkles size={11} className="-ml-0.5" />
               <span>Most popular</span>
-            </SeverityPill>
+            </span>
           </div>
         </>
       )}
@@ -804,36 +810,68 @@ export function PricingPageClient() {
         </div>
       </SectionShell>
 
-      {/* SCALE+ STRIP */}
-      <SectionShell tone="muted" eyebrow="Scale+" title="Custom volume for high-volume teams.">
-        <div className="mx-auto max-w-3xl rounded-2xl border border-border/60 bg-card p-6 text-center">
-          <p className="text-base leading-relaxed mb-5 opacity-90">
-            250+ filings per month or 25+ users? We have a custom volume tier with annual contract
-            pricing, dedicated support, and SSO.
-          </p>
-          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button variant="gold" size="lg" asChild>
+      {/* CLOSING — two complementary cards in a single section:
+          a prominent gold-accented "Start free" + a smaller navy "Scale+"
+          for high-volume buyers. Avoids the previous stacked-CTA look. */}
+      <SectionShell tone="muted">
+        <div className="mx-auto grid max-w-5xl gap-4 md:grid-cols-5">
+          {/* Primary — Start free */}
+          <div className="relative overflow-hidden rounded-2xl border-2 border-gold/40 bg-card p-8 md:col-span-3">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -z-10"
+              style={{
+                background:
+                  "radial-gradient(ellipse 80% 60% at 30% 100%, hsl(43 96% 56% / 0.10) 0%, transparent 70%)",
+              }}
+            />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gold-dark dark:text-gold">
+              Start free
+            </span>
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight">
+              Two filings a month, no card.
+            </h3>
+            <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+              Stay on Starter forever, or upgrade the moment volume picks up. Cancel anytime.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button variant="gold" size="lg" asChild>
+                <a href="https://app.mycargolens.com/register">Start free</a>
+              </Button>
+              <Button variant="outline" size="lg" asChild>
+                <Link href="/security">Security &amp; trust</Link>
+              </Button>
+            </div>
+          </div>
+
+          {/* Secondary — Scale+ (dark navy) */}
+          <div className="relative overflow-hidden rounded-2xl bg-[hsl(222_47%_11%)] p-8 text-white md:col-span-2">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse 70% 50% at 100% 0%, hsl(43 96% 56% / 0.12) 0%, transparent 70%)",
+              }}
+            />
+            <span className="relative text-[10px] font-semibold uppercase tracking-[0.18em] text-gold">
+              Scale+
+            </span>
+            <h3 className="relative mt-2 text-2xl font-semibold tracking-tight">
+              High-volume?
+            </h3>
+            <p className="relative mt-2 text-sm leading-relaxed text-white/70">
+              250+ filings/mo or 25+ users. Annual contracts, SSO, dedicated support.
+            </p>
+            <Button
+              variant="outline"
+              size="lg"
+              className="relative mt-5 border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              asChild
+            >
               <Link href="/contact">Talk to founders</Link>
             </Button>
-            <Button variant="outline" size="lg" asChild>
-              <Link href="/security">Security & trust</Link>
-            </Button>
           </div>
-        </div>
-      </SectionShell>
-
-      <SectionShell
-        tone="default"
-        headingAlign="center"
-        title="Start with the free plan. Upgrade when you need."
-      >
-        <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button variant="gold" size="lg" asChild>
-            <a href="https://app.mycargolens.com/register">Start free</a>
-          </Button>
-          <Button variant="outline" size="lg" asChild>
-            <Link href="/contact">Talk to founders</Link>
-          </Button>
         </div>
       </SectionShell>
     </>
