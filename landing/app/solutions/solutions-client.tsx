@@ -170,7 +170,7 @@ function SolutionsHeroIllustration() {
     },
     {
       x: 174,
-      y: 224,
+      y: 240,
       label: "FORWARDER",
       tone: GOLD,
       rows: [
@@ -200,22 +200,68 @@ function SolutionsHeroIllustration() {
           <stop offset="0%" stopColor={GOLD} stopOpacity="0.16" />
           <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
         </radialGradient>
+        <radialGradient id="sol-particle" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={GOLD} stopOpacity="1" />
+          <stop offset="60%" stopColor={GOLD} stopOpacity="0.7" />
+          <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
+        </radialGradient>
       </defs>
       <ellipse cx="240" cy="180" rx="200" ry="140" fill="url(#sol-glow)" stroke="none" />
 
-      {/* Connecting paths from each persona panel toward the central hub */}
-      <motion.g
-        strokeOpacity="0.22"
-        strokeDasharray="3 5"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: { opacity: 1, transition: { duration: 0.8, delay: 0.4 } },
-        }}
-      >
-        <path d="M 132 130 Q 180 160 200 178" />
-        <path d="M 348 130 Q 300 160 280 178" />
-        <path d="M 240 220 L 240 224" />
-      </motion.g>
+      {/* Connecting paths draw on with pathLength, then particles flow
+          along them toward the hub — each persona feeding the product.
+          Each path renders inline (so motion's pathLength stroke-dash
+          trick works) AND keeps its id so <animateMotion><mpath/> can
+          reference the same geometry without duplication. */}
+      {[
+        { id: "sol-path-ops", d: "M 150 125 Q 175 155 200 178", dur: 2.6, begin: 1.5 },
+        { id: "sol-path-brk", d: "M 330 125 Q 305 155 280 178", dur: 2.6, begin: 1.9 },
+        { id: "sol-path-fwd", d: "M 240 240 L 240 224", dur: 1.4, begin: 2.3 },
+      ].map((p, i) => (
+        <React.Fragment key={p.id}>
+          <motion.path
+            id={p.id}
+            d={p.d}
+            stroke="currentColor"
+            strokeOpacity="0.32"
+            strokeDasharray="3 5"
+            fill="none"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{
+              pathLength: { duration: 1.0, delay: 0.5 + i * 0.12, ease: EASE_OUT_QUART },
+              opacity: { duration: 0.5, delay: 0.5 + i * 0.12 },
+            }}
+          />
+          {/* Two staggered particles per path, so the flow feels
+              continuous rather than blinking once per cycle. */}
+          {[0, p.dur / 2].map((stagger) => (
+            <circle
+              key={stagger}
+              r="2.5"
+              fill="url(#sol-particle)"
+              stroke="none"
+              opacity="0"
+            >
+              <animateMotion
+                dur={`${p.dur}s`}
+                repeatCount="indefinite"
+                begin={`${p.begin + stagger}s`}
+              >
+                <mpath href={`#${p.id}`} />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+                dur={`${p.dur}s`}
+                begin={`${p.begin + stagger}s`}
+                repeatCount="indefinite"
+              />
+            </circle>
+          ))}
+        </React.Fragment>
+      ))}
 
       {/* === Three persona "what they see" panels =================== */}
       {panels.map((p, idx) => (
@@ -295,18 +341,36 @@ function SolutionsHeroIllustration() {
           visible: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: EASE_OUT_QUART, delay: 0.5 } },
         }}
       >
-        {/* Pulse halo */}
-        <motion.circle
-          cx="240"
-          cy="180"
-          r="48"
-          stroke={GOLD}
-          strokeOpacity="0.4"
-          fill="none"
-          animate={{ scale: [1, 1.3, 1], opacity: [0.45, 0, 0.45] }}
-          transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
-          style={{ transformOrigin: "240px 180px" }}
-        />
+        {/* Three staggered ripples — each starts at radius 44 and grows
+            outward as it fades, giving the hub a "live, receiving" feel.
+            SMIL handles the pivot exactly at (240,180) without needing
+            CSS transform-origin gymnastics. */}
+        {[0, 0.9, 1.8].map((begin, i) => (
+          <circle
+            key={i}
+            cx="240"
+            cy="180"
+            r="44"
+            stroke={GOLD}
+            strokeWidth="1.5"
+            fill="none"
+          >
+            <animate
+              attributeName="r"
+              values="44;76"
+              dur="2.7s"
+              begin={`${begin}s`}
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="opacity"
+              values="0.55;0"
+              dur="2.7s"
+              begin={`${begin}s`}
+              repeatCount="indefinite"
+            />
+          </circle>
+        ))}
         {/* Hub circle with gold */}
         <circle
           cx="240"
@@ -325,6 +389,38 @@ function SolutionsHeroIllustration() {
           strokeOpacity="0.55"
           fill="none"
         />
+        {/* Slow-rotating outer tick ring — 12 marks suggest "always on,
+            always working". SVG-native rotation pinned to the hub centre. */}
+        <g>
+          <animateTransform
+            attributeName="transform"
+            type="rotate"
+            from="0 240 180"
+            to="360 240 180"
+            dur="40s"
+            repeatCount="indefinite"
+          />
+          {Array.from({ length: 12 }).map((_, i) => {
+            const deg = (i * 360) / 12;
+            const rad = (deg - 90) * (Math.PI / 180);
+            const x1 = 240 + Math.cos(rad) * 50;
+            const y1 = 180 + Math.sin(rad) * 50;
+            const x2 = 240 + Math.cos(rad) * (i % 3 === 0 ? 54 : 52);
+            const y2 = 180 + Math.sin(rad) * (i % 3 === 0 ? 54 : 52);
+            return (
+              <line
+                key={i}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke={GOLD}
+                strokeOpacity={i % 3 === 0 ? 0.55 : 0.25}
+                strokeWidth="1.2"
+              />
+            );
+          })}
+        </g>
         {/* MCL wordmark — three stacked chevrons */}
         <g stroke={GOLD} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M 226 174 l 14 -8 l 14 8" fill="none" />
