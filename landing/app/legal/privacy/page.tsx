@@ -7,14 +7,6 @@ export const metadata: Metadata = {
     "How MyCargoLens collects, uses, and protects your personal information.",
 };
 
-function Placeholder({ children }: { children: React.ReactNode }) {
-  return (
-    <mark className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded text-amber-800 dark:text-amber-200 not-italic">
-      {children}
-    </mark>
-  );
-}
-
 export default function PrivacyPolicyPage() {
   return (
     <Container className="max-w-3xl py-20 md:py-28">
@@ -24,12 +16,7 @@ export default function PrivacyPolicyPage() {
           Legal
         </p>
         <h1 className="text-4xl font-bold tracking-tight mb-4">Privacy Policy</h1>
-        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          <span>Last updated: April 2026</span>
-          <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-3 py-1 text-xs font-semibold text-amber-800 dark:text-amber-200 ring-1 ring-amber-300 dark:ring-amber-700">
-            DRAFT — subject to legal review
-          </span>
-        </div>
+        <p className="text-sm text-muted-foreground">Last updated: May 2026</p>
       </div>
 
       {/* Prose content */}
@@ -37,7 +24,7 @@ export default function PrivacyPolicyPage() {
 
         <h2 className="text-xl font-semibold mt-10 mb-4">1. Introduction</h2>
         <p className="mb-4">
-          <Placeholder>[COMPANY_NAME]</Placeholder> (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the MyCargoLens
+          MyCargoLens (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the MyCargoLens
           platform at mycargolens.com. This policy describes how we collect, use, and protect your
           personal information.
         </p>
@@ -109,10 +96,9 @@ export default function PrivacyPolicyPage() {
 
         <h2 className="text-xl font-semibold mt-10 mb-4">5. Data Retention</h2>
         <p className="mb-4">
-          Filing data is retained for{" "}
-          <Placeholder>[RETENTION_PERIOD]</Placeholder> after your account is closed, per CBP
-          recordkeeping requirements (19 CFR 163). Account information is deleted upon written
-          request except where retention is required by law.
+          Filing data is retained for 5 years after your account is closed, per CBP recordkeeping
+          requirements (19 CFR 163). Account information is deleted upon written request except
+          where retention is required by law.
         </p>
 
         <h2 className="text-xl font-semibold mt-10 mb-4">6. Security</h2>
@@ -126,8 +112,13 @@ export default function PrivacyPolicyPage() {
         <h2 className="text-xl font-semibold mt-10 mb-4">7. Your Rights</h2>
         <p className="mb-4">
           You may request access to, correction of, or deletion of your personal data by emailing{" "}
-          <Placeholder>[SUPPORT_EMAIL]</Placeholder>. We will respond within 30 days. California
-          residents: see the CCPA section below.
+          <a
+            href="mailto:support@mycargolens.com"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            support@mycargolens.com
+          </a>
+          . We will respond within 30 days. California residents: see the CCPA section below.
         </p>
 
         <h2 className="text-xl font-semibold mt-10 mb-4">8. CCPA Notice (California Residents)</h2>
@@ -138,11 +129,14 @@ export default function PrivacyPolicyPage() {
           (we do not sell personal information).
         </p>
         <p className="mb-4">
-          <Placeholder>[ADDITIONAL_CCPA_DETAILS — add categories of PI collected, sources, business purposes, and third-party disclosures per CCPA 1798.100 et seq.]</Placeholder>
-        </p>
-        <p className="mb-4">
           To exercise your CCPA rights, contact us at{" "}
-          <Placeholder>[SUPPORT_EMAIL]</Placeholder>.
+          <a
+            href="mailto:support@mycargolens.com"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            support@mycargolens.com
+          </a>
+          .
         </p>
 
         <h2 className="text-xl font-semibold mt-10 mb-4">9. Cookies</h2>
@@ -164,11 +158,15 @@ export default function PrivacyPolicyPage() {
           If you have questions about this Privacy Policy, please contact:
         </p>
         <p className="mb-4">
-          <Placeholder>[COMPANY_NAME]</Placeholder>
+          MyCargoLens
           <br />
-          <Placeholder>[ADDRESS]</Placeholder>
-          <br />
-          Email: <Placeholder>[SUPPORT_EMAIL]</Placeholder>
+          Email:{" "}
+          <a
+            href="mailto:support@mycargolens.com"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            support@mycargolens.com
+          </a>
         </p>
 
       </div>
