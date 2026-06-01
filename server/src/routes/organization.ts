@@ -391,7 +391,10 @@ router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> =
 });
 
 // ─── PATCH /api/v1/organization/onboarding — Mark onboarding complete
-router.patch('/onboarding', async (req: AuthRequest, res: Response): Promise<void> => {
+// requireRole gate: marks the workspace onboardingCompleted, which is the
+// gating flag used elsewhere to skip first-run flows. Only owner/admin
+// should be able to flip it.
+router.patch('/onboarding', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     await prisma.organization.update({
       where: { id: req.user!.orgId },

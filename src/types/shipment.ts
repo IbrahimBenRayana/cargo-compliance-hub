@@ -212,25 +212,6 @@ export interface ApiSubmissionLog {
   } | null;
 }
 
-// ─── Legacy types kept for backward compat ─────────────────
-export interface SubmissionLog {
-  id: string;
-  shipmentId: string;
-  billOfLading: string;
-  date: string;
-  status: 'success' | 'error' | 'pending';
-  requestPayload: string;
-  responseData: string;
-}
-
-export interface ActivityItem {
-  id: string;
-  type: 'submission' | 'error' | 'alert';
-  message: string;
-  timestamp: string;
-  shipmentId?: string;
-}
-
 // ─── Helpers ───────────────────────────────────────────────
 export function getPartyName(party: PartyInfo | string | null | undefined): string {
   if (!party) return '';

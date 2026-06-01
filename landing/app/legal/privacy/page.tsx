@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Container } from "@/components/ui/container";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — MyCargoLens",
+  // Plain title — the root layout's title.template appends " — MyCargoLens".
+  // Pre-fix this read as "Privacy Policy — MyCargoLens — MyCargoLens".
+  title: "Privacy Policy",
   description:
     "How MyCargoLens collects, uses, and protects your personal information.",
 };
