@@ -512,11 +512,14 @@ export function HeroScene({ className }: HeroSceneProps) {
           animate={{ y: [0, -3, 0] }}
           transition={{ duration: 5.2, repeat: Infinity, ease: "easeInOut", delay: 2.8 }}
         >
-          {/* Background card */}
+          {/* Background card — widened from 78→96 (and shifted 8px left)
+              so the "COMPLIANCE" label fits inside the box at fontSize 7
+              with letterSpacing 0.8. Previous width clipped the last
+              letter against the right edge. */}
           <rect
-            x="468"
+            x="460"
             y="50"
-            width="78"
+            width="96"
             height="44"
             rx="8"
             fill="currentColor"
@@ -525,7 +528,7 @@ export function HeroScene({ className }: HeroSceneProps) {
           />
           {/* Tiny donut track */}
           <circle
-            cx="486"
+            cx="478"
             cy="72"
             r="11"
             fill="none"
@@ -535,7 +538,7 @@ export function HeroScene({ className }: HeroSceneProps) {
           />
           {/* Animated arc */}
           <motion.circle
-            cx="486"
+            cx="478"
             cy="72"
             r="11"
             fill="none"
@@ -544,13 +547,13 @@ export function HeroScene({ className }: HeroSceneProps) {
             strokeLinecap="round"
             strokeDasharray="69.1"
             strokeDashoffset="69.1"
-            transform="rotate(-90 486 72)"
+            transform="rotate(-90 478 72)"
             animate={{ strokeDashoffset: 9.7 }}
             transition={{ duration: 1.3, delay: 2.4, ease: [0.16, 1, 0.3, 1] }}
           />
           {/* Label "Compliance" + number */}
           <text
-            x="504"
+            x="496"
             y="65"
             fontSize="7"
             fontFamily="ui-sans-serif, sans-serif"
@@ -563,7 +566,7 @@ export function HeroScene({ className }: HeroSceneProps) {
             COMPLIANCE
           </text>
           <text
-            x="504"
+            x="496"
             y="82"
             fontSize="12"
             fontFamily="ui-sans-serif, sans-serif"
