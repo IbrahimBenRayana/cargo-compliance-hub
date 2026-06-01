@@ -7,7 +7,7 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../config/database.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
 import logger from '../config/logger.js';
 
 const router = Router();
@@ -120,9 +120,13 @@ router.post('/change-password', async (req: AuthRequest, res: Response): Promise
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 12);
+    // Null the refresh token in the same write. A stolen refresh token would
+    // otherwise keep minting access tokens for the full 7-day window even
+    // after the user "changes their password to be safe" — the exact reflex
+    // we want to honour.
     await prisma.user.update({
       where: { id: req.user!.id },
-      data: { passwordHash },
+      data: { passwordHash, refreshToken: null },
     });
 
     res.json({ success: true, message: 'Password changed successfully' });
@@ -168,7 +172,10 @@ router.get('/organization', async (req: AuthRequest, res: Response): Promise<voi
 });
 
 // ─── PATCH /api/v1/settings/organization — Update org settings
-router.patch('/organization', async (req: AuthRequest, res: Response): Promise<void> => {
+// requireRole gate: org name, IOR, EIN, address feed every CBP submission
+// downstream. operator/viewer must not be able to rewrite the legal entity
+// behind a filing — only owner/admin can.
+router.patch('/organization', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { name, iorNumber, einNumber, address, phone, website } = req.body;
 

@@ -56,7 +56,16 @@ router.get('/csv', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const escCsv = (v: any) => {
       if (v === null || v === undefined) return '';
-      const s = String(v);
+      let s = String(v);
+      // CSV formula-injection defence: Excel / Google Sheets / Numbers treat
+      // any cell starting with =, +, -, @, tab, or CR as a formula. An
+      // authenticated user could plant =HYPERLINK(...) in (say) a commodity
+      // description, and an analyst opening the export executes it.
+      // Prefix with a single quote to neutralise — the quote isn't shown by
+      // the spreadsheet but blocks formula evaluation.
+      if (/^[=+\-@\t\r]/.test(s)) {
+        s = "'" + s;
+      }
       if (s.includes(',') || s.includes('"') || s.includes('\n')) {
         return `"${s.replace(/"/g, '""')}"`;
       }

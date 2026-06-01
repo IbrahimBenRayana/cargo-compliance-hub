@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Container } from "@/components/ui/container";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — MyCargoLens",
+  // Plain title — the root layout's title.template appends " — MyCargoLens".
+  title: "Terms of Service",
   description:
     "Terms and conditions governing your use of the MyCargoLens CBP compliance platform.",
 };

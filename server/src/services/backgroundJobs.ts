@@ -389,28 +389,35 @@ let addCvdSyncTask: ScheduledTask | null = null;
 export function startBackgroundJobs(): void {
   logger.info('[Jobs] Starting background job scheduler');
 
+  // All cron expressions are UTC-anchored — without `{ timezone: 'UTC' }`
+  // node-cron uses the host's local TZ, which means a DST shift or VPS
+  // re-imaged in a different region silently moves "04:00 UTC" by hours.
+  // (Cross-replica advisory locking is tracked in audit Phase 7; the
+  // in-process re-entrancy flags below cover the current single-VPS deploy.)
+  const cronOpts = { timezone: 'UTC' } as const;
+
   statusPollTask = cron.schedule('*/5 * * * *', () => {
     pollSubmittedFilings().catch(err => logger.error({ err }, '[Jobs:StatusPoll] Unhandled'));
-  });
-  logger.info('[Jobs] Status polling scheduled — every 5 minutes');
+  }, cronOpts);
+  logger.info('[Jobs] Status polling scheduled — every 5 minutes (UTC)');
 
   deadlineTask = cron.schedule('30 * * * *', () => {
     checkDeadlines().catch(err => logger.error({ err }, '[Jobs:Deadlines] Unhandled'));
-  });
-  logger.info('[Jobs] Deadline alerts scheduled — every hour at :30');
+  }, cronOpts);
+  logger.info('[Jobs] Deadline alerts scheduled — every hour at :30 (UTC)');
 
   staleCheckTask = cron.schedule('0 */6 * * *', () => {
     checkStaleFilings().catch(err => logger.error({ err }, '[Jobs:StaleCheck] Unhandled'));
-  });
-  logger.info('[Jobs] Stale filing check scheduled — every 6 hours');
+  }, cronOpts);
+  logger.info('[Jobs] Stale filing check scheduled — every 6 hours (UTC)');
 
   // Phase 6: drain the email delivery queue every 30s. The worker is
   // re-entrant (skips if a previous tick is still running) so this
   // cadence is safe even if a single batch takes longer than 30s.
   deliveryDrainTask = cron.schedule('*/30 * * * * *', () => {
     drainEmailDeliveries().catch(err => logger.error({ err }, '[Jobs:Delivery] Unhandled'));
-  });
-  logger.info('[Jobs] Email delivery drain scheduled — every 30 seconds');
+  }, cronOpts);
+  logger.info('[Jobs] Email delivery drain scheduled — every 30 seconds (UTC)');
 
   // Daily ADD/CVD sync from the Federal Register. New candidates land
   // with status='pending' for admin review. Runs at 04:00 UTC so it
@@ -422,7 +429,7 @@ export function startBackgroundJobs(): void {
         logger.info({ result }, '[Jobs:AddCvdSync] Done');
       })
       .catch(err => logger.error({ err }, '[Jobs:AddCvdSync] Unhandled'));
-  });
+  }, cronOpts);
   logger.info('[Jobs] ADD/CVD Federal Register sync scheduled — daily at 04:00 UTC');
 
   setTimeout(() => {

@@ -18,8 +18,8 @@ function GoldMark() {
 }
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('demo@mycargolens.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/';
@@ -142,11 +142,13 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <p className="text-xs text-muted-foreground text-center">
-                <span className="font-medium">Demo credentials</span>
-                <br />
-                demo@mycargolens.com / password123
-              </p>
+              {import.meta.env.DEV && (
+                <p className="text-xs text-muted-foreground text-center">
+                  <span className="font-medium">Demo credentials</span>
+                  <br />
+                  demo@mycargolens.com / password123
+                </p>
+              )}
 
               {/* Footer */}
               <p className="mt-6 text-sm text-muted-foreground text-center">
