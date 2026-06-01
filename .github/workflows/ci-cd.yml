@@ -200,11 +200,27 @@ jobs:
           # the feature when the key is blank.
           TERMINAL49_API_BASE_URL:  ${{ secrets.TERMINAL49_API_BASE_URL }}
           TERMINAL49_API_KEY:       ${{ secrets.TERMINAL49_API_KEY }}
+          # Rotatable secrets. Each maps to a GitHub Secret of the same name.
+          # `upsert_env` below skips empty values so a missing secret here does
+          # NOT wipe a working VPS .env line — the founder can roll these in
+          # one at a time as they rotate at the provider end.
+          # (The sed-based wiring on these is interim. Phase 5 of the audit
+          # plan replaces the whole mechanism with a committed compose.prod.yml
+          # that pulls every env var from a single canonical source.)
+          CC_API_TOKEN:             ${{ secrets.CC_API_TOKEN }}
+          CC_ENVIRONMENT:           ${{ secrets.CC_ENVIRONMENT }}
+          STRIPE_SECRET_KEY:        ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET:    ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PUBLISHABLE_KEY:   ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          JWT_ACCESS_SECRET:        ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET:       ${{ secrets.JWT_REFRESH_SECRET }}
+          EMAIL_USER:               ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS:               ${{ secrets.EMAIL_PASS }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: NEW_TAG,AI_ASSESSMENT_ENABLED,AI_PROVIDER,AI_MODEL,AI_API_KEY,AI_MAX_TOKENS,AI_TEMPERATURE,AI_RATE_LIMIT_PER_USER,AI_DISABLE_TRAINING_DATA,TERMINAL49_API_BASE_URL,TERMINAL49_API_KEY
+          envs: NEW_TAG,AI_ASSESSMENT_ENABLED,AI_PROVIDER,AI_MODEL,AI_API_KEY,AI_MAX_TOKENS,AI_TEMPERATURE,AI_RATE_LIMIT_PER_USER,AI_DISABLE_TRAINING_DATA,TERMINAL49_API_BASE_URL,TERMINAL49_API_KEY,CC_API_TOKEN,CC_ENVIRONMENT,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,STRIPE_PUBLISHABLE_KEY,JWT_ACCESS_SECRET,JWT_REFRESH_SECRET,EMAIL_USER,EMAIL_PASS
           script: |
             set -euo pipefail
             cd /opt/mycargolens
@@ -238,7 +254,19 @@ jobs:
             upsert_env AI_DISABLE_TRAINING_DATA "$AI_DISABLE_TRAINING_DATA"
             upsert_env TERMINAL49_API_BASE_URL  "$TERMINAL49_API_BASE_URL"
             upsert_env TERMINAL49_API_KEY       "$TERMINAL49_API_KEY"
-            echo "▶ AI_* + TERMINAL49_* env synced from GitHub Secrets"
+            # Rotatable secrets — each upsert is a no-op when the matching
+            # GitHub Secret is unset, so this is safe to merge before all of
+            # them are populated.
+            upsert_env CC_API_TOKEN             "$CC_API_TOKEN"
+            upsert_env CC_ENVIRONMENT           "$CC_ENVIRONMENT"
+            upsert_env STRIPE_SECRET_KEY        "$STRIPE_SECRET_KEY"
+            upsert_env STRIPE_WEBHOOK_SECRET    "$STRIPE_WEBHOOK_SECRET"
+            upsert_env STRIPE_PUBLISHABLE_KEY   "$STRIPE_PUBLISHABLE_KEY"
+            upsert_env JWT_ACCESS_SECRET        "$JWT_ACCESS_SECRET"
+            upsert_env JWT_REFRESH_SECRET       "$JWT_REFRESH_SECRET"
+            upsert_env EMAIL_USER               "$EMAIL_USER"
+            upsert_env EMAIL_PASS               "$EMAIL_PASS"
+            echo "▶ AI_* + TERMINAL49_* + rotatable secrets synced from GitHub Secrets"
 
             # ── Patch docker-compose.yml to forward AI_* into the server ──
             # The VPS compose has an `environment:` block under the server

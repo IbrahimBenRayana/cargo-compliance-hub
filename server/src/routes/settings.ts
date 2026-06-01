@@ -6,9 +6,25 @@
 
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
 import logger from '../config/logger.js';
+
+// PATCH /profile only accepts name updates. Email changes need re-verification
+// against the new address — that lands in audit Phase 4 alongside the
+// pendingEmail schema migration. Until then, attempts to change email through
+// this endpoint are rejected with a 400 so we don't silently allow a
+// zero-verification email swap (the original P0 takeover vector).
+const profileUpdateSchema = z.object({
+  firstName: z.string().trim().min(1).max(100).optional(),
+  lastName: z.string().trim().min(1).max(100).optional(),
+}).strict();
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(128),
+}).strict();
 
 const router = Router();
 router.use(authMiddleware);
@@ -54,23 +70,28 @@ router.get('/profile', async (req: AuthRequest, res: Response): Promise<void> =>
 // ─── PATCH /api/v1/settings/profile — Update user profile
 router.patch('/profile', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { firstName, lastName, email } = req.body;
-
-    // Check email uniqueness if changing
-    if (email && email !== req.user!.email) {
-      const existing = await prisma.user.findUnique({ where: { email } });
-      if (existing) {
-        res.status(409).json({ error: 'Email already in use' });
-        return;
-      }
+    // Pre-Zod: if the caller sent `email`, refuse explicitly so they don't
+    // think a silent swap happened. The proper pendingEmail flow lands in
+    // audit Phase 4 (alongside the schema migration adding pendingEmail).
+    if (typeof req.body?.email === 'string' && req.body.email !== req.user!.email) {
+      res.status(400).json({
+        error: 'Changing email through profile settings is temporarily disabled. Contact support to update your email.',
+      });
+      return;
     }
+
+    const parsed = profileUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
+      return;
+    }
+    const { firstName, lastName } = parsed.data;
 
     const updated = await prisma.user.update({
       where: { id: req.user!.id },
       data: {
         ...(firstName !== undefined && { firstName }),
         ...(lastName !== undefined && { lastName }),
-        ...(email && { email }),
       },
       select: {
         id: true,
@@ -91,17 +112,12 @@ router.patch('/profile', async (req: AuthRequest, res: Response): Promise<void> 
 // ─── POST /api/v1/settings/change-password — Change password
 router.post('/change-password', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      res.status(400).json({ error: 'Current and new passwords are required' });
+    const parsed = changePasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
       return;
     }
-
-    if (newPassword.length < 8) {
-      res.status(400).json({ error: 'New password must be at least 8 characters' });
-      return;
-    }
+    const { currentPassword, newPassword } = parsed.data;
 
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
