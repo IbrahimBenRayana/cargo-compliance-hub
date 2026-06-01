@@ -7,14 +7,6 @@ export const metadata: Metadata = {
     "Terms and conditions governing your use of the MyCargoLens CBP compliance platform.",
 };
 
-function Placeholder({ children }: { children: React.ReactNode }) {
-  return (
-    <mark className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded text-amber-800 dark:text-amber-200 not-italic">
-      {children}
-    </mark>
-  );
-}
-
 export default function TermsOfServicePage() {
   return (
     <Container className="max-w-3xl py-20 md:py-28">
@@ -24,12 +16,7 @@ export default function TermsOfServicePage() {
           Legal
         </p>
         <h1 className="text-4xl font-bold tracking-tight mb-4">Terms of Service</h1>
-        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          <span>Last updated: April 2026</span>
-          <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-3 py-1 text-xs font-semibold text-amber-800 dark:text-amber-200 ring-1 ring-amber-300 dark:ring-amber-700">
-            DRAFT — subject to legal review
-          </span>
-        </div>
+        <p className="text-sm text-muted-foreground">Last updated: May 2026</p>
       </div>
 
       {/* Prose content */}
@@ -39,8 +26,7 @@ export default function TermsOfServicePage() {
         <p className="mb-4">
           By accessing or using MyCargoLens, you agree to be bound by these Terms of Service and
           our Privacy Policy. If you do not agree to these terms, you may not use the platform.
-          These terms constitute a legally binding agreement between you and{" "}
-          <Placeholder>[COMPANY_NAME]</Placeholder>.
+          These terms constitute a legally binding agreement between you and MyCargoLens.
         </p>
 
         <h2 className="text-xl font-semibold mt-10 mb-4">2. Description of Service</h2>
@@ -55,7 +41,14 @@ export default function TermsOfServicePage() {
           You must provide accurate, complete, and current information when registering an account.
           You are responsible for maintaining the confidentiality of your account credentials and
           for all activity that occurs under your account. Notify us immediately of any unauthorized
-          access at <Placeholder>[SUPPORT_EMAIL]</Placeholder>.
+          access at{" "}
+          <a
+            href="mailto:support@mycargolens.com"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            support@mycargolens.com
+          </a>
+          .
         </p>
         <p className="mb-4">
           You may not share your account credentials or allow others to access the platform using
@@ -106,10 +99,10 @@ export default function TermsOfServicePage() {
 
         <h2 className="text-xl font-semibold mt-10 mb-4">7. Intellectual Property</h2>
         <p className="mb-4">
-          All platform software, design, trademarks, and content are the intellectual property of{" "}
-          <Placeholder>[COMPANY_NAME]</Placeholder> and are protected by applicable intellectual
-          property laws. No license to our intellectual property is granted except as necessary to
-          use the platform as described in these terms.
+          All platform software, design, trademarks, and content are the intellectual property of
+          MyCargoLens and are protected by applicable intellectual property laws. No license to our
+          intellectual property is granted except as necessary to use the platform as described in
+          these terms.
         </p>
         <p className="mb-4">
           Your filing data belongs to you. We claim no ownership over the customs data you submit
@@ -123,19 +116,18 @@ export default function TermsOfServicePage() {
           for a particular purpose, or non-infringement.
         </p>
         <p className="mb-4">
-          To the maximum extent permitted by law, <Placeholder>[COMPANY_NAME]</Placeholder>{" "}
-          shall not be liable for any indirect, incidental, special, consequential, or punitive
-          damages. Our total liability to you for any claim arising from use of the platform shall
-          not exceed the fees paid by you to us in the twelve (12) months preceding the claim.
+          To the maximum extent permitted by law, MyCargoLens shall not be liable for any indirect,
+          incidental, special, consequential, or punitive damages. Our total liability to you for
+          any claim arising from use of the platform shall not exceed the fees paid by you to us in
+          the twelve (12) months preceding the claim.
         </p>
 
         <h2 className="text-xl font-semibold mt-10 mb-4">9. Indemnification</h2>
         <p className="mb-4">
-          You agree to indemnify, defend, and hold harmless{" "}
-          <Placeholder>[COMPANY_NAME]</Placeholder> and its officers, directors, employees, and
-          agents from and against any claims, liabilities, damages, losses, and expenses (including
-          reasonable attorneys&apos; fees) arising out of or related to your use of the platform, your
-          filings, or your violation of these terms.
+          You agree to indemnify, defend, and hold harmless MyCargoLens and its officers, directors,
+          employees, and agents from and against any claims, liabilities, damages, losses, and
+          expenses (including reasonable attorneys&apos; fees) arising out of or related to your use
+          of the platform, your filings, or your violation of these terms.
         </p>
 
         <h2 className="text-xl font-semibold mt-10 mb-4">10. Termination</h2>
@@ -152,10 +144,9 @@ export default function TermsOfServicePage() {
 
         <h2 className="text-xl font-semibold mt-10 mb-4">11. Governing Law</h2>
         <p className="mb-4">
-          These terms are governed by the laws of <Placeholder>[JURISDICTION]</Placeholder>,
-          without regard to conflict of law principles. Any disputes arising from these terms shall
-          be resolved exclusively in the courts of{" "}
-          <Placeholder>[JURISDICTION]</Placeholder>.
+          These terms are governed by the laws of the State of Delaware, without regard to its
+          conflict of law principles. Any disputes arising from these terms shall be resolved
+          exclusively in the state or federal courts located in Delaware.
         </p>
 
         <h2 className="text-xl font-semibold mt-10 mb-4">12. Changes to Terms</h2>
@@ -171,11 +162,15 @@ export default function TermsOfServicePage() {
           For questions about these Terms of Service, please contact:
         </p>
         <p className="mb-4">
-          <Placeholder>[COMPANY_NAME]</Placeholder>
+          MyCargoLens
           <br />
-          <Placeholder>[ADDRESS]</Placeholder>
-          <br />
-          Email: <Placeholder>[SUPPORT_EMAIL]</Placeholder>
+          Email:{" "}
+          <a
+            href="mailto:support@mycargolens.com"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            support@mycargolens.com
+          </a>
         </p>
 
       </div>
