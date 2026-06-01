@@ -323,6 +323,31 @@ router.post('/accept-invite', async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
+    // Verify the invitation was issued to the calling user. Without this
+    // check, anyone who obtained the token (forwarded email, intercepted
+    // link, log leak) could join an arbitrary org and silently lose their
+    // original org's data. /register already enforces this; this endpoint
+    // was the asymmetric gap.
+    if (invitation.email.toLowerCase() !== req.user!.email.toLowerCase()) {
+      res.status(403).json({ error: 'This invitation was issued to a different email address.' });
+      return;
+    }
+
+    // Refuse if the caller is currently the sole owner of another org —
+    // accepting would leave that org with no owner. They need to transfer
+    // ownership first.
+    if (req.user!.role === 'owner') {
+      const otherOwners = await prisma.user.count({
+        where: { orgId: req.user!.orgId, role: 'owner', isActive: true, id: { not: req.user!.id } },
+      });
+      if (otherOwners === 0) {
+        res.status(409).json({
+          error: 'You are the sole owner of your current organization. Transfer ownership or delete the org before accepting this invitation.',
+        });
+        return;
+      }
+    }
+
     // Transfer user to the new org
     await prisma.$transaction([
       prisma.user.update({
