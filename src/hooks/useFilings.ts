@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { filingsApi, FilingListParams, notificationsApi, templatesApi, settingsApi, integrationsApi, bulkApi, organizationApi, documentsApi, exportApi } from '../api/client';
 
 export function useFilings(params?: FilingListParams) {
@@ -43,6 +44,86 @@ export function useUpdateFiling() {
       queryClient.invalidateQueries({ queryKey: ['filing', variables.id] });
     },
   });
+}
+
+/**
+ * Debounced autosave for the ShipmentWizard (audit Phase 8.2).
+ *
+ * Mirrors the ABI flow's `useAbiDocumentAutosave`: rapid `save()` calls
+ * coalesce into a single PATCH after `debounceMs`. Pending edits flush on
+ * unmount so closing the tab / navigating away doesn't lose data, and an
+ * `isDirty` flag (+ pending-on-window-close listener) prevents accidental
+ * destruction of unsaved work via the browser's beforeunload warning.
+ */
+export function useFilingAutosave(id: string | undefined, debounceMs = 800) {
+  const update = useUpdateFiling();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<Record<string, any>>({});
+  const idRef = useRef(id);
+  const dirtyRef = useRef(false);
+
+  useEffect(() => {
+    idRef.current = id;
+  }, [id]);
+
+  const flush = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    const nextId = idRef.current;
+    const payload = pendingRef.current;
+    if (!nextId || Object.keys(payload).length === 0) return;
+    pendingRef.current = {};
+    dirtyRef.current = false;
+    update.mutate({ id: nextId, data: payload });
+  };
+
+  const save = (patch: Record<string, any>) => {
+    pendingRef.current = { ...pendingRef.current, ...patch };
+    dirtyRef.current = true;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(flush, debounceMs);
+  };
+
+  // beforeunload guard — only attached while there's actual unsaved state.
+  // Some browsers ignore the returned string in modern versions but still
+  // honour event.returnValue, so we set both.
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!dirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
+
+  // Flush pending edits on unmount so we don't drop the last keystroke.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      const nextId = idRef.current;
+      const payload = pendingRef.current;
+      if (nextId && Object.keys(payload).length > 0) {
+        pendingRef.current = {};
+        dirtyRef.current = false;
+        update.mutate({ id: nextId, data: payload });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return {
+    save,
+    flush,
+    isSaving: update.isPending,
+    error: update.error,
+  };
 }
 
 export function useDeleteFiling() {
