@@ -696,3 +696,21 @@ model TrackedShipment {
   @@unique([orgId, t49ShipmentId])
   @@map("tracked_shipments")
 }
+
+// ─── Stripe Webhook Events (idempotency ledger) ────────────
+// Stripe retries on 5xx and occasionally after 2xx. We INSERT the event_id
+// ON CONFLICT DO NOTHING at handler entry — a returning row means we've
+// processed this event before and should bail. Without this, the same
+// `customer.subscription.deleted` event runs our handler N times and
+// clobbers `canceledAt` on every retry. processedAt is filled after the
+// handler finishes so we can tell "received but never finished" apart from
+// "fully handled".
+model StripeWebhookEvent {
+  eventId     String    @id @map("event_id")
+  type        String
+  receivedAt  DateTime  @default(now()) @map("received_at") @db.Timestamptz()
+  processedAt DateTime? @map("processed_at") @db.Timestamptz()
+
+  @@index([receivedAt(sort: Desc)])
+  @@map("stripe_webhook_events")
+}

@@ -23,11 +23,33 @@ ALTER TABLE "notifications"
   ADD COLUMN IF NOT EXISTS "abi_document_id" UUID;
 
 -- ── 3. Foreign key for abi_document_id (matches filing_id behaviour) ─
+-- ⚠ Guarded by table existence as well as constraint existence: when this
+-- migration first shipped (2026-05-04), abi_documents had already been
+-- created on prod via deploy/migrations/2026-04-27-abi-documents.sql, so
+-- the ALTER worked. On any fresh DB (CI, staging, dev clone, DR rebuild)
+-- abi_documents does NOT exist yet — the FK creation would error out and
+-- abort the whole migration. We added the table-existence check so the FK
+-- is only added when the referenced table is present; the matching FK is
+-- added by migration `a_add_billing_abi_and_webhook_tables` when it
+-- creates abi_documents on fresh envs. (The new migration uses an `a_`
+-- prefix so it sorts after `9_tracked_shipments` lexicographically — the
+-- existing 0_/1_/.../9_ scheme is non-standard, and `10_*` would have
+-- sorted between `1_` and `2_`.)
+--
+-- Editing an already-applied migration is normally a Prisma anti-pattern,
+-- but on prod the FK exists and this DO block remains a no-op, so the only
+-- observable effect of the checksum change is a one-time warning from
+-- `prisma migrate status` that's resolved by running
+-- `prisma migrate resolve --applied 2_add_notification_severity_metadata`
+-- against the prod DB (no SQL is re-executed).
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conname = 'notifications_abi_document_id_fkey'
+  ) AND EXISTS (
+    SELECT 1 FROM pg_tables
+    WHERE schemaname = 'public' AND tablename = 'abi_documents'
   ) THEN
     ALTER TABLE "notifications"
       ADD CONSTRAINT "notifications_abi_document_id_fkey"
