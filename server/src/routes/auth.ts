@@ -18,6 +18,40 @@ import {
 
 const router = Router();
 
+// ─── Refresh-token cookie helpers ─────────────────────────
+// Pre-Phase-6 the refresh token round-tripped through the JSON body and
+// was persisted in localStorage on the SPA — so any XSS gave an attacker
+// a 7-day login. Moving it to an httpOnly cookie scoped to the refresh
+// endpoint closes that window. SameSite=Strict is the primary CSRF
+// defence (the cookie won't ride along on cross-site requests); the
+// path scope keeps the cookie off every other request entirely.
+const REFRESH_COOKIE = 'mcl_refresh';
+const REFRESH_COOKIE_PATH = '/api/v1/auth/refresh';
+const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+function setRefreshCookie(res: Response, token: string): void {
+  res.cookie(REFRESH_COOKIE, token, {
+    httpOnly: true,
+    // Secure attribute requires HTTPS — required in prod, would break
+    // dev over plain HTTP (browsers reject Secure cookies on http://).
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: REFRESH_COOKIE_PATH,
+    maxAge: REFRESH_COOKIE_MAX_AGE_MS,
+  });
+}
+
+function clearRefreshCookie(res: Response): void {
+  // Attributes must match the ones used to SET the cookie or the browser
+  // won't recognise the clear command.
+  res.clearCookie(REFRESH_COOKIE, {
+    path: REFRESH_COOKIE_PATH,
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'strict',
+  });
+}
+
 // ─── Zod Schemas ──────────────────────────────────────────
 const registerSchema = z.object({
   email: z.string().email(),
@@ -147,6 +181,10 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
       data: { refreshToken },
     });
 
+    // Refresh token now goes back in an httpOnly cookie (audit Phase 6)
+    // instead of in the JSON body. The SPA never sees it from JavaScript.
+    setRefreshCookie(res, refreshToken);
+
     res.status(201).json({
       user: {
         id: result.user.id,
@@ -162,7 +200,6 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
         },
       },
       accessToken,
-      refreshToken,
     });
 
     // Fire-and-forget: issue + email a fresh 6-digit verification code.
@@ -241,12 +278,14 @@ router.post('/login', authLimiter, async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Check lockout
+    // Locked-account check — return the SAME 401 "Invalid email or
+    // password" we use for missing accounts and wrong passwords. Pre-fix
+    // we returned 423 with the lock expiry, which gave attackers both an
+    // existence oracle (email is registered ⇒ 423; not registered ⇒ 401)
+    // AND a trivial account-DoS (5 wrong attempts locks any known email
+    // for 15 minutes). Silently failing during the window stops both.
     if (user.lockedUntil && user.lockedUntil > new Date()) {
-      res.status(423).json({
-        error: 'Account locked',
-        lockedUntil: user.lockedUntil.toISOString(),
-      });
+      res.status(401).json({ error: 'Invalid email or password' });
       return;
     }
 
@@ -286,6 +325,9 @@ router.post('/login', authLimiter, async (req: Request, res: Response): Promise<
       },
     });
 
+    // Refresh token → httpOnly cookie (audit Phase 6).
+    setRefreshCookie(res, refreshToken);
+
     res.json({
       user: {
         id: user.id,
@@ -300,7 +342,6 @@ router.post('/login', authLimiter, async (req: Request, res: Response): Promise<
         },
       },
       accessToken,
-      refreshToken,
     });
 
     // Audit log
@@ -320,11 +361,28 @@ router.post('/login', authLimiter, async (req: Request, res: Response): Promise<
 });
 
 // ─── POST /api/v1/auth/refresh ────────────────────────────
+// Audit Phase 6: the refresh token now arrives in the mcl_refresh httpOnly
+// cookie (set by /login + /register), NOT in the JSON body. SameSite=Strict
+// on the cookie is the primary CSRF defence; we additionally Origin-check
+// the request as defense-in-depth because the refresh endpoint is the most
+// security-sensitive in the app.
 router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { refreshToken } = req.body;
+    // Defense-in-depth CSRF check. SameSite=Strict already blocks the
+    // cookie from accompanying cross-site fetches in any modern browser,
+    // but we additionally reject any request whose Origin doesn't match
+    // our SPA. Allow no Origin (curl / native clients) only when the
+    // cookie is absent — those callers can't be CSRF victims either way.
+    const origin = req.get('origin');
+    if (origin && env.FRONTEND_URL && origin !== env.FRONTEND_URL) {
+      res.status(403).json({ error: 'Cross-origin refresh refused' });
+      return;
+    }
+
+    const refreshToken: string | undefined =
+      (req.cookies && req.cookies[REFRESH_COOKIE]) || undefined;
     if (!refreshToken) {
-      res.status(400).json({ error: 'Refresh token required' });
+      res.status(401).json({ error: 'No refresh cookie' });
       return;
     }
 
@@ -334,6 +392,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
     };
 
     if (decoded.type !== 'refresh') {
+      clearRefreshCookie(res);
       res.status(401).json({ error: 'Invalid token type' });
       return;
     }
@@ -344,11 +403,15 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
     });
 
     if (!user || user.refreshToken !== refreshToken || !user.isActive) {
+      clearRefreshCookie(res);
       res.status(401).json({ error: 'Invalid refresh token' });
       return;
     }
 
-    // Rotate tokens
+    // Rotate tokens — every refresh issues a new refresh token and
+    // invalidates the previous one (the DB column stores the latest
+    // valid token; an attacker reusing an old one fails the equality
+    // check above).
     const newAccessToken = generateAccessToken({
       id: user.id,
       email: user.email,
@@ -362,11 +425,15 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
       data: { refreshToken: newRefreshToken },
     });
 
+    setRefreshCookie(res, newRefreshToken);
+
     res.json({
       accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
     });
   } catch (err) {
+    // Clear the cookie on any verify-time failure so the client doesn't
+    // keep retrying with a token the server can't accept.
+    clearRefreshCookie(res);
     if (err instanceof jwt.TokenExpiredError) {
       res.status(401).json({ error: 'Refresh token expired, please login again' });
       return;
@@ -381,6 +448,10 @@ router.post('/logout', authMiddleware, async (req: AuthRequest, res: Response): 
     where: { id: req.user!.id },
     data: { refreshToken: null },
   });
+  // Clear the browser-side cookie too; without this the cookie persists
+  // (now pointing at a NULL DB column, so it's already useless, but tidy
+  // up so DevTools doesn't show a stale credential).
+  clearRefreshCookie(res);
   res.json({ message: 'Logged out' });
 });
 

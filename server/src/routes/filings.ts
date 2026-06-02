@@ -664,7 +664,7 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
 });
 
 // ─── POST /api/v1/filings/:id/amend — Submit amendment ─────
-router.post('/:id/amend', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
   const filing = await prisma.filing.findFirst({
     where: { id: paramId(req), orgId: req.user!.orgId },
   });
@@ -808,7 +808,7 @@ router.post('/:id/amend', ccApiLimiter, async (req: AuthRequest, res: Response):
 });
 
 // ─── POST /api/v1/filings/:id/cancel — Cancel a filing ────
-router.post('/:id/cancel', filingMutationLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/cancel', filingMutationLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
   const filing = await prisma.filing.findFirst({
     where: { id: paramId(req), orgId: req.user!.orgId },
   });
@@ -1429,7 +1429,7 @@ router.post('/:id/save-template', filingMutationLimiter, async (req: AuthRequest
 });
 
 // ─── POST /api/v1/filings/bulk-submit — Submit multiple draft filings ──
-router.post('/bulk-submit', filingMutationLimiter, ccApiLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/bulk-submit', filingMutationLimiter, ccApiLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { filingIds } = req.body;
     if (!Array.isArray(filingIds) || filingIds.length === 0) {
