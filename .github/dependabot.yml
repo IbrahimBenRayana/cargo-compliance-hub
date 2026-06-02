@@ -1,0 +1,87 @@
+# ============================================================
+# Dependabot — weekly grouped dependency updates
+# ============================================================
+# Three npm package ecosystems live in this repo (frontend at the root,
+# server, landing). One updates entry per ecosystem; minor/patch updates
+# are grouped into a single PR per week to keep the review queue
+# manageable. Major updates open separate PRs so they get scrutiny.
+#
+# Security advisories are handled separately by GitHub's
+# Dependabot security updates (enabled at the repo-settings level, NOT
+# configured here) — they ignore the weekly schedule and open PRs as
+# soon as a CVE is published.
+# ============================================================
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+    commit-message:
+      prefix: deps(frontend)
+
+  - package-ecosystem: npm
+    directory: /server
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    groups:
+      server-minor-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+    commit-message:
+      prefix: deps(server)
+
+  - package-ecosystem: npm
+    directory: /landing
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    groups:
+      landing-minor-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+    commit-message:
+      prefix: deps(landing)
+
+  # ── GitHub Actions ─────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        applies-to: version-updates
+    commit-message:
+      prefix: deps(ci)
+
+  # ── Docker base images ─────────────────────────────────────
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: deps(docker)
