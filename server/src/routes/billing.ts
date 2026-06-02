@@ -7,6 +7,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
 import { getStripe, stripeConfigured } from '../services/stripe.js';
 import { notify } from '../services/notifications.js';
+import { writeAuditLog } from '../services/auditLog.js';
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
 
@@ -169,6 +170,17 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session): Promise<vo
   });
   logger.info({ orgId, planId }, '✓ Subscription activated via checkout');
 
+  // Audit trail (Phase 7): subscriptions are the highest-stakes financial
+  // state on the platform. Every state change is logged so we can chase
+  // back any billing dispute to the exact Stripe event that drove it.
+  writeAuditLog({
+    orgId,
+    action: 'subscription.activated',
+    entityType: 'subscription',
+    entityId: stripeSubscriptionId,
+    newValue: { planId, status: stripeSub.status, stripeCustomerId },
+  });
+
   // Phase 3: notify owners + admins that the subscription is live.
   await notify({
     kind:     'billing_subscription_changed',
@@ -210,6 +222,15 @@ async function onSubscriptionChanged(sub: Stripe.Subscription): Promise<void> {
       canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
     },
   });
+
+  writeAuditLog({
+    orgId: existing.orgId,
+    action: 'subscription.updated',
+    entityType: 'subscription',
+    entityId: sub.id,
+    oldValue: { planId: existing.planId, status: existing.status },
+    newValue: { planId: plan?.id ?? existing.planId, status: sub.status, cancelAtPeriodEnd: sub.cancel_at_period_end },
+  });
 }
 
 async function onSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
@@ -237,6 +258,15 @@ async function onSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
     },
   });
   logger.info({ orgId: existing.orgId }, '✓ Subscription canceled, downgraded to Starter');
+
+  writeAuditLog({
+    orgId: existing.orgId,
+    action: 'subscription.canceled',
+    entityType: 'subscription',
+    entityId: sub.id,
+    oldValue: { planId: existing.planId, status: existing.status },
+    newValue: { planId: 'starter', status: 'canceled', canceledAt },
+  });
 
   // Phase 3: warn owners + admins. Severity is 'warning' (default for kind),
   // not 'critical' — the org has been downgraded but is not blocked.

@@ -9,6 +9,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
+import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import logger from '../config/logger.js';
 
 // PATCH /profile only accepts name updates. Email changes need re-verification
@@ -146,6 +147,16 @@ router.post('/change-password', async (req: AuthRequest, res: Response): Promise
     });
 
     res.json({ success: true, message: 'Password changed successfully' });
+
+    const meta = getRequestMeta(req);
+    writeAuditLog({
+      orgId: req.user!.orgId,
+      userId: req.user!.id,
+      action: 'user.password_changed',
+      entityType: 'user',
+      entityId: req.user!.id,
+      ...meta,
+    });
   } catch (err: any) {
     logger.error({ err: err.message }, '[Settings] Error changing password:');
     res.status(500).json({ error: 'Failed to change password' });
@@ -195,6 +206,15 @@ router.patch('/organization', requireRole('owner', 'admin'), async (req: AuthReq
   try {
     const { name, iorNumber, einNumber, address, phone, website } = req.body;
 
+    // Read the previous values so the audit row can show the diff.
+    // Org IOR/EIN flow into every CBP submission downstream — anyone who
+    // rewrites them silently is the most dangerous insider action in the
+    // app, hence the audit entry below (audit Phase 7).
+    const before = await prisma.organization.findUnique({
+      where: { id: req.user!.orgId },
+      select: { name: true, iorNumber: true, einNumber: true, address: true, phone: true, website: true },
+    });
+
     const updated = await prisma.organization.update({
       where: { id: req.user!.orgId },
       data: {
@@ -218,6 +238,25 @@ router.patch('/organization', requireRole('owner', 'admin'), async (req: AuthReq
     });
 
     res.json(updated);
+
+    const meta = getRequestMeta(req);
+    writeAuditLog({
+      orgId: req.user!.orgId,
+      userId: req.user!.id,
+      action: 'organization.updated',
+      entityType: 'organization',
+      entityId: req.user!.orgId,
+      oldValue: before ?? undefined,
+      newValue: {
+        name: updated.name,
+        iorNumber: updated.iorNumber,
+        einNumber: updated.einNumber,
+        address: updated.address,
+        phone: updated.phone,
+        website: updated.website,
+      },
+      ...meta,
+    });
   } catch (err: any) {
     logger.error({ err: err.message }, '[Settings] Error updating organization:');
     res.status(500).json({ error: 'Failed to update organization' });

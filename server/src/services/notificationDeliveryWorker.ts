@@ -60,6 +60,13 @@ export async function drainEmailDeliveries(): Promise<void> {
 
   try {
     const now = new Date();
+    // audit Phase 7.1: on a multi-replica deploy two drainers can
+    // findMany() the same rows and both send the email. The deploy is
+    // single-VPS today and the in-process isRunning guard above covers
+    // same-process re-entry, so this isn't an active issue — but the
+    // proper fix is a (locked_until, locked_by) claim column +
+    // SELECT ... FOR UPDATE SKIP LOCKED. Tracked to land alongside the
+    // multi-replica work (likely in a Phase 7b schema PR).
     const due = await prisma.notificationDelivery.findMany({
       where: {
         status:        'queued',

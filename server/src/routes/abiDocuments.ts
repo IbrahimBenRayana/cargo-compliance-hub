@@ -19,6 +19,7 @@ import {
 } from '../services/abiDocumentMapper.js';
 import { sanitizeErrorMessage } from '../services/errorTranslator.js';
 import { notify } from '../services/notifications.js';
+import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import logger from '../config/logger.js';
 
 const router = Router();
@@ -540,9 +541,15 @@ router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, async (req: AuthReq
     return;
   }
 
-  // Stamp SENDING + sentAt up-front so concurrent calls short-circuit.
-  const sendingDoc = await prisma.abiDocument.update({
-    where: { id: doc.id },
+  // Atomic DRAFT→SENDING. Pre-fix the bare `update` matched only on id,
+  // so two concurrent /send calls both saw status=DRAFT, both transitioned
+  // to SENDING, both called CC, and the second one's response clobbered
+  // the first's data. The updateMany with a status='DRAFT' predicate is
+  // a single SQL UPDATE that only succeeds when the row is still DRAFT —
+  // exactly one concurrent caller wins. The loser gets a fresh fetch via
+  // findFirst and short-circuits with the current status.
+  const claim = await prisma.abiDocument.updateMany({
+    where: { id: doc.id, status: 'DRAFT' },
     data: {
       status: 'SENDING',
       sentAt: new Date(),
@@ -550,6 +557,17 @@ router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, async (req: AuthReq
       ...denorm,
     },
   });
+  if (claim.count === 0) {
+    const current = await prisma.abiDocument.findUnique({ where: { id: doc.id } });
+    res.status(200).json({
+      data: current,
+      note: `Another request already transitioned the document (now ${current?.status}).`,
+    });
+    return;
+  }
+  // Refetch the row we just claimed so downstream mapping has the fresh
+  // denorm columns.
+  const sendingDoc = await prisma.abiDocument.findUniqueOrThrow({ where: { id: doc.id } });
 
   try {
     // Step 1 — POST /api/abi/documents
@@ -673,6 +691,24 @@ router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, async (req: AuthReq
     const sentDoc = await prisma.abiDocument.update({
       where: { id: postCreateDoc.id },
       data: { status: 'SENT' },
+    });
+
+    // Audit (Phase 7): ABI submissions are CBP transmissions — high stakes,
+    // log every one. Includes ccDocumentId so we can chase back to the
+    // CustomsCity side of the transaction.
+    const meta = getRequestMeta(req);
+    writeAuditLog({
+      orgId: req.user!.orgId,
+      userId: req.user!.id,
+      action: 'abi_document.sent',
+      entityType: 'abi_document',
+      entityId: sentDoc.id,
+      newValue: {
+        entryNumber: sentDoc.entryNumber,
+        mbolNumber: sentDoc.mbolNumber,
+        ccDocumentId: sentDoc.ccDocumentId,
+      },
+      ...meta,
     });
 
     // Phase 3: actor-only notification confirming the entry left for CBP.
