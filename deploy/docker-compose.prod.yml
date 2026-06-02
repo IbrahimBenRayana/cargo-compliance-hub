@@ -1,0 +1,128 @@
+# ============================================================
+# MyCargoLens — Production Docker Compose
+# ============================================================
+# Single committed source of truth for the prod stack.
+# rsync'd to /opt/mycargolens/docker-compose.yml by the deploy job in
+# .github/workflows/ci-cd.yml. Pre-Phase-5 this file lived only on the
+# VPS and the deploy job sed-patched it for every new env var — a brittle
+# pattern that contributed to the 2026-06-01 → 2026-06-02 outage.
+#
+# How env vars resolve (docker compose semantics):
+#   shell env > /opt/mycargolens/.env > defaults defined in this file
+# The deploy job unsets empty GH-Secret shell vars before invoking
+# docker compose, so unset secrets fall through to .env values.
+#
+# When adding a new env var: bump server/src/config/env.ts, add the
+# line here, and add it to the upsert_env block in ci-cd.yml if it
+# should be rotatable via GH Secrets.
+# ============================================================
+
+services:
+  # ── PostgreSQL ───────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: mycargolens-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mycargolens
+      POSTGRES_USER: mycargolens
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mycargolens -d mycargolens"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Backend API Server ───────────────────────────────────
+  server:
+    image: ghcr.io/ibrahimbenrayana/cargo-compliance-hub:${IMAGE_TAG:-latest}
+    container_name: mycargolens-server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    environment:
+      # Runtime + DB
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://mycargolens:${DB_PASSWORD}@db:5432/mycargolens?schema=public
+
+      # Auth — required, no default. Container will exit 1 if missing.
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET required (>=16 chars)}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET required (>=16 chars)}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+
+      # URLs (CORS + email links)
+      FRONTEND_URL: ${FRONTEND_URL:-https://app.mycargolens.com}
+      # LANDING_URL — added Phase 3 for cross-origin contact form POST.
+      LANDING_URL: ${LANDING_URL:-https://mycargolens.com}
+
+      # CustomsCity
+      CC_API_BASE_URL: ${CC_API_BASE_URL:-https://api-cert.customscity.com}
+      CC_API_TOKEN: ${CC_API_TOKEN:-}
+      CC_ENVIRONMENT: ${CC_ENVIRONMENT:-sandbox}
+
+      # Email (Azure ACS SMTP relay)
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.azurecomm.net}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASS: ${EMAIL_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@mycargolens.com}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-MyCargoLens}
+
+      # AI — provider-agnostic. AI_PROVIDER chooses backend; AI_API_KEY is matching credential.
+      AI_ASSESSMENT_ENABLED:    ${AI_ASSESSMENT_ENABLED:-false}
+      AI_PROVIDER:              ${AI_PROVIDER:-openai}
+      AI_MODEL:                 ${AI_MODEL:-gpt-4o-mini}
+      AI_API_KEY:               ${AI_API_KEY:-}
+      AI_MAX_TOKENS:            ${AI_MAX_TOKENS:-2048}
+      AI_TEMPERATURE:           ${AI_TEMPERATURE:-0.3}
+      AI_RATE_LIMIT_PER_USER:   ${AI_RATE_LIMIT_PER_USER:-50}
+      AI_DISABLE_TRAINING_DATA: ${AI_DISABLE_TRAINING_DATA:-true}
+
+      # Terminal 49 — container tracking; feature self-disables when key is blank
+      TERMINAL49_API_BASE_URL: ${TERMINAL49_API_BASE_URL:-https://api.terminal49.com/v2}
+      TERMINAL49_API_KEY:      ${TERMINAL49_API_KEY:-}
+
+      # Stripe
+      STRIPE_SECRET_KEY:      ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET:  ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+    volumes:
+      - uploads_data:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # ── Marketing Site ───────────────────────────────────────
+  landing:
+    image: ghcr.io/ibrahimbenrayana/cargo-compliance-hub-landing:${LANDING_IMAGE_TAG:-latest}
+    container_name: mycargolens-landing
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      # Public so the browser bundle uses the right origin for /api/v1/contact etc.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://app.mycargolens.com}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.mycargolens.com}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  postgres_data:
+  uploads_data:
