@@ -7,20 +7,26 @@ import { Button } from "@/components/ui/button";
 import { PageHero } from "@/components/page-hero";
 import { ContactScene } from "@/components/illustrations/contact-scene";
 
+// Subject values match the server enum (see server/src/routes/contact.ts).
+// The display labels in the <option> elements diverge from these keys —
+// keys are stable, labels can be reworded without a server change.
 type SubjectOption =
   | ""
-  | "Demo request"
-  | "General inquiry"
-  | "Technical support"
-  | "Enterprise inquiry"
-  | "Bug report"
-  | "Other";
+  | "demo"
+  | "general"
+  | "support"
+  | "enterprise"
+  | "bug"
+  | "other";
 
 interface FormState {
   name: string;
   email: string;
   subject: SubjectOption;
   message: string;
+  // Honeypot — kept hidden in the DOM. Real users never fill it; bots do.
+  // Submitted as-is so the server can drop spam silently.
+  website: string;
 }
 
 const initialForm: FormState = {
@@ -28,7 +34,14 @@ const initialForm: FormState = {
   email: "",
   subject: "",
   message: "",
+  website: "",
 };
+
+// Marketing site → API base URL. Configured per-deploy via
+// NEXT_PUBLIC_API_URL (e.g. https://app.mycargolens.com). Falls back to the
+// dev server in development.
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:3001";
 
 const infoCards = [
   {
@@ -63,15 +76,54 @@ export default function ContactPage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError(null);
+
+    // Browser-side guard — the select keeps an empty-string default.
+    if (!form.subject) {
+      setError("Please pick a topic.");
+      return;
+    }
+
     setLoading(true);
-    // Simulate async submission
-    setTimeout(() => {
-      console.log("Contact form:", form);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // No cookies needed — endpoint is public. credentials:'omit' keeps
+        // the preflight simple.
+        credentials: "omit",
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          subject: form.subject,
+          message: form.message.trim(),
+          // Honeypot — kept blank by real users, populated by bots.
+          website: form.website,
+        }),
+      });
+
+      if (!res.ok) {
+        // 429 = rate-limited (caller hit our 5/hr cap). Surface a specific
+        // message; everything else gets a generic one.
+        if (res.status === 429) {
+          setError("Too many submissions from this network. Email us directly: support@mycargolens.com");
+        } else {
+          setError("Something went wrong sending your message. Please email us at support@mycargolens.com");
+        }
+        setLoading(false);
+        return;
+      }
+
       setLoading(false);
       setSubmitted(true);
-    }, 600);
+    } catch {
+      setError("Couldn't reach the server. Please email us at support@mycargolens.com");
+      setLoading(false);
+    }
   }
 
   return (
@@ -135,6 +187,7 @@ export default function ContactPage() {
                   onClick={() => {
                     setForm(initialForm);
                     setSubmitted(false);
+                    setError(null);
                   }}
                 >
                   Send another message
@@ -187,12 +240,12 @@ export default function ContactPage() {
                     className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                   >
                     <option value="">Select a topic…</option>
-                    <option value="Demo request">Demo request</option>
-                    <option value="General inquiry">General inquiry</option>
-                    <option value="Technical support">Technical support</option>
-                    <option value="Enterprise inquiry">Enterprise inquiry</option>
-                    <option value="Bug report">Bug report</option>
-                    <option value="Other">Other</option>
+                    <option value="demo">Demo request</option>
+                    <option value="general">General inquiry</option>
+                    <option value="support">Technical support</option>
+                    <option value="enterprise">Enterprise inquiry</option>
+                    <option value="bug">Bug report</option>
+                    <option value="other">Other</option>
                   </select>
                 </div>
 
@@ -211,6 +264,27 @@ export default function ContactPage() {
                     className="w-full resize-none rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                   />
                 </div>
+
+                {/* Honeypot — visually hidden, off the tab order, with a name
+                    most bots can't resist filling. Real users never see it. */}
+                <div aria-hidden="true" className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden">
+                  <label htmlFor="website">Website</label>
+                  <input
+                    id="website"
+                    name="website"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={form.website}
+                    onChange={handleChange}
+                  />
+                </div>
+
+                {error && (
+                  <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                    {error}
+                  </p>
+                )}
 
                 <Button
                   type="submit"

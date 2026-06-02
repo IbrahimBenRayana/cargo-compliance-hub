@@ -239,7 +239,7 @@ const FEATURES: Feature[] = [
   { name: "Compliance score (per filing)", surface: "compliance", status: "live", blurb: "0-100 score with snapshot at every scoring event.", icon: ShieldCheck },
   { name: "UFLPA Risk Inbox", surface: "compliance", status: "live", blurb: "Severity-ranked filings with supplier chain evidence.", icon: ShieldCheck },
   { name: "PGA Flag Lookup", surface: "compliance", status: "live", blurb: "FDA, USDA-APHIS, EPA, FCC flags per HTS.", icon: ShieldCheck },
-  { name: "5106 EIN self-check", surface: "compliance", status: "live", blurb: "Verify EIN matches IRS records before filing.", icon: ShieldCheck },
+  { name: "5106 EIN self-check", surface: "compliance", status: "live", blurb: "EIN format check + Form 5106 quick link before CBP rejects your filing.", icon: ShieldCheck },
   { name: "HTS Classifier", surface: "compliance", status: "live", blurb: "AI-suggested 10-digit HTS from goods description.", icon: Sparkles },
   { name: "ADD/CVD daily sync", surface: "compliance", status: "live", blurb: "Federal Register synced daily at 04:00 UTC.", icon: Database },
   { name: "FTA Preference Calculator", surface: "compliance", status: "live", blurb: "USMCA, GSP, AGOA, CBI + 13 more programs.", icon: ShieldCheck },

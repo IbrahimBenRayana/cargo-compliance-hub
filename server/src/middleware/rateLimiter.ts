@@ -46,6 +46,21 @@ export const generalLimiter = rateLimit({
   },
 });
 
+// Marketing contact form — strict, anti-spam. The form is unauthenticated
+// and routed to a real inbox, so we cap aggressively per IP. 5/hr is enough
+// for a legitimate visitor who hits "send" twice + waits + retries; deters
+// drive-by scraper spam.
+export const contactFormLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many contact-form submissions. Please email us directly.',
+    code: 'RATE_LIMIT_CONTACT',
+  },
+});
+
 // CBP filing API calls — protect against accidental hammering of external API
 export const ccApiLimiter = rateLimit({
   windowMs: 60 * 1000,
