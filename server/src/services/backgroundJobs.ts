@@ -142,49 +142,69 @@ async function pollSubmittedFilings(): Promise<void> {
 
             const isfTxnNumber = messages.find((m: any) => m.ISFTransactionNumber)?.ISFTransactionNumber;
 
-            await prisma.filing.update({
-              where: { id: filing.id },
-              data: {
-                status: newStatus,
-                acceptedAt: newStatus === 'accepted' ? new Date() : undefined,
-                // Clear rejection metadata when CBP accepts — otherwise the
-                // "previous rejection" panel keeps surfacing stale text on
-                // accepted filings. History stays in FilingStatusHistory.
-                rejectedAt: newStatus === 'accepted' ? null
-                  : newStatus === 'rejected' ? new Date()
-                  : undefined,
-                rejectionReason: newStatus === 'accepted' ? null
-                  : newStatus === 'rejected' ? (rejectionReason ?? undefined)
-                  : undefined,
-                cbpTransactionId: isfTxnNumber ?? filing.cbpTransactionId ?? undefined,
-              },
+            // Atomic per-filing write: filing + history + submissionLog land
+            // together in one transaction so a crash mid-update can't leave
+            // the filing in a new state with no history row to explain it.
+            // The updateMany predicate (status='submitted') ensures a
+            // concurrent worker that won the race affects 0 rows — we then
+            // return null and short-circuit without firing duplicate
+            // notifications. recordScoreSnapshot and notify* run AFTER the
+            // tx commits so they don't extend the lock window.
+            const committed = await prisma.$transaction(async (tx) => {
+              const claimed = await tx.filing.updateMany({
+                where: { id: filing.id, status: 'submitted' },
+                data: {
+                  status: newStatus,
+                  acceptedAt: newStatus === 'accepted' ? new Date() : undefined,
+                  // Clear rejection metadata when CBP accepts — otherwise the
+                  // "previous rejection" panel keeps surfacing stale text on
+                  // accepted filings. History stays in FilingStatusHistory.
+                  rejectedAt: newStatus === 'accepted' ? null
+                    : newStatus === 'rejected' ? new Date()
+                    : undefined,
+                  rejectionReason: newStatus === 'accepted' ? null
+                    : newStatus === 'rejected' ? (rejectionReason ?? undefined)
+                    : undefined,
+                  cbpTransactionId: isfTxnNumber ?? filing.cbpTransactionId ?? undefined,
+                },
+              });
+              if (claimed.count === 0) return false; // another worker won
+
+              await tx.filingStatusHistory.create({
+                data: {
+                  filingId: filing.id,
+                  status: newStatus,
+                  message: newStatus === 'accepted'
+                    ? `CBP accepted the ISF filing${isfTxnNumber ? ` (ISF Txn: ${isfTxnNumber})` : ''} [auto-poll]`
+                    : newStatus === 'rejected'
+                    ? `CBP rejected: ${rejectionReason} [auto-poll]`
+                    : `CBP placed filing on hold [auto-poll]`,
+                  ccResponse: { documentStatus: matchingDoc, messages } as any,
+                  changedById: filing.createdById,
+                },
+              });
+
+              await tx.submissionLog.create({
+                data: {
+                  orgId: filing.orgId, filingId: filing.id, userId: filing.createdById,
+                  method: 'GET', url: '/api/document-status [auto-poll]',
+                  requestPayload: statusParams as any,
+                  responseStatus: statusResult.status,
+                  responseBody: statusResult.data as any,
+                  latencyMs: statusResult.latencyMs,
+                },
+              });
+
+              return true;
             });
 
-            await prisma.filingStatusHistory.create({
-              data: {
-                filingId: filing.id,
-                status: newStatus,
-                message: newStatus === 'accepted'
-                  ? `CBP accepted the ISF filing${isfTxnNumber ? ` (ISF Txn: ${isfTxnNumber})` : ''} [auto-poll]`
-                  : newStatus === 'rejected'
-                  ? `CBP rejected: ${rejectionReason} [auto-poll]`
-                  : `CBP placed filing on hold [auto-poll]`,
-                ccResponse: { documentStatus: matchingDoc, messages } as any,
-                changedById: filing.createdById,
-              },
-            });
+            if (!committed) {
+              // Another worker already advanced this filing — skip the
+              // side effects so we don't double-notify the org.
+              return;
+            }
+
             await recordScoreSnapshot(filing.id, triggerForStatus(newStatus));
-
-            await prisma.submissionLog.create({
-              data: {
-                orgId: filing.orgId, filingId: filing.id, userId: filing.createdById,
-                method: 'GET', url: '/api/document-status [auto-poll]',
-                requestPayload: statusParams as any,
-                responseStatus: statusResult.status,
-                responseBody: statusResult.data as any,
-                latencyMs: statusResult.latencyMs,
-              },
-            });
 
             const bol = filing.houseBol || filing.masterBol || filing.id.slice(0, 8);
             if (newStatus === 'accepted') {
@@ -378,6 +398,59 @@ async function checkStaleFilings(): Promise<void> {
   }
 }
 
+// ─── ABI DOCUMENT REAPER ───────────────────────────────────
+// audit Phase 7.3: if the server is killed between the DRAFT→SENDING
+// claim and the final SENT update, the document gets stuck SENDING
+// indefinitely — the dashboard shows in-flight rows that never resolve
+// and a retry from the UI sees status=SENDING so it short-circuits.
+// Every 5 minutes we scan for docs that have been SENDING for >15
+// minutes and reconcile: if CC has an entry number for the document
+// id we promote SENDING→SENT; otherwise we roll back to DRAFT so the
+// user can retry. The 15-minute threshold is comfortably larger than
+// any legitimate CC round-trip (typical 2-3s, p99 well under a minute).
+const SENDING_TIMEOUT_MS = 15 * 60 * 1000;
+
+let isAbiReaperRunning = false;
+async function reapStuckAbiDocuments(): Promise<void> {
+  if (isAbiReaperRunning) return; // re-entrant guard
+  isAbiReaperRunning = true;
+  try {
+    const cutoff = new Date(Date.now() - SENDING_TIMEOUT_MS);
+    const stuck = await prisma.abiDocument.findMany({
+      where: { status: 'SENDING', sentAt: { lt: cutoff } },
+      select: { id: true, orgId: true, ccDocumentId: true, sentAt: true },
+    });
+    if (stuck.length === 0) return;
+
+    logger.warn({ count: stuck.length }, '[Jobs:AbiReaper] Found documents stuck in SENDING');
+
+    for (const doc of stuck) {
+      // Roll back to DRAFT so the user can retry. We deliberately don't
+      // try to reach CC for reconciliation — the audit's recommendation
+      // is to keep the reaper simple and let the user (or the next /send
+      // call) drive the retry. Anything more interesting (auto-promote
+      // to SENT when CC has an entry number) can layer on later.
+      const claimed = await prisma.abiDocument.updateMany({
+        where: { id: doc.id, status: 'SENDING', sentAt: { lt: cutoff } },
+        data: {
+          status: 'DRAFT',
+          sentAt: null,
+          lastError: 'Send timed out — automatic rollback by reaper. Please retry.',
+        },
+      });
+      if (claimed.count === 0) {
+        // Another path raced us and resolved the doc — fine, skip.
+        continue;
+      }
+      logger.info({ docId: doc.id, orgId: doc.orgId }, '[Jobs:AbiReaper] Rolled SENDING back to DRAFT');
+    }
+  } catch (err: any) {
+    logger.error({ err: err.message }, '[Jobs:AbiReaper] Failed');
+  } finally {
+    isAbiReaperRunning = false;
+  }
+}
+
 // ─── SCHEDULER ─────────────────────────────────────────────
 
 let statusPollTask: ScheduledTask | null = null;
@@ -385,6 +458,7 @@ let deadlineTask: ScheduledTask | null = null;
 let staleCheckTask: ScheduledTask | null = null;
 let deliveryDrainTask: ScheduledTask | null = null;
 let addCvdSyncTask: ScheduledTask | null = null;
+let abiReaperTask: ScheduledTask | null = null;
 
 export function startBackgroundJobs(): void {
   logger.info('[Jobs] Starting background job scheduler');
@@ -432,6 +506,14 @@ export function startBackgroundJobs(): void {
   }, cronOpts);
   logger.info('[Jobs] ADD/CVD Federal Register sync scheduled — daily at 04:00 UTC');
 
+  // ABI document reaper — every 5 minutes, rolls SENDING-for-15-minutes
+  // documents back to DRAFT so the dashboard never carries a permanently
+  // in-flight row. See reapStuckAbiDocuments above for the rationale.
+  abiReaperTask = cron.schedule('*/5 * * * *', () => {
+    reapStuckAbiDocuments().catch(err => logger.error({ err }, '[Jobs:AbiReaper] Unhandled'));
+  }, cronOpts);
+  logger.info('[Jobs] ABI document reaper scheduled — every 5 minutes (UTC)');
+
   setTimeout(() => {
     checkDeadlines().catch(err => logger.error({ err }, '[Jobs:Deadlines] Initial check error'));
   }, 5000);
@@ -446,9 +528,13 @@ export function stopBackgroundJobs(): void {
   staleCheckTask?.stop();
   deliveryDrainTask?.stop();
   addCvdSyncTask?.stop();
+  abiReaperTask?.stop();
   statusPollTask = null;
   deadlineTask = null;
   staleCheckTask = null;
+  deliveryDrainTask = null;
+  addCvdSyncTask = null;
+  abiReaperTask = null;
 }
 
 /**
