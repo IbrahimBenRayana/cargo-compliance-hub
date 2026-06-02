@@ -55,69 +55,20 @@ echo "📂 Creating app directory at $APP_DIR..."
 mkdir -p "$APP_DIR"
 cd "$APP_DIR"
 
-# ── 4. Create docker-compose.prod.yml ──────────────────────
-echo "📝 Creating docker-compose.prod.yml..."
-cat > docker-compose.prod.yml << 'COMPOSE_EOF'
-services:
-  db:
-    image: postgres:16-alpine
-    container_name: mycargolens-db
-    restart: always
-    environment:
-      POSTGRES_DB: mycargolens
-      POSTGRES_USER: mycargolens
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mycargolens -d mycargolens"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    # No port exposed — only accessible from server container
-
-  server:
-    image: ghcr.io/ibrahimbenrayana/cargo-compliance-hub:latest
-    container_name: mycargolens-server
-    restart: always
-    depends_on:
-      db:
-        condition: service_healthy
-    ports:
-      - "3001:3001"
-    environment:
-      NODE_ENV: production
-      PORT: 3001
-      DATABASE_URL: postgresql://mycargolens:${DB_PASSWORD}@db:5432/mycargolens?schema=public
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
-      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
-      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3001}
-      CC_API_BASE_URL: ${CC_API_BASE_URL:-https://api-cert.customscity.com}
-      CC_API_TOKEN: ${CC_API_TOKEN:-}
-      CC_ENVIRONMENT: ${CC_ENVIRONMENT:-sandbox}
-      EMAIL_HOST: ${EMAIL_HOST:-}
-      EMAIL_PORT: ${EMAIL_PORT:-587}
-      EMAIL_USER: ${EMAIL_USER:-}
-      EMAIL_PASS: ${EMAIL_PASS:-}
-      EMAIL_FROM: ${EMAIL_FROM:-noreply@mycargolens.com}
-      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-MyCargoLens}
-    volumes:
-      - uploads_data:/app/uploads
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
-      interval: 30s
-      timeout: 5s
-      start_period: 15s
-      retries: 3
-
-volumes:
-  postgres_data:
-    driver: local
-  uploads_data:
-    driver: local
-COMPOSE_EOF
+# ── 4. Fetch the committed prod docker-compose.yml ────────
+# Pre-Phase-5 this script inlined a (perpetually-stale) compose file
+# heredoc here. The committed file at deploy/docker-compose.prod.yml in
+# the repo is now the single source of truth — fetch it directly so a
+# fresh VPS has the same compose the next CI deploy will sync, including
+# the landing service and every env var the server reads.
+echo "📥 Fetching deploy/docker-compose.prod.yml from main..."
+COMPOSE_URL="https://raw.githubusercontent.com/IbrahimBenRayana/cargo-compliance-hub/main/deploy/docker-compose.prod.yml"
+if curl -fsSL "$COMPOSE_URL" -o docker-compose.yml; then
+  echo "✅ docker-compose.yml in place ($(wc -l < docker-compose.yml) lines)"
+else
+  echo "⚠ Could not fetch compose file from $COMPOSE_URL"
+  echo "   The next CI deploy will sync it. Until then `docker compose up` will fail."
+fi
 
 # ── 5. Create .env template ───────────────────────────────
 if [ ! -f .env ]; then
@@ -166,13 +117,13 @@ cat > update.sh << 'UPDATE_EOF'
 set -euo pipefail
 cd /opt/mycargolens
 echo "📥 Pulling latest image..."
-docker compose -f docker-compose.prod.yml pull server
+docker compose pull server
 echo "🔄 Restarting..."
-docker compose -f docker-compose.prod.yml up -d
+docker compose up -d
 echo "🧹 Cleaning old images..."
 docker image prune -f
 echo "✅ Update complete!"
-docker compose -f docker-compose.prod.yml ps
+docker compose ps
 UPDATE_EOF
 chmod +x update.sh
 
@@ -187,7 +138,7 @@ BACKUP_DIR="/opt/mycargolens/backups"
 mkdir -p "$BACKUP_DIR"
 FILENAME="mycargolens_$(date +%Y%m%d_%H%M%S).sql.gz"
 echo "💾 Backing up database..."
-docker compose -f docker-compose.prod.yml exec -T db pg_dump -U mycargolens mycargolens | gzip > "$BACKUP_DIR/$FILENAME"
+docker compose exec -T db pg_dump -U mycargolens mycargolens | gzip > "$BACKUP_DIR/$FILENAME"
 echo "✅ Backup saved: $BACKUP_DIR/$FILENAME"
 # Keep only last 30 backups
 ls -t "$BACKUP_DIR"/*.sql.gz 2>/dev/null | tail -n +31 | xargs -r rm --
@@ -214,15 +165,15 @@ echo "   1. Edit secrets:     nano $APP_DIR/.env"
 echo "   2. Generate JWT secrets:"
 echo "      openssl rand -hex 32   # Use for JWT_ACCESS_SECRET"
 echo "      openssl rand -hex 32   # Use for JWT_REFRESH_SECRET"
-echo "   3. Start the app:   cd $APP_DIR && docker compose -f docker-compose.prod.yml up -d"
-echo "   4. Seed demo data:  docker compose -f docker-compose.prod.yml exec server npx tsx prisma/seed.ts"
+echo "   3. Start the app:   cd $APP_DIR && docker compose up -d"
+echo "   4. Seed demo data:  docker compose exec server npx tsx prisma/seed.ts"
 echo "   5. Check health:    curl http://localhost:3001/api/health"
 echo ""
 echo " Maintenance:"
 echo "   Update:  $APP_DIR/update.sh"
 echo "   Backup:  $APP_DIR/backup.sh"
-echo "   Logs:    docker compose -f docker-compose.prod.yml logs -f server"
-echo "   Status:  docker compose -f docker-compose.prod.yml ps"
+echo "   Logs:    docker compose logs -f server"
+echo "   Status:  docker compose ps"
 echo ""
 echo " Optional: Set up Nginx reverse proxy + SSL with Certbot"
 echo "   apt install nginx certbot python3-certbot-nginx"
