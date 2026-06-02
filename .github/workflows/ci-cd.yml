@@ -225,6 +225,42 @@ jobs:
             set -euo pipefail
             cd /opt/mycargolens
 
+            # ── Drop empty shell env vars so they don't override .env ──
+            # `envs:` above forwards every listed GitHub Secret into this SSH
+            # session's shell. A secret that isn't set in the repo evaluates
+            # to "" — but it's STILL exported as an empty shell var. docker
+            # compose's interpolation order is shell-env → .env, so the empty
+            # shell var wins and overrides a perfectly valid .env value at
+            # container-create time.
+            #
+            # This is what took prod down on 2026-06-01 (Phase 2 of the audit
+            # added JWT_ACCESS_SECRET / JWT_REFRESH_SECRET to envs: before
+            # the GitHub Secrets were populated → empty shell var → container
+            # got empty JWT secrets → Zod rejected → crash-loop → rollback
+            # ran into the same empty env → also crashed).
+            #
+            # Unsetting empties up-front means: if a secret is not in GitHub
+            # Secrets, docker compose falls through to .env. The upsert_env
+            # function below also short-circuits on empty so the .env file is
+            # left untouched — the existing value continues to be used.
+            for var in JWT_ACCESS_SECRET JWT_REFRESH_SECRET \
+                       CC_API_TOKEN CC_ENVIRONMENT \
+                       STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PUBLISHABLE_KEY \
+                       EMAIL_USER EMAIL_PASS \
+                       AI_API_KEY AI_ASSESSMENT_ENABLED AI_PROVIDER AI_MODEL \
+                       AI_MAX_TOKENS AI_TEMPERATURE AI_RATE_LIMIT_PER_USER \
+                       AI_DISABLE_TRAINING_DATA \
+                       TERMINAL49_API_BASE_URL TERMINAL49_API_KEY; do
+              # The :- handles the case where the var is unset entirely (set -u
+              # would otherwise blow up here). If empty, unset it; printf the
+              # outcome so deploy logs make the decision auditable.
+              eval "current=\${$var:-}"
+              if [ -z "$current" ]; then
+                unset "$var" 2>/dev/null || true
+                printf '%s\n' "▶ (unset) $var — falling through to .env"
+              fi
+            done
+
             # ── Sync AI_* env vars from GitHub Secrets into the VPS .env ──
             # Idempotent upsert: replace the line if it already exists, append
             # if it doesn't. Only touches lines prefixed with AI_ so other
