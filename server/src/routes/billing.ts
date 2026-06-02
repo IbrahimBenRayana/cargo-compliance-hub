@@ -55,24 +55,65 @@ router.post(
 );
 
 // ─── Event handler (dispatch by type) ──────────────────────
+// Idempotency: Stripe retries delivery on 5xx and occasionally after 2xx
+// (the at-least-once contract). Without a ledger the same event runs our
+// handler twice — `onSubscriptionDeleted` would clobber canceledAt with
+// every retry, and notifications would fan out twice.
+// We INSERT event.id ON CONFLICT DO NOTHING at the top; if the row already
+// existed we treat it as a no-op success and return. processedAt is set
+// after the handler finishes so we can tell "received but not processed"
+// (likely crashed mid-handler) apart from "fully done".
 async function handleStripeEvent(event: Stripe.Event): Promise<void> {
-  switch (event.type) {
-    case 'checkout.session.completed':
-      await onCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
-      break;
-    case 'customer.subscription.created':
-    case 'customer.subscription.updated':
-      await onSubscriptionChanged(event.data.object as Stripe.Subscription);
-      break;
-    case 'customer.subscription.deleted':
-      await onSubscriptionDeleted(event.data.object as Stripe.Subscription);
-      break;
-    case 'invoice.payment_failed':
-      await onInvoicePaymentFailed(event.data.object as Stripe.Invoice);
-      break;
-    default:
-      logger.debug({ type: event.type }, 'Unhandled Stripe event');
+  // First-write wins. RETURNING returns the inserted row only on insert;
+  // empty result means this event was already seen.
+  const inserted = await prisma.$queryRaw<Array<{ event_id: string }>>`
+    INSERT INTO "stripe_webhook_events" ("event_id", "type", "received_at")
+    VALUES (${event.id}, ${event.type}, NOW())
+    ON CONFLICT ("event_id") DO NOTHING
+    RETURNING "event_id"
+  `;
+
+  if (inserted.length === 0) {
+    logger.info({ eventId: event.id, type: event.type }, 'Stripe webhook: duplicate event, ignoring');
+    return;
   }
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed':
+        await onCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+        break;
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+        await onSubscriptionChanged(event.data.object as Stripe.Subscription);
+        break;
+      case 'customer.subscription.deleted':
+        await onSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        break;
+      case 'invoice.payment_failed':
+        await onInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+        break;
+      default:
+        logger.debug({ type: event.type }, 'Unhandled Stripe event');
+    }
+  } catch (err) {
+    // Handler failed — null out processed_at so a future retry from Stripe
+    // can re-execute the handler. (The audit-log row in stripe_webhook_events
+    // stays; only the marker that says "we finished" is cleared.)
+    await prisma.stripeWebhookEvent.update({
+      where: { eventId: event.id },
+      data: { processedAt: null },
+    }).catch(() => { /* swallow; primary error is more important */ });
+    throw err;
+  }
+
+  // Mark done. (For retries that come in past this point, the row already
+  // exists with processedAt set — the ON CONFLICT DO NOTHING at the top
+  // will short-circuit them.)
+  await prisma.stripeWebhookEvent.update({
+    where: { eventId: event.id },
+    data: { processedAt: new Date() },
+  });
 }
 
 // Helper: extract billing period dates from a Stripe Subscription.
@@ -177,12 +218,21 @@ async function onSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
     where: { stripeSubscriptionId: sub.id },
   });
   if (!existing) return;
+  // Preserve the original cancellation timestamp. Pre-fix every retry set
+  // `canceledAt: new Date()`, so the audit trail showed the LAST retry
+  // rather than when the user actually cancelled. Prefer Stripe's own
+  // canceled_at when present; fall back to NOW only on first cancel.
+  const canceledAt = existing.canceledAt
+    ? existing.canceledAt
+    : sub.canceled_at
+    ? new Date(sub.canceled_at * 1000)
+    : new Date();
   await prisma.subscription.update({
     where: { stripeSubscriptionId: sub.id },
     data: {
       planId: 'starter',
       status: 'canceled',
-      canceledAt: new Date(),
+      canceledAt,
       stripeSubscriptionId: null, // allow the org to resubscribe
     },
   });

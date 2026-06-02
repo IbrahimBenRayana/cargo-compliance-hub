@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
@@ -10,6 +11,7 @@ import { notifyFilingSubmitted, notifyFilingRejected, notifyFilingAmended, notif
 import { recordScoreSnapshot, triggerForStatus } from '../services/compliance/scoreSnapshot.js';
 import { filingMutationLimiter, ccApiLimiter } from '../middleware/rateLimiter.js';
 import { translateValidationErrors, translateCBPRejection, sanitizeErrorMessage } from '../services/errorTranslator.js';
+import logger from '../config/logger.js';
 
 const router = Router();
 
@@ -368,32 +370,71 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
     return;
   }
 
-  // ─── Plan limit enforcement ───────────────────────────────
-  {
-    const month = new Date().toISOString().slice(0, 7); // YYYY-MM
-    const [sub, usageRow] = await Promise.all([
-      prisma.subscription.findUnique({
-        where: { orgId: req.user!.orgId },
-        include: { plan: true },
-      }),
-      prisma.filingUsage.findUnique({
-        where: { orgId_month: { orgId: req.user!.orgId, month } },
-      }),
-    ]);
-    const plan = sub?.plan ?? (await prisma.plan.findUnique({ where: { id: 'starter' } }));
-    const currentCount = usageRow?.count ?? 0;
-    const hardCap = plan?.id === 'starter'; // only free plan hard-caps; paid plans allow overage
+  // ─── Plan limit enforcement + atomic slot reservation ────
+  // Pre-fix this was findUnique → submit → upsert(count+1). Two concurrent
+  // /submit calls would both read currentCount=0, both pass the gate, and
+  // both submit to CBP — Starter users could exceed the hard cap and any
+  // overage-charged plan undercounted billable usage.
+  //
+  // New shape:
+  //   1. Reserve a slot atomically — single SQL INSERT ON CONFLICT DO
+  //      UPDATE WHERE count < limit RETURNING. 0 rows ⇒ cap hit; refuse
+  //      without calling CC.
+  //   2. Call CC (potentially expensive).
+  //   3. On CC failure: best-effort decrement so the reservation doesn't
+  //      poison the count.
+  // The post-CC `prisma.filingUsage.upsert(... count+1)` further down is
+  // removed — the slot is already reserved here.
+  const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const sub = await prisma.subscription.findUnique({
+    where: { orgId: req.user!.orgId },
+    include: { plan: true },
+  });
+  const plan = sub?.plan ?? (await prisma.plan.findUnique({ where: { id: 'starter' } }));
 
-    if (plan && currentCount >= plan.filingsIncluded && hardCap) {
-      res.status(402).json({
-        error: 'plan_limit_reached',
-        message: `You've reached your Starter plan's ${plan.filingsIncluded}-filing monthly limit. Upgrade to continue filing.`,
-        upgradeUrl: '/pricing',
-        usage: { current: currentCount, limit: plan.filingsIncluded },
-      });
-      return;
-    }
+  if (!plan) {
+    res.status(500).json({ error: 'plan_not_found', message: 'No plan associated with this organization.' });
+    return;
   }
+
+  // Starter is the only plan that hard-caps. Paid plans pass any slotLimit
+  // gate (overage is billed separately, not blocked here) — we still
+  // increment the counter atomically so reporting is consistent.
+  const hardCap = plan.id === 'starter';
+  const slotLimit = hardCap ? plan.filingsIncluded : Number.MAX_SAFE_INTEGER;
+  const reservedId = randomUUID();
+
+  const reservation = await prisma.$queryRaw<Array<{ count: number }>>`
+    INSERT INTO "filing_usage" ("id", "org_id", "month", "count", "created_at", "updated_at")
+    VALUES (${reservedId}::uuid, ${req.user!.orgId}::uuid, ${month}, 1, NOW(), NOW())
+    ON CONFLICT ("org_id", "month") DO UPDATE
+      SET "count" = "filing_usage"."count" + 1, "updated_at" = NOW()
+      WHERE "filing_usage"."count" < ${slotLimit}
+    RETURNING "count"
+  `;
+
+  if (reservation.length === 0) {
+    res.status(402).json({
+      error: 'plan_limit_reached',
+      message: `You've reached your Starter plan's ${plan.filingsIncluded}-filing monthly limit. Upgrade to continue filing.`,
+      upgradeUrl: '/pricing',
+      usage: { current: plan.filingsIncluded, limit: plan.filingsIncluded },
+    });
+    return;
+  }
+
+  // Decrement helper for paths that fail after we've reserved.
+  const releaseSlot = async () => {
+    try {
+      await prisma.$executeRaw`
+        UPDATE "filing_usage"
+        SET "count" = GREATEST("count" - 1, 0), "updated_at" = NOW()
+        WHERE "org_id" = ${req.user!.orgId}::uuid AND "month" = ${month}
+      `;
+    } catch (err: any) {
+      logger.error({ err: err.message, orgId: req.user!.orgId, month }, '[Filings] Failed to release reserved slot');
+    }
+  };
 
   try {
     // Map to CustomsCity format (auto-detect ISF-10 vs ISF-5)
@@ -454,6 +495,9 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
       });
       await recordScoreSnapshot(filing.id, 'rejected');
 
+      // Rejected before transmission to CBP — release the reserved slot.
+      await releaseSlot();
+
       res.status(422).json({
         error: 'Filing was rejected due to validation errors. Please review and correct the issues below.',
         validationErrors: translatedErrors,
@@ -484,6 +528,9 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
         },
       });
       await recordScoreSnapshot(filing.id, 'rejected');
+
+      // CC returned a hard error before our filing made it to CBP — release.
+      await releaseSlot();
 
       res.status(400).json({
         error: 'The filing was rejected by the CBP filing system. Please review your data and try again.',
@@ -568,14 +615,11 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
       sendResponse: sendResult?.data ?? createResult.data,
     });
 
-    // Track billable usage — increment ONLY on successful submit, not on draft create
-    if (newStatus === 'submitted') {
-      const month = new Date().toISOString().slice(0, 7); // YYYY-MM
-      await prisma.filingUsage.upsert({
-        where: { orgId_month: { orgId: req.user!.orgId, month } },
-        update: { count: { increment: 1 } },
-        create: { orgId: req.user!.orgId, month, count: 1 },
-      });
+    // The slot was reserved up-front; release it if the send call ultimately
+    // rejected the filing so rejected attempts don't count toward usage.
+    // (Successful submits keep the reservation — no further mutation needed.)
+    if (newStatus !== 'submitted') {
+      await releaseSlot();
     }
 
     // Audit log + notifications (fire-and-forget)
@@ -593,6 +637,10 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
       notifyFilingRejected(req.user!.orgId, filing.id, filing.masterBol || '', JSON.stringify(sendResult?.data ?? createResult.data));
     }
   } catch (err: any) {
+    // CC call (or downstream DB write) threw — release the reservation so
+    // the attempt doesn't poison the monthly count for the org.
+    await releaseSlot();
+
     // Log failed attempt
     await prisma.submissionLog.create({
       data: {
