@@ -45,9 +45,13 @@ export async function writeAuditLog(entry: AuditLogEntry): Promise<void> {
  * Helper: extract IP + user-agent from an Express request.
  */
 export function getRequestMeta(req: any): { ipAddress: string; userAgent: string } {
-  const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
-    || req.socket?.remoteAddress
-    || '';
+  // Use req.ip (computed by Express against the trust-proxy setting in
+  // index.ts) rather than raw X-Forwarded-For. Pre-fix any client could
+  // ship an arbitrary XFF header and have that string land in the audit
+  // log as their IP — destroying the forensic value. `app.set('trust
+  // proxy', 1)` pins the trust boundary to the nginx loopback subnet so
+  // req.ip reflects the real upstream client.
+  const ipAddress = req.ip || req.socket?.remoteAddress || '';
   const userAgent = (req.headers['user-agent'] as string) || '';
   return { ipAddress, userAgent };
 }

@@ -11,6 +11,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { fileTypeFromFile } from 'file-type';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
@@ -89,6 +90,34 @@ router.post('/:filingId', upload.array('files', 5), async (req: AuthRequest, res
     if (!files || files.length === 0) {
       res.status(400).json({ error: 'No files uploaded' });
       return;
+    }
+
+    // Magic-byte MIME sniff — multer's fileFilter only checked the
+    // client-supplied mimetype, which is trivially spoofable. We re-read
+    // the first bytes from disk and reject if the detected type doesn't
+    // match the claimed one. Plain-text files (.txt, .csv) don't have
+    // magic bytes; for those we accept the multer-decided extension-
+    // based MIME as a best-effort.
+    const TEXT_FALLBACK_MIMES = new Set(['text/csv', 'text/plain']);
+    for (const file of files) {
+      const claimed = file.mimetype;
+      if (TEXT_FALLBACK_MIMES.has(claimed)) continue;
+
+      const detected = await fileTypeFromFile(file.path);
+      if (!detected || !ALLOWED_MIME_TYPES.includes(detected.mime)) {
+        // Cleanup all uploaded files in this batch — partial saves leave
+        // dangling rows otherwise. Then 400 with a descriptive error.
+        files.forEach(f => { try { fs.unlinkSync(f.path); } catch { /* gone */ } });
+        res.status(400).json({
+          error: `Detected file type "${detected?.mime ?? 'unknown'}" does not match declared type "${claimed}".`,
+        });
+        return;
+      }
+      // Belt-and-braces: if the sniff disagrees with the claim, use the
+      // sniffed value when storing so downstream rendering uses reality.
+      if (detected.mime !== claimed) {
+        file.mimetype = detected.mime;
+      }
     }
 
     // documentType comes from body (can be one string applied to all, or comma-separated per file)
@@ -187,8 +216,16 @@ router.get('/:filingId/:docId/download', async (req: AuthRequest, res: Response)
       return;
     }
 
+    // Force application/octet-stream on download so the browser doesn't
+    // try to render the file inline (audit Phase 6). An attacker who
+    // managed to upload a polyglot file would otherwise get the browser
+    // to execute it under our origin. attachment + octet-stream is the
+    // safest combo — the browser saves to disk and the user opens it
+    // explicitly in whatever app handles that extension.
+    // X-Content-Type-Options: nosniff blocks IE/Edge MIME sniffing too.
     res.setHeader('Content-Disposition', `attachment; filename="${doc.fileName}"`);
-    res.setHeader('Content-Type', doc.fileType);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Length', doc.fileSizeBytes.toString());
 
     const stream = fs.createReadStream(filePath);

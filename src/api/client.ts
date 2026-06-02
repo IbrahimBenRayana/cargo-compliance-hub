@@ -4,20 +4,30 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-// ─── Token Storage (in memory — never localStorage) ───────
+// ─── Token Storage ────────────────────────────────────────
+// Access token: in-memory only — never localStorage. Lost on tab close,
+// regained on demand via /auth/refresh.
+// Refresh token: NOT in JS reach. Lives in the mcl_refresh httpOnly
+// cookie managed by the server (audit Phase 6). The browser handles
+// it automatically when we hit the path-scoped /api/v1/auth/refresh
+// endpoint with credentials: 'include'.
 let accessToken: string | null = null;
-let refreshToken: string | null = localStorage.getItem('mcl_refresh'); // Only refresh token in storage
 
-export function setTokens(access: string, refresh: string) {
+// Drop any legacy localStorage entry from the pre-Phase-6 era so the same
+// browser session doesn't keep a now-orphaned token around. Safe to keep
+// indefinitely — by the time everyone has rotated, this is a no-op.
+try {
+  localStorage.removeItem('mcl_refresh');
+} catch {
+  /* private browsing / SSR fallback */
+}
+
+export function setAccessToken(access: string | null) {
   accessToken = access;
-  refreshToken = refresh;
-  localStorage.setItem('mcl_refresh', refresh);
 }
 
 export function clearTokens() {
   accessToken = null;
-  refreshToken = null;
-  localStorage.removeItem('mcl_refresh');
 }
 
 export function getAccessToken() {
@@ -42,8 +52,10 @@ async function apiFetch<T = any>(
 
   let response = await fetch(url, { ...options, headers });
 
-  // If 401 and we have a refresh token, try to refresh
-  if (response.status === 401 && refreshToken) {
+  // If 401, attempt a refresh — the browser will send the httpOnly
+  // mcl_refresh cookie if it has one. If it doesn't, the refresh call
+  // will fail fast (401) and we surface the original 401 unchanged.
+  if (response.status === 401) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
       headers['Authorization'] = `Bearer ${accessToken}`;
@@ -96,16 +108,18 @@ async function tryRefreshToken(): Promise<boolean> {
 
   refreshInFlight = (async () => {
     try {
+      // credentials: 'include' is what tells the browser to send the
+      // path-scoped mcl_refresh cookie. We send no JSON body — the
+      // server reads the token from the cookie only (audit Phase 6).
       const res = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
+        credentials: 'include',
       });
 
       if (!res.ok) return false;
 
       const data = await res.json();
-      setTokens(data.accessToken, data.refreshToken);
+      setAccessToken(data.accessToken);
       return true;
     } catch {
       return false;
@@ -121,15 +135,20 @@ async function tryRefreshToken(): Promise<boolean> {
 // ─── Auth API ─────────────────────────────────────────────
 export const authApi = {
   register(data: { email: string; password: string; firstName: string; lastName: string; companyName?: string; iorNumber?: string; inviteToken?: string }) {
-    return apiFetch<{ user: any; accessToken: string; refreshToken: string }>('/api/v1/auth/register', {
+    // Phase 6: refresh token now arrives via httpOnly cookie; response body
+    // returns the access token + user only. credentials: 'include' so the
+    // Set-Cookie response actually lands in the browser.
+    return apiFetch<{ user: any; accessToken: string }>('/api/v1/auth/register', {
       method: 'POST',
+      credentials: 'include',
       body: JSON.stringify(data),
     });
   },
 
   login(email: string, password: string) {
-    return apiFetch<{ user: any; accessToken: string; refreshToken: string }>('/api/v1/auth/login', {
+    return apiFetch<{ user: any; accessToken: string }>('/api/v1/auth/login', {
       method: 'POST',
+      credentials: 'include',
       body: JSON.stringify({ email, password }),
     });
   },
@@ -476,7 +495,7 @@ async function apiUpload<T = any>(path: string, formData: FormData): Promise<T> 
 
   let response = await fetch(url, { method: 'POST', headers, body: formData });
 
-  if (response.status === 401 && refreshToken) {
+  if (response.status === 401) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
       headers['Authorization'] = `Bearer ${accessToken}`;
@@ -509,7 +528,7 @@ async function apiDownload(path: string): Promise<{ blob: Blob; filename: string
 
   let response = await fetch(url, { headers });
 
-  if (response.status === 401 && refreshToken) {
+  if (response.status === 401) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
       headers['Authorization'] = `Bearer ${accessToken}`;

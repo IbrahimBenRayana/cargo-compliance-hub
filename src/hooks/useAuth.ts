@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { authApi, setTokens, clearTokens } from '../api/client';
+import { authApi, setAccessToken, clearTokens } from '../api/client';
 import { create } from 'zustand';
 
 // ─── Auth Store (Zustand) ─────────────────────────────────
@@ -29,7 +29,7 @@ export function useLogin() {
     mutationFn: ({ email, password }: { email: string; password: string }) =>
       authApi.login(email, password),
     onSuccess: (data) => {
-      setTokens(data.accessToken, data.refreshToken);
+      setAccessToken(data.accessToken);
       setUser(data.user);
     },
   });
@@ -41,7 +41,7 @@ export function useRegister() {
     mutationFn: (data: { email: string; password: string; firstName: string; lastName: string; companyName?: string; inviteToken?: string }) =>
       authApi.register(data),
     onSuccess: (data) => {
-      setTokens(data.accessToken, data.refreshToken);
+      setAccessToken(data.accessToken);
       setUser(data.user);
     },
   });

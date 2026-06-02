@@ -724,7 +724,7 @@ router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, async (req: AuthReq
 
 // ── POST /:id/poll — Manual re-poll ────────────────────
 
-router.post('/:id/poll', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/poll', ccApiLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
   const doc = await prisma.abiDocument.findFirst({

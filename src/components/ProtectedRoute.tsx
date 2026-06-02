@@ -1,18 +1,20 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore, useCurrentUser } from '@/hooks/useAuth';
-import { getAccessToken } from '@/api/client';
 import { Loader2 } from 'lucide-react';
 
 export function ProtectedRoute() {
   const { isAuthenticated, isLoading, user } = useAuthStore();
-  const refreshToken = localStorage.getItem('mcl_refresh');
   const location = useLocation();
-  
-  // If we have a refresh token, try to fetch the current user
+
+  // Always try to fetch the current user. Phase 6 moved the refresh token
+  // out of localStorage and into an httpOnly cookie, so the FE has no
+  // JS-readable signal for "credentials present"; we just attempt /me
+  // and let apiFetch auto-refresh via the cookie if one is set.
   const { isLoading: isUserLoading } = useCurrentUser();
 
-  // Show loading while checking auth
-  if ((isLoading || isUserLoading) && refreshToken) {
+  // Show loading while the first /me round-trip is in flight (covers the
+  // implicit /auth/refresh that fires on /me's 401).
+  if (isLoading || isUserLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -23,9 +25,9 @@ export function ProtectedRoute() {
     );
   }
 
-  // If not authenticated and no refresh token, redirect to login
-  // Preserve the intended destination so user returns after auth
-  if (!isAuthenticated && !refreshToken) {
+  // Once useCurrentUser resolves, isAuthenticated reflects the real auth
+  // state — no cookie / no valid refresh ⇒ redirect.
+  if (!isAuthenticated) {
     const intended = location.pathname + location.search;
     const loginUrl = intended && intended !== '/'
       ? `/login?redirect=${encodeURIComponent(intended)}`
