@@ -190,16 +190,17 @@ export function ChangelogClient() {
         </ol>
       </SectionShell>
 
-      <SectionShell tone="muted" headingAlign="center" title="Want a heads-up when we ship?">
+      <SectionShell tone="muted" headingAlign="center" title="Try it out yourself.">
         <p className="mx-auto max-w-xl text-center text-base leading-relaxed mb-8 opacity-80">
-          We email a monthly digest of what shipped — no spam, no marketing fluff, unsubscribe anytime.
+          Two filings a month on the free plan — no card, no time limit.
+          See the inbox we&apos;re building from the inside.
         </p>
         <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button variant="gold" size="lg" asChild>
             <a href="https://app.mycargolens.com/register">Start free</a>
           </Button>
           <Button variant="outline" size="lg" asChild>
-            <Link href="/contact">Email digest signup</Link>
+            <Link href="/contact">Talk to founders</Link>
           </Button>
         </div>
       </SectionShell>

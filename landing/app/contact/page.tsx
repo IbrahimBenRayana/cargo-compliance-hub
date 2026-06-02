@@ -240,7 +240,6 @@ export default function ContactPage() {
                     className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                   >
                     <option value="">Select a topic…</option>
-                    <option value="demo">Demo request</option>
                     <option value="general">General inquiry</option>
                     <option value="support">Technical support</option>
                     <option value="enterprise">Enterprise inquiry</option>
