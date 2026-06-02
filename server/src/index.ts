@@ -25,6 +25,7 @@ import manifestQueryRoutes from './routes/manifestQuery.js';
 import abiDocumentsRoutes from './routes/abiDocuments.js';
 import dutyCalculationRoutes from './routes/dutyCalculation.js';
 import trackingRoutes from './routes/tracking.js';
+import contactRoutes from './routes/contact.js';
 import { startBackgroundJobs, stopBackgroundJobs, getJobStatus, pollSubmittedFilings, checkDeadlines } from './services/backgroundJobs.js';
 import { startNotificationStream, stopNotificationStream } from './services/notificationStream.js';
 import { verifyEmailConnection } from './services/email.js';
@@ -54,10 +55,14 @@ app.use(helmet({
   crossOriginOpenerPolicy: false,
   originAgentCluster: false,
 }));
+// CORS: the SPA is the primary client (FRONTEND_URL = app.mycargolens.com),
+// but the marketing site at LANDING_URL (mycargolens.com) now calls
+// /api/v1/contact. Both origins are allowed in production. In dev we also
+// allow the Vite ports + the landing dev server (3100).
 app.use(cors({
   origin: env.NODE_ENV === 'production'
-    ? [env.FRONTEND_URL]
-    : [env.FRONTEND_URL, 'http://localhost:8080', 'http://localhost:5173'],
+    ? [env.FRONTEND_URL, env.LANDING_URL].filter(Boolean) as string[]
+    : [env.FRONTEND_URL, env.LANDING_URL, 'http://localhost:8080', 'http://localhost:5173', 'http://localhost:3100'].filter(Boolean) as string[],
   credentials: true,
 }));
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
@@ -95,6 +100,10 @@ app.use('/api/v1/abi-documents', abiDocumentsRoutes);
 app.use('/api/v1/duty-calculation', dutyCalculationRoutes);
 app.use('/api/v1/compliance', complianceRoutes);
 app.use('/api/v1/tracking', trackingRoutes);
+// Public, unauthenticated — marketing-site contact form. Rate-limited per IP
+// inside the route module. Mount here so it sits under the same /api/v1
+// prefix as everything else.
+app.use('/api/v1/contact', contactRoutes);
 
 // ─── Background Jobs Endpoints ────────────────────────────
 // GET job status + POST manual trigger. Pre-fix these were mounted with

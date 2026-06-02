@@ -596,7 +596,10 @@ export function ComplianceClient() {
           </div>
           <div className="rounded-2xl border border-border/60 bg-card p-5">
             <h3 className="text-sm font-semibold text-foreground mb-3">5106 EIN Self-Check</h3>
-            <p className="text-xs text-muted-foreground mb-3">Verify your importer EIN matches IRS records before filing.</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Catch malformed EINs and missing CBP 5106 registrations before
+              CBP rejects your filing — plus a one-click jump to Form 5106.
+            </p>
             <input
               readOnly
               className="mb-3 w-full rounded-lg border border-border/60 bg-background/60 px-3 py-2 font-mono text-xs"
@@ -604,7 +607,7 @@ export function ComplianceClient() {
             />
             <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
               <span className="size-2 rounded-full bg-emerald-500" />
-              <span className="text-[12px] text-foreground">EIN matches IRS records · 2023-08-14</span>
+              <span className="text-[12px] text-foreground">EIN format valid · 5106 reminder armed</span>
             </div>
           </div>
         </div>

@@ -40,7 +40,7 @@ const DATA_ITEMS = [
 
 const VENDORS = [
   { name: "CustomsCity", role: "ABI gateway", data: "Filing data, party data, MBOL", region: "US" },
-  { name: "OpenAI (gpt-4o)", role: "AI Coach + pre-flight + HTS classifier", data: "Filing data + CBP response only", region: "US (zero-retention API tier)" },
+  { name: "OpenAI (gpt-4o-class models)", role: "AI Coach + pre-flight + HTS classifier", data: "Filing data + CBP response only", region: "US (zero-retention API tier)" },
   { name: "Stripe", role: "Billing", data: "Email, plan, invoice events", region: "US" },
   { name: "AWS (us-east-1)", role: "Hosting + Postgres + S3", data: "All app data", region: "US" },
   { name: "Resend", role: "Transactional email", data: "Recipient email + message body", region: "US" },

@@ -199,8 +199,18 @@ async function main() {
   console.log(`✅ Created ${filings.length} sample filings`);
 
   // ─── Plans ─────────────────────────────────────────────
-  // stripePriceId is null until you create prices in Stripe Dashboard and
-  // update these values (or re-seed after editing the IDs below).
+  // Pricing source of truth: the landing site at landing/app/pricing/pricing-client.tsx.
+  // Re-aligned in audit Phase 3 — pre-fix the seed (Grower $99, Scale $299,
+  // 15/60 filings, $8 overage) contradicted the marketing site (Grower $49,
+  // Scale $149, 25/100 filings, $2/$1 overage). A buyer couldn't self-correct.
+  //
+  // The old stripePriceId values pointed to the old prices in Stripe and have
+  // been NULLED here so a fresh seed doesn't reactivate them. The founder must:
+  //   1. Create new Prices in Stripe Dashboard at $49/$149 monthly + $470/$1430 annual.
+  //   2. Paste the price_xxx ids into the four placeholders below.
+  //   3. Re-run `npx prisma db seed` (or update the prod plan rows by hand).
+  // Existing customer subscriptions stay grandfathered on their original Stripe
+  // Price ids — only NEW signups see the new pricing.
   const plans = [
     {
       id: 'starter',
@@ -221,13 +231,14 @@ async function main() {
       id: 'grower_monthly',
       name: 'Grower',
       description: 'For small importers with consistent volume',
-      stripePriceId: 'price_1TMtJpREhYOSzfjmVS4eUHBK',
-      stripeProductId: 'prod_ULaUWbxxb6S0aq',
-      priceCents: 9900,
+      // TODO(stripe): create new Price at $49/mo and paste the id here.
+      stripePriceId: null,
+      stripeProductId: null,
+      priceCents: 4900, // $49/mo
       billingInterval: 'month',
-      filingsIncluded: 15,
+      filingsIncluded: 25,
       maxSeats: 3,
-      overageCents: 800,
+      overageCents: 200, // $2/filing
       features: ['basic_dashboard', 'email_support', 'chat_support', 'isf_10_2', 'isf_5', 'audit_trail', 'csv_export', 'templates'],
       isPublic: true,
       sortOrder: 1,
@@ -236,13 +247,15 @@ async function main() {
       id: 'grower_annual',
       name: 'Grower',
       description: 'For small importers with consistent volume (annual)',
-      stripePriceId: 'price_1TMtKfREhYOSzfjmt1CzPkoQ',
-      stripeProductId: 'prod_ULaUWbxxb6S0aq',
-      priceCents: 94800, // $948/yr = $79/mo
+      // TODO(stripe): create new Price at $470/yr and paste the id here.
+      // $470/yr ≈ $39/mo (~20% off the $49 monthly tier).
+      stripePriceId: null,
+      stripeProductId: null,
+      priceCents: 47000, // $470/yr ≈ $39/mo
       billingInterval: 'year',
-      filingsIncluded: 15,
+      filingsIncluded: 25,
       maxSeats: 3,
-      overageCents: 800,
+      overageCents: 200,
       features: ['basic_dashboard', 'email_support', 'chat_support', 'isf_10_2', 'isf_5', 'audit_trail', 'csv_export', 'templates'],
       isPublic: true,
       sortOrder: 2,
@@ -251,13 +264,14 @@ async function main() {
       id: 'scale_monthly',
       name: 'Scale',
       description: 'For growing teams and 3PLs',
-      stripePriceId: 'price_1TMtLQREhYOSzfjmq2MnD5aR',
-      stripeProductId: 'prod_ULaWeZKXhlq7QU',
-      priceCents: 29900,
+      // TODO(stripe): create new Price at $149/mo and paste the id here.
+      stripePriceId: null,
+      stripeProductId: null,
+      priceCents: 14900, // $149/mo
       billingInterval: 'month',
-      filingsIncluded: 60,
+      filingsIncluded: 100,
       maxSeats: 10,
-      overageCents: 800,
+      overageCents: 100, // $1/filing
       features: ['everything_in_grower', 'bulk_csv_import', 'api_access', 'priority_support_4h', 'custom_roles'],
       isPublic: true,
       sortOrder: 3,
@@ -266,13 +280,15 @@ async function main() {
       id: 'scale_annual',
       name: 'Scale',
       description: 'For growing teams and 3PLs (annual)',
-      stripePriceId: 'price_1TMtM4REhYOSzfjmhFup9sxD',
-      stripeProductId: 'prod_ULaWeZKXhlq7QU',
-      priceCents: 286800, // $2868/yr = $239/mo
+      // TODO(stripe): create new Price at $1430/yr and paste the id here.
+      // $1430/yr ≈ $119/mo (~20% off the $149 monthly tier).
+      stripePriceId: null,
+      stripeProductId: null,
+      priceCents: 143000, // $1430/yr ≈ $119/mo
       billingInterval: 'year',
-      filingsIncluded: 60,
+      filingsIncluded: 100,
       maxSeats: 10,
-      overageCents: 800,
+      overageCents: 100,
       features: ['everything_in_grower', 'bulk_csv_import', 'api_access', 'priority_support_4h', 'custom_roles'],
       isPublic: true,
       sortOrder: 4,

@@ -861,7 +861,7 @@ export function PricingPageClient() {
               High-volume?
             </h3>
             <p className="relative mt-2 text-sm leading-relaxed text-white/70">
-              250+ filings/mo or 25+ users. Annual contracts, SSO, dedicated support.
+              250+ filings/mo or 25+ users. Annual contracts, dedicated support. SSO/SAML on the Q4 2026 roadmap.
             </p>
             <Button
               variant="outline"

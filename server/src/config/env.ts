@@ -12,6 +12,11 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3001),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   FRONTEND_URL: z.string().default('http://localhost:8080'),
+  // LANDING_URL — marketing site origin, allowed in CORS so /api/v1/contact
+  // (and any future landing→API calls) can reach the server cross-origin.
+  // Empty default → CORS allowlist is unchanged in dev; set to your prod
+  // landing domain (e.g. https://mycargolens.com) at deploy time.
+  LANDING_URL: z.string().default(''),
   CC_API_BASE_URL: z.string().default('https://api-cert.customscity.com'),
   CC_API_TOKEN: z.string().optional(),
   CC_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
