@@ -467,7 +467,7 @@ const FAQ = [
   },
   {
     q: "What happens if I hit my plan limit mid-month?",
-    a: "A calm plan-limit modal appears. You can either keep going at the overage rate or upgrade. We never block a filing — your shipments don't wait for billing.",
+    a: "On paid plans a calm plan-limit modal appears with overage pricing — your shipments don't wait for billing. The free Starter tier has a 2-filing monthly cap so we can keep offering it free.",
   },
   {
     q: "Can I downgrade?",

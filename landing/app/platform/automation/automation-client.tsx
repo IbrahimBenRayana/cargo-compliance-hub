@@ -254,7 +254,7 @@ const NOTIF_KINDS = [
   { kind: "filing.rejected", channels: "in-app · email", body: "AI Coach card pre-loaded with the rejection explanation." },
   { kind: "filing.accepted", channels: "in-app", body: "Quiet confirmation — no email noise for good news." },
   { kind: "filing.on_hold", channels: "in-app · email", body: "Includes the CBP detail code and the suggested next step." },
-  { kind: "deadline.warning", channels: "in-app · email", body: "Fires at 24h, 12h, 4h, and 1h before the deadline." },
+  { kind: "deadline.warning", channels: "in-app · email", body: "Fires at 72h, 48h, and 24h before the deadline, plus an overdue alert once it lapses." },
   { kind: "entry.psc_closing", channels: "in-app · email", body: "Once the PSC window enters its final 14 days." },
   { kind: "billing.event", channels: "email", body: "Plan-limit warnings and invoice events from Stripe." },
 ];

@@ -39,6 +39,13 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  // Canonical URL anchored to the production domain (audit Phase 9.3).
+  // Without an explicit canonical, search engines treat mycargolens.com/
+  // www.mycargolens.com/ and any preview URL as independent pages and
+  // dilute the ranking signal.
+  alternates: {
+    canonical: "/",
+  },
 };
 
 export default function RootLayout({
