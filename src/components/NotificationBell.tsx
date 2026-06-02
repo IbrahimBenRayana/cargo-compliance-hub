@@ -146,7 +146,19 @@ export function NotificationBell() {
 
   function handleClick(n: Notification) {
     if (!n.isRead) markRead.mutate(n.id);
-    const target = n.linkUrl ?? (n.filingId ? `/shipments/${n.filingId}` : null);
+    // Fallback chain extended for the entities surfaced by the
+    // notification stream (audit Phase 8). Pre-fix any
+    // entry_*/manifest_query_*/billing_* notification emitted without a
+    // server-set linkUrl was a dead click because the chain only knew
+    // about filingId. We now prefer abiDocumentId for entry notifications
+    // before falling back to filingId. (Server callers should still set
+    // linkUrl whenever the destination is anything other than the entity
+    // detail page; this is the safety net.)
+    const target =
+      n.linkUrl ??
+      (n.abiDocumentId ? `/abi-documents/${n.abiDocumentId}`
+       : n.filingId   ? `/shipments/${n.filingId}`
+       : null);
     if (target) {
       navigate(target);
       setOpen(false);

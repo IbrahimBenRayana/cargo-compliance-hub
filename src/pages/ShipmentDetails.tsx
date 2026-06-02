@@ -545,6 +545,11 @@ export default function ShipmentDetails() {
   const [templateName, setTemplateName] = useState('');
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [planLimit, setPlanLimit] = useState<{ current: number; limit: number } | null>(null);
+  // Resubmit validation errors → shown in a Dialog with one row per field
+  // (audit Phase 8.3). Pre-fix the user only saw "N validation errors" in
+  // a toast and had no way to act on them; the full list now lives until
+  // they dismiss it.
+  const [resubmitErrors, setResubmitErrors] = useState<Array<{ field?: string; message?: string }> | null>(null);
   const [coachOpen, setCoachOpen] = useState(false);
   // Drawer can render in two modes: rejection (for rejected) or draft-review
   // (for in-flight). One drawer instance + state controls both.
@@ -608,8 +613,9 @@ export default function ShipmentDetails() {
         return;
       }
       if (body?.validationErrors && Array.isArray(body.validationErrors)) {
-        const count = body.validationErrors.length;
-        toast.error(`Submission failed: ${count} validation error(s). Please review and fix the issues.`, { duration: 8000 });
+        // Drop the toast-only "N validation errors" message and surface the
+        // full list in a Dialog so the user can actually act on each field.
+        setResubmitErrors(body.validationErrors);
       } else {
         toast.error(body?.error || 'Resubmission failed');
       }
@@ -732,6 +738,43 @@ export default function ShipmentDetails() {
         onClose={() => setPlanLimit(null)}
         usage={planLimit ?? { current: 0, limit: 0 }}
       />
+
+      {/* Resubmit validation errors — shown when the server rejects the
+          resubmit attempt with a structured validationErrors array. */}
+      <Dialog open={resubmitErrors !== null} onOpenChange={(open) => !open && setResubmitErrors(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Resubmission failed — {resubmitErrors?.length ?? 0} validation issue
+              {(resubmitErrors?.length ?? 0) === 1 ? '' : 's'}
+            </DialogTitle>
+            <DialogDescription>
+              CBP requires every field below to be valid before the filing
+              can re-transmit. Edit the filing to address each one and try
+              resubmit again.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="max-h-[50vh] overflow-y-auto space-y-2 text-sm">
+            {resubmitErrors?.map((e, i) => (
+              <li key={i} className="flex items-start gap-2 rounded-md border border-border/60 bg-secondary/40 px-3 py-2">
+                {e.field && (
+                  <span className="font-mono text-xs text-foreground/70 shrink-0">{e.field}</span>
+                )}
+                <span className="text-foreground/85">{e.message ?? 'Validation failed'}</span>
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResubmitErrors(null)}>
+              Close
+            </Button>
+            <Button onClick={() => { setResubmitErrors(null); navigate(`/shipments/${filing.id}/edit`); }}>
+              Edit filing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="flex items-center gap-3 opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
         <Button variant="ghost" size="icon" className="rounded-xl" asChild>
@@ -777,10 +820,31 @@ export default function ShipmentDetails() {
             </Button>
           )}
           {filing.status === 'accepted' && (
-            <Button variant="outline" className="gap-1.5" onClick={handleAmend} disabled={amendFiling.isPending}>
-              {amendFiling.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileEdit className="h-4 w-4" />}
-              Amend
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="gap-1.5" disabled={amendFiling.isPending}>
+                  {amendFiling.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileEdit className="h-4 w-4" />}
+                  Amend
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>File an amendment with CBP?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This re-transmits the ISF to CBP. Amendments can incur
+                    per-submission fees on your CC plan, and depending on the
+                    timing relative to vessel departure, late-amendment penalties
+                    may apply. Make sure your changes are final before continuing.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep as-is</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleAmend}>
+                    Send amendment to CBP
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
 
           {/* Check Manifest — look up cargo status at CBP */}

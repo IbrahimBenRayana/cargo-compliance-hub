@@ -17,6 +17,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   Plus, Search, Eye, Pencil, Filter, X, Ship, CalendarIcon,
   ArrowUpDown, ArrowUp, ArrowDown, Package, Globe, FileText, Clock, Loader2, Send, Bookmark, ChevronDown,
   Trash2, CheckCheck, Download,
@@ -461,11 +465,34 @@ export default function ShipmentsList() {
                   {bulkSubmit.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
                   Submit {selectedDraftIds.length}
                 </Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-red-300 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
-                  onClick={handleBulkDelete} disabled={bulkDelete.isPending}>
-                  {bulkDelete.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                  Delete {selectedDraftIds.length}
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-red-300 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
+                      disabled={bulkDelete.isPending}>
+                      {bulkDelete.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                      Delete {selectedDraftIds.length}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Delete {selectedDraftIds.length} draft{selectedDraftIds.length === 1 ? '' : 's'}?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This permanently removes the selected drafts and any
+                        documents attached to them. Only drafts that haven't
+                        been submitted to CBP are affected. This cannot be
+                        undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Keep drafts</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Delete drafts
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </>
             )}
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
@@ -618,7 +645,67 @@ export default function ShipmentsList() {
                 </TableRow>
                 );
               })}
-              {filtered.length === 0 && (
+              {/* States, in priority order (audit Phase 8.3):
+                   1. Loading on first fetch → skeleton rows
+                   2. Error → error tile with retry guidance
+                   3. Zero filings AND no active filters/search → first-time
+                      onboarding nudge (different from "no matches")
+                   4. Zero filtered rows but filings exist → adjust-filters
+                      message (the pre-fix copy, now correctly scoped). */}
+              {isLoading && filtered.length === 0 && (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={10} className="py-3">
+                      <Skeleton className="h-9 w-full rounded" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+              {!isLoading && isError && (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center py-16">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-12 w-12 rounded-xl bg-rose-100 dark:bg-rose-950/30 flex items-center justify-center">
+                        <X className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">Couldn&apos;t load shipments</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          The server didn&apos;t respond. Check your connection
+                          and try again.
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-1">
+                        Reload
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && !isError && filtered.length === 0 && filings.length === 0 && activeFilterCount === 0 && !search && (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center py-16">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center">
+                        <Ship className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">No filings yet</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Start your first ISF filing to see it here.
+                        </p>
+                      </div>
+                      <Button size="sm" className="mt-1" asChild>
+                        <Link to="/shipments/new">
+                          <Plus className="h-3.5 w-3.5 mr-1" />
+                          New filing
+                        </Link>
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && !isError && filtered.length === 0 && (filings.length > 0 || activeFilterCount > 0 || search) && (
                 <TableRow>
                   <TableCell colSpan={10} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">

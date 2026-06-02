@@ -6,7 +6,7 @@
  * ABI wizard works against a DeepPartial `ABIDocumentDraft` state instead of
  * a flat ISF form model.
  */
-import { memo, useState, type ReactNode } from 'react';
+import { memo, useId, useState, type ReactNode } from 'react';
 import { AlertCircle, Check, ChevronsUpDown, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -106,16 +106,19 @@ export const HintLabel = memo(function HintLabel({
   hint,
   required,
   labelExtra,
+  htmlFor,
 }: {
   label: string;
   hint?: string;
   required?: boolean;
   /** Optional slot rendered after the label (e.g. provenance chip). */
   labelExtra?: React.ReactNode;
+  /** id of the labelled input — wires click-to-focus + a11y (Phase 8.4). */
+  htmlFor?: string;
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <Label className="text-sm font-medium">
+      <Label htmlFor={htmlFor} className="text-sm font-medium">
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </Label>
@@ -164,10 +167,15 @@ export const TextField = memo(function TextField({
   className?: string;
   labelExtra?: React.ReactNode;
 }) {
+  const fieldId = useId();
+  const errorId = `${fieldId}-error`;
   return (
     <div className={cn('space-y-1.5', cls)}>
-      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} />
+      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} htmlFor={fieldId} />
       <Input
+        id={fieldId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -177,7 +185,7 @@ export const TextField = memo(function TextField({
         className={cn(error && 'border-red-500 focus-visible:ring-red-500')}
       />
       {error && (
-        <p className="text-xs text-red-500 flex items-center gap-1">
+        <p id={errorId} className="text-xs text-red-500 flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
           {error}
         </p>
@@ -214,11 +222,18 @@ export const SelectField = memo(function SelectField({
   className?: string;
   labelExtra?: React.ReactNode;
 }) {
+  const fieldId = useId();
+  const errorId = `${fieldId}-error`;
   return (
     <div className={cn('space-y-1.5', cls)}>
-      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} />
+      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} htmlFor={fieldId} />
       <Select value={value || undefined} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger className={cn(error && 'border-red-500')}>
+        <SelectTrigger
+          id={fieldId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          className={cn(error && 'border-red-500')}
+        >
           <SelectValue placeholder={placeholder || 'Select...'} />
         </SelectTrigger>
         <SelectContent>
@@ -234,7 +249,7 @@ export const SelectField = memo(function SelectField({
         </SelectContent>
       </Select>
       {error && (
-        <p className="text-xs text-red-500 flex items-center gap-1">
+        <p id={errorId} className="text-xs text-red-500 flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
           {error}
         </p>
@@ -271,12 +286,17 @@ export const ComboboxField = memo(function ComboboxField({
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
+  const fieldId = useId();
+  const errorId = `${fieldId}-error`;
   return (
     <div className={cn('space-y-1.5', cls)}>
-      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} />
+      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} htmlFor={fieldId} />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
+            id={fieldId}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
             variant="outline"
             role="combobox"
             aria-expanded={open}
@@ -327,7 +347,7 @@ export const ComboboxField = memo(function ComboboxField({
         </PopoverContent>
       </Popover>
       {error && (
-        <p className="text-xs text-red-500 flex items-center gap-1">
+        <p id={errorId} className="text-xs text-red-500 flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
           {error}
         </p>
@@ -359,10 +379,15 @@ export const DateField = memo(function DateField({
   labelExtra?: React.ReactNode;
 }) {
   const iso = yyyymmddToISO(value);
+  const fieldId = useId();
+  const errorId = `${fieldId}-error`;
   return (
     <div className={cn('space-y-1.5', cls)}>
-      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} />
+      <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} htmlFor={fieldId} />
       <Input
+        id={fieldId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
         type="date"
         value={iso}
         disabled={disabled}
@@ -370,7 +395,7 @@ export const DateField = memo(function DateField({
         className={cn(error && 'border-red-500 focus-visible:ring-red-500')}
       />
       {error && (
-        <p className="text-xs text-red-500 flex items-center gap-1">
+        <p id={errorId} className="text-xs text-red-500 flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
           {error}
         </p>

@@ -245,17 +245,17 @@ export default function SettingsPage() {
                 <CardContent className="pt-6 space-y-5">
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">First Name</Label>
-                      <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
+                      <Label htmlFor="settings-first-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">First Name</Label>
+                      <Input id="settings-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Last Name</Label>
-                      <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
+                      <Label htmlFor="settings-last-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Last Name</Label>
+                      <Input id="settings-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email Address</Label>
-                    <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@company.com" />
+                    <Label htmlFor="settings-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email Address</Label>
+                    <Input id="settings-email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@company.com" />
                   </div>
                   <div className="flex items-center justify-between pt-2">
                     <p className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -280,9 +280,10 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="pt-6 space-y-5">
                   <div className="space-y-2">
-                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current Password</Label>
+                    <Label htmlFor="settings-current-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current Password</Label>
                     <div className="relative">
                       <Input
+                        id="settings-current-password"
                         type={showPasswords ? 'text' : 'password'}
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
@@ -300,8 +301,9 @@ export default function SettingsPage() {
                   </div>
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">New Password</Label>
+                      <Label htmlFor="settings-new-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">New Password</Label>
                       <Input
+                        id="settings-new-password"
                         type={showPasswords ? 'text' : 'password'}
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
@@ -309,8 +311,9 @@ export default function SettingsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Confirm Password</Label>
+                      <Label htmlFor="settings-confirm-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Confirm Password</Label>
                       <Input
+                        id="settings-confirm-password"
                         type={showPasswords ? 'text' : 'password'}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -353,18 +356,18 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="pt-6 space-y-5">
                   <div className="space-y-2">
-                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Company Name</Label>
-                    <Input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="Legal company name" />
+                    <Label htmlFor="settings-org-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Company Name</Label>
+                    <Input id="settings-org-name" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="Legal company name" />
                   </div>
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">IOR Number</Label>
-                      <Input value={iorNumber} onChange={(e) => setIorNumber(e.target.value)} placeholder="XX-XXXXXXXXX" className="font-mono" />
+                      <Label htmlFor="settings-ior" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">IOR Number</Label>
+                      <Input id="settings-ior" value={iorNumber} onChange={(e) => setIorNumber(e.target.value)} placeholder="XX-XXXXXXXXX" className="font-mono" />
                       <p className="text-[11px] text-muted-foreground">Importer of Record — used on all ISF filings</p>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">EIN / Tax ID</Label>
-                      <Input value={einNumber} onChange={(e) => setEinNumber(e.target.value)} placeholder="XX-XXXXXXX" className="font-mono" />
+                      <Label htmlFor="settings-ein" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">EIN / Tax ID</Label>
+                      <Input id="settings-ein" value={einNumber} onChange={(e) => setEinNumber(e.target.value)} placeholder="XX-XXXXXXX" className="font-mono" />
                       <p className="text-[11px] text-muted-foreground">Employer Identification Number</p>
                     </div>
                   </div>

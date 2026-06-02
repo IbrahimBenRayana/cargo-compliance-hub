@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useId, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { useFiling, useCreateFiling, useUpdateFiling } from '@/hooks/useFilings';
+import { useFiling, useCreateFiling, useUpdateFiling, useFilingAutosave } from '@/hooks/useFilings';
 import { useManifestQuery } from '@/hooks/useManifestQuery';
 import type { PartyInfo, CommodityInfo, ContainerInfo } from '@/types/shipment';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -230,10 +230,14 @@ const initialForm = (): ISFFormState => ({
 
 // ─── Reusable Field Components ─────────────────────────────
 
-const HintLabel = memo(function HintLabel({ label, hint, required }: { label: string; hint?: string; required?: boolean }) {
+// htmlFor wires the Label to its input by id so clicking the label focuses
+// the input and screen readers announce the label when the input is read
+// (audit Phase 8.4). Pre-fix Label was rendered next to Input with no
+// id/htmlFor pairing — Radix doesn't auto-associate by proximity.
+const HintLabel = memo(function HintLabel({ label, hint, required, htmlFor }: { label: string; hint?: string; required?: boolean; htmlFor?: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <Label className="text-sm font-medium">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</Label>
+      <Label htmlFor={htmlFor} className="text-sm font-medium">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</Label>
       {hint && (
         <TooltipProvider delayDuration={200}>
           <Tooltip>
@@ -255,10 +259,15 @@ const TextField = memo(function TextField({
   value: string; onChange: (v: string) => void; maxLength?: number; pattern?: string;
   error?: string; className?: string;
 }) {
+  const fieldId = useId();
+  const errorId = `${fieldId}-error`;
   return (
     <div className={cn('space-y-1.5', cls)}>
-      <HintLabel label={label} hint={hint} required={required} />
+      <HintLabel label={label} hint={hint} required={required} htmlFor={fieldId} />
       <Input
+        id={fieldId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
@@ -266,7 +275,7 @@ const TextField = memo(function TextField({
         pattern={pattern}
         className={cn(error && 'border-red-500 focus-visible:ring-red-500')}
       />
-      {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
+      {error && <p id={errorId} className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
       {maxLength && value.length > maxLength * 0.8 && !error && (
         <p className="text-xs text-muted-foreground text-right">{value.length}/{maxLength}</p>
       )}
@@ -282,18 +291,25 @@ const SelectField = memo(function SelectField({
   options: { value: string; label: string }[];
   placeholder?: string; error?: string; className?: string;
 }) {
+  const fieldId = useId();
+  const errorId = `${fieldId}-error`;
   return (
     <div className={cn('space-y-1.5', cls)}>
-      <HintLabel label={label} hint={hint} required={required} />
+      <HintLabel label={label} hint={hint} required={required} htmlFor={fieldId} />
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className={cn(error && 'border-red-500')}>
+        <SelectTrigger
+          id={fieldId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          className={cn(error && 'border-red-500')}
+        >
           <SelectValue placeholder={placeholder || 'Select...'} />
         </SelectTrigger>
         <SelectContent>
           {options.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
         </SelectContent>
       </Select>
-      {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
+      {error && <p id={errorId} className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
     </div>
   );
 });
@@ -310,12 +326,16 @@ const PortSelectField = memo(function PortSelectField({
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find(o => o.value === value);
+  const fieldId = useId();
+  const errorId = `${fieldId}-error`;
   return (
     <div className={cn('space-y-1.5', cls)}>
-      <HintLabel label={label} hint={hint} required={required} />
+      <HintLabel label={label} hint={hint} required={required} htmlFor={fieldId} />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" role="combobox" aria-expanded={open}
+          <Button id={fieldId} variant="outline" role="combobox" aria-expanded={open}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
             className={cn('w-full justify-between font-normal h-9 px-3', !selected && 'text-muted-foreground', error && 'border-red-500')}>
             <span className="truncate">{selected ? selected.label : (placeholder || 'Select port…')}</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -338,7 +358,7 @@ const PortSelectField = memo(function PortSelectField({
           </Command>
         </PopoverContent>
       </Popover>
-      {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
+      {error && <p id={errorId} className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
     </div>
   );
 });
@@ -428,6 +448,15 @@ export default function ShipmentWizard() {
   const { data: existing, isLoading: isLoadingFiling } = useFiling(id);
   const createFiling = useCreateFiling();
   const updateFiling = useUpdateFiling();
+  // Phase 8.2 autosave — only active in edit mode (where we have a filing
+  // id to PATCH against). New-mode persistence stays explicit via the
+  // submit button so the user knows when their first server-side row
+  // appears.
+  const autosave = useFilingAutosave(isEdit ? id : undefined);
+  // Track whether the user has touched the form since hydration so we
+  // don't fire an autosave PATCH from the initial useFiling load.
+  const hydratedRef = useRef(false);
+  const [savedRecentlyAt, setSavedRecentlyAt] = useState<number | null>(null);
 
   // Filing→Filing prefill chain. If `?fromFiling=<id>` is set on a NEW
   // wizard (not edit), we fetch that filing and hydrate the form from it,
@@ -645,7 +674,41 @@ export default function ShipmentWizard() {
         USPortOfArrival: existing.isf5Data.USPortOfArrival || '',
       } : emptyISF5(),
     });
+    // Flag the form as hydrated AFTER setForm so the autosave effect below
+    // doesn't fire on the first existing-row hydration cycle.
+    hydratedRef.current = true;
   }, [existing, parseParty]);
+
+  // Autosave on form change (audit Phase 8.2). The hook debounces internally,
+  // so this effect can fire on every keystroke without spamming the server.
+  // Skip until hydration completes so we don't PATCH with the just-loaded
+  // server state right after it lands.
+  useEffect(() => {
+    if (!isEdit || !id || !hydratedRef.current) return;
+    autosave.save(buildPayload());
+    // buildPayload is a useMemo; autosave is a stable object — listing both
+    // would cause infinite re-saves. We watch `form` only and trust the
+    // hook's debounce + dedup to coalesce.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, isEdit, id]);
+
+  // Reset the "Saved" indicator a few seconds after a successful flush so
+  // the user gets affirmation without it sticking on the screen forever.
+  useEffect(() => {
+    if (!autosave.isSaving && savedRecentlyAt) {
+      const t = setTimeout(() => setSavedRecentlyAt(null), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [autosave.isSaving, savedRecentlyAt]);
+
+  // Mark a successful save (transitions isSaving true → false).
+  const prevSavingRef = useRef(false);
+  useEffect(() => {
+    if (prevSavingRef.current && !autosave.isSaving && !autosave.error) {
+      setSavedRecentlyAt(Date.now());
+    }
+    prevSavingRef.current = autosave.isSaving;
+  }, [autosave.isSaving, autosave.error]);
 
   // ─── Updaters ──────────────────────
   const set = useCallback(<K extends keyof ISFFormState>(field: K, value: ISFFormState[K]) => {
@@ -1376,7 +1439,28 @@ export default function ShipmentWizard() {
           <Link to="/shipments"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">{isEdit ? 'Edit ISF Filing' : 'New ISF Filing'}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">{isEdit ? 'Edit ISF Filing' : 'New ISF Filing'}</h1>
+            {/* Autosave indicator (audit Phase 8.2) — only in edit mode. */}
+            {isEdit && autosave.isSaving && (
+              <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Saving…
+              </span>
+            )}
+            {isEdit && !autosave.isSaving && savedRecentlyAt && (
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1.5">
+                <Check className="h-3 w-3" />
+                Saved
+              </span>
+            )}
+            {isEdit && autosave.error && (
+              <span className="text-xs text-red-600 dark:text-red-400 inline-flex items-center gap-1.5">
+                <AlertCircle className="h-3 w-3" />
+                Save failed
+              </span>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
             Step {step + 1} of {STEPS.length} — {STEPS[step].desc}
           </p>
