@@ -122,8 +122,20 @@ const createFilingSchema = z.object({
 });
 
 // One Master BOL + N House BOLs → N draft filings sharing a generated
-// consolidationId. Per-HBL overrides are deferred to PR 2; PR 1 only
-// captures the HBL number per filing — every other field is shared.
+// consolidationId. Shared fields (importer, vessel, voyage, port, bond...)
+// come from the parent schema; per-HBL overrides ride alongside in `perHbl`.
+//
+// In a real consolidation, commodities almost always differ per house bill
+// (each HBL is a distinct supplier shipment). PR 2 ships the commodities
+// override; containers + party-level overrides are queued for PR 2b.
+const perHblOverrideSchema = z
+  .object({
+    // When provided, replaces the shared commodities array for this filing.
+    // When omitted (or empty), the shared list applies.
+    commodities: z.array(commoditySchema).optional(),
+  })
+  .strict();
+
 const createConsolidationSchema = createFilingSchema.extend({
   // Suppress the single houseBol in favour of an explicit list. We don't
   // strip it from the parent schema because the standard create route
@@ -133,6 +145,11 @@ const createConsolidationSchema = createFilingSchema.extend({
     .array(z.string().trim().min(1, 'House BOL cannot be empty').max(100))
     .min(2, 'A consolidation needs at least 2 house bills — use the standard create for a single HBL')
     .max(50, 'Consolidations are capped at 50 house bills per shipment'),
+  /**
+   * Per-HBL overrides — index-aligned to `houseBills`. Optional; omitted
+   * entries inherit every shared field from the parent payload.
+   */
+  perHbl: z.array(perHblOverrideSchema).optional(),
 });
 
 // ─── POST /api/v1/filings — Create new filing ─────────────
@@ -221,7 +238,17 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
   try {
     const data = createConsolidationSchema.parse(req.body);
     // Strip the never-typed houseBol stub so it doesn't leak through.
-    const { houseBol: _unused, houseBills, ...shared } = data;
+    const { houseBol: _unused, houseBills, perHbl, ...shared } = data;
+
+    // perHbl must align 1:1 with houseBills when provided. We accept a
+    // shorter array (trailing inherits) but reject longer than houseBills.
+    if (perHbl && perHbl.length > houseBills.length) {
+      res.status(400).json({
+        error: 'per_hbl_misaligned',
+        message: `perHbl has ${perHbl.length} entries but only ${houseBills.length} house bills`,
+      });
+      return;
+    }
 
     // Reject duplicate house bills within the same consolidation — these
     // would create CBP-rejectable siblings (same BOLNumber twice).
@@ -248,8 +275,18 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
     // no orphaned siblings. statusHistory is created in the same tx.
     const created = await prisma.$transaction(async (tx) => {
       const rows = await Promise.all(
-        normalised.map((hbl) =>
-          tx.filing.create({
+        normalised.map((hbl, idx) => {
+          // Per-HBL override: a non-empty commodities array replaces the
+          // shared list for this filing. Empty arrays + missing entries
+          // both fall back to the shared list (the common "all HBLs use
+          // the same goods" path).
+          const override = perHbl?.[idx];
+          const filingCommodities =
+            override?.commodities && override.commodities.length > 0
+              ? override.commodities
+              : shared.commodities;
+
+          return tx.filing.create({
             data: {
               orgId: req.user!.orgId,
               createdById: req.user!.id,
@@ -280,7 +317,7 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
               bondType: shared.bondType,
               bondSuretyCode: shared.bondSuretyCode,
               isf5Data: shared.isf5Data ?? undefined,
-              commodities: shared.commodities,
+              commodities: filingCommodities,
               containers: shared.containers,
               statusHistory: {
                 create: {
@@ -290,8 +327,8 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
                 },
               },
             },
-          }),
-        ),
+          });
+        }),
       );
       return rows;
     });

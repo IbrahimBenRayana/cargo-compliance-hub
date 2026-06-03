@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import {
   ArrowLeft, ArrowRight, Check, ChevronsUpDown, Loader2, Info, Ship, Package, Users, FileText,
@@ -144,6 +145,14 @@ interface ISFFormState {
    * each consuming its own plan slot at /submit.
    */
   additionalHouseBills: string[];
+  /**
+   * Per-HBL overrides for fields that genuinely differ between sibling
+   * filings in a consolidation. Length is kept in sync with
+   * `1 + additionalHouseBills.length` so index 0 = primary HBL, indices
+   * 1..N = additionalHouseBills[i-1]. An empty/undefined `commodities`
+   * means "inherit from the shared `commodities` array" — the common case.
+   */
+  perHblOverrides: Array<{ commodities?: CommodityFormData[] }>;
   bondType: string;
 
   // IOR & Filer
@@ -214,6 +223,7 @@ const initialForm = (): ISFFormState => ({
   masterBol: '',
   houseBol: '',
   additionalHouseBills: [],
+  perHblOverrides: [{}],
   bondType: 'continuous',
   importerName: '',
   importerNumber: '',
@@ -531,6 +541,7 @@ export default function ShipmentWizard() {
       masterBol: '',
       houseBol: '',
       additionalHouseBills: [],
+      perHblOverrides: [{}],
       voyageNumber: '',
       estimatedDeparture: '',
       estimatedArrival: '',
@@ -639,6 +650,7 @@ export default function ShipmentWizard() {
       houseBol: existing.houseBol || '',
       // Edit mode is per-filing, so consolidation list is empty in this path.
       additionalHouseBills: [],
+      perHblOverrides: [{}],
       bondType: existing.bondType || 'continuous',
       importerName: existing.importerName || '',
       importerNumber: existing.importerNumber || '',
@@ -759,6 +771,19 @@ export default function ShipmentWizard() {
   const removeCommodity = useCallback((i: number) => setForm(p => ({ ...p, commodities: p.commodities.filter((_, idx) => idx !== i) })), []);
   const addContainer = useCallback(() => setForm(p => ({ ...p, containers: [...p.containers, emptyContainer()] })), []);
   const removeContainer = useCallback((i: number) => setForm(p => ({ ...p, containers: p.containers.filter((_, idx) => idx !== i) })), []);
+
+  // ─── Per-HBL commodity overrides (consolidation mode) ──
+  // hblIdx 0 = primary `houseBol`, 1..N = additionalHouseBills[i-1].
+  // setHblCommodities replaces the whole array on a given HBL; passing
+  // undefined removes the override so the HBL inherits the shared list.
+  const setHblCommodities = useCallback((hblIdx: number, next: CommodityFormData[] | undefined) => {
+    setForm(prev => {
+      const overrides = [...prev.perHblOverrides];
+      while (overrides.length <= hblIdx) overrides.push({});
+      overrides[hblIdx] = { ...overrides[hblIdx], commodities: next };
+      return { ...prev, perHblOverrides: overrides };
+    });
+  }, []);
 
   const progress = useMemo(() => calcProgress(form), [form]);
   const isSaving = createFiling.isPending || createConsolidation.isPending || updateFiling.isPending;
@@ -958,15 +983,46 @@ export default function ShipmentWizard() {
           form.houseBol.trim(),
           ...form.additionalHouseBills.map((h) => h.trim()).filter(Boolean),
         ];
+
+        // Build perHbl payload from local overrides. We map each
+        // perHblOverrides[i].commodities (which is in form shape) through
+        // the same CommodityInfo coercion the shared payload uses, then
+        // omit entries that don't override anything (Zod accepts a shorter
+        // array — trailing inherits). A tail of empty entries is trimmed
+        // for tidiness.
+        const perHblBuilt = form.perHblOverrides.map((o) => {
+          if (!o.commodities || o.commodities.length === 0) return {};
+          return {
+            commodities: o.commodities
+              .filter(c => c.htsCode.trim() && c.countryOfOrigin.trim())
+              .map(c => ({
+                htsCode: c.htsCode.replace(/[\.\-\s]/g, ''),
+                description: c.description || undefined,
+                countryOfOrigin: c.countryOfOrigin,
+                quantity: c.quantity ? Number(c.quantity) : undefined,
+                quantityUOM: c.quantityUOM || undefined,
+                weight: c.weight ? { value: Number(c.weight), unit: c.weightUOM || 'K' } : undefined,
+              })),
+          };
+        });
+        // Trim trailing no-op entries so we don't send a longer array than needed.
+        while (perHblBuilt.length > 0 && Object.keys(perHblBuilt[perHblBuilt.length - 1]).length === 0) {
+          perHblBuilt.pop();
+        }
+
         // Strip the single houseBol from the payload — the server expects the
         // explicit `houseBills` list on the consolidation endpoint.
         const { houseBol: _stripped, ...sharedPayload } = payload;
         const result = await createConsolidation.mutateAsync({
           ...sharedPayload,
           houseBills,
+          ...(perHblBuilt.length > 0 ? { perHbl: perHblBuilt } : {}),
         });
+        const overrideCount = perHblBuilt.filter((o) => Object.keys(o).length > 0).length;
         toast.success(
-          `Consolidation created — ${result.count} ISF drafts (one per house bill). Each will count as 1 filing when submitted.`,
+          overrideCount > 0
+            ? `Consolidation created — ${result.count} ISF drafts (${overrideCount} with custom commodities). Each will count as 1 filing when submitted.`
+            : `Consolidation created — ${result.count} ISF drafts (one per house bill). Each will count as 1 filing when submitted.`,
           { duration: 6500 },
         );
         navigate(`/shipments/${result.filings[0].id}`);
@@ -1062,6 +1118,9 @@ export default function ShipmentWizard() {
                     setForm((prev) => ({
                       ...prev,
                       additionalHouseBills: prev.additionalHouseBills.filter((_, i) => i !== idx),
+                      // perHblOverrides[0] = primary HBL, so the i-th additional
+                      // maps to perHblOverrides[i+1]. Drop that slot.
+                      perHblOverrides: prev.perHblOverrides.filter((_, i) => i !== idx + 1),
                     }))
                   }
                   aria-label={`Remove house bill ${idx + 2}`}
@@ -1079,6 +1138,7 @@ export default function ShipmentWizard() {
                 setForm((prev) => ({
                   ...prev,
                   additionalHouseBills: [...prev.additionalHouseBills, ''],
+                  perHblOverrides: [...prev.perHblOverrides, {}],
                 }))
               }
               disabled={form.additionalHouseBills.length >= 49}
@@ -1217,7 +1277,84 @@ export default function ShipmentWizard() {
     </div>
   );
 
-  const renderCargo = () => (
+  const renderCargo = () => {
+    // ── Inline commodities editor — reused for the shared list AND each
+    // per-HBL tab in consolidation mode. Driven by the caller's
+    // commodities array + onChange so the same JSX can edit either the
+    // top-level shared list or a perHblOverrides[i].commodities entry.
+    const renderCommoditiesEditor = (
+      commodities: CommodityFormData[],
+      onChange: (next: CommodityFormData[]) => void,
+      errorPrefix: string,
+    ) => (
+      <div className="space-y-4">
+        {commodities.map((c, i) => (
+          <Card key={i} className="border-border/60">
+            <CardContent className="pt-4 pb-4 px-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <Badge variant="secondary" className="text-xs">Item {i + 1}</Badge>
+                {commodities.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onChange(commodities.filter((_, idx) => idx !== i))}
+                    className="text-destructive hover:text-destructive h-7 px-2"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <TextField label="Description" value={c.description}
+                  onChange={v => onChange(commodities.map((x, idx) => idx === i ? { ...x, description: v } : x))}
+                  placeholder="e.g., Steel Bolts" hint="Short commodity description" maxLength={50} />
+                <HTSAutocomplete
+                  value={c.htsCode}
+                  onChange={v => onChange(commodities.map((x, idx) => idx === i ? { ...x, htsCode: v } : x))}
+                  description={c.description}
+                  error={errors[`${errorPrefix}.${i}.htsCode`]}
+                  maxLength={10}
+                />
+                <SelectField label="Country of Origin" required value={c.countryOfOrigin}
+                  onChange={v => onChange(commodities.map((x, idx) => idx === i ? { ...x, countryOfOrigin: v } : x))}
+                  options={COMMON_COUNTRIES} placeholder="Select"
+                  error={errors[`${errorPrefix}.${i}.countryOfOrigin`]}
+                  hint="Where the goods were manufactured" />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <TextField label="Quantity" value={c.quantity}
+                  onChange={v => onChange(commodities.map((x, idx) => idx === i ? { ...x, quantity: v } : x))}
+                  placeholder="100" />
+                <SelectField label="Qty Unit" value={c.quantityUOM}
+                  onChange={v => onChange(commodities.map((x, idx) => idx === i ? { ...x, quantityUOM: v } : x))}
+                  options={QUANTITY_UOMS} />
+                <TextField label="Weight" value={c.weight}
+                  onChange={v => onChange(commodities.map((x, idx) => idx === i ? { ...x, weight: v } : x))}
+                  placeholder="500" />
+                <SelectField label="Weight Unit" value={c.weightUOM}
+                  onChange={v => onChange(commodities.map((x, idx) => idx === i ? { ...x, weightUOM: v } : x))}
+                  options={WEIGHT_UOMS} />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        <div>
+          <Button variant="outline" size="sm" onClick={() => onChange([...commodities, emptyCommodity()])}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add Item
+          </Button>
+        </div>
+      </div>
+    );
+
+    // Consolidation mode → tab strip: Shared + one tab per HBL.
+    // Each HBL tab can either inherit the shared commodities ("Customize"
+    // initialises an override copied from the shared list) or hold its own.
+    const consolidationMode = !isEdit && form.additionalHouseBills.length > 0;
+    const allHouseBills = consolidationMode
+      ? [form.houseBol || '(primary)', ...form.additionalHouseBills.map((h, i) => h || `HBL ${i + 2}`)]
+      : [];
+
+    return (
     <div className="space-y-6">
       {/* Commodities */}
       <div>
@@ -1225,52 +1362,101 @@ export default function ShipmentWizard() {
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <Package className="h-4 w-4 text-primary" /> Commodities
           </h3>
-          <Button variant="outline" size="sm" onClick={addCommodity}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add Item
-          </Button>
+          {!consolidationMode && (
+            <Button variant="outline" size="sm" onClick={addCommodity}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Item
+            </Button>
+          )}
         </div>
-        <div className="space-y-4">
-          {form.commodities.map((c, i) => (
-            <Card key={i} className="border-border/60">
-              <CardContent className="pt-4 pb-4 px-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className="text-xs">Item {i + 1}</Badge>
-                  {form.commodities.length > 1 && (
-                    <Button variant="ghost" size="sm" onClick={() => removeCommodity(i)} className="text-destructive hover:text-destructive h-7 px-2">
-                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
-                    </Button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <TextField label="Description" value={c.description}
-                    onChange={v => setCommodity(i, { ...c, description: v })} placeholder="e.g., Steel Bolts"
-                    hint="Short commodity description" maxLength={50} />
-                  <HTSAutocomplete
-                    value={c.htsCode}
-                    onChange={v => setCommodity(i, { ...c, htsCode: v })}
-                    description={c.description}
-                    error={errors[`commodities.${i}.htsCode`]}
-                    maxLength={10}
-                  />
-                  <SelectField label="Country of Origin" required value={c.countryOfOrigin}
-                    onChange={v => setCommodity(i, { ...c, countryOfOrigin: v })} options={COMMON_COUNTRIES}
-                    placeholder="Select" error={errors[`commodities.${i}.countryOfOrigin`]}
-                    hint="Where the goods were manufactured" />
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <TextField label="Quantity" value={c.quantity}
-                    onChange={v => setCommodity(i, { ...c, quantity: v })} placeholder="100" />
-                  <SelectField label="Qty Unit" value={c.quantityUOM}
-                    onChange={v => setCommodity(i, { ...c, quantityUOM: v })} options={QUANTITY_UOMS} />
-                  <TextField label="Weight" value={c.weight}
-                    onChange={v => setCommodity(i, { ...c, weight: v })} placeholder="500" />
-                  <SelectField label="Weight Unit" value={c.weightUOM}
-                    onChange={v => setCommodity(i, { ...c, weightUOM: v })} options={WEIGHT_UOMS} />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+
+        {consolidationMode ? (
+          <Tabs defaultValue="shared" className="w-full">
+            <TabsList className="w-full justify-start h-auto flex-wrap gap-1 bg-muted/60 p-1">
+              <TabsTrigger value="shared" className="text-xs">
+                Shared ({form.commodities.length})
+              </TabsTrigger>
+              {allHouseBills.map((hbl, idx) => {
+                const override = form.perHblOverrides[idx]?.commodities;
+                return (
+                  <TabsTrigger key={idx} value={`hbl-${idx}`} className="text-xs">
+                    HBL {idx + 1}: {hbl.length > 14 ? hbl.slice(0, 14) + '…' : hbl}
+                    {override && <span className="ml-1 text-amber-600 dark:text-amber-400">·{override.length}</span>}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+            <TabsContent value="shared" className="mt-4 space-y-3">
+              <p className="text-xs text-muted-foreground">
+                These commodities apply to all {allHouseBills.length} house bills unless overridden in a specific HBL tab.
+              </p>
+              {renderCommoditiesEditor(
+                form.commodities,
+                (next) => setForm(p => ({ ...p, commodities: next })),
+                'commodities',
+              )}
+            </TabsContent>
+            {allHouseBills.map((hbl, idx) => {
+              const override = form.perHblOverrides[idx]?.commodities;
+              const hasOverride = !!override;
+              return (
+                <TabsContent key={idx} value={`hbl-${idx}`} className="mt-4 space-y-3">
+                  <div className="flex items-center justify-between rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+                    <div className="text-xs">
+                      <span className="font-semibold">HBL {idx + 1}: {hbl || '(unset)'}</span>
+                      <span className="text-muted-foreground ml-2">
+                        {hasOverride ? 'Using HBL-specific commodities' : 'Inheriting shared commodities'}
+                      </span>
+                    </div>
+                    {hasOverride ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-7"
+                        onClick={() => setHblCommodities(idx, undefined)}
+                      >
+                        Reset to shared
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7"
+                        onClick={() =>
+                          setHblCommodities(
+                            idx,
+                            form.commodities.length > 0
+                              ? form.commodities.map(c => ({ ...c }))
+                              : [emptyCommodity()],
+                          )
+                        }
+                      >
+                        Customize for this HBL
+                      </Button>
+                    )}
+                  </div>
+                  {hasOverride
+                    ? renderCommoditiesEditor(
+                        override,
+                        (next) => setHblCommodities(idx, next),
+                        `perHbl.${idx}.commodities`,
+                      )
+                    : (
+                      <p className="text-xs text-muted-foreground pl-1">
+                        This filing will use the shared commodities list ({form.commodities.length} items). Click
+                        "Customize for this HBL" to define a different set just for this house bill.
+                      </p>
+                    )}
+                </TabsContent>
+              );
+            })}
+          </Tabs>
+        ) : (
+          renderCommoditiesEditor(
+            form.commodities,
+            (next) => setForm(p => ({ ...p, commodities: next })),
+            'commodities',
+          )
+        )}
       </div>
 
       <Separator />
@@ -1303,7 +1489,8 @@ export default function ShipmentWizard() {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   // ─── ISF-5: Filer & Booking Party Step ─────
   const renderISF5FilerBookingParty = () => (
