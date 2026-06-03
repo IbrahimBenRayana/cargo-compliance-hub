@@ -1087,6 +1087,32 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response): Promise<vo
   res.json(validation);
 });
 
+// ─── GET /api/v1/filings/consolidations/:id — sibling filings ──
+// Lightweight: returns just enough for the consolidation strip and the
+// list-page popover (id, houseBol, status, masterBol, createdAt). Ordered
+// by createdAt so the "primary" filing — the one created first — comes
+// first, matching the wizard's primary/additional distinction.
+router.get('/consolidations/:id', async (req: AuthRequest, res: Response): Promise<void> => {
+  const consolidationId = paramId(req);
+  if (!consolidationId) {
+    res.status(400).json({ error: 'Invalid id' });
+    return;
+  }
+  const filings = await prisma.filing.findMany({
+    where: { consolidationId, orgId: req.user!.orgId },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      houseBol: true,
+      masterBol: true,
+      status: true,
+      createdAt: true,
+      filingDeadline: true,
+    },
+  });
+  res.json({ consolidationId, count: filings.length, filings });
+});
+
 // ─── GET /api/v1/filings/stats — Dashboard stats ──────────
 router.get('/stats/overview', async (req: AuthRequest, res: Response): Promise<void> => {
   const orgId = req.user!.orgId;

@@ -23,7 +23,7 @@ import {
 import {
   Plus, Search, Eye, Pencil, Filter, X, Ship, CalendarIcon,
   ArrowUpDown, ArrowUp, ArrowDown, Package, Globe, FileText, Clock, Loader2, Send, Bookmark, ChevronDown,
-  Trash2, CheckCheck, Download,
+  Trash2, CheckCheck, Download, Layers,
 } from 'lucide-react';
 import { ShipmentStatus, Filing, getPartyName, getFirstCommodity } from '@/types/shipment';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -41,6 +41,57 @@ const countries = [
 ];
 
 const statusOptions: ShipmentStatus[] = ['draft', 'submitted', 'accepted', 'rejected'];
+
+// Inline chip that opens a popover listing the sibling filings of a
+// consolidation. Renders only when the row has a consolidationId — the
+// caller does the gate. Clicking a sibling jumps to its detail page.
+function ConsolidationPopover({ currentId, siblings }: { currentId: string; siblings: Filing[] }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 ring-1 ring-amber-200/60 dark:ring-amber-800/40 hover:bg-amber-100 dark:hover:bg-amber-950/60 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Consolidation: ${siblings.length} filings`}
+          title={`Consolidation: ${siblings.length} house bills under one master`}
+        >
+          <Layers className="h-2.5 w-2.5" />
+          <span>{siblings.length}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="start">
+        <div className="px-3 py-2 border-b">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+            Consolidation — {siblings.length} filings
+          </p>
+          <p className="text-xs text-foreground/80 mt-0.5">
+            One Master BOL, {siblings.length} house bills. Each counts as one filing.
+          </p>
+        </div>
+        <ul className="max-h-72 overflow-auto py-1">
+          {siblings.map((s) => {
+            const isCurrent = s.id === currentId;
+            return (
+              <li key={s.id}>
+                <Link
+                  to={`/shipments/${s.id}`}
+                  className={`flex items-center justify-between gap-2 px-3 py-2 text-xs hover:bg-accent ${
+                    isCurrent ? 'bg-accent/60 font-semibold' : ''
+                  }`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="truncate tabular-nums">{s.houseBol || s.id.slice(0, 8)}</span>
+                  <StatusBadge status={s.status as ShipmentStatus} />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function ShipmentsList() {
   const [search, setSearch] = useState('');
@@ -211,6 +262,24 @@ export default function ShipmentsList() {
 
     return result;
   }, [filings, selectedStatuses, selectedCountries, dateFrom, dateTo, sortField, sortDir]);
+
+  // Index consolidations by id so the row chip can show siblings without
+  // an extra API roundtrip — every sibling is already on this page (the
+  // tx-created drafts all land in one query response).
+  const consolidationGroups = useMemo(() => {
+    const groups = new Map<string, Filing[]>();
+    for (const f of filings) {
+      if (!f.consolidationId) continue;
+      const arr = groups.get(f.consolidationId);
+      if (arr) arr.push(f);
+      else groups.set(f.consolidationId, [f]);
+    }
+    // Sort siblings by createdAt so the popover lists them in order.
+    for (const arr of groups.values()) {
+      arr.sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
+    }
+    return groups;
+  }, [filings]);
 
   const selectedDraftIds = useMemo(() =>
     Array.from(selectedIds).filter(id => filtered.find(f => f.id === id && f.status === 'draft')),
@@ -588,8 +657,18 @@ export default function ShipmentsList() {
                         <FileText className="h-3.5 w-3.5 text-primary" />
                       </div>
                       <div>
-                        <p className="font-semibold text-sm">{f.masterBol || f.houseBol || '—'}</p>
-                        <p className="text-[11px] text-muted-foreground">{f.id.slice(0, 8)}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-sm">{f.masterBol || f.houseBol || '—'}</p>
+                          {f.consolidationId && consolidationGroups.has(f.consolidationId) && (
+                            <ConsolidationPopover
+                              currentId={f.id}
+                              siblings={consolidationGroups.get(f.consolidationId)!}
+                            />
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          {f.houseBol ? <>HBL: <span className="tabular-nums">{f.houseBol}</span></> : f.id.slice(0, 8)}
+                        </p>
                       </div>
                     </div>
                   </TableCell>

@@ -46,6 +46,16 @@ export function useCreateConsolidation() {
   });
 }
 
+/** Sibling filings for a consolidation (used by list popover + detail strip). */
+export function useConsolidationSiblings(consolidationId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['consolidation', consolidationId],
+    queryFn: () => filingsApi.getConsolidation(consolidationId as string),
+    enabled: !!consolidationId,
+    staleTime: 30_000,
+  });
+}
+
 export function useUpdateFiling() {
   const queryClient = useQueryClient();
   return useMutation({

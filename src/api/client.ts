@@ -273,6 +273,22 @@ export const filingsApi = {
     });
   },
 
+  /** Lightweight sibling list for a consolidation — used by the strip + popover. */
+  getConsolidation(consolidationId: string) {
+    return apiFetch<{
+      consolidationId: string;
+      count: number;
+      filings: Array<{
+        id: string;
+        houseBol: string | null;
+        masterBol: string | null;
+        status: string;
+        createdAt: string;
+        filingDeadline: string | null;
+      }>;
+    }>(`/api/v1/filings/consolidations/${consolidationId}`);
+  },
+
   delete(id: string) {
     return apiFetch<MessageResponse>(`/api/v1/filings/${id}`, { method: 'DELETE' });
   },
