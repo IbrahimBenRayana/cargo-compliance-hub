@@ -39,3 +39,7 @@ landing/node_modules/
 landing/.next/
 landing/out/
 landing/next-env.d.ts
+
+# bun lockfiles (we use npm; bun was a brief experiment)
+bun.lock
+bun.lockb

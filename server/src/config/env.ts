@@ -36,6 +36,13 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().default(''),
   STRIPE_PUBLISHABLE_KEY: z.string().default(''),
+  // Sentry (audit Phase 10). Empty default → Sentry is off in dev / CI
+  // and the SDK never initializes. Set to a real DSN in prod via GitHub
+  // Secrets → upsert_env → VPS .env. Release tag flows from the deploy
+  // SHA so errors group by version.
+  SENTRY_DSN: z.string().default(''),
+  SENTRY_ENVIRONMENT: z.string().default('production'),
+  SENTRY_RELEASE: z.string().default(''),
   // AI provider — Compliance Center features. All optional with sensible
   // defaults; server boots fine without them (graceful degradation via
   // services/ai.ts). When AI_API_KEY is unset the /ai-status endpoint
