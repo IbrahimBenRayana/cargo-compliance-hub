@@ -122,6 +122,8 @@ export interface Filing {
   containerStuffingLocation?: PartyInfo | string | null;
   consolidator?: PartyInfo | string | null;
 
+  /** Set when this filing is one of N siblings sharing a Master BOL. */
+  consolidationId?: string | null;
   masterBol?: string | null;
   houseBol?: string | null;
   scacCode?: string | null;

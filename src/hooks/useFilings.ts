@@ -35,6 +35,17 @@ export function useCreateFiling() {
   });
 }
 
+export function useCreateConsolidation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => filingsApi.createConsolidation(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['filings'] });
+      queryClient.invalidateQueries({ queryKey: ['filingStats'] });
+    },
+  });
+}
+
 export function useUpdateFiling() {
   const queryClient = useQueryClient();
   return useMutation({

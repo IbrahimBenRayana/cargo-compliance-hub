@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, memo, useId, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { useFiling, useCreateFiling, useUpdateFiling, useFilingAutosave } from '@/hooks/useFilings';
+import { useFiling, useCreateFiling, useCreateConsolidation, useUpdateFiling, useFilingAutosave } from '@/hooks/useFilings';
 import { useManifestQuery } from '@/hooks/useManifestQuery';
 import type { PartyInfo, CommodityInfo, ContainerInfo } from '@/types/shipment';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -136,6 +136,14 @@ interface ISFFormState {
   filingType: 'ISF-10' | 'ISF-5';
   masterBol: string;
   houseBol: string;
+  /**
+   * Extra house bills filed under the same Master BOL.
+   * Empty array = single-HBL flow (current behaviour).
+   * One or more entries = consolidation: on save we POST to
+   * /api/v1/filings/consolidation and N draft filings are created,
+   * each consuming its own plan slot at /submit.
+   */
+  additionalHouseBills: string[];
   bondType: string;
 
   // IOR & Filer
@@ -205,6 +213,7 @@ const initialForm = (): ISFFormState => ({
   filingType: 'ISF-10',
   masterBol: '',
   houseBol: '',
+  additionalHouseBills: [],
   bondType: 'continuous',
   importerName: '',
   importerNumber: '',
@@ -447,6 +456,7 @@ export default function ShipmentWizard() {
 
   const { data: existing, isLoading: isLoadingFiling } = useFiling(id);
   const createFiling = useCreateFiling();
+  const createConsolidation = useCreateConsolidation();
   const updateFiling = useUpdateFiling();
   // Phase 8.2 autosave — only active in edit mode (where we have a filing
   // id to PATCH against). New-mode persistence stays explicit via the
@@ -520,6 +530,7 @@ export default function ShipmentWizard() {
       // Identity fields blanked — user must supply per-shipment values.
       masterBol: '',
       houseBol: '',
+      additionalHouseBills: [],
       voyageNumber: '',
       estimatedDeparture: '',
       estimatedArrival: '',
@@ -626,6 +637,8 @@ export default function ShipmentWizard() {
       filingType: existing.filingType || 'ISF-10',
       masterBol: existing.masterBol || '',
       houseBol: existing.houseBol || '',
+      // Edit mode is per-filing, so consolidation list is empty in this path.
+      additionalHouseBills: [],
       bondType: existing.bondType || 'continuous',
       importerName: existing.importerName || '',
       importerNumber: existing.importerNumber || '',
@@ -748,7 +761,7 @@ export default function ShipmentWizard() {
   const removeContainer = useCallback((i: number) => setForm(p => ({ ...p, containers: p.containers.filter((_, idx) => idx !== i) })), []);
 
   const progress = useMemo(() => calcProgress(form), [form]);
-  const isSaving = createFiling.isPending || updateFiling.isPending;
+  const isSaving = createFiling.isPending || createConsolidation.isPending || updateFiling.isPending;
 
   // ─── Validation per step ───────────
   const validateStep = useCallback((s: number): boolean => {
@@ -759,6 +772,27 @@ export default function ShipmentWizard() {
       if (!form.masterBol.trim()) e.masterBol = 'Master BOL is required';
       // House BOL is only required for ISF-10; ISF-5 derives it from the master BOL
       if (form.filingType === 'ISF-10' && !form.houseBol.trim()) e.houseBol = 'House BOL is required';
+
+      // Consolidation mode: validate each extra HBL + reject in-list dupes.
+      // The primary houseBol is included in the seen-set so users can't enter
+      // the same number in both the main field and an "additional" row.
+      if (form.additionalHouseBills.length > 0) {
+        const seen = new Set<string>();
+        if (form.houseBol.trim()) seen.add(form.houseBol.trim().toUpperCase());
+        form.additionalHouseBills.forEach((hbl, idx) => {
+          const trimmed = hbl.trim();
+          if (!trimmed) {
+            e[`additionalHouseBills.${idx}`] = 'House BOL cannot be empty';
+            return;
+          }
+          const key = trimmed.toUpperCase();
+          if (seen.has(key)) {
+            e[`additionalHouseBills.${idx}`] = 'Duplicate house BOL — each must be unique';
+            return;
+          }
+          seen.add(key);
+        });
+      }
     }
 
     // ISF-10: IOR & Consignee step
@@ -917,6 +951,25 @@ export default function ShipmentWizard() {
         await updateFiling.mutateAsync({ id, data: payload });
         toast.success('Filing updated successfully!');
         navigate(`/shipments/${id}`);
+      } else if (form.additionalHouseBills.length > 0) {
+        // Consolidation: 1 MBL + N HBLs → N drafts, each billed separately at submit.
+        // The primary HBL becomes filing #1; each additional HBL becomes its own filing.
+        const houseBills = [
+          form.houseBol.trim(),
+          ...form.additionalHouseBills.map((h) => h.trim()).filter(Boolean),
+        ];
+        // Strip the single houseBol from the payload — the server expects the
+        // explicit `houseBills` list on the consolidation endpoint.
+        const { houseBol: _stripped, ...sharedPayload } = payload;
+        const result = await createConsolidation.mutateAsync({
+          ...sharedPayload,
+          houseBills,
+        });
+        toast.success(
+          `Consolidation created — ${result.count} ISF drafts (one per house bill). Each will count as 1 filing when submitted.`,
+          { duration: 6500 },
+        );
+        navigate(`/shipments/${result.filings[0].id}`);
       } else {
         const created = await createFiling.mutateAsync(payload);
         toast.success('ISF filing created! You can now review and submit it to CBP.', { duration: 5000 });
@@ -972,6 +1025,78 @@ export default function ShipmentWizard() {
             hint={form.filingType === 'ISF-5' ? 'Optional for ISF-5 — will be auto-derived from Master BOL if left blank.' : 'House BOL from your freight forwarder. This is used to send documents to CBP.'}
             error={errors.houseBol} maxLength={50} />
         </div>
+
+        {/* Multi-HBL consolidation editor. Hidden in edit mode (per-filing) and
+            for ISF-5 (single-bill flow). When the user adds one or more extra
+            HBLs we POST to /api/v1/filings/consolidation on save and create N
+            sibling drafts — each will consume its own plan slot at /submit. */}
+        {!isEdit && form.filingType === 'ISF-10' && (
+          <div className="mt-4 space-y-2">
+            {form.additionalHouseBills.map((hbl, idx) => (
+              <div key={idx} className="flex items-end gap-2">
+                <div className="flex-1">
+                  <TextField
+                    label={idx === 0 ? 'Additional House Bills (same Master BOL)' : ''}
+                    value={hbl}
+                    onChange={(v) =>
+                      setForm((prev) => {
+                        const next = [...prev.additionalHouseBills];
+                        next[idx] = v;
+                        return { ...prev, additionalHouseBills: next };
+                      })
+                    }
+                    placeholder="e.g., HCLA12345679"
+                    hint={idx === 0
+                      ? 'Each extra house bill becomes its own ISF filing (CBP requires one ISF per house bill). Each filing counts separately toward your plan.'
+                      : undefined}
+                    error={errors[`additionalHouseBills.${idx}`]}
+                    maxLength={50}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-destructive shrink-0"
+                  onClick={() =>
+                    setForm((prev) => ({
+                      ...prev,
+                      additionalHouseBills: prev.additionalHouseBills.filter((_, i) => i !== idx),
+                    }))
+                  }
+                  aria-label={`Remove house bill ${idx + 2}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() =>
+                setForm((prev) => ({
+                  ...prev,
+                  additionalHouseBills: [...prev.additionalHouseBills, ''],
+                }))
+              }
+              disabled={form.additionalHouseBills.length >= 49}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add another house bill under this Master BOL
+            </Button>
+            {form.additionalHouseBills.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                This shipment will create{' '}
+                <span className="font-semibold text-foreground">
+                  {1 + form.additionalHouseBills.length} ISF filings
+                </span>{' '}
+                — one per house bill, all sharing this Master BOL.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

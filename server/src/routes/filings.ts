@@ -121,6 +121,20 @@ const createFilingSchema = z.object({
   containers: z.array(containerSchema).default([]),
 });
 
+// One Master BOL + N House BOLs → N draft filings sharing a generated
+// consolidationId. Per-HBL overrides are deferred to PR 2; PR 1 only
+// captures the HBL number per filing — every other field is shared.
+const createConsolidationSchema = createFilingSchema.extend({
+  // Suppress the single houseBol in favour of an explicit list. We don't
+  // strip it from the parent schema because the standard create route
+  // still accepts it.
+  houseBol: z.never().optional(),
+  houseBills: z
+    .array(z.string().trim().min(1, 'House BOL cannot be empty').max(100))
+    .min(2, 'A consolidation needs at least 2 house bills — use the standard create for a single HBL')
+    .max(50, 'Consolidations are capped at 50 house bills per shipment'),
+});
+
 // ─── POST /api/v1/filings — Create new filing ─────────────
 router.post('/', filingMutationLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -188,6 +202,121 @@ router.post('/', filingMutationLimiter, async (req: AuthRequest, res: Response):
     await recordScoreSnapshot(filing.id, 'created');
 
     res.status(201).json(filing);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation failed', details: err.flatten() });
+      return;
+    }
+    throw err;
+  }
+});
+
+// ─── POST /api/v1/filings/consolidation ───────────────────
+// Create a multi-HBL consolidation: one Master BOL, N House BOLs → N draft
+// filings that share a generated consolidationId. Each filing reaches CBP as
+// its own ISF document at the house-bill level (CBP requirement), and each
+// will consume its own plan slot at /submit time — there is intentionally no
+// "consolidation discount" in billing.
+router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const data = createConsolidationSchema.parse(req.body);
+    // Strip the never-typed houseBol stub so it doesn't leak through.
+    const { houseBol: _unused, houseBills, ...shared } = data;
+
+    // Reject duplicate house bills within the same consolidation — these
+    // would create CBP-rejectable siblings (same BOLNumber twice).
+    const normalised = houseBills.map((h) => h.trim());
+    const dupes = normalised.filter((h, i) => normalised.indexOf(h) !== i);
+    if (dupes.length > 0) {
+      res.status(400).json({
+        error: 'duplicate_house_bills',
+        message: 'House bills must be unique within a consolidation',
+        duplicates: Array.from(new Set(dupes)),
+      });
+      return;
+    }
+
+    let filingDeadline: Date | null = null;
+    if (shared.estimatedDeparture) {
+      filingDeadline = new Date(shared.estimatedDeparture);
+      filingDeadline.setHours(filingDeadline.getHours() - 24);
+    }
+
+    const consolidationId = randomUUID();
+
+    // Create all N drafts in a single transaction so partial failure leaves
+    // no orphaned siblings. statusHistory is created in the same tx.
+    const created = await prisma.$transaction(async (tx) => {
+      const rows = await Promise.all(
+        normalised.map((hbl) =>
+          tx.filing.create({
+            data: {
+              orgId: req.user!.orgId,
+              createdById: req.user!.id,
+              filingType: shared.filingType,
+              status: 'draft',
+              consolidationId,
+              importerName: shared.importerName,
+              importerNumber: shared.importerNumber,
+              consigneeName: shared.consigneeName,
+              consigneeNumber: shared.consigneeNumber,
+              consigneeAddress: shared.consigneeAddress ?? undefined,
+              manufacturer: shared.manufacturer ?? undefined,
+              seller: shared.seller ?? undefined,
+              buyer: shared.buyer ?? undefined,
+              shipToParty: shared.shipToParty ?? undefined,
+              containerStuffingLocation: shared.containerStuffingLocation ?? undefined,
+              consolidator: shared.consolidator ?? undefined,
+              masterBol: shared.masterBol,
+              houseBol: hbl,
+              scacCode: shared.scacCode,
+              vesselName: shared.vesselName,
+              voyageNumber: shared.voyageNumber,
+              foreignPortOfUnlading: shared.foreignPortOfUnlading,
+              placeOfDelivery: shared.placeOfDelivery,
+              estimatedDeparture: shared.estimatedDeparture ? new Date(shared.estimatedDeparture) : undefined,
+              estimatedArrival: shared.estimatedArrival ? new Date(shared.estimatedArrival) : undefined,
+              filingDeadline: filingDeadline ?? undefined,
+              bondType: shared.bondType,
+              bondSuretyCode: shared.bondSuretyCode,
+              isf5Data: shared.isf5Data ?? undefined,
+              commodities: shared.commodities,
+              containers: shared.containers,
+              statusHistory: {
+                create: {
+                  status: 'draft',
+                  message: `Filing created (consolidation ${consolidationId.slice(0, 8)}, HBL ${hbl})`,
+                  changedById: req.user!.id,
+                },
+              },
+            },
+          }),
+        ),
+      );
+      return rows;
+    });
+
+    const meta = getRequestMeta(req);
+    writeAuditLog({
+      orgId: req.user!.orgId,
+      userId: req.user!.id,
+      action: 'filing.consolidation_created',
+      entityType: 'filing',
+      entityId: consolidationId,
+      newValue: {
+        consolidationId,
+        masterBol: shared.masterBol,
+        houseBolCount: normalised.length,
+        filingIds: created.map((f) => f.id),
+      },
+      ...meta,
+    });
+
+    res.status(201).json({
+      consolidationId,
+      count: created.length,
+      filings: created,
+    });
   } catch (err) {
     if (err instanceof z.ZodError) {
       res.status(400).json({ error: 'Validation failed', details: err.flatten() });

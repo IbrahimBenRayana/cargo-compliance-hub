@@ -138,6 +138,11 @@ model Filing {
   containerStuffingLocation Json? @map("container_stuffing_location")
   consolidator              Json?
 
+  // Consolidation grouping (one Master BOL + multiple House BOLs).
+  // ISF goes to CBP at the house-bill level — N HBLs under one MBL =
+  // N filings that share this id. Null for single-HBL filings.
+  consolidationId String? @map("consolidation_id") @db.Uuid
+
   // Shipment Details
   masterBol             String?   @map("master_bol") @db.VarChar(100)
   houseBol              String?   @map("house_bol") @db.VarChar(100)
@@ -187,6 +192,7 @@ model Filing {
   @@index([createdById])
   @@index([filingDeadline])
   @@index([masterBol])
+  @@index([consolidationId])
   @@map("filings")
 }
 
