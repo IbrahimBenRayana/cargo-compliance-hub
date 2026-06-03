@@ -2,7 +2,37 @@
  * API Client — Typed fetch wrapper with auto-refresh JWT tokens
  */
 
+import type { AuthSession, User } from '@/types/auth';
+import type { Filing } from '@/types/shipment';
+
 const API_BASE = import.meta.env.VITE_API_URL || '';
+
+// ─── Shared response envelopes ─────────────────────────────
+export interface Pagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: Pagination;
+}
+export interface SuccessResponse {
+  success: boolean;
+  message?: string;
+}
+export interface MessageResponse {
+  message: string;
+}
+
+/** Validation issue surfaced by the rule-based validator. */
+export interface ValidationIssue {
+  field?: string;
+  message: string;
+  severity: 'critical' | 'warning' | 'info';
+  code?: string;
+}
 
 // ─── Token Storage ────────────────────────────────────────
 // Access token: in-memory only — never localStorage. Lost on tab close,
@@ -138,7 +168,7 @@ export const authApi = {
     // Phase 6: refresh token now arrives via httpOnly cookie; response body
     // returns the access token + user only. credentials: 'include' so the
     // Set-Cookie response actually lands in the browser.
-    return apiFetch<{ user: any; accessToken: string }>('/api/v1/auth/register', {
+    return apiFetch<AuthSession>('/api/v1/auth/register', {
       method: 'POST',
       credentials: 'include',
       body: JSON.stringify(data),
@@ -146,7 +176,7 @@ export const authApi = {
   },
 
   login(email: string, password: string) {
-    return apiFetch<{ user: any; accessToken: string }>('/api/v1/auth/login', {
+    return apiFetch<AuthSession>('/api/v1/auth/login', {
       method: 'POST',
       credentials: 'include',
       body: JSON.stringify({ email, password }),
@@ -154,11 +184,11 @@ export const authApi = {
   },
 
   logout() {
-    return apiFetch('/api/v1/auth/logout', { method: 'POST' }).finally(clearTokens);
+    return apiFetch<MessageResponse>('/api/v1/auth/logout', { method: 'POST' }).finally(clearTokens);
   },
 
   me() {
-    return apiFetch<any>('/api/v1/auth/me');
+    return apiFetch<User>('/api/v1/auth/me');
   },
 
   verifyEmailState() {
@@ -206,73 +236,77 @@ export const filingsApi = {
       });
     }
     const qs = query.toString();
-    return apiFetch<{ data: any[]; pagination: any }>(`/api/v1/filings${qs ? `?${qs}` : ''}`);
+    return apiFetch<PaginatedResponse<Filing>>(`/api/v1/filings${qs ? `?${qs}` : ''}`);
   },
 
   get(id: string) {
-    return apiFetch<any>(`/api/v1/filings/${id}`);
+    return apiFetch<Filing>(`/api/v1/filings/${id}`);
   },
 
-  create(data: any) {
-    return apiFetch<any>('/api/v1/filings', {
+  create(data: Partial<Filing> & Record<string, unknown>) {
+    return apiFetch<Filing>('/api/v1/filings', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  update(id: string, data: any) {
-    return apiFetch<any>(`/api/v1/filings/${id}`, {
+  update(id: string, data: Partial<Filing> & Record<string, unknown>) {
+    return apiFetch<Filing>(`/api/v1/filings/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   },
 
   delete(id: string) {
-    return apiFetch(`/api/v1/filings/${id}`, { method: 'DELETE' });
+    return apiFetch<MessageResponse>(`/api/v1/filings/${id}`, { method: 'DELETE' });
   },
 
   submit(id: string) {
-    return apiFetch<any>(`/api/v1/filings/${id}/submit`, { method: 'POST' });
+    return apiFetch<{
+      filing: Filing;
+      ccFilingId: string | null;
+      sendResponse?: { success?: boolean; 'Documents sent'?: number } & Record<string, unknown>;
+    }>(`/api/v1/filings/${id}/submit`, { method: 'POST' });
   },
 
-  amend(id: string, data?: any) {
-    return apiFetch<any>(`/api/v1/filings/${id}/amend`, {
+  amend(id: string, data?: Partial<Filing> & Record<string, unknown>) {
+    return apiFetch<{ filing: Filing }>(`/api/v1/filings/${id}/amend`, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
     });
   },
 
   cancel(id: string, reason?: string) {
-    return apiFetch<any>(`/api/v1/filings/${id}/cancel`, {
+    return apiFetch<{ filing: Filing }>(`/api/v1/filings/${id}/cancel`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
     });
   },
 
   duplicate(id: string) {
-    return apiFetch<any>(`/api/v1/filings/${id}/duplicate`, { method: 'POST' });
+    return apiFetch<Filing>(`/api/v1/filings/${id}/duplicate`, { method: 'POST' });
   },
 
   saveAsTemplate(id: string, name: string) {
-    return apiFetch<any>(`/api/v1/filings/${id}/save-template`, {
+    return apiFetch<{ id: string; name: string; filingType: string }>(`/api/v1/filings/${id}/save-template`, {
       method: 'POST',
       body: JSON.stringify({ name }),
     });
   },
 
   validate(id: string) {
-    return apiFetch<{ valid: boolean; errors: any[]; score: number; criticalCount: number; warningCount: number; infoCount: number }>(`/api/v1/filings/${id}/validate`, { method: 'POST' });
+    return apiFetch<{ valid: boolean; errors: ValidationIssue[]; score: number; criticalCount: number; warningCount: number; infoCount: number }>(`/api/v1/filings/${id}/validate`, { method: 'POST' });
   },
 
   checkStatus(id: string) {
     return apiFetch<{
-      filing: any;
-      ccStatus: any;
-      messages: any[];
+      filing: Filing;
+      ccStatus: unknown;
+      messages: unknown[];
       statusChanged: boolean;
       newStatus: string | null;
-      eventSummary: any;
-      lastEvent: any;
+      eventSummary: unknown;
+      lastEvent: unknown;
     }>(`/api/v1/filings/${id}/check-status`, { method: 'POST' });
   },
 
@@ -285,11 +319,26 @@ export const filingsApi = {
   },
 
   stats() {
-    return apiFetch<{ total: number; statusCounts: Record<string, number>; recentFilings: any[] }>('/api/v1/filings/stats/overview');
+    return apiFetch<{ total: number; statusCounts: Record<string, number>; recentFilings: Filing[] }>('/api/v1/filings/stats/overview');
   },
 };
 
 // ─── Submission Logs API ──────────────────────────────────
+export interface SubmissionLogEntry {
+  id: string;
+  orgId: string;
+  userId: string | null;
+  filingId: string | null;
+  method: string;
+  url: string;
+  requestPayload: Record<string, unknown> | null;
+  responseStatus: number;
+  responseBody: Record<string, unknown> | null;
+  latencyMs: number;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
 export const submissionLogsApi = {
   list(params?: { filingId?: string; page?: number; limit?: number }) {
     const query = new URLSearchParams();
@@ -299,7 +348,7 @@ export const submissionLogsApi = {
       });
     }
     const qs = query.toString();
-    return apiFetch<{ data: any[]; pagination: any }>(`/api/v1/submission-logs${qs ? `?${qs}` : ''}`);
+    return apiFetch<PaginatedResponse<SubmissionLogEntry>>(`/api/v1/submission-logs${qs ? `?${qs}` : ''}`);
   },
 };
 
@@ -326,11 +375,11 @@ export const notificationsApi = {
   },
 
   markRead(id: string) {
-    return apiFetch(`/api/v1/notifications/${id}/read`, { method: 'PATCH' });
+    return apiFetch<SuccessResponse>(`/api/v1/notifications/${id}/read`, { method: 'PATCH' });
   },
 
   markAllRead() {
-    return apiFetch('/api/v1/notifications/read-all', { method: 'POST' });
+    return apiFetch<{ updated: number }>('/api/v1/notifications/read-all', { method: 'POST' });
   },
 
   // Phase 5 — preferences
@@ -353,14 +402,18 @@ export const integrationsApi = {
   },
 
   classifyHTS(description: string) {
-    return apiFetch<any>('/api/v1/integrations/hts-classify', {
+    return apiFetch<{
+      suggestions: Array<{ hts: string; description: string; confidence?: number }>;
+      message?: string;
+      raw?: unknown;
+    }>('/api/v1/integrations/hts-classify', {
       method: 'POST',
       body: JSON.stringify({ description }),
     });
   },
 
   getMIDList() {
-    return apiFetch<any>('/api/v1/integrations/mid-list');
+    return apiFetch<{ data: Array<{ mid: string; name?: string; address?: string }> }>('/api/v1/integrations/mid-list');
   },
 
   testEmail() {
@@ -373,6 +426,16 @@ export const integrationsApi = {
 };
 
 // ─── Templates API ────────────────────────────────────────
+export interface FilingTemplate {
+  id: string;
+  orgId: string;
+  name: string;
+  filingType: string;
+  templateData: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const templatesApi = {
   list(params?: { filingType?: string; search?: string }) {
     const query = new URLSearchParams();
@@ -382,70 +445,112 @@ export const templatesApi = {
       });
     }
     const qs = query.toString();
-    return apiFetch<{ data: any[] }>(`/api/v1/templates${qs ? `?${qs}` : ''}`);
+    return apiFetch<{ data: FilingTemplate[] }>(`/api/v1/templates${qs ? `?${qs}` : ''}`);
   },
 
   get(id: string) {
-    return apiFetch<any>(`/api/v1/templates/${id}`);
+    return apiFetch<FilingTemplate>(`/api/v1/templates/${id}`);
   },
 
-  create(data: { name: string; filingType: string; templateData?: any }) {
-    return apiFetch<any>('/api/v1/templates', {
+  create(data: { name: string; filingType: string; templateData?: Record<string, unknown> }) {
+    return apiFetch<FilingTemplate>('/api/v1/templates', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  update(id: string, data: { name?: string; templateData?: any }) {
-    return apiFetch<any>(`/api/v1/templates/${id}`, {
+  update(id: string, data: { name?: string; templateData?: Record<string, unknown> }) {
+    return apiFetch<FilingTemplate>(`/api/v1/templates/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   },
 
   delete(id: string) {
-    return apiFetch(`/api/v1/templates/${id}`, { method: 'DELETE' });
+    return apiFetch<SuccessResponse>(`/api/v1/templates/${id}`, { method: 'DELETE' });
   },
 
   apply(id: string) {
-    return apiFetch<any>(`/api/v1/templates/${id}/apply`, { method: 'POST' });
+    return apiFetch<Filing>(`/api/v1/templates/${id}/apply`, { method: 'POST' });
   },
 };
 
 // ─── Settings API ─────────────────────────────────────────
+export interface OrgAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+}
+
+export interface SettingsProfile {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+  createdAt: string;
+  lastLoginAt: string | null;
+  organization: {
+    id: string;
+    name: string;
+    iorNumber: string | null;
+    einNumber: string | null;
+    ccEnvironment: string;
+    address: OrgAddress | null;
+  };
+}
+
+export interface SettingsOrganization {
+  id: string;
+  name: string;
+  iorNumber: string | null;
+  einNumber: string | null;
+  ccEnvironment: string;
+  address: OrgAddress | null;
+  createdAt: string;
+  _count: { users: number; filings: number; filingTemplates: number };
+}
+
+export interface AuditLogEntry {
+  id: string;
+  orgId: string;
+  userId: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  metadata: Record<string, unknown> | null;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
 export const settingsApi = {
   getProfile() {
-    return apiFetch<{
-      id: string; email: string; firstName: string | null; lastName: string | null;
-      role: string; createdAt: string; lastLoginAt: string | null;
-      organization: { id: string; name: string; iorNumber: string | null; einNumber: string | null; ccEnvironment: string; address: any };
-    }>('/api/v1/settings/profile');
+    return apiFetch<SettingsProfile>('/api/v1/settings/profile');
   },
 
   updateProfile(data: { firstName?: string; lastName?: string; email?: string }) {
-    return apiFetch<any>('/api/v1/settings/profile', {
+    return apiFetch<SettingsProfile>('/api/v1/settings/profile', {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   },
 
   changePassword(currentPassword: string, newPassword: string) {
-    return apiFetch<{ success: boolean; message: string }>('/api/v1/settings/change-password', {
+    return apiFetch<SuccessResponse>('/api/v1/settings/change-password', {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),
     });
   },
 
   getOrganization() {
-    return apiFetch<{
-      id: string; name: string; iorNumber: string | null; einNumber: string | null;
-      ccEnvironment: string; address: any; createdAt: string;
-      _count: { users: number; filings: number; filingTemplates: number };
-    }>('/api/v1/settings/organization');
+    return apiFetch<SettingsOrganization>('/api/v1/settings/organization');
   },
 
-  updateOrganization(data: { name?: string; iorNumber?: string; einNumber?: string; address?: any }) {
-    return apiFetch<any>('/api/v1/settings/organization', {
+  updateOrganization(data: { name?: string; iorNumber?: string; einNumber?: string; address?: OrgAddress }) {
+    return apiFetch<SettingsOrganization>('/api/v1/settings/organization', {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -459,7 +564,7 @@ export const settingsApi = {
       });
     }
     const qs = query.toString();
-    return apiFetch<{ data: any[]; pagination: any }>(`/api/v1/settings/audit-log${qs ? `?${qs}` : ''}`);
+    return apiFetch<PaginatedResponse<AuditLogEntry>>(`/api/v1/settings/audit-log${qs ? `?${qs}` : ''}`);
   },
 };
 
@@ -566,7 +671,7 @@ export const documentsApi = {
     const formData = new FormData();
     files.forEach(f => formData.append('files', f));
     formData.append('documentType', documentType);
-    return apiUpload<{ data: any[]; count: number }>(`/api/v1/documents/${filingId}`, formData);
+    return apiUpload<{ data: FilingDoc[]; count: number }>(`/api/v1/documents/${filingId}`, formData);
   },
 
   download(filingId: string, docId: string) {
@@ -574,7 +679,7 @@ export const documentsApi = {
   },
 
   delete(filingId: string, docId: string) {
-    return apiFetch(`/api/v1/documents/${filingId}/${docId}`, { method: 'DELETE' });
+    return apiFetch<SuccessResponse>(`/api/v1/documents/${filingId}/${docId}`, { method: 'DELETE' });
   },
 };
 
@@ -783,6 +888,21 @@ export const trackingApi = {
   },
 };
 
+export interface ManifestQueryRecord {
+  id: string;
+  orgId: string;
+  filingId: string | null;
+  ccRequestId: string;
+  bolNumber: string;
+  bolType: string;
+  houseBOLNumber: string | null;
+  status: 'pending' | 'polling' | 'completed' | 'failed' | 'timeout';
+  responseData: Record<string, unknown> | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const manifestQueryApi = {
   create(data: {
     bolNumber: string;
@@ -800,7 +920,7 @@ export const manifestQueryApi = {
   },
 
   get(id: string) {
-    return apiFetch<{ data: any }>(`/api/v1/manifest-queries/${id}`);
+    return apiFetch<{ data: ManifestQueryRecord }>(`/api/v1/manifest-queries/${id}`);
   },
 
   list(params?: { page?: number; limit?: number; bolNumber?: string; status?: string }) {
@@ -811,7 +931,7 @@ export const manifestQueryApi = {
       });
     }
     const qs = query.toString();
-    return apiFetch<{ data: any[]; pagination: { total: number; page: number; limit: number; totalPages: number } }>(`/api/v1/manifest-queries${qs ? `?${qs}` : ''}`);
+    return apiFetch<{ data: ManifestQueryRecord[]; pagination: { total: number; page: number; limit: number; totalPages: number } }>(`/api/v1/manifest-queries${qs ? `?${qs}` : ''}`);
   },
 
   poll(id: string) {
@@ -1023,14 +1143,14 @@ export const organizationApi = {
   },
 
   changeRole(memberId: string, role: string) {
-    return apiFetch<any>(`/api/v1/organization/members/${memberId}/role`, {
+    return apiFetch<OrgMember>(`/api/v1/organization/members/${memberId}/role`, {
       method: 'PATCH',
       body: JSON.stringify({ role }),
     });
   },
 
   removeMember(memberId: string) {
-    return apiFetch(`/api/v1/organization/members/${memberId}`, { method: 'DELETE' });
+    return apiFetch<SuccessResponse>(`/api/v1/organization/members/${memberId}`, { method: 'DELETE' });
   },
 
   getInvitations() {
@@ -1045,11 +1165,11 @@ export const organizationApi = {
   },
 
   revokeInvitation(invitationId: string) {
-    return apiFetch(`/api/v1/organization/invitations/${invitationId}`, { method: 'DELETE' });
+    return apiFetch<SuccessResponse>(`/api/v1/organization/invitations/${invitationId}`, { method: 'DELETE' });
   },
 
   completeOnboarding() {
-    return apiFetch('/api/v1/organization/onboarding', { method: 'PATCH' });
+    return apiFetch<SuccessResponse>('/api/v1/organization/onboarding', { method: 'PATCH' });
   },
 };
 
@@ -1587,7 +1707,7 @@ async function* streamCoach(path: string, filingId: string): AsyncGenerator<stri
         }
         if (eventName === 'done') return;
         if (eventName === 'error') {
-          let parsed: any = {};
+          let parsed: { error?: string; code?: string } = {};
           try { parsed = JSON.parse(dataLine); } catch { /* ignore */ }
           throw Object.assign(new Error(parsed.error || 'AI stream error'), { code: parsed.code });
         }
