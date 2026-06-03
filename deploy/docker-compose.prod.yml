@@ -93,6 +93,15 @@ services:
       STRIPE_SECRET_KEY:      ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET:  ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+
+      # Sentry (audit Phase 10). Server-side only; empty DSN disables init.
+      # The SPA bundle needs VITE_SENTRY_DSN at *build* time (Vite bakes
+      # import.meta.env.* into the bundle), so it's NOT here — set it via
+      # a docker build ARG when the SPA image is built. Same for landing's
+      # NEXT_PUBLIC_SENTRY_DSN.
+      SENTRY_DSN:         ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_RELEASE:     ${SENTRY_RELEASE:-}
     volumes:
       - uploads_data:/app/uploads
     healthcheck:

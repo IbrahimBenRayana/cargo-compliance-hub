@@ -12,10 +12,14 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
 # Copy root package files
-COPY package.json package-lock.json* bun.lock* ./
+COPY package.json package-lock.json ./
 
-# Install frontend deps
-RUN npm install --frozen-lockfile 2>/dev/null || npm install
+# Install frontend deps. `npm ci` requires package-lock.json and refuses
+# to drift from it — exactly what we want in a reproducible build. The
+# old `npm install --frozen-lockfile` was an npm-ignored flag (bun
+# syntax); npm parsed it as `--frozen=lockfile` and silently re-resolved
+# against the registry.
+RUN npm ci
 
 # Copy frontend source + configs
 COPY index.html vite.config.ts tsconfig.json tsconfig.app.json tsconfig.node.json tailwind.config.ts postcss.config.js components.json ./
@@ -36,10 +40,10 @@ FROM node:20-alpine AS server-builder
 WORKDIR /app/server
 
 # Copy server package files
-COPY server/package.json server/package-lock.json* ./
+COPY server/package.json server/package-lock.json ./
 
 # Install ALL deps (need devDependencies for tsc + prisma generate)
-RUN npm install --frozen-lockfile 2>/dev/null || npm install
+RUN npm ci
 
 # Copy server source + prisma
 COPY server/tsconfig.json server/tsconfig.build.json ./
@@ -63,8 +67,8 @@ RUN addgroup -g 1001 -S appgroup && \
     adduser -S appuser -u 1001 -G appgroup
 
 # Install production server deps only
-COPY server/package.json server/package-lock.json* ./
-RUN npm install --omit=dev --frozen-lockfile 2>/dev/null || npm install --omit=dev
+COPY server/package.json server/package-lock.json ./
+RUN npm ci --omit=dev
 
 # Copy Prisma schema + generated client + migrations
 COPY server/prisma/ ./prisma/

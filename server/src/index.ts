@@ -1,3 +1,6 @@
+// Sentry instrumentation MUST be the first import — see instrument.ts.
+import './instrument.js';
+import * as Sentry from '@sentry/node';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -163,6 +166,10 @@ if (env.NODE_ENV === 'production') {
 }
 
 // ─── Error Handler ────────────────────────────────────────
+// Sentry's express handler must come BEFORE our app errorHandler so
+// thrown errors get captured before being formatted into a JSON response.
+// No-op when SENTRY_DSN isn't set (init() is skipped in instrument.ts).
+Sentry.setupExpressErrorHandler(app);
 app.use(errorHandler);
 
 // ─── Start Server ─────────────────────────────────────────
@@ -208,6 +215,27 @@ async function main() {
 
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGINT', () => shutdown('SIGINT'));
+
+    // Global error nets (audit Phase 10). Pre-fix a stray Promise rejection
+    // (typically from a fire-and-forget notification or a bare catch that
+    // re-threw) would kill the process without running graceful shutdown,
+    // dropping in-flight requests and any pending background work. We
+    // forward the error to Sentry, log, and let the process die with code
+    // 1 — Docker's restart-on-failure brings it back, but with a captured
+    // stack trace instead of silent loss.
+    process.on('unhandledRejection', (reason) => {
+      // eslint-disable-next-line no-console
+      console.error('[Server] Unhandled promise rejection:', reason);
+      Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)));
+    });
+    process.on('uncaughtException', (err) => {
+      // eslint-disable-next-line no-console
+      console.error('[Server] Uncaught exception:', err);
+      Sentry.captureException(err);
+      // After capturing, exit so the container can restart into a clean state.
+      // (Sentry's flush is async; give it 2 seconds before forcing exit.)
+      Sentry.flush(2000).finally(() => process.exit(1));
+    });
   } catch (err) {
     console.error('❌ Failed to start server:', err);
     process.exit(1);
