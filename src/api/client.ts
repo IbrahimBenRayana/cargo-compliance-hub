@@ -250,6 +250,22 @@ export const filingsApi = {
     });
   },
 
+  /**
+   * Create a consolidation: N draft filings sharing one Master BOL.
+   * `data` matches the standard create payload but uses `houseBills: string[]`
+   * instead of a single `houseBol`. Returns the generated consolidationId and
+   * the N created filings.
+   */
+  createConsolidation(data: Partial<Filing> & { houseBills: string[] } & Record<string, unknown>) {
+    return apiFetch<{ consolidationId: string; count: number; filings: Filing[] }>(
+      '/api/v1/filings/consolidation',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    );
+  },
+
   update(id: string, data: Partial<Filing> & Record<string, unknown>) {
     return apiFetch<Filing>(`/api/v1/filings/${id}`, {
       method: 'PATCH',
