@@ -21,6 +21,7 @@ import { sanitizeErrorMessage } from '../services/errorTranslator.js';
 import { notify } from '../services/notifications.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import logger from '../config/logger.js';
+import { CC_POLL_INTERVAL_MS } from '../config/schedules.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -279,10 +280,9 @@ async function pollABIDocumentStatus(
   mbolNumber: string | null
 ): Promise<void> {
   const MAX_ATTEMPTS = 10;
-  const POLL_INTERVAL_MS = 3000;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    await new Promise((resolve) => setTimeout(resolve, CC_POLL_INTERVAL_MS));
 
     try {
       const { terminal } = await runSinglePoll({

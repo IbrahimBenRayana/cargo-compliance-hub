@@ -8,14 +8,14 @@
  *   POST   /:id/refresh                  → re-sync from Terminal 49 (poll request + fetch shipment)
  *   DELETE /:id                          → soft-stop and remove (admin only)
  *
- * Sync model (Phase 1 = pull only):
+ * Sync model (pull-based today):
  *   - On create we POST /tracking_requests and store the returned request id.
  *   - "tracking" status is set once trackingRequest.status === 'created' AND
  *     a shipment id is attached → at that point we fetch /shipments/{id}?include=containers
  *     and persist the flattened snapshot + the denorm fields used by the list view.
  *   - Refresh re-runs the same logic.
  *
- * Phase 2 will introduce webhook ingestion so we don't have to poll.
+ * Future work: switch to webhook ingestion once volume warrants it.
  */
 
 import { Router, Response } from 'express';

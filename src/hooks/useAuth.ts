@@ -65,9 +65,23 @@ export function useCurrentUser() {
         const user = await authApi.me();
         setUser(user);
         return user;
-      } catch {
-        setUser(null);
-        return null;
+      } catch (err: any) {
+        // Audit Phase 11.2: pre-fix any /auth/me failure (transient 5xx,
+        // network blip, CORS hiccup) cleared the user and triggered a
+        // bounce to /login — indistinguishable from a real session
+        // expiry. Now we only clear on the genuinely auth-related codes;
+        // anything else (5xx, network, undefined status) leaves the
+        // cached user in place so the next render keeps showing the app.
+        const status = err?.status;
+        const isAuthFailure = status === 401 || status === 403;
+        if (isAuthFailure) {
+          setUser(null);
+          return null;
+        }
+        // Re-throw so React Query knows the query failed and the caller
+        // can show a transient-error banner if they care — but importantly
+        // the user/auth state is unchanged.
+        throw err;
       }
     },
     retry: false,

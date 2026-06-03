@@ -27,7 +27,7 @@ import {
 } from '@/hooks/useFilings';
 import type { Notification, NotificationSeverity } from '@/types/notification';
 import { useNavigate } from 'react-router-dom';
-import { formatDistanceToNow } from '@/lib/utils';
+import { formatTimeAgo } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 // ─── Visual mapping (kind → icon, severity → rail color) ─────────────
@@ -325,7 +325,7 @@ function NotificationRow({ notification, onClick }: { notification: Notification
           </p>
         )}
         <p className="text-[11px] text-muted-foreground/60 mt-1 tabular-nums">
-          {formatDistanceToNow(notification.createdAt)}
+          {formatTimeAgo(notification.createdAt)}
         </p>
       </div>
 

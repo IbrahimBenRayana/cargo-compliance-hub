@@ -346,3 +346,44 @@
     );
   }
 }
+
+/* ── Global accessibility primitives ─────────────────────
+   These live outside @layer so the rules win regardless of import order. */
+
+/* Skip-to-content link — visually hidden until focused. Wired in App.tsx. */
+.mcl-skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 100;
+  padding: 0.5rem 0.875rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transform: translateY(-150%);
+  transition: transform 150ms ease-out;
+}
+.mcl-skip-link:focus,
+.mcl-skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Global reduced-motion guard. Tailwind's animate-* utilities don't
+   automatically stop under prefers-reduced-motion — this catches every
+   case so we don't have to remember `motion-reduce:animate-none` at every
+   call site. Components that genuinely want movement under reduced-motion
+   can opt out with a custom class. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

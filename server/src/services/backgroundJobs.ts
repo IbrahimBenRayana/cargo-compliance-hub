@@ -28,6 +28,7 @@ import { drainEmailDeliveries } from './notificationDeliveryWorker.js';
 import { recordScoreSnapshot, triggerForStatus } from './compliance/scoreSnapshot.js';
 import { syncFromFederalRegister } from './compliance/addCvdSync.js';
 import { invalidateAddCvdCache } from './compliance/addCvd.js';
+import { CRON, ABI_SENDING_TIMEOUT_MS } from '../config/schedules.js';
 
 // ─── Job State ─────────────────────────────────────────────
 
@@ -113,7 +114,12 @@ async function pollSubmittedFilings(): Promise<void> {
               if (masterBol) msgParams.masterBOLNumber = masterBol;
               const msgResult = await ccClient.getMessages(msgParams);
               messages = msgResult.data?.data ?? [];
-            } catch { /* non-fatal */ }
+            } catch (err: any) {
+              // Non-fatal — we may have created the filing before CC
+              // accepted any messages. Still log a breadcrumb so a
+              // pattern of failures becomes visible.
+              logger.warn({ err: err?.message, houseBol }, '[Jobs:StatusPoll] CC getMessages failed (non-fatal)');
+            }
           }
 
           const ccStatus = matchingDoc?.status?.toUpperCase();
@@ -408,14 +414,12 @@ async function checkStaleFilings(): Promise<void> {
 // id we promote SENDING→SENT; otherwise we roll back to DRAFT so the
 // user can retry. The 15-minute threshold is comfortably larger than
 // any legitimate CC round-trip (typical 2-3s, p99 well under a minute).
-const SENDING_TIMEOUT_MS = 15 * 60 * 1000;
-
 let isAbiReaperRunning = false;
 async function reapStuckAbiDocuments(): Promise<void> {
   if (isAbiReaperRunning) return; // re-entrant guard
   isAbiReaperRunning = true;
   try {
-    const cutoff = new Date(Date.now() - SENDING_TIMEOUT_MS);
+    const cutoff = new Date(Date.now() - ABI_SENDING_TIMEOUT_MS);
     const stuck = await prisma.abiDocument.findMany({
       where: { status: 'SENDING', sentAt: { lt: cutoff } },
       select: { id: true, orgId: true, ccDocumentId: true, sentAt: true },
@@ -470,17 +474,17 @@ export function startBackgroundJobs(): void {
   // in-process re-entrancy flags below cover the current single-VPS deploy.)
   const cronOpts = { timezone: 'UTC' } as const;
 
-  statusPollTask = cron.schedule('*/5 * * * *', () => {
+  statusPollTask = cron.schedule(CRON.STATUS_POLL, () => {
     pollSubmittedFilings().catch(err => logger.error({ err }, '[Jobs:StatusPoll] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Status polling scheduled — every 5 minutes (UTC)');
 
-  deadlineTask = cron.schedule('30 * * * *', () => {
+  deadlineTask = cron.schedule(CRON.DEADLINE_ALERTS, () => {
     checkDeadlines().catch(err => logger.error({ err }, '[Jobs:Deadlines] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Deadline alerts scheduled — every hour at :30 (UTC)');
 
-  staleCheckTask = cron.schedule('0 */6 * * *', () => {
+  staleCheckTask = cron.schedule(CRON.STALE_CHECK, () => {
     checkStaleFilings().catch(err => logger.error({ err }, '[Jobs:StaleCheck] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Stale filing check scheduled — every 6 hours (UTC)');
@@ -488,7 +492,7 @@ export function startBackgroundJobs(): void {
   // Phase 6: drain the email delivery queue every 30s. The worker is
   // re-entrant (skips if a previous tick is still running) so this
   // cadence is safe even if a single batch takes longer than 30s.
-  deliveryDrainTask = cron.schedule('*/30 * * * * *', () => {
+  deliveryDrainTask = cron.schedule(CRON.EMAIL_DELIVERY_DRAIN, () => {
     drainEmailDeliveries().catch(err => logger.error({ err }, '[Jobs:Delivery] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Email delivery drain scheduled — every 30 seconds (UTC)');
@@ -496,7 +500,7 @@ export function startBackgroundJobs(): void {
   // Daily ADD/CVD sync from the Federal Register. New candidates land
   // with status='pending' for admin review. Runs at 04:00 UTC so it
   // happens during the lowest-traffic window for North American users.
-  addCvdSyncTask = cron.schedule('0 4 * * *', () => {
+  addCvdSyncTask = cron.schedule(CRON.ADD_CVD_SYNC, () => {
     syncFromFederalRegister()
       .then((result) => {
         if (result.inserted > 0) invalidateAddCvdCache();
@@ -509,7 +513,7 @@ export function startBackgroundJobs(): void {
   // ABI document reaper — every 5 minutes, rolls SENDING-for-15-minutes
   // documents back to DRAFT so the dashboard never carries a permanently
   // in-flight row. See reapStuckAbiDocuments above for the rationale.
-  abiReaperTask = cron.schedule('*/5 * * * *', () => {
+  abiReaperTask = cron.schedule(CRON.ABI_REAPER, () => {
     reapStuckAbiDocuments().catch(err => logger.error({ err }, '[Jobs:AbiReaper] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] ABI document reaper scheduled — every 5 minutes (UTC)');
