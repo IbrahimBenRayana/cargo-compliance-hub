@@ -29,6 +29,7 @@ import { recordScoreSnapshot, triggerForStatus } from './compliance/scoreSnapsho
 import { syncFromFederalRegister } from './compliance/addCvdSync.js';
 import { invalidateAddCvdCache } from './compliance/addCvd.js';
 import { CRON, ABI_SENDING_TIMEOUT_MS } from '../config/schedules.js';
+import { withAdvisoryLock } from './distributedLock.js';
 
 // ─── Job State ─────────────────────────────────────────────
 
@@ -474,18 +475,23 @@ export function startBackgroundJobs(): void {
   // in-process re-entrancy flags below cover the current single-VPS deploy.)
   const cronOpts = { timezone: 'UTC' } as const;
 
+  // Each tick wraps the underlying job in `withAdvisoryLock` so multi-replica
+  // deployments don't N-fire the same cron — only the lock holder runs.
   statusPollTask = cron.schedule(CRON.STATUS_POLL, () => {
-    pollSubmittedFilings().catch(err => logger.error({ err }, '[Jobs:StatusPoll] Unhandled'));
+    withAdvisoryLock('jobs:status-poll', pollSubmittedFilings)
+      .catch(err => logger.error({ err }, '[Jobs:StatusPoll] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Status polling scheduled — every 5 minutes (UTC)');
 
   deadlineTask = cron.schedule(CRON.DEADLINE_ALERTS, () => {
-    checkDeadlines().catch(err => logger.error({ err }, '[Jobs:Deadlines] Unhandled'));
+    withAdvisoryLock('jobs:deadlines', checkDeadlines)
+      .catch(err => logger.error({ err }, '[Jobs:Deadlines] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Deadline alerts scheduled — every hour at :30 (UTC)');
 
   staleCheckTask = cron.schedule(CRON.STALE_CHECK, () => {
-    checkStaleFilings().catch(err => logger.error({ err }, '[Jobs:StaleCheck] Unhandled'));
+    withAdvisoryLock('jobs:stale-check', checkStaleFilings)
+      .catch(err => logger.error({ err }, '[Jobs:StaleCheck] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Stale filing check scheduled — every 6 hours (UTC)');
 
@@ -493,7 +499,8 @@ export function startBackgroundJobs(): void {
   // re-entrant (skips if a previous tick is still running) so this
   // cadence is safe even if a single batch takes longer than 30s.
   deliveryDrainTask = cron.schedule(CRON.EMAIL_DELIVERY_DRAIN, () => {
-    drainEmailDeliveries().catch(err => logger.error({ err }, '[Jobs:Delivery] Unhandled'));
+    withAdvisoryLock('jobs:email-delivery', drainEmailDeliveries)
+      .catch(err => logger.error({ err }, '[Jobs:Delivery] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Email delivery drain scheduled — every 30 seconds (UTC)');
 
@@ -501,12 +508,11 @@ export function startBackgroundJobs(): void {
   // with status='pending' for admin review. Runs at 04:00 UTC so it
   // happens during the lowest-traffic window for North American users.
   addCvdSyncTask = cron.schedule(CRON.ADD_CVD_SYNC, () => {
-    syncFromFederalRegister()
-      .then((result) => {
-        if (result.inserted > 0) invalidateAddCvdCache();
-        logger.info({ result }, '[Jobs:AddCvdSync] Done');
-      })
-      .catch(err => logger.error({ err }, '[Jobs:AddCvdSync] Unhandled'));
+    withAdvisoryLock('jobs:add-cvd-sync', async () => {
+      const result = await syncFromFederalRegister();
+      if (result.inserted > 0) invalidateAddCvdCache();
+      logger.info({ result }, '[Jobs:AddCvdSync] Done');
+    }).catch(err => logger.error({ err }, '[Jobs:AddCvdSync] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] ADD/CVD Federal Register sync scheduled — daily at 04:00 UTC');
 
@@ -514,7 +520,8 @@ export function startBackgroundJobs(): void {
   // documents back to DRAFT so the dashboard never carries a permanently
   // in-flight row. See reapStuckAbiDocuments above for the rationale.
   abiReaperTask = cron.schedule(CRON.ABI_REAPER, () => {
-    reapStuckAbiDocuments().catch(err => logger.error({ err }, '[Jobs:AbiReaper] Unhandled'));
+    withAdvisoryLock('jobs:abi-reaper', reapStuckAbiDocuments)
+      .catch(err => logger.error({ err }, '[Jobs:AbiReaper] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] ABI document reaper scheduled — every 5 minutes (UTC)');
 

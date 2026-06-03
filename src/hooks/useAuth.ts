@@ -1,13 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authApi, setAccessToken, clearTokens } from '../api/client';
 import { create } from 'zustand';
+import type { User } from '../types/auth';
 
 // ─── Auth Store (Zustand) ─────────────────────────────────
 interface AuthState {
-  user: any | null;
+  user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  setUser: (user: any) => void;
+  setUser: (user: User | null) => void;
   logout: () => void;
 }
 

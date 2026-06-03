@@ -58,6 +58,7 @@ export interface CommodityInfo {
   countryOfOrigin: string;
   description?: string;
   quantity?: number;
+  quantityUOM?: string;
   weight?: { value: number; unit: string };
   value?: { amount: number; currency: string };
 }
