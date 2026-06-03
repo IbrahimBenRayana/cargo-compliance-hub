@@ -1,6 +1,6 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useFiling, useSubmitFiling, useAmendFiling, useCancelFiling, useValidateFiling, useCheckFilingStatus, useDuplicateFiling, useSaveFilingAsTemplate, useFilingDocuments, useUploadDocuments, useDownloadDocument, useDeleteDocument, useExportPdf } from '@/hooks/useFilings';
+import { useFiling, useSubmitFiling, useAmendFiling, useCancelFiling, useValidateFiling, useCheckFilingStatus, useDuplicateFiling, useSaveFilingAsTemplate, useFilingDocuments, useUploadDocuments, useDownloadDocument, useDeleteDocument, useExportPdf, useConsolidationSiblings } from '@/hooks/useFilings';
 import { useAbiDocumentsList } from '@/hooks/useAbiDocument';
 import { useManifestQueries } from '@/hooks/useManifestQuery';
 import { Filing, getPartyName, getFirstCommodity, ShipmentStatus } from '@/types/shipment';
@@ -35,7 +35,7 @@ import {
   FileEdit, Ban, Shield, AlertTriangle, Ship, Package, Globe, Anchor,
   Container, Users, FileText, Clock, ChevronRight, Zap, Activity,
   RefreshCw, Radio, Inbox, ArrowDownToLine, Copy, Bookmark, MoreHorizontal,
-  Upload, Trash2, Paperclip, Search, FileCheck, Sparkles,
+  Upload, Trash2, Paperclip, Search, FileCheck, Sparkles, Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -530,6 +530,59 @@ function CBPStatusChecker({ filing, onStatusUpdate }: { filing: Filing; onStatus
   );
 }
 
+// ─── Consolidation strip ────────────────────────────────────
+// Shown at the top of the detail page when this filing belongs to a
+// multi-HBL consolidation. Lists every sibling as a clickable chip + its
+// status; the current filing's chip is highlighted in place.
+function ConsolidationStrip({
+  consolidationId,
+  currentId,
+  masterBol,
+}: {
+  consolidationId: string;
+  currentId: string;
+  masterBol: string | null;
+}) {
+  const { data, isLoading } = useConsolidationSiblings(consolidationId);
+  if (isLoading || !data) return null;
+  const siblings = data.filings;
+  if (siblings.length < 2) return null;
+  return (
+    <div className="rounded-xl border border-amber-200/70 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 px-4 py-3">
+      <div className="flex items-center gap-2 mb-2">
+        <Layers className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" />
+        <span className="text-[11px] uppercase tracking-wider font-semibold text-amber-700 dark:text-amber-300">
+          Consolidation {masterBol ? <>· <span className="tabular-nums normal-case font-mono">{masterBol}</span></> : null}
+        </span>
+        <span className="text-[11px] text-muted-foreground">
+          {siblings.length} house bills — each filed separately with CBP and billed as 1 filing
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {siblings.map((s, idx) => {
+          const isCurrent = s.id === currentId;
+          return (
+            <Link
+              key={s.id}
+              to={`/shipments/${s.id}`}
+              className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] tabular-nums ring-1 transition-colors ${
+                isCurrent
+                  ? 'bg-amber-100 dark:bg-amber-900/40 ring-amber-300/70 dark:ring-amber-700/60 font-semibold text-amber-900 dark:text-amber-100'
+                  : 'bg-background ring-border hover:bg-accent hover:ring-accent-foreground/20'
+              }`}
+              aria-current={isCurrent ? 'page' : undefined}
+            >
+              <span className="text-muted-foreground text-[10px]">HBL {idx + 1}</span>
+              <span>{s.houseBol || s.id.slice(0, 8)}</span>
+              <StatusBadge status={s.status as ShipmentStatus} />
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ────────────────────────────────────────
 
 export default function ShipmentDetails() {
@@ -983,6 +1036,19 @@ export default function ShipmentDetails() {
           </Dialog>
         </div>
       </div>
+
+      {/* Consolidation strip — only when this filing is part of a multi-HBL
+          consolidation. Chips jump to siblings; current filing's chip is
+          highlighted. The list is fetched from the lightweight sibling
+          endpoint so this page works even if siblings live off the current
+          ShipmentsList page (pagination boundary). */}
+      {filing.consolidationId && (
+        <ConsolidationStrip
+          consolidationId={filing.consolidationId}
+          currentId={filing.id}
+          masterBol={filing.masterBol ?? null}
+        />
+      )}
 
       {/* Lifecycle widget — horizontal stage tracker (ISF · Manifest · Entry · Cleared) */}
       <div
