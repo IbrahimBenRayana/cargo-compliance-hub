@@ -7,8 +7,12 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Human-readable "time ago" string from a date.
+ *
+ * Named distinctly from date-fns's `formatDistanceToNow` (which is also used
+ * in the app, e.g. ShipmentsList/ABIDocumentsListPage) so there's no shadowing
+ * confusion at the import site.
  */
-export function formatDistanceToNow(date: string | Date): string {
+export function formatTimeAgo(date: string | Date): string {
   const now = Date.now();
   const then = new Date(date).getTime();
   const diffMs = now - then;

@@ -6,6 +6,7 @@ import { ccClient, CCManifestQueryPayload } from '../services/customscity.js';
 import { ccApiLimiter } from '../middleware/rateLimiter.js';
 import { notify } from '../services/notifications.js';
 import logger from '../config/logger.js';
+import { CC_POLL_INTERVAL_MS } from '../config/schedules.js';
 
 const router = Router();
 
@@ -140,11 +141,10 @@ router.post('/', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<
 
 async function pollManifestQueryResult(queryId: string, ccRequestId: string, orgId: string): Promise<void> {
   const MAX_ATTEMPTS = 10;
-  const POLL_INTERVAL_MS = 3000;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     // Wait before polling (except first attempt — give CC a moment)
-    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+    await new Promise(resolve => setTimeout(resolve, CC_POLL_INTERVAL_MS));
 
     try {
       const result = await ccClient.getManifestQueryById(ccRequestId);
@@ -224,7 +224,7 @@ async function pollManifestQueryResult(queryId: string, ccRequestId: string, org
     where: { id: queryId },
     data: {
       status: 'timeout',
-      errorMessage: `No response after ${MAX_ATTEMPTS} poll attempts (${MAX_ATTEMPTS * POLL_INTERVAL_MS / 1000}s)`,
+      errorMessage: `No response after ${MAX_ATTEMPTS} poll attempts (${MAX_ATTEMPTS * CC_POLL_INTERVAL_MS / 1000}s)`,
     },
     select: { userId: true, bolNumber: true },
   });

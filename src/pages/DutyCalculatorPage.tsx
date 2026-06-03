@@ -1,7 +1,7 @@
 /**
- * Duty Calculator — Phase 1.
+ * Duty Calculator — standalone /duty-calculator page.
  *
- * Standalone /duty-calculator page. Two modes:
+ * Two modes:
  *   • Standard (HTS) — POST /api/v1/duty-calculation, deterministic
  *   • AI-assisted   — POST /api/v1/duty-calculation/ai, AI classifies
  *
@@ -45,9 +45,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
+import { COUNTRIES, CURRENCIES } from '@/data/geo';
 import {
-  COUNTRIES,
-  CURRENCIES,
   ComboboxField,
   DateField,
   SelectField,

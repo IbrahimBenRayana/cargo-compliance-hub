@@ -13,7 +13,8 @@
  *   getShipment()            — GET  /shipments/{id}?include=containers,pod_terminal,...
  *   getContainer()           — GET  /containers/{id}
  *
- * Phase 2 (webhooks) will add register/list/delete webhook endpoints.
+ * Future work: webhook ingestion (register/list/delete webhook endpoints)
+ * for push-based updates once active tracking volume justifies it.
  *
  * The service is intentionally thin — JSON:API responses are returned in
  * a flattened, MyCargoLens-friendly shape (the route layer maps these into

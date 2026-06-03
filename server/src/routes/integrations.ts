@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { ccClient } from '../services/customscity.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { sendTestEmail, verifyEmailConnection } from '../services/email.js';
+import { env } from '../config/env.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -12,8 +13,8 @@ router.post('/test', async (req: AuthRequest, res: Response): Promise<void> => {
     const connected = await ccClient.testConnection();
     res.json({
       connected,
-      environment: process.env.CC_ENVIRONMENT ?? 'sandbox',
-      baseUrl: process.env.CC_API_BASE_URL,
+      environment: env.CC_ENVIRONMENT,
+      baseUrl: env.CC_API_BASE_URL,
     });
   } catch (err: any) {
     res.json({
@@ -137,9 +138,9 @@ router.get('/email-status', async (req: AuthRequest, res: Response): Promise<voi
   try {
     const connected = await verifyEmailConnection();
     res.json({
-      configured: !!process.env.EMAIL_USER,
+      configured: !!env.EMAIL_USER,
       connected,
-      from: process.env.EMAIL_FROM || 'not configured',
+      from: env.EMAIL_FROM,
     });
   } catch (err: any) {
     res.json({ configured: false, connected: false, error: err.message });

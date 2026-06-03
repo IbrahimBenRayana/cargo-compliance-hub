@@ -9,9 +9,9 @@
  * for the audit trail, and surface CC errors via `extractCCErrorMessage`
  * so the user sees the actual problem (not just "failed").
  *
- * No DB persistence at this layer — calculations are stateless. Phase 2
- * may add a `dutyEstimate Json?` column on AbiDocument if customers ask
- * for permanent stamping.
+ * No DB persistence at this layer — calculations are stateless. A
+ * `dutyEstimate Json?` column on AbiDocument could be added later if
+ * customers ask for permanent stamping.
  */
 import { Router, type Response } from 'express';
 import { prisma } from '../config/database.js';

@@ -44,6 +44,9 @@ export function AppLayout() {
 
   return (
     <SidebarProvider>
+      <a href="#main-content" className="mcl-skip-link sr-only focus:not-sr-only">
+        Skip to main content
+      </a>
       <div className="min-h-screen flex w-full bg-mesh">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
@@ -108,7 +111,7 @@ export function AppLayout() {
           </header>
 
           {/* ── Page Content ── */}
-          <main className="flex-1 overflow-auto p-6">
+          <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto p-6">
             <Outlet />
           </main>
 
