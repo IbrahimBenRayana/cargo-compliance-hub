@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import {
   ArrowLeft, ArrowRight, Check, ChevronsUpDown, Loader2, Info, Ship, Package, Users, FileText,
-  Building2, MapPin, Plus, Trash2, AlertCircle, CheckCircle2, Sparkles, Container, X,
+  Building2, MapPin, Plus, Trash2, AlertCircle, CheckCircle2, Sparkles, Container, X, Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -146,13 +146,39 @@ interface ISFFormState {
    */
   additionalHouseBills: string[];
   /**
-   * Per-HBL overrides for fields that genuinely differ between sibling
-   * filings in a consolidation. Length is kept in sync with
-   * `1 + additionalHouseBills.length` so index 0 = primary HBL, indices
-   * 1..N = additionalHouseBills[i-1]. An empty/undefined `commodities`
-   * means "inherit from the shared `commodities` array" — the common case.
+   * Consolidation type — chosen by the operator when they add a second HBL.
+   *   • 'buyer' = one importer/consignee/buyer/ship-to across all HBLs,
+   *     vendors differ per HBL (retail import scenario).
+   *   • 'lcl'   = each HBL has its own importer/consignee/buyer/ship-to
+   *     alongside its own vendors. Only the carrier-level data is shared
+   *     (vessel, voyage, port, MBL).
+   * Drives which steps render tab strips vs single inputs.
    */
-  perHblOverrides: Array<{ commodities?: CommodityFormData[] }>;
+  consolidationMode: 'buyer' | 'lcl';
+  /**
+   * Per-HBL overrides for fields that differ between sibling filings.
+   * Length is kept in sync with `1 + additionalHouseBills.length`:
+   * index 0 = primary HBL, indices 1..N = additionalHouseBills[i-1].
+   * Each field on an entry is optional: undefined / empty array means
+   * "inherit the shared value." Different mode = different fields the
+   * UI exposes for editing, but the shape is the same.
+   */
+  perHblOverrides: Array<{
+    // LCL-mode importer/consignee
+    importerName?: string;
+    importerNumber?: string;
+    consigneeName?: string;
+    consigneeNumber?: string;
+    consigneeAddress?: PartyFormData;
+    // Trade parties
+    buyer?: PartyFormData;
+    seller?: PartyFormData;
+    shipToParty?: PartyFormData;
+    manufacturer?: PartyFormData;
+    // Cargo
+    commodities?: CommodityFormData[];
+    containers?: ContainerFormData[];
+  }>;
   bondType: string;
 
   // IOR & Filer
@@ -223,6 +249,7 @@ const initialForm = (): ISFFormState => ({
   masterBol: '',
   houseBol: '',
   additionalHouseBills: [],
+  consolidationMode: 'buyer',
   perHblOverrides: [{}],
   bondType: 'continuous',
   importerName: '',
@@ -541,6 +568,7 @@ export default function ShipmentWizard() {
       masterBol: '',
       houseBol: '',
       additionalHouseBills: [],
+      consolidationMode: 'buyer',
       perHblOverrides: [{}],
       voyageNumber: '',
       estimatedDeparture: '',
@@ -650,6 +678,7 @@ export default function ShipmentWizard() {
       houseBol: existing.houseBol || '',
       // Edit mode is per-filing, so consolidation list is empty in this path.
       additionalHouseBills: [],
+      consolidationMode: 'buyer',
       perHblOverrides: [{}],
       bondType: existing.bondType || 'continuous',
       importerName: existing.importerName || '',
@@ -785,6 +814,21 @@ export default function ShipmentWizard() {
     });
   }, []);
 
+  // Generic per-HBL field setter — works for any key on the override entry.
+  // Passing undefined clears the override (the HBL inherits the shared value).
+  const setHblField = useCallback(<K extends keyof ISFFormState['perHblOverrides'][number]>(
+    hblIdx: number,
+    field: K,
+    value: ISFFormState['perHblOverrides'][number][K] | undefined,
+  ) => {
+    setForm(prev => {
+      const overrides = [...prev.perHblOverrides];
+      while (overrides.length <= hblIdx) overrides.push({});
+      overrides[hblIdx] = { ...overrides[hblIdx], [field]: value };
+      return { ...prev, perHblOverrides: overrides };
+    });
+  }, []);
+
   const progress = useMemo(() => calcProgress(form), [form]);
   const isSaving = createFiling.isPending || createConsolidation.isPending || updateFiling.isPending;
 
@@ -881,15 +925,18 @@ export default function ShipmentWizard() {
 
   const goBack = useCallback(() => { if (step > 0) setStep(step - 1); }, [step]);
 
+  // Lifted out of buildPayload so the consolidation perHbl builder can
+  // reuse it. Returns undefined for empty (name-less) parties.
+  const partyObj = useCallback((p: PartyFormData): PartyInfo | undefined => {
+    if (!p.name.trim()) return undefined;
+    return {
+      name: p.name, address1: p.address1 || undefined, address2: p.address2 || undefined,
+      city: p.city || undefined, state: p.state || undefined, zip: p.zip || undefined, country: p.country || undefined,
+    } as PartyInfo;
+  }, []);
+
   // ─── Build payload ─────────────────
   const buildPayload = useCallback(() => {
-    const partyObj = (p: PartyFormData): PartyInfo | undefined => {
-      if (!p.name.trim()) return undefined;
-      return {
-        name: p.name, address1: p.address1 || undefined, address2: p.address2 || undefined,
-        city: p.city || undefined, state: p.state || undefined, zip: p.zip || undefined, country: p.country || undefined,
-      } as PartyInfo;
-    };
     const commodities: CommodityInfo[] = form.commodities
       .filter(c => c.htsCode.trim())
       .map(c => ({
@@ -984,16 +1031,30 @@ export default function ShipmentWizard() {
           ...form.additionalHouseBills.map((h) => h.trim()).filter(Boolean),
         ];
 
-        // Build perHbl payload from local overrides. We map each
-        // perHblOverrides[i].commodities (which is in form shape) through
-        // the same CommodityInfo coercion the shared payload uses, then
-        // omit entries that don't override anything (Zod accepts a shorter
-        // array — trailing inherits). A tail of empty entries is trimmed
-        // for tidiness.
+        // Build perHbl payload from local overrides. Every override field is
+        // optional — missing entries inherit shared. Commodities go through
+        // the same coercion used by the shared payload; party objects go
+        // through partyObj which strips empty rows.
+        const coerceParty = (p?: PartyFormData) =>
+          p && p.name.trim() ? partyObj(p) : undefined;
         const perHblBuilt = form.perHblOverrides.map((o) => {
-          if (!o.commodities || o.commodities.length === 0) return {};
-          return {
-            commodities: o.commodities
+          const entry: Record<string, any> = {};
+          if (o.importerName?.trim())    entry.importerName    = o.importerName.trim();
+          if (o.importerNumber?.trim())  entry.importerNumber  = o.importerNumber.trim();
+          if (o.consigneeName?.trim())   entry.consigneeName   = o.consigneeName.trim();
+          if (o.consigneeNumber?.trim()) entry.consigneeNumber = o.consigneeNumber.trim();
+          const consAddr = coerceParty(o.consigneeAddress);
+          if (consAddr) entry.consigneeAddress = consAddr;
+          const buyer = coerceParty(o.buyer);
+          if (buyer) entry.buyer = buyer;
+          const seller = coerceParty(o.seller);
+          if (seller) entry.seller = seller;
+          const ship = coerceParty(o.shipToParty);
+          if (ship) entry.shipToParty = ship;
+          const mfg = coerceParty(o.manufacturer);
+          if (mfg) entry.manufacturer = mfg;
+          if (o.commodities && o.commodities.length > 0) {
+            entry.commodities = o.commodities
               .filter(c => c.htsCode.trim() && c.countryOfOrigin.trim())
               .map(c => ({
                 htsCode: c.htsCode.replace(/[\.\-\s]/g, ''),
@@ -1002,8 +1063,9 @@ export default function ShipmentWizard() {
                 quantity: c.quantity ? Number(c.quantity) : undefined,
                 quantityUOM: c.quantityUOM || undefined,
                 weight: c.weight ? { value: Number(c.weight), unit: c.weightUOM || 'K' } : undefined,
-              })),
-          };
+              }));
+          }
+          return entry;
         });
         // Trim trailing no-op entries so we don't send a longer array than needed.
         while (perHblBuilt.length > 0 && Object.keys(perHblBuilt[perHblBuilt.length - 1]).length === 0) {
@@ -1016,13 +1078,15 @@ export default function ShipmentWizard() {
         const result = await createConsolidation.mutateAsync({
           ...sharedPayload,
           houseBills,
+          consolidationMode: form.consolidationMode,
           ...(perHblBuilt.length > 0 ? { perHbl: perHblBuilt } : {}),
         });
         const overrideCount = perHblBuilt.filter((o) => Object.keys(o).length > 0).length;
+        const modeLabel = form.consolidationMode === 'lcl' ? 'LCL' : 'buyer';
         toast.success(
           overrideCount > 0
-            ? `Consolidation created — ${result.count} ISF drafts (${overrideCount} with custom commodities). Each will count as 1 filing when submitted.`
-            : `Consolidation created — ${result.count} ISF drafts (one per house bill). Each will count as 1 filing when submitted.`,
+            ? `${modeLabel} consolidation created — ${result.count} ISF drafts (${overrideCount} with per-HBL overrides). Each will count as 1 filing when submitted.`
+            : `${modeLabel} consolidation created — ${result.count} ISF drafts (one per house bill). Each will count as 1 filing when submitted.`,
           { duration: 6500 },
         );
         navigate(`/shipments/${result.filings[0].id}`);
@@ -1155,14 +1219,71 @@ export default function ShipmentWizard() {
                 — one per house bill, all sharing this Master BOL.
               </p>
             )}
+
+            {/* Consolidation type — only meaningful when there are 2+ HBLs.
+                Picks the right shared/per-HBL field layout for later steps
+                (buyer = one importer + N suppliers; LCL = N independent
+                importers each with their own buyer + supplier). */}
+            {form.additionalHouseBills.length > 0 && (
+              <div className="rounded-md border border-border/60 bg-muted/30 p-3 mt-2 space-y-2">
+                <p className="text-xs font-semibold text-foreground">Consolidation type</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => set('consolidationMode', 'buyer')}
+                    className={cn(
+                      'text-left rounded-md border px-3 py-2 transition-colors',
+                      form.consolidationMode === 'buyer'
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                        : 'border-border/70 hover:bg-muted/60'
+                    )}
+                  >
+                    <p className="text-xs font-semibold">Buyer consolidation</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      One importer, multiple suppliers. Different vendors per HBL.
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => set('consolidationMode', 'lcl')}
+                    className={cn(
+                      'text-left rounded-md border px-3 py-2 transition-colors',
+                      form.consolidationMode === 'lcl'
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                        : 'border-border/70 hover:bg-muted/60'
+                    )}
+                  >
+                    <p className="text-xs font-semibold">LCL consolidation</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Independent shipments share a container. Importer + buyer + supplier differ per HBL.
+                    </p>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 
-  const renderImporterConsignee = () => (
+  const renderImporterConsignee = () => {
+    const isConsolidation = !isEdit && form.additionalHouseBills.length > 0;
+    const isLcl = isConsolidation && form.consolidationMode === 'lcl';
+    const allHouseBills = isConsolidation
+      ? [form.houseBol || '(primary)', ...form.additionalHouseBills.map((h, i) => h || `HBL ${i + 2}`)]
+      : [];
+    return (
     <div className="space-y-6">
+      {isLcl && (
+        <div className="rounded-md border border-amber-200/70 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2 flex items-center gap-2">
+          <Layers className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" />
+          <p className="text-[12px] text-foreground/80">
+            LCL mode — fields below are the shared baseline. Use the per-HBL section at the bottom to set
+            distinct importer + consignee for each house bill.
+          </p>
+        </div>
+      )}
       <Card className="border-blue-200 bg-blue-50/30 dark:bg-blue-950/10 dark:border-blue-900/40">
         <CardHeader className="pb-3 pt-4 px-4">
           <div className="flex items-center gap-2">
@@ -1231,19 +1352,248 @@ export default function ShipmentWizard() {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
 
-  const renderTradeParties = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <PartyCard title="Buyer" icon={Users} party={form.buyer} onChange={p => setParty('buyer', p)} />
-      <PartyCard title="Seller" icon={Users} party={form.seller} onChange={p => setParty('seller', p)} />
-      <PartyCard title="Ship-To Party" icon={MapPin} party={form.shipToParty} onChange={p => setParty('shipToParty', p)} />
-      <PartyCard title="Manufacturer / Supplier" icon={Building2} party={form.manufacturer} onChange={p => setParty('manufacturer', p)} />
-      <PartyCard title="Consolidator" icon={Container} party={form.consolidator} onChange={p => setParty('consolidator', p)} />
-      <PartyCard title="Container Stuffing Location" icon={Package} party={form.containerStuffingLocation} onChange={p => setParty('containerStuffingLocation', p)} />
+      {isLcl && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Layers className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <h3 className="text-sm font-semibold">Per-house-bill importer + consignee</h3>
+            <span className="text-[11px] text-muted-foreground">
+              LCL — each HBL has its own IOR + consignee. Empty fields inherit the shared baseline above.
+            </span>
+          </div>
+          <Tabs defaultValue="hbl-0" className="w-full">
+            <TabsList className="w-full justify-start h-auto flex-wrap gap-1 bg-muted/60 p-1">
+              {allHouseBills.map((hbl, idx) => {
+                const o = form.perHblOverrides[idx];
+                const customCount = (['importerName','importerNumber','consigneeName','consigneeNumber','consigneeAddress'] as const)
+                  .filter(k => !!o?.[k]).length;
+                return (
+                  <TabsTrigger key={idx} value={`hbl-${idx}`} className="text-xs">
+                    HBL {idx + 1}: {hbl.length > 14 ? hbl.slice(0, 14) + '…' : hbl}
+                    {customCount > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">·{customCount}</span>}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+            {allHouseBills.map((hbl, idx) => {
+              const o = form.perHblOverrides[idx] ?? {};
+              return (
+                <TabsContent key={idx} value={`hbl-${idx}`} className="mt-3 space-y-3">
+                  <p className="text-[11px] text-muted-foreground">
+                    HBL {idx + 1}: <span className="font-mono">{hbl}</span>
+                  </p>
+                  <Card className="border-border/60">
+                    <CardHeader className="pb-3 pt-4 px-4">
+                      <CardTitle className="text-sm font-semibold">Importer (HBL {idx + 1})</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-4 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <TextField label="Importer Name" value={o.importerName ?? ''}
+                          onChange={v => setHblField(idx, 'importerName', v || undefined)}
+                          maxLength={35} placeholder="Inherit shared if blank" />
+                        <TextField label="IOR Number (EIN)" value={o.importerNumber ?? ''}
+                          onChange={v => setHblField(idx, 'importerNumber', v || undefined)}
+                          maxLength={12} placeholder="XX-XXXXXXXXX" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-border/60">
+                    <CardHeader className="pb-3 pt-4 px-4">
+                      <CardTitle className="text-sm font-semibold">Consignee (HBL {idx + 1})</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-4 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <TextField label="Consignee Name" value={o.consigneeName ?? ''}
+                          onChange={v => setHblField(idx, 'consigneeName', v || undefined)}
+                          maxLength={35} placeholder="Inherit shared if blank" />
+                        <TextField label="Consignee Number (EIN)" value={o.consigneeNumber ?? ''}
+                          onChange={v => setHblField(idx, 'consigneeNumber', v || undefined)}
+                          maxLength={12} placeholder="XX-XXXXXXXXX" />
+                      </div>
+                      {!o.consigneeAddress ? (
+                        <Button type="button" variant="outline" size="sm" className="text-xs h-7"
+                          onClick={() => setHblField(idx, 'consigneeAddress', emptyParty())}>
+                          Customize consignee address for this HBL
+                        </Button>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <TextField label="Address Line 1" value={o.consigneeAddress.address1}
+                              onChange={v => setHblField(idx, 'consigneeAddress', { ...o.consigneeAddress!, address1: v })}
+                              maxLength={35} />
+                            <TextField label="Address Line 2" value={o.consigneeAddress.address2}
+                              onChange={v => setHblField(idx, 'consigneeAddress', { ...o.consigneeAddress!, address2: v })}
+                              maxLength={35} />
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <TextField label="City" value={o.consigneeAddress.city}
+                              onChange={v => setHblField(idx, 'consigneeAddress', { ...o.consigneeAddress!, city: v })}
+                              maxLength={35} />
+                            <TextField label="State" value={o.consigneeAddress.state}
+                              onChange={v => setHblField(idx, 'consigneeAddress', { ...o.consigneeAddress!, state: v })}
+                              maxLength={4} placeholder="ST" />
+                            <TextField label="Postal Code" value={o.consigneeAddress.zip}
+                              onChange={v => setHblField(idx, 'consigneeAddress', { ...o.consigneeAddress!, zip: v })}
+                              maxLength={10} />
+                            <SelectField label="Country" value={o.consigneeAddress.country}
+                              onChange={v => setHblField(idx, 'consigneeAddress', { ...o.consigneeAddress!, country: v })}
+                              options={COMMON_COUNTRIES} placeholder="Select" />
+                          </div>
+                          <Button type="button" variant="ghost" size="sm" className="text-[11px] h-6 text-muted-foreground"
+                            onClick={() => setHblField(idx, 'consigneeAddress', undefined)}>
+                            Reset consignee address to shared
+                          </Button>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              );
+            })}
+          </Tabs>
+        </div>
+      )}
     </div>
-  );
+    );
+  };
+
+  const renderTradeParties = () => {
+    const isConsolidation = !isEdit && form.additionalHouseBills.length > 0;
+    const isLcl = isConsolidation && form.consolidationMode === 'lcl';
+    const allHouseBills = isConsolidation
+      ? [form.houseBol || '(primary)', ...form.additionalHouseBills.map((h, i) => h || `HBL ${i + 2}`)]
+      : [];
+
+    // Which party fields belong in the per-HBL section per the locked spec.
+    //   Buyer mode: seller + manufacturer differ per HBL (Adnan's "vendors differ").
+    //   LCL mode:   all of buyer + seller + shipToParty + manufacturer differ.
+    // Consolidator + Container Stuffing Location are ALWAYS shared.
+    const perHblPartyKeys = isLcl
+      ? (['buyer', 'seller', 'shipToParty', 'manufacturer'] as const)
+      : isConsolidation
+        ? (['seller', 'manufacturer'] as const)
+        : ([] as const);
+
+    return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Always shared: Consolidator + Container Stuffing Location. */}
+        {!isLcl && (
+          <PartyCard title="Buyer" icon={Users} party={form.buyer} onChange={p => setParty('buyer', p)} />
+        )}
+        {!isConsolidation && (
+          <PartyCard title="Seller" icon={Users} party={form.seller} onChange={p => setParty('seller', p)} />
+        )}
+        {!isLcl && (
+          <PartyCard title="Ship-To Party" icon={MapPin} party={form.shipToParty} onChange={p => setParty('shipToParty', p)} />
+        )}
+        {!isConsolidation && (
+          <PartyCard title="Manufacturer / Supplier" icon={Building2} party={form.manufacturer} onChange={p => setParty('manufacturer', p)} />
+        )}
+        <PartyCard title="Consolidator" icon={Container} party={form.consolidator} onChange={p => setParty('consolidator', p)} />
+        <PartyCard title="Container Stuffing Location" icon={Package} party={form.containerStuffingLocation} onChange={p => setParty('containerStuffingLocation', p)} />
+      </div>
+
+      {isConsolidation && perHblPartyKeys.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Layers className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <h3 className="text-sm font-semibold">
+              Per-house-bill parties
+            </h3>
+            <span className="text-[11px] text-muted-foreground">
+              {isLcl
+                ? 'LCL mode — each HBL has its own buyer / seller / ship-to / manufacturer.'
+                : 'Buyer-consolidation mode — vendors differ per HBL.'}
+            </span>
+          </div>
+
+          <Tabs defaultValue="hbl-0" className="w-full">
+            <TabsList className="w-full justify-start h-auto flex-wrap gap-1 bg-muted/60 p-1">
+              {allHouseBills.map((hbl, idx) => {
+                const o = form.perHblOverrides[idx];
+                const customCount = perHblPartyKeys.filter((k) => !!o?.[k]).length;
+                return (
+                  <TabsTrigger key={idx} value={`hbl-${idx}`} className="text-xs">
+                    HBL {idx + 1}: {hbl.length > 14 ? hbl.slice(0, 14) + '…' : hbl}
+                    {customCount > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">·{customCount}</span>}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+            {allHouseBills.map((hbl, idx) => (
+              <TabsContent key={idx} value={`hbl-${idx}`} className="mt-3 space-y-3">
+                <p className="text-[11px] text-muted-foreground">
+                  HBL {idx + 1}: <span className="font-mono">{hbl}</span> — leave a card unset to inherit; click
+                  "Customize for this HBL" to fill in a value just for this filing.
+                </p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {perHblPartyKeys.map((field) => {
+                    const labelMap: Record<typeof field, { title: string; icon: React.ElementType }> = {
+                      buyer:       { title: 'Buyer',                    icon: Users },
+                      seller:      { title: 'Seller',                   icon: Users },
+                      shipToParty: { title: 'Ship-To Party',            icon: MapPin },
+                      manufacturer:{ title: 'Manufacturer / Supplier',  icon: Building2 },
+                    };
+                    const cfg = labelMap[field];
+                    const override = form.perHblOverrides[idx]?.[field];
+                    if (!override) {
+                      return (
+                        <div
+                          key={field}
+                          className="rounded-md border border-dashed border-border/60 px-3 py-4 flex flex-col items-start gap-2 bg-muted/20"
+                        >
+                          <div className="flex items-center gap-1.5 text-xs font-semibold">
+                            <cfg.icon className="h-3.5 w-3.5 text-muted-foreground" />
+                            {cfg.title}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            {field === 'seller' || field === 'manufacturer'
+                              ? 'Required for ISF-10 — fill in this HBL\'s vendor.'
+                              : 'Inheriting shared value (if any). Click to set a different value for this HBL.'}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-7"
+                            onClick={() => setHblField(idx, field, emptyParty())}
+                          >
+                            Customize for this HBL
+                          </Button>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={field} className="relative">
+                        <PartyCard
+                          title={cfg.title}
+                          icon={cfg.icon}
+                          party={override}
+                          onChange={(p) => setHblField(idx, field, p)}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute top-3 right-2 text-[11px] h-7 text-muted-foreground hover:text-foreground"
+                          onClick={() => setHblField(idx, field, undefined)}
+                        >
+                          Reset to shared
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </TabsContent>
+            ))}
+          </Tabs>
+        </div>
+      )}
+    </div>
+    );
+  };
 
   const renderTransport = () => (
     <div className="space-y-6">
@@ -1349,8 +1699,8 @@ export default function ShipmentWizard() {
     // Consolidation mode → tab strip: Shared + one tab per HBL.
     // Each HBL tab can either inherit the shared commodities ("Customize"
     // initialises an override copied from the shared list) or hold its own.
-    const consolidationMode = !isEdit && form.additionalHouseBills.length > 0;
-    const allHouseBills = consolidationMode
+    const isConsolidation = !isEdit && form.additionalHouseBills.length > 0;
+    const allHouseBills = isConsolidation
       ? [form.houseBol || '(primary)', ...form.additionalHouseBills.map((h, i) => h || `HBL ${i + 2}`)]
       : [];
 
@@ -1362,14 +1712,14 @@ export default function ShipmentWizard() {
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <Package className="h-4 w-4 text-primary" /> Commodities
           </h3>
-          {!consolidationMode && (
+          {!isConsolidation && (
             <Button variant="outline" size="sm" onClick={addCommodity}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Add Item
             </Button>
           )}
         </div>
 
-        {consolidationMode ? (
+        {isConsolidation ? (
           <Tabs defaultValue="shared" className="w-full">
             <TabsList className="w-full justify-start h-auto flex-wrap gap-1 bg-muted/60 p-1">
               <TabsTrigger value="shared" className="text-xs">
