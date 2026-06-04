@@ -503,6 +503,12 @@ export default function ShipmentWizard() {
   // Track whether the user has touched the form since hydration so we
   // don't fire an autosave PATCH from the initial useFiling load.
   const hydratedRef = useRef(false);
+  // Tracks the filing id we've already hydrated from `existing`. Without
+  // this, every autosave PATCH invalidates the `['filing', id]` query,
+  // useFiling refetches, `existing` becomes a new object, the hydration
+  // effect re-runs setForm with server data, the autosave effect sees a
+  // form change and fires again → infinite Saving/Saved ping-pong.
+  const hydratedIdRef = useRef<string | null>(null);
   const [savedRecentlyAt, setSavedRecentlyAt] = useState<number | null>(null);
 
   // Filing→Filing prefill chain. If `?fromFiling=<id>` is set on a NEW
@@ -667,9 +673,13 @@ export default function ShipmentWizard() {
     });
   }, [sourceManifestQuery, isEdit]);
 
-  // Populate form when editing
+  // Populate form when editing. Runs ONCE per filing id — re-running on
+  // every `existing` change would stomp the user's in-flight edits with
+  // the server's pre-edit state every time the autosave PATCH invalidates
+  // the cache (which is what created the Saving/Saved loop the user hit).
   useEffect(() => {
     if (!existing) return;
+    if (hydratedIdRef.current === existing.id) return;
     const c0 = existing.commodities?.[0];
     const ct0 = existing.containers?.[0];
     setForm({
@@ -731,6 +741,7 @@ export default function ShipmentWizard() {
     // Flag the form as hydrated AFTER setForm so the autosave effect below
     // doesn't fire on the first existing-row hydration cycle.
     hydratedRef.current = true;
+    hydratedIdRef.current = existing.id;
   }, [existing, parseParty]);
 
   // Autosave on form change (audit Phase 8.2). The hook debounces internally,
