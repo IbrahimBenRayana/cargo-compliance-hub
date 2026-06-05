@@ -34,6 +34,23 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    # Sea-Gold-prep hardening (2026-06-05):
+    # ── Resource limits: VPS has 6 vCPU + 11 GiB. Pinning Postgres to
+    #    4 GiB / 4 cores leaves headroom for server + landing + OS, and
+    #    means a runaway query OOM-kills postgres alone instead of the
+    #    host. The container will use far less in practice.
+    # ── Ulimits: default 1024 fds is tight under cron + autosave +
+    #    SSE traffic; 65536 matches Postgres's recommended ceiling.
+    # Top-level cpus/mem_limit syntax works with both `docker compose up`
+    # and Swarm; `deploy.resources` only applies under Swarm so we don't
+    # use it here.
+    cpus: '4'
+    mem_limit: 4g
+    mem_reservation: 256m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   # ── Backend API Server ───────────────────────────────────
   server:
@@ -49,7 +66,12 @@ services:
       # Runtime + DB
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://mycargolens:${DB_PASSWORD}@db:5432/mycargolens?schema=public
+      # connection_limit is an explicit Prisma pool size. Default is
+      # num_physical_cpus * 2 + 1 (~13 on this 6-vCPU box); we pin to 20
+      # so cron-poll batches + autosave + SSE-driven reads don't queue.
+      # Postgres default max_connections is 100, so 20 leaves plenty of
+      # headroom for psql/admin sessions.
+      DATABASE_URL: postgresql://mycargolens:${DB_PASSWORD}@db:5432/mycargolens?schema=public&connection_limit=20
 
       # Auth — required, no default. Container will exit 1 if missing.
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET required (>=16 chars)}
@@ -110,6 +132,13 @@ services:
       timeout: 5s
       start_period: 20s
       retries: 3
+    cpus: '2'
+    mem_limit: 1g
+    mem_reservation: 128m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   # ── Marketing Site ───────────────────────────────────────
   landing:
@@ -131,6 +160,13 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+    cpus: '1'
+    mem_limit: 512m
+    mem_reservation: 64m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
 volumes:
   postgres_data:
