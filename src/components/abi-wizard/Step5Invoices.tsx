@@ -38,6 +38,7 @@ import {
 import {
   COUNTRIES,
   CURRENCIES,
+  ComboboxField,
   DateField,
   SelectField,
   TextField,
@@ -286,12 +287,14 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                   disabled
                   hint="Phase 1 supports unrelated-party transactions only. Related-party (Y) reporting will unlock in a later phase."
                 />
-                <SelectField
+                <ComboboxField
                   label="Country of Export"
                   required
                   value={inv.countryOfExport || ''}
                   onChange={(v) => updateInvoice(invIdx, { countryOfExport: v })}
                   options={COUNTRIES}
+                  placeholder="Search countries…"
+                  searchPlaceholder="Type a country, ISO code, or alias…"
                   error={errors[`invoices.${invIdx}.countryOfExport`]}
                 />
                 <SelectField
@@ -397,7 +400,7 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                             maxLength={60}
                             error={errors[`${itemPath}.description`]}
                           />
-                          <SelectField
+                          <ComboboxField
                             label="Country of Origin"
                             required
                             value={item.origin?.country || ''}
@@ -407,6 +410,8 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                               })
                             }
                             options={COUNTRIES}
+                            placeholder="Search countries…"
+                            searchPlaceholder="Type a country, ISO code, or alias…"
                             error={errors[`${itemPath}.origin.country`]}
                           />
                           <SelectField
@@ -643,7 +648,7 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                                       }
                                       maxLength={10}
                                     />
-                                    <SelectField
+                                    <ComboboxField
                                       label="Country"
                                       value={p.country || ''}
                                       onChange={(v) =>
@@ -652,6 +657,8 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                                         })
                                       }
                                       options={COUNTRIES}
+                                      placeholder="Search countries…"
+                                      searchPlaceholder="Type a country, ISO code, or alias…"
                                     />
                                   </div>
                                 </div>

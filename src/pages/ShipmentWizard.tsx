@@ -21,6 +21,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+// Every country dropdown in this wizard now uses the full ISO 3166-1
+// list from src/data/geo.ts (~250 entries) via ComboboxField below.
+import { COUNTRIES as ALL_COUNTRIES } from '@/data/geo';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { SCHEDULE_D_PORTS, CBP_PORTS_4DIGIT } from '@/data/schedule-d-ports';
@@ -54,36 +57,6 @@ const QUANTITY_UOMS = [
   { value: 'PLT', label: 'PLT — Pallets' },
   { value: 'BX', label: 'BX — Boxes' },
   { value: 'EA', label: 'EA — Each' },
-];
-
-const COMMON_COUNTRIES = [
-  { value: 'US', label: '🇺🇸 United States' },
-  { value: 'CN', label: '🇨🇳 China' },
-  { value: 'IN', label: '🇮🇳 India' },
-  { value: 'DE', label: '🇩🇪 Germany' },
-  { value: 'JP', label: '🇯🇵 Japan' },
-  { value: 'KR', label: '🇰🇷 South Korea' },
-  { value: 'TW', label: '🇹🇼 Taiwan' },
-  { value: 'VN', label: '🇻🇳 Vietnam' },
-  { value: 'TH', label: '🇹🇭 Thailand' },
-  { value: 'MX', label: '🇲🇽 Mexico' },
-  { value: 'CA', label: '🇨🇦 Canada' },
-  { value: 'GB', label: '🇬🇧 United Kingdom' },
-  { value: 'FR', label: '🇫🇷 France' },
-  { value: 'IT', label: '🇮🇹 Italy' },
-  { value: 'BR', label: '🇧🇷 Brazil' },
-  { value: 'BD', label: '🇧🇩 Bangladesh' },
-  { value: 'ID', label: '🇮🇩 Indonesia' },
-  { value: 'PK', label: '🇵🇰 Pakistan' },
-  { value: 'TR', label: '🇹🇷 Turkey' },
-  { value: 'MY', label: '🇲🇾 Malaysia' },
-  { value: 'SG', label: '🇸🇬 Singapore' },
-  { value: 'HK', label: '🇭🇰 Hong Kong' },
-  { value: 'AE', label: '🇦🇪 UAE' },
-  { value: 'NL', label: '🇳🇱 Netherlands' },
-  { value: 'ES', label: '🇪🇸 Spain' },
-  { value: 'AU', label: '🇦🇺 Australia' },
-  { value: 'PH', label: '🇵🇭 Philippines' },
 ];
 
 // ─── Wizard Step Definitions ───────────────────────────────
@@ -362,13 +335,21 @@ const SelectField = memo(function SelectField({
 
 // ─── Searchable Port Combobox ──────────────────────────────
 
+// PortSelectField is the searchable combobox used for ports + countries.
+// Each option may carry a `keywords` array (e.g. country alt-spellings
+// "USA", "America" for United States) that cmdk uses alongside the
+// visible label when matching the user's query. `searchPlaceholder` and
+// `emptyMessage` are optional so a country field can show "No country
+// found." instead of "No port found."
 const PortSelectField = memo(function PortSelectField({
   label, hint, required, value, onChange, options, placeholder, error, className: cls,
+  searchPlaceholder, emptyMessage,
 }: {
   label: string; hint?: string; required?: boolean;
   value: string; onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; keywords?: string[] }[];
   placeholder?: string; error?: string; className?: string;
+  searchPlaceholder?: string; emptyMessage?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find(o => o.value === value);
@@ -383,18 +364,18 @@ const PortSelectField = memo(function PortSelectField({
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
             className={cn('w-full justify-between font-normal h-9 px-3', !selected && 'text-muted-foreground', error && 'border-red-500')}>
-            <span className="truncate">{selected ? selected.label : (placeholder || 'Select port…')}</span>
+            <span className="truncate">{selected ? selected.label : (placeholder || 'Select…')}</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
           <Command>
-            <CommandInput placeholder="Search by code or city…" />
+            <CommandInput placeholder={searchPlaceholder || 'Search by code or city…'} />
             <CommandList className="max-h-[280px]">
-              <CommandEmpty>No port found.</CommandEmpty>
+              <CommandEmpty>{emptyMessage || 'No match.'}</CommandEmpty>
               <CommandGroup>
                 {options.map(o => (
-                  <CommandItem key={o.value} value={o.label} onSelect={() => { onChange(o.value); setOpen(false); }}>
+                  <CommandItem key={o.value} value={o.label} keywords={o.keywords} onSelect={() => { onChange(o.value); setOpen(false); }}>
                     <Check className={cn('mr-2 h-4 w-4', value === o.value ? 'opacity-100' : 'opacity-0')} />
                     {o.label}
                   </CommandItem>
@@ -446,8 +427,9 @@ const PartyCard = memo(function PartyCard({
             placeholder="ST" maxLength={4} />
           <TextField label="Postal Code" value={party.zip} onChange={v => up('zip', v)}
             placeholder="00000" maxLength={10} />
-          <SelectField label="Country" required value={party.country} onChange={v => up('country', v)}
-            options={COMMON_COUNTRIES} placeholder="Select" />
+          <PortSelectField label="Country" required value={party.country} onChange={v => up('country', v)}
+            options={ALL_COUNTRIES} placeholder="Search country…"
+            searchPlaceholder="Country, ISO code, or alias…" emptyMessage="No country found." />
         </div>
       </CardContent>
     </Card>
@@ -1357,9 +1339,10 @@ export default function ShipmentWizard() {
               onChange={v => setParty('consigneeAddress', { ...form.consigneeAddress, state: v })} maxLength={4} placeholder="ST" />
             <TextField label="Postal Code" value={form.consigneeAddress.zip}
               onChange={v => setParty('consigneeAddress', { ...form.consigneeAddress, zip: v })} maxLength={10} placeholder="00000" />
-            <SelectField label="Country" required value={form.consigneeAddress.country}
+            <PortSelectField label="Country" required value={form.consigneeAddress.country}
               onChange={v => setParty('consigneeAddress', { ...form.consigneeAddress, country: v })}
-              options={COMMON_COUNTRIES} placeholder="Select" />
+              options={ALL_COUNTRIES} placeholder="Search country…"
+              searchPlaceholder="Country, ISO code, or alias…" emptyMessage="No country found." />
           </div>
         </CardContent>
       </Card>
@@ -1447,9 +1430,10 @@ export default function ShipmentWizard() {
                             <TextField label="Postal Code" value={o.consigneeAddress.zip}
                               onChange={v => setHblField(idx, 'consigneeAddress', { ...o.consigneeAddress!, zip: v })}
                               maxLength={10} />
-                            <SelectField label="Country" value={o.consigneeAddress.country}
+                            <PortSelectField label="Country" value={o.consigneeAddress.country}
                               onChange={v => setHblField(idx, 'consigneeAddress', { ...o.consigneeAddress!, country: v })}
-                              options={COMMON_COUNTRIES} placeholder="Select" />
+                              options={ALL_COUNTRIES} placeholder="Search country…"
+                              searchPlaceholder="Country, ISO code, or alias…" emptyMessage="No country found." />
                           </div>
                           <Button type="button" variant="ghost" size="sm" className="text-[11px] h-6 text-muted-foreground"
                             onClick={() => setHblField(idx, 'consigneeAddress', undefined)}>
@@ -1676,9 +1660,10 @@ export default function ShipmentWizard() {
                   error={errors[`${errorPrefix}.${i}.htsCode`]}
                   maxLength={10}
                 />
-                <SelectField label="Country of Origin" required value={c.countryOfOrigin}
+                <PortSelectField label="Country of Origin" required value={c.countryOfOrigin}
                   onChange={v => onChange(commodities.map((x, idx) => idx === i ? { ...x, countryOfOrigin: v } : x))}
-                  options={COMMON_COUNTRIES} placeholder="Select"
+                  options={ALL_COUNTRIES} placeholder="Search country…"
+                  searchPlaceholder="Country, ISO code, or alias…" emptyMessage="No country found."
                   error={errors[`${errorPrefix}.${i}.countryOfOrigin`]}
                   hint="Where the goods were manufactured" />
               </div>
@@ -1924,9 +1909,10 @@ export default function ShipmentWizard() {
               onChange={v => setISF5('bookingPartyStateOrProvince', v)} maxLength={4} placeholder="ST" />
             <TextField label="Postal Code" value={form.isf5.bookingPartyPostalCode}
               onChange={v => setISF5('bookingPartyPostalCode', v)} maxLength={10} placeholder="00000" />
-            <SelectField label="Country" required value={form.isf5.bookingPartyCountry}
-              onChange={v => setISF5('bookingPartyCountry', v)} options={COMMON_COUNTRIES}
-              placeholder="Select" error={errors['isf5.bookingPartyCountry']} />
+            <PortSelectField label="Country" required value={form.isf5.bookingPartyCountry}
+              onChange={v => setISF5('bookingPartyCountry', v)} options={ALL_COUNTRIES}
+              placeholder="Search country…" searchPlaceholder="Country, ISO code, or alias…"
+              emptyMessage="No country found." error={errors['isf5.bookingPartyCountry']} />
           </div>
         </CardContent>
       </Card>

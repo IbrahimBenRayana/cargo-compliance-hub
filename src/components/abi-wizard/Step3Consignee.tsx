@@ -9,6 +9,7 @@ import { MapPin } from 'lucide-react';
 import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
 import {
   COUNTRIES,
+  ComboboxField,
   SectionHeader,
   SelectField,
   TextField,
@@ -117,12 +118,14 @@ export default function Step3Consignee({ value, onChange, errors = {} }: Props) 
           placeholder="00000"
           error={errors['entryConsignee.postalCode']}
         />
-        <SelectField
+        <ComboboxField
           label="Country"
           required
           value={c.country || ''}
           onChange={(v) => set({ country: v })}
           options={COUNTRIES}
+          placeholder="Search countries…"
+          searchPlaceholder="Type a country, ISO code, or alias…"
           error={errors['entryConsignee.country']}
         />
       </div>

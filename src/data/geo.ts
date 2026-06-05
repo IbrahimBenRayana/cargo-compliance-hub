@@ -2,11 +2,60 @@
  * Shared US-state and country pick-lists used across the ABI wizard,
  * duty calculator, and shipment wizard.
  *
- * Lifted out of `components/abi-wizard/shared.tsx` so non-wizard pages
- * (DutyCalculatorPage, etc.) don't have to reach into a UI module for
- * static data.
+ * COUNTRIES is the complete ISO 3166-1 alpha-2 list (~250 entries),
+ * derived at module-init from the `world-countries` npm package. Each
+ * option carries a flag emoji (e.g. 🇺🇸), the common English name,
+ * and a `keywords` array (alt spellings + ISO code) so the searchable
+ * combobox matches "USA", "U.S.A.", "America" → United States, etc.
+ *
+ * `value` is the ISO 3166-1 alpha-2 code — that's what CustomsCity
+ * expects and what we persist in filings.
  */
 
+import worldCountries from 'world-countries';
+
+/** Convert an ISO alpha-2 code (e.g. "US") into its flag emoji. */
+function flagFromIso2(code: string): string {
+  return code
+    .toUpperCase()
+    .split('')
+    .map((c) => String.fromCodePoint(127397 + c.charCodeAt(0)))
+    .join('');
+}
+
+export interface CountryOption {
+  value: string;
+  label: string;
+  /** Extra strings the combobox should match against (ISO code, alt spellings). */
+  keywords?: string[];
+}
+
+export const COUNTRIES: CountryOption[] = (worldCountries as Array<{
+  cca2: string;
+  name: { common: string };
+  altSpellings: string[];
+  flag?: string;
+}>)
+  .filter((c) => c.cca2 && c.cca2.length === 2)
+  .map((c) => {
+    const code = c.cca2.toUpperCase();
+    const name = c.name.common;
+    // Use the country's own .flag when present, else derive from the
+    // ISO code. world-countries already provides .flag for every entry,
+    // but the derivation is a safe fallback if a record is missing it.
+    const flag = c.flag || flagFromIso2(code);
+    return {
+      value: code,
+      label: `${flag}  ${name}`,
+      // altSpellings often contains the ISO code as the first entry —
+      // dedupe + include common name so cmdk substring matching finds
+      // the country regardless of which alias the user types.
+      keywords: Array.from(new Set([code, name, ...c.altSpellings])),
+    };
+  })
+  .sort((a, b) => a.label.localeCompare(b.label, 'en', { sensitivity: 'base' }));
+
+/** US states (50 + DC + PR). Stable, hardcoded — no package dependency. */
 export const US_STATES: { value: string; label: string }[] = (
   [
     ['AL', 'Alabama'], ['AK', 'Alaska'], ['AZ', 'Arizona'], ['AR', 'Arkansas'],
@@ -24,37 +73,6 @@ export const US_STATES: { value: string; label: string }[] = (
     ['WV', 'West Virginia'], ['WI', 'Wisconsin'], ['WY', 'Wyoming'], ['PR', 'Puerto Rico'],
   ] as const
 ).map(([value, label]) => ({ value, label: `${value} — ${label}` }));
-
-/** Common countries reused across invoice / item / consignee selectors. */
-export const COUNTRIES: { value: string; label: string }[] = [
-  { value: 'US', label: 'US — United States' },
-  { value: 'CN', label: 'CN — China' },
-  { value: 'IN', label: 'IN — India' },
-  { value: 'DE', label: 'DE — Germany' },
-  { value: 'JP', label: 'JP — Japan' },
-  { value: 'KR', label: 'KR — South Korea' },
-  { value: 'TW', label: 'TW — Taiwan' },
-  { value: 'VN', label: 'VN — Vietnam' },
-  { value: 'TH', label: 'TH — Thailand' },
-  { value: 'MX', label: 'MX — Mexico' },
-  { value: 'CA', label: 'CA — Canada' },
-  { value: 'GB', label: 'GB — United Kingdom' },
-  { value: 'FR', label: 'FR — France' },
-  { value: 'IT', label: 'IT — Italy' },
-  { value: 'BR', label: 'BR — Brazil' },
-  { value: 'BD', label: 'BD — Bangladesh' },
-  { value: 'ID', label: 'ID — Indonesia' },
-  { value: 'PK', label: 'PK — Pakistan' },
-  { value: 'TR', label: 'TR — Turkey' },
-  { value: 'MY', label: 'MY — Malaysia' },
-  { value: 'SG', label: 'SG — Singapore' },
-  { value: 'HK', label: 'HK — Hong Kong' },
-  { value: 'AE', label: 'AE — UAE' },
-  { value: 'NL', label: 'NL — Netherlands' },
-  { value: 'ES', label: 'ES — Spain' },
-  { value: 'AU', label: 'AU — Australia' },
-  { value: 'PH', label: 'PH — Philippines' },
-];
 
 export const CURRENCIES: { value: string; label: string }[] = [
   { value: 'USD', label: 'USD' },
