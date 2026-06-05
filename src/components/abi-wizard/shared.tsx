@@ -221,7 +221,7 @@ export const ComboboxField = memo(function ComboboxField({
   required?: boolean;
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; keywords?: string[] }[];
   placeholder?: string;
   error?: string;
   className?: string;
@@ -271,6 +271,10 @@ export const ComboboxField = memo(function ComboboxField({
                   <CommandItem
                     key={o.value}
                     value={o.label}
+                    // keywords feed cmdk's match scorer alongside the value —
+                    // lets a country combo find "United States" when the user
+                    // types "USA" or "America".
+                    keywords={o.keywords}
                     onSelect={() => {
                       onChange(o.value);
                       setOpen(false);
