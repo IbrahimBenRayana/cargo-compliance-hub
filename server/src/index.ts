@@ -84,13 +84,28 @@ app.use(cookieParser());
 app.use(generalLimiter);
 
 // ─── Health Check ─────────────────────────────────────────
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: env.NODE_ENV,
-    jobs: getJobStatus(),
-  });
+// Probes Postgres on every call so Docker's container healthcheck flips
+// to unhealthy when the DB is unreachable — that's the trigger we need
+// for auto-restart + monitoring alerts. Previously this endpoint returned
+// 200 unconditionally, which masked the 22-hour outage on 2026-06-01.
+app.get('/api/health', async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      status: 'ok',
+      db: 'up',
+      timestamp: new Date().toISOString(),
+      environment: env.NODE_ENV,
+      jobs: getJobStatus(),
+    });
+  } catch (err: any) {
+    res.status(503).json({
+      status: 'degraded',
+      db: 'down',
+      error: err?.message ?? 'db probe failed',
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // ─── API Routes (v1) ─────────────────────────────────────
