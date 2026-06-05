@@ -9,7 +9,7 @@
  * headline + amber primary), with a left-column input form and a
  * right-column results panel that materialises after a successful call.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Calculator,
   Loader2,
@@ -1021,6 +1021,15 @@ export default function DutyCalculatorPage() {
   // when the user touches that field, or wholesale on resubmit.
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
 
+  // Holds the page's "have you actually tried to Calculate yet?" gate so
+  // we don't shout "Required" at every empty field the moment the page
+  // mounts. Validation still runs in the background (so the toast on
+  // submit knows what's missing), but field-level error pills + the
+  // "N issues to fix" footer only render once the user has clicked
+  // Calculate at least once. Reset by switching modes (Standard ↔ AI).
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  useEffect(() => { setSubmitAttempted(false); }, [mode]);
+
   function clearServerError(key: string) {
     if (!(key in serverErrors)) return;
     setServerErrors(prev => {
@@ -1030,11 +1039,12 @@ export default function DutyCalculatorPage() {
     });
   }
 
-  /** Build the per-item error subset that ItemCard expects (keyed by ItemDraft field). */
+  /** Build the per-item error subset that ItemCard expects (keyed by ItemDraft field).
+   *  Reads visibleErrors (submit-gated) so item rows render clean on first open. */
   function itemErrorsAt(index: number): Partial<Record<keyof ItemDraft, string>> {
     const out: Partial<Record<keyof ItemDraft, string>> = {};
     const prefix = `item.${index}.`;
-    for (const [k, v] of Object.entries(allErrors)) {
+    for (const [k, v] of Object.entries(visibleErrors)) {
       if (k.startsWith(prefix)) {
         const field = k.slice(prefix.length) as keyof ItemDraft;
         out[field] = v;
@@ -1049,11 +1059,22 @@ export default function DutyCalculatorPage() {
   const allErrors = useMemo<Record<string, string>>(() => ({ ...validationErrors, ...serverErrors }),
     [validationErrors, serverErrors]);
 
+  // Errors actually rendered in the UI. Client-side validation is
+  // gated on submitAttempted so a freshly opened form stays clean —
+  // server errors always show because they only arrive after a real
+  // submit anyway.
+  const visibleErrors = useMemo<Record<string, string>>(() => ({
+    ...(submitAttempted ? validationErrors : {}),
+    ...serverErrors,
+  }), [submitAttempted, validationErrors, serverErrors]);
+
   const errorCount = Object.keys(allErrors).length;
   const hasErrors = errorCount > 0;
+  const visibleErrorCount = Object.keys(visibleErrors).length;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
     if (hasErrors) {
       const first = Object.values(allErrors)[0];
       toast.error(`${errorCount} ${errorCount === 1 ? 'field needs' : 'fields need'} attention`, {
@@ -1253,7 +1274,7 @@ export default function DutyCalculatorPage() {
                 options={COUNTRIES}
                 placeholder="Select country…"
                 labelExtra={<ProvenanceChip source={provenanceFor('countryOfOrigin')} />}
-                error={allErrors.countryOfOrigin}
+                error={visibleErrors.countryOfOrigin}
               />
               <SelectField
                 label="Mode of Transportation"
@@ -1271,7 +1292,7 @@ export default function DutyCalculatorPage() {
                   { value: 'rail', label: 'Rail' },
                 ]}
                 labelExtra={<ProvenanceChip source={provenanceFor('modeOfTransportation')} />}
-                error={allErrors.modeOfTransportation}
+                error={visibleErrors.modeOfTransportation}
               />
               <SelectField
                 label="Entry Type"
@@ -1285,7 +1306,7 @@ export default function DutyCalculatorPage() {
                   { value: 'formal', label: 'Formal' },
                   { value: 'informal', label: 'Informal' },
                 ]}
-                error={allErrors.entryType}
+                error={visibleErrors.entryType}
               />
               <SelectField
                 label="Currency"
@@ -1294,7 +1315,7 @@ export default function DutyCalculatorPage() {
                 onChange={(v) => { setCurrency(v); markFieldEdited('currency'); clearServerError('currency'); }}
                 options={CURRENCIES}
                 labelExtra={<ProvenanceChip source={provenanceFor('currency')} />}
-                error={allErrors.currency}
+                error={visibleErrors.currency}
               />
               <DateField
                 label="Estimated Entry Date"
@@ -1302,7 +1323,7 @@ export default function DutyCalculatorPage() {
                 value={estimatedEntryDateYYYYMMDD}
                 onChange={(v) => { setEstimatedEntryDateYYYYMMDD(v); clearServerError('entryDate'); clearServerError('estimatedEntryDate'); }}
                 hint={`UI: ${yyyymmddToISO(estimatedEntryDateYYYYMMDD) || '—'}`}
-                error={allErrors.entryDate || allErrors.estimatedEntryDate}
+                error={visibleErrors.entryDate || visibleErrors.estimatedEntryDate}
               />
             </CardContent>
           </Card>
@@ -1348,14 +1369,14 @@ export default function DutyCalculatorPage() {
             </CardContent>
           </Card>
 
-          {hasErrors && (
+          {visibleErrorCount > 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40 px-3 py-2.5">
               <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 text-[12.5px] font-medium">
                 <AlertCircle className="h-3.5 w-3.5" />
-                {errorCount} {errorCount === 1 ? 'issue' : 'issues'} to fix before calculating
+                {visibleErrorCount} {visibleErrorCount === 1 ? 'issue' : 'issues'} to fix before calculating
               </div>
               <ul className="mt-1.5 space-y-0.5 text-[12px] text-amber-900/85 dark:text-amber-200/85 leading-snug pl-5 list-disc">
-                {Object.entries(allErrors).slice(0, 6).map(([key, msg]) => (
+                {Object.entries(visibleErrors).slice(0, 6).map(([key, msg]) => (
                   <li key={key}>
                     <span className="font-mono text-[11px] text-amber-900/70 dark:text-amber-200/70 mr-1">
                       {humanKey(key)}
@@ -1363,9 +1384,9 @@ export default function DutyCalculatorPage() {
                     {msg}
                   </li>
                 ))}
-                {errorCount > 6 && (
+                {visibleErrorCount > 6 && (
                   <li className="text-amber-900/70 dark:text-amber-200/70 italic">
-                    + {errorCount - 6} more — each highlighted in red below
+                    + {visibleErrorCount - 6} more — each highlighted in red below
                   </li>
                 )}
               </ul>
