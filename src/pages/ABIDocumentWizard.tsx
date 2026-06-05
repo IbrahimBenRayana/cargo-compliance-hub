@@ -201,14 +201,22 @@ export default function ABIDocumentWizard() {
   // ── Transmit
   const validation = useMemo(() => validateAbiDraft(draft), [draft]);
 
-  // Per-step error map. Recomputes on every draft change so the user
-  // sees inline issues in real time as they type.
+  // Per-step error map. We compute it on every draft change so the
+  // Next button can gate on it, but we only *show* the errors to the
+  // user after they've tried to advance past this step — opening a
+  // brand-new step shouldn't shout "Required" at every empty field.
   const stepErrors = useMemo(
     () => STEP_VALIDATORS[step]?.(draft) ?? {},
     [draft, step],
   );
   const stepErrorCount = Object.keys(stepErrors).length;
   const canAdvance = stepErrorCount === 0;
+  // Per-step "have they tried Next yet?" gate. Index = step number.
+  // Reset when the underlying filing changes (docId).
+  const [errorsShownForStep, setErrorsShownForStep] = useState<Record<number, boolean>>({});
+  useEffect(() => { setErrorsShownForStep({}); }, [docId]);
+  const showErrorsForCurrentStep = errorsShownForStep[step] === true;
+  const visibleStepErrors = showErrorsForCurrentStep ? stepErrors : {};
   const [transmitOpen, setTransmitOpen] = useState(false);
 
   const handleTransmit = async () => {
@@ -235,7 +243,17 @@ export default function ABIDocumentWizard() {
 
   // ── Stepper interactions
   const StepComponent = STEP_COMPONENTS[step];
-  const goNext = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  // Click handler for Next: if the step is valid, advance. If not, reveal
+  // the inline errors for the current step (and stay put) so the user
+  // sees what's missing — the older "disabled until valid" pattern just
+  // left them staring at a greyed-out button with no guidance.
+  const goNext = () => {
+    if (canAdvance) {
+      setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    } else {
+      setErrorsShownForStep((prev) => ({ ...prev, [step]: true }));
+    }
+  };
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
   const progress = Math.round(((step + 1) / STEPS.length) * 100);
 
@@ -393,7 +411,7 @@ export default function ABIDocumentWizard() {
           <CardDescription>{STEPS[step].desc}</CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
-          <StepComponent value={draft} onChange={onChange} doc={doc} errors={stepErrors} />
+          <StepComponent value={draft} onChange={onChange} doc={doc} errors={visibleStepErrors} />
         </CardContent>
       </Card>
 
@@ -406,7 +424,7 @@ export default function ABIDocumentWizard() {
         <div className="flex items-center gap-2">
           {step < STEPS.length - 1 ? (
             <>
-              {!canAdvance && (
+              {showErrorsForCurrentStep && !canAdvance && (
                 <span className="text-xs text-amber-600 dark:text-amber-400 hidden sm:inline">
                   Fix {stepErrorCount} {stepErrorCount === 1 ? 'issue' : 'issues'} above to continue
                 </span>
@@ -414,7 +432,7 @@ export default function ABIDocumentWizard() {
               <Button variant="outline" size="lg" onClick={handleSaveDraft}>
                 Save Draft
               </Button>
-              <Button onClick={goNext} size="lg" disabled={!canAdvance}>
+              <Button onClick={goNext} size="lg">
                 Next <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </>

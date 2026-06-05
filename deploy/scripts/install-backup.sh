@@ -36,7 +36,17 @@ CRON_LINE="0 3 * * * $SCRIPT_DST >> $LOG_FILE 2>&1"
 CRON_MARKER="# mycargolens-nightly-backup"
 
 mkdir -p "$INSTALL_DIR" "$BACKUP_DIR"
-install -m 0750 -o root -g root "$SCRIPT_SRC" "$SCRIPT_DST"
+# If the operator scp'd the installer + backup script into INSTALL_DIR
+# already (the common path: `scp deploy/scripts/*.sh vps:$INSTALL_DIR/`
+# then `sudo bash $INSTALL_DIR/install-backup.sh`), SCRIPT_SRC and
+# SCRIPT_DST point to the same inode and `install` errors out. Skip
+# the copy in that case but still pin permissions on the destination.
+if [ "$(readlink -f "$SCRIPT_SRC")" = "$(readlink -f "$SCRIPT_DST")" ]; then
+  chown root:root "$SCRIPT_DST"
+  chmod 0750 "$SCRIPT_DST"
+else
+  install -m 0750 -o root -g root "$SCRIPT_SRC" "$SCRIPT_DST"
+fi
 touch "$LOG_FILE"
 chmod 0640 "$LOG_FILE"
 
