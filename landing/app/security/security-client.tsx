@@ -15,6 +15,7 @@ import {
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
+import { IconTile } from "@/components/ui/icon-tile";
 import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
 
 const AUTH_ITEMS = [
@@ -70,9 +71,7 @@ export function SecurityClient() {
           {AUTH_ITEMS.map(({ icon: Icon, title, body }) => (
             <li key={title} className="rounded-2xl border border-border/60 bg-card p-5">
               <div className="flex items-start gap-3 mb-3">
-                <div className="grid size-9 place-items-center rounded-xl bg-gold/15 text-gold-dark dark:text-gold shrink-0">
-                  <Icon size={16} />
-                </div>
+                <IconTile icon={Icon} hover="lift" reveal className="size-9" />
                 <h3 className="text-sm font-semibold text-foreground mt-1">{title}</h3>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
@@ -107,9 +106,7 @@ export function SecurityClient() {
           {DATA_ITEMS.map(({ icon: Icon, title, body }) => (
             <li key={title} className="rounded-2xl border border-border/60 bg-card p-5">
               <div className="flex items-start gap-3 mb-3">
-                <div className="grid size-9 place-items-center rounded-xl bg-gold/15 text-gold-dark dark:text-gold shrink-0">
-                  <Icon size={16} />
-                </div>
+                <IconTile icon={Icon} hover="lift" reveal className="size-9" />
                 <h3 className="text-sm font-semibold text-foreground mt-1">{title}</h3>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>

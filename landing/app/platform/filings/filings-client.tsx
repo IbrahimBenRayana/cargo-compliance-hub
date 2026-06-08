@@ -20,6 +20,7 @@ import {
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
+import { IconTile } from "@/components/ui/icon-tile";
 import { SeverityPill } from "@/components/ui/severity-pill";
 import { CodeStream } from "@/components/ui/code-stream";
 import { IsfScene } from "@/components/illustrations/isf-scene";
@@ -266,14 +267,12 @@ export function FilingsClient() {
         intro="The three accelerators every ops team asks for after the first filing."
       >
         <ul className="grid gap-5 sm:grid-cols-3">
-          {MOVE_FASTER.map(({ icon: Icon, title, body }) => (
+          {MOVE_FASTER.map(({ icon: Icon, title, body }, idx) => (
             <li
               key={title}
               className="rounded-2xl border border-border/60 bg-card p-5"
             >
-              <div className="grid size-9 place-items-center rounded-xl bg-gold/15 text-gold-dark dark:text-gold mb-4">
-                <Icon size={18} />
-              </div>
+              <IconTile icon={Icon} hover="lift" reveal revealDelay={idx * 0.06} className="size-9 mb-4" />
               <h3 className="text-base font-semibold text-foreground mb-2">{title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
             </li>

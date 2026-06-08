@@ -15,6 +15,7 @@ import {
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
+import { IconTile } from "@/components/ui/icon-tile";
 import { SeverityPill } from "@/components/ui/severity-pill";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -249,11 +250,9 @@ export function AboutClient() {
         intro="When something's on the fence, these are how we break ties."
       >
         <ul className="grid gap-5 md:grid-cols-3">
-          {PRINCIPLES.map(({ icon: Icon, title, body }) => (
+          {PRINCIPLES.map(({ icon: Icon, title, body }, idx) => (
             <li key={title} className="rounded-2xl border border-border/60 bg-card p-6">
-              <div className="grid size-10 place-items-center rounded-xl bg-gold/15 text-gold-dark dark:text-gold mb-4">
-                <Icon size={18} />
-              </div>
+              <IconTile icon={Icon} hover="lift" reveal revealDelay={idx * 0.06} className="mb-4" />
               <h3 className="text-base font-semibold mb-2">{title}</h3>
               <p className="text-sm opacity-80 leading-relaxed">{body}</p>
             </li>
@@ -264,11 +263,9 @@ export function AboutClient() {
       {/* NUMBERS strip */}
       <SectionShell tone="default" eyebrow="By the numbers" title="What we ship to.">
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {NUMBERS.map(({ value, label, icon: Icon }) => (
+          {NUMBERS.map(({ value, label, icon: Icon }, idx) => (
             <li key={label} className="rounded-2xl border border-border/60 bg-card p-5">
-              <div className="grid size-9 place-items-center rounded-xl bg-gold/15 text-gold-dark dark:text-gold mb-3">
-                <Icon size={16} />
-              </div>
+              <IconTile icon={Icon} hover="lift" reveal revealDelay={idx * 0.06} className="size-9 mb-3" />
               <div className="text-2xl font-semibold tabular-nums text-foreground">{value}</div>
               <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground mt-1">{label}</div>
             </li>

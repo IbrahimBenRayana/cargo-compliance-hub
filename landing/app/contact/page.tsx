@@ -4,6 +4,7 @@ import * as React from "react";
 import { Mail, Clock, Building2, CheckCircle2 } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
+import { IconTile, type IconTileHover } from "@/components/ui/icon-tile";
 import { PageHero } from "@/components/page-hero";
 import { ContactScene } from "@/components/illustrations/contact-scene";
 
@@ -43,21 +44,30 @@ const initialForm: FormState = {
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:3001";
 
-const infoCards = [
+const infoCards: Array<{
+  icon: typeof Mail;
+  hover: IconTileHover;
+  title: string;
+  body: string;
+  href: string | null;
+}> = [
   {
     icon: Mail,
+    hover: "lift",
     title: "Email us",
     body: "support@mycargolens.com",
     href: "mailto:support@mycargolens.com",
   },
   {
     icon: Clock,
+    hover: "spin",
     title: "Response time",
     body: "We reply within one business day",
     href: null,
   },
   {
     icon: Building2,
+    hover: "lift",
     title: "Enterprise",
     body: "For enterprise inquiries, use the form or email sales@mycargolens.com",
     href: "mailto:sales@mycargolens.com",
@@ -142,14 +152,19 @@ export default function ContactPage() {
 
             {/* Info cards */}
             <div className="flex flex-col gap-4">
-              {infoCards.map(({ icon: Icon, title, body, href }) => (
+              {infoCards.map(({ icon: Icon, hover, title, body, href }, idx) => (
                 <div
                   key={title}
                   className="flex items-start gap-4 rounded-xl border border-border/60 bg-card/50 p-5"
                 >
-                  <div className="mt-0.5 flex-shrink-0 flex items-center justify-center rounded-lg bg-primary/8 p-2.5">
-                    <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
-                  </div>
+                  <IconTile
+                    icon={Icon}
+                    hover={hover}
+                    tone="primary"
+                    reveal
+                    revealDelay={idx * 0.06}
+                    className="mt-0.5 size-9 rounded-lg"
+                  />
                   <div>
                     <p className="text-sm font-semibold mb-0.5">{title}</p>
                     {href ? (

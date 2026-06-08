@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bot, Search, Sparkles, Sun } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
+import { IconTile } from "@/components/ui/icon-tile";
 import { Button } from "@/components/ui/button";
 import { CodeStream } from "@/components/ui/code-stream";
 import { SeverityPill } from "@/components/ui/severity-pill";
@@ -333,9 +334,7 @@ export function AiClient() {
               the cards with streaming chat. Includes a sample brief, the
               rule-based fallback example, and the generation cadence. */}
           <li className="rounded-2xl border border-border/60 bg-card p-5 flex flex-col min-h-[520px]">
-            <div className="grid size-9 place-items-center rounded-xl bg-gold/15 text-gold-dark dark:text-gold mb-4">
-              <Sun size={18} />
-            </div>
+            <IconTile icon={Sun} hover="spin" reveal className="size-9 mb-4" />
             <h3 className="text-base font-semibold text-foreground mb-2">Today's brief</h3>
             <p className="text-sm text-muted-foreground leading-relaxed mb-5">
               One sentence at the top of your day. Auto-generated when you open
@@ -369,9 +368,9 @@ export function AiClient() {
           </li>
 
           <li className="rounded-2xl border border-border/60 bg-card p-5 flex flex-col min-h-[520px]">
-            <div className="grid size-9 place-items-center rounded-xl bg-gold/15 text-gold-dark dark:text-gold mb-4">
-              <Bot size={18} />
-            </div>
+            {/* Pulse — the AI Coach feels alive. Only one of the three AI
+                cards gets the continuous breath so it doesn't compete. */}
+            <IconTile icon={Bot} hover="pulse" reveal revealDelay={0.08} className="size-9 mb-4" />
             <h3 className="text-base font-semibold text-foreground mb-2">AI Coach — rejection mode</h3>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-1">
               When CBP rejects, the Coach reads the error code, your filing, and party data — then streams numbered fix steps.
@@ -380,9 +379,7 @@ export function AiClient() {
           </li>
 
           <li className="rounded-2xl border border-border/60 bg-card p-5 flex flex-col min-h-[520px]">
-            <div className="grid size-9 place-items-center rounded-xl bg-gold/15 text-gold-dark dark:text-gold mb-4">
-              <Sparkles size={18} />
-            </div>
+            <IconTile icon={Sparkles} hover="wiggle" reveal revealDelay={0.16} className="size-9 mb-4" />
             <h3 className="text-base font-semibold text-foreground mb-2">AI Coach — pre-flight mode</h3>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-1">
               Reviews the entire draft for UFLPA risks, PGA flags, HTS issues, and rule-based gates before you submit.
