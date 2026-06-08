@@ -38,7 +38,12 @@ export function Wordmark({ className }: WordmarkProps) {
         />
       </svg>
 
-      {/* Wordmark text */}
+      {/* Wordmark text — color via Tailwind classes only.
+          Previously had `color: hsl(222 47% 22%)` as an inline style with
+          `dark:!text-...` to override, but inline styles can outrank the
+          arbitrary-value Tailwind variant in the cascade, leaving the
+          word "MyCargoLens" near-invisible against the dark background
+          when the user switched themes. */}
       <span
         style={{
           fontFamily: "'Inter', ui-sans-serif, sans-serif",
@@ -46,9 +51,8 @@ export function Wordmark({ className }: WordmarkProps) {
           fontWeight: 600,
           letterSpacing: "-0.01em",
           lineHeight: 1,
-          color: "hsl(222 47% 22%)",
         }}
-        className="dark:!text-[hsl(210_40%_96%)]"
+        className="text-[hsl(222_47%_22%)] dark:text-[hsl(210_40%_96%)]"
       >
         MyCargoLens
       </span>
