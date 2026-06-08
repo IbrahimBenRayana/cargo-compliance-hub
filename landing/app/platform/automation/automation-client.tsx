@@ -6,6 +6,7 @@ import { BellRing, Clock, Database, Mail, RefreshCw, ShieldCheck, Users } from "
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
+import { IconTile, type IconTileHover } from "@/components/ui/icon-tile";
 import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -219,9 +220,18 @@ function AutomationHeroIllustration() {
   );
 }
 
-const SCHEDULES = [
+const SCHEDULES: Array<{
+  icon: typeof RefreshCw;
+  hover: IconTileHover;
+  cadence: string;
+  title: string;
+  body: string;
+  trigger: string;
+}> = [
   {
     icon: RefreshCw,
+    // Spin is semantically perfect for a refresh/poll icon.
+    hover: "spin",
     cadence: "Every 5 minutes",
     title: "CBP status polling",
     body: "We poll the CustomsCity ABI gateway for every in-flight filing. New acceptances, rejections, and on-hold notices land in your action queue within minutes.",
@@ -229,6 +239,7 @@ const SCHEDULES = [
   },
   {
     icon: Database,
+    hover: "lift",
     cadence: "Daily at 04:00 UTC",
     title: "Federal Register sync",
     body: "The full Antidumping & Countervailing Duty docket from the Federal Register, parsed and indexed by HTS, country, and case number. Every morning before the East Coast workday.",
@@ -236,6 +247,8 @@ const SCHEDULES = [
   },
   {
     icon: BellRing,
+    // Wiggle matches a bell being struck — the "alert" gesture.
+    hover: "wiggle",
     cadence: "Every hour",
     title: "Deadline alerts",
     body: "Sweeps every open filing for impending deadlines: ISF cutoffs, PSC windows, liquidation dates, AD/CVD reviews. Items inside 24h get pushed to the top of your queue.",
@@ -243,6 +256,7 @@ const SCHEDULES = [
   },
   {
     icon: Clock,
+    hover: "lift",
     cadence: "Every 6 hours",
     title: "Stale-check sweep",
     body: "Filings that haven't moved in 48h get a stale-flag. We check that CBP didn't lose a response, that the importer hasn't gone silent, and that the bond is still active.",
@@ -283,12 +297,13 @@ export function AutomationClient() {
       {/* 4 schedules */}
       <SectionShell tone="default" eyebrow="The schedules" title="Four jobs running on your behalf.">
         <ul className="grid gap-5 md:grid-cols-2">
-          {SCHEDULES.map(({ icon: Icon, cadence, title, body, trigger }) => (
-            <li key={title} className="rounded-2xl border border-border/60 bg-card p-5">
+          {SCHEDULES.map(({ icon: Icon, hover, cadence, title, body, trigger }, idx) => (
+            <li
+              key={title}
+              className="group rounded-2xl border border-border/60 bg-card p-5 transition-colors hover:border-gold/40"
+            >
               <div className="flex items-start gap-4 mb-3">
-                <div className="grid size-10 place-items-center rounded-xl bg-gold/15 text-gold-dark dark:text-gold shrink-0">
-                  <Icon size={18} />
-                </div>
+                <IconTile icon={Icon} hover={hover} reveal revealDelay={idx * 0.06} />
                 <div>
                   <div className="text-[11px] font-mono tabular-nums uppercase tracking-[0.14em] text-muted-foreground">{cadence}</div>
                   <h3 className="text-base font-semibold text-foreground mt-0.5">{title}</h3>

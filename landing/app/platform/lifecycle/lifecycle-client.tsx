@@ -12,6 +12,7 @@ import {
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
+import { IconTile } from "@/components/ui/icon-tile";
 import { SeverityPill } from "@/components/ui/severity-pill";
 import { cn } from "@/lib/utils";
 
@@ -621,9 +622,7 @@ Filed at: 2026-04-12T09:21:00Z`}
       {/* PDF export */}
       <SectionShell tone="default" eyebrow="PDF export" title="Every filing, exportable.">
         <div className="mx-auto max-w-2xl rounded-2xl border border-border/60 bg-card p-6 flex items-center gap-4">
-          <div className="grid size-12 place-items-center rounded-xl bg-gold/15 text-gold-dark dark:text-gold shrink-0">
-            <FileDown size={20} />
-          </div>
+          <IconTile icon={FileDown} hover="lift" size="lg" reveal />
           <div className="flex-1">
             <h3 className="text-base font-semibold text-foreground">One-click PDF of any filing, at any stage.</h3>
             <p className="text-sm text-muted-foreground leading-relaxed mt-1">
