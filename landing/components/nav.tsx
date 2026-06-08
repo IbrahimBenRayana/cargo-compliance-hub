@@ -23,37 +23,72 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-const platformDropdownItems = [
+// Stripe-style mega-menu: items grouped into columns, each column has a
+// small uppercase header. Icons are kept (lucide) but rendered smaller
+// in muted-tone to subordinate them to the title + description — the
+// "atmosphere" is typography-led, not icon-led.
+const platformColumns: Array<{
+  heading: string;
+  items: Array<{
+    icon: typeof Ship;
+    title: string;
+    description: string;
+    href: string;
+  }>;
+}> = [
   {
-    icon: Ship,
-    title: "Filings",
-    description: "ISF-10, ISF-5, ABI Entry, bulk, templates",
-    href: "/platform/filings",
+    heading: "Filing & data",
+    items: [
+      {
+        icon: Ship,
+        title: "Filings",
+        description: "ISF-10, ISF-5, ABI Entry, bulk, templates",
+        href: "/platform/filings",
+      },
+      {
+        icon: ListChecks,
+        title: "Lifecycle",
+        description: "Timeline, score history, PDF export",
+        href: "/platform/lifecycle",
+      },
+    ],
   },
   {
-    icon: BarChart3,
-    title: "Compliance Center",
-    description: "Action queue, UFLPA, ADD/CVD, liquidation",
-    href: "/platform/compliance",
+    heading: "Compliance & alerts",
+    items: [
+      {
+        icon: BarChart3,
+        title: "Compliance Center",
+        description: "Action queue, UFLPA, ADD/CVD, liquidation",
+        href: "/platform/compliance",
+      },
+      {
+        icon: Sparkles,
+        title: "Automation",
+        description: "CBP polling, Federal Register sync, alerts",
+        href: "/platform/automation",
+      },
+    ],
   },
   {
-    icon: Bot,
-    title: "AI",
-    description: "Today's brief, rejection coach, HTS classifier",
-    href: "/platform/ai",
+    heading: "AI",
+    items: [
+      {
+        icon: Bot,
+        title: "AI tools",
+        description: "Today's brief, rejection coach, HTS classifier",
+        href: "/platform/ai",
+      },
+    ],
   },
-  {
-    icon: ListChecks,
-    title: "Lifecycle",
-    description: "Timeline, score history, PDF export",
-    href: "/platform/lifecycle",
-  },
-  {
-    icon: Sparkles,
-    title: "Automation",
-    description: "CBP polling, Federal Register sync, alerts",
-    href: "/platform/automation",
-  },
+];
+
+// Right-rail "more" column on the mega-menu — non-product links that
+// users still need to find from the Platform menu.
+const platformMoreLinks: Array<{ title: string; href: string; description?: string }> = [
+  { title: "All features", href: "/features", description: "Overview of every capability" },
+  { title: "Security", href: "/security", description: "Auth, encryption, audit trail" },
+  { title: "Pricing", href: "/pricing", description: "Plans + plan-limit details" },
 ];
 
 const topLevelLinks = [
@@ -62,16 +97,11 @@ const topLevelLinks = [
   { label: "About", href: "/about" },
 ];
 
-// Shared layoutId for the sliding hover pill so framer-motion morphs the
-// background between hovered top-level links (Linear/Vercel pattern).
-const HOVER_PILL_ID = "nav-hover-pill";
-
 export function Nav() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [platformOpen, setPlatformOpen] = React.useState(false);
   const [mobilePlatformOpen, setMobilePlatformOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
-  const [hoveredKey, setHoveredKey] = React.useState<string | null>(null);
   const platformTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const reducedMotion = useReducedMotion();
 
@@ -99,7 +129,6 @@ export function Nav() {
   const handlePlatformMouseEnter = () => {
     if (platformTimeout.current) clearTimeout(platformTimeout.current);
     setPlatformOpen(true);
-    setHoveredKey("platform");
   };
 
   const handlePlatformMouseLeave = () => {
@@ -117,10 +146,7 @@ export function Nav() {
         )}
       >
         <Container>
-          <nav
-            className="flex h-16 items-center justify-between"
-            onMouseLeave={() => setHoveredKey(null)}
-          >
+          <nav className="flex h-16 items-center justify-between">
             {/* Logo — subtle magnetic hover: gentle scale on the whole
                 wordmark, no rotation on the SVG itself (that would
                 require touching Wordmark internals). */}
@@ -144,131 +170,124 @@ export function Nav() {
                 onMouseLeave={handlePlatformMouseLeave}
               >
                 <button
-                  className="relative flex items-center gap-1 px-3.5 py-2 text-[13.5px] font-medium text-muted-foreground hover:text-foreground rounded-full transition-colors"
+                  className="flex items-center gap-1 px-3 py-2 text-[14px] font-medium text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => setPlatformOpen((v) => !v)}
                   aria-expanded={platformOpen}
                   aria-haspopup="true"
                 >
-                  {hoveredKey === "platform" && (
-                    <motion.span
-                      layoutId={HOVER_PILL_ID}
-                      className="absolute inset-0 rounded-full bg-secondary/80"
-                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                    />
-                  )}
-                  <span className="relative">Platform</span>
+                  Platform
                   <motion.span
                     animate={{ rotate: platformOpen ? 180 : 0 }}
                     transition={{ duration: 0.2, ease: EASE }}
-                    className="relative flex items-center"
+                    className="flex items-center"
                   >
-                    <ChevronDown size={14} />
+                    <ChevronDown size={14} strokeWidth={2.2} />
                   </motion.span>
                 </button>
 
+                {/* Mega-menu — Stripe atmosphere: wide white panel, soft
+                    shadow, multi-column grid, typography-led. No backdrop
+                    blur, no scale animation; subtle 6px fade-down. */}
                 <AnimatePresence>
                   {platformOpen && (
                     <motion.div
-                      initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
                       transition={{ duration: 0.22, ease: EASE }}
-                      style={{ transformOrigin: "top left" }}
-                      className="absolute top-full left-0 mt-2 border border-border/40 rounded-2xl shadow-[0_20px_60px_-12px_hsl(var(--foreground)/0.18),0_0_0_1px_hsl(var(--border)/0.6)] min-w-[360px] overflow-hidden bg-[hsl(var(--card)/0.96)] backdrop-blur-2xl backdrop-saturate-150"
+                      className="absolute top-full left-0 mt-3 border border-border/50 rounded-2xl shadow-[0_24px_80px_-20px_hsl(var(--foreground)/0.22)] overflow-hidden bg-card"
+                      style={{ width: "min(900px, calc(100vw - 4rem))" }}
                       onMouseEnter={handlePlatformMouseEnter}
                       onMouseLeave={handlePlatformMouseLeave}
                     >
-                      {/* Gold gradient hairline at the very top. */}
-                      <div className="h-px w-full bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
+                      <div className="grid grid-cols-[1fr_1fr_1fr_minmax(180px,220px)]">
+                        {/* Three product columns */}
+                        {platformColumns.map((col) => (
+                          <div key={col.heading} className="px-5 py-6">
+                            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-3">
+                              {col.heading}
+                            </p>
+                            <ul className="space-y-1">
+                              {col.items.map((item) => {
+                                const Icon = item.icon;
+                                return (
+                                  <li key={item.href}>
+                                    <Link
+                                      href={item.href}
+                                      className="block -mx-2 px-2 py-2 rounded-md hover:bg-secondary/60 transition-colors group"
+                                      onClick={() => setPlatformOpen(false)}
+                                    >
+                                      <div className="flex items-start gap-2.5">
+                                        <span className="mt-0.5 text-muted-foreground group-hover:text-gold-dark dark:group-hover:text-gold transition-colors">
+                                          <Icon size={15} strokeWidth={2} />
+                                        </span>
+                                        <div className="min-w-0">
+                                          <p className="text-[13.5px] font-semibold text-foreground leading-tight">
+                                            {item.title}
+                                          </p>
+                                          <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
+                                            {item.description}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </Link>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        ))}
 
-                      {/* All Features overview row */}
-                      <Link
-                        href="/features"
-                        className="flex items-center justify-between px-4 py-3.5 hover:bg-secondary/60 transition-colors border-b border-border/40 group"
-                        onClick={() => setPlatformOpen(false)}
-                      >
-                        <div>
-                          <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-0.5">
-                            All features
+                        {/* "More" rail — bordered, slightly tinted */}
+                        <div className="px-5 py-6 bg-secondary/30 border-l border-border/50">
+                          <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-3">
+                            More
                           </p>
-                          <p className="text-sm text-foreground font-medium">
-                            Overview of every capability
-                          </p>
+                          <ul className="space-y-1.5">
+                            {platformMoreLinks.map((m) => (
+                              <li key={m.href}>
+                                <Link
+                                  href={m.href}
+                                  className="group block -mx-2 px-2 py-1.5 rounded-md hover:bg-background/70 transition-colors"
+                                  onClick={() => setPlatformOpen(false)}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-[13px] font-semibold text-foreground">
+                                      {m.title}
+                                    </p>
+                                    <motion.span
+                                      initial={false}
+                                      animate={{ x: 0 }}
+                                      whileHover={reducedMotion ? undefined : { x: 2 }}
+                                      className="text-muted-foreground group-hover:text-foreground"
+                                    >
+                                      <ArrowRight size={12} />
+                                    </motion.span>
+                                  </div>
+                                  {m.description && (
+                                    <p className="text-[11.5px] text-muted-foreground mt-0.5 leading-snug">
+                                      {m.description}
+                                    </p>
+                                  )}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                        <motion.span
-                          initial={false}
-                          whileHover={reducedMotion ? undefined : { x: 3 }}
-                          className="text-muted-foreground group-hover:text-foreground"
-                        >
-                          <ArrowRight size={16} />
-                        </motion.span>
-                      </Link>
-
-                      {/* Individual platform items — staggered entrance. */}
-                      <motion.div
-                        className="py-1.5"
-                        initial="hidden"
-                        animate="visible"
-                        variants={{
-                          hidden: {},
-                          visible: { transition: { staggerChildren: 0.035, delayChildren: 0.04 } },
-                        }}
-                      >
-                        {platformDropdownItems.map((item) => {
-                          const Icon = item.icon;
-                          return (
-                            <motion.div
-                              key={item.href}
-                              variants={{
-                                hidden: { opacity: 0, x: -6 },
-                                visible: { opacity: 1, x: 0, transition: { duration: 0.22, ease: EASE } },
-                              }}
-                            >
-                              <Link
-                                href={item.href}
-                                className="flex items-start gap-3 px-4 py-3 hover:bg-secondary/60 transition-colors group"
-                                onClick={() => setPlatformOpen(false)}
-                              >
-                                <div className="w-8 h-8 rounded-lg bg-gold/15 flex items-center justify-center text-gold-dark dark:text-gold flex-shrink-0 mt-0.5 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
-                                  <Icon size={16} />
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium text-foreground leading-tight">
-                                    {item.title}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                                    {item.description}
-                                  </p>
-                                </div>
-                              </Link>
-                            </motion.div>
-                          );
-                        })}
-                      </motion.div>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </li>
 
-              {/* Other top-level links — same morphing pill. */}
+              {/* Top-level links — Stripe's subtle text-color hover, no pill. */}
               {topLevelLinks.map((link) => (
-                <li
-                  key={link.href}
-                  className="relative"
-                  onMouseEnter={() => setHoveredKey(link.href)}
-                >
+                <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="relative px-3.5 py-2 text-[13.5px] font-medium text-muted-foreground hover:text-foreground rounded-full transition-colors inline-flex"
+                    className="px-3 py-2 text-[14px] font-medium text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    {hoveredKey === link.href && (
-                      <motion.span
-                        layoutId={HOVER_PILL_ID}
-                        className="absolute inset-0 rounded-full bg-secondary/80"
-                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                      />
-                    )}
-                    <span className="relative">{link.label}</span>
+                    {link.label}
                   </Link>
                 </li>
               ))}
@@ -394,7 +413,7 @@ export function Nav() {
                               All features
                             </Link>
                           </li>
-                          {platformDropdownItems.map((item) => {
+                          {platformColumns.flatMap((col) => col.items).map((item) => {
                             const Icon = item.icon;
                             return (
                               <li key={item.href}>

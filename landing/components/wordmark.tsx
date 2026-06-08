@@ -22,7 +22,11 @@ export function Wordmark({ className }: WordmarkProps) {
         viewBox="0 0 32 32"
         aria-hidden="true"
         xmlns="http://www.w3.org/2000/svg"
-        className="text-[hsl(222_47%_22%)] dark:text-[hsl(43_96%_70%)]"
+        // text-primary inherits the --primary CSS variable, which is
+        // already defined per-theme in globals.css: dark-navy in light
+        // mode, gold in dark mode. No arbitrary Tailwind variants → no
+        // JIT/cache surprises and no FOUC.
+        className="text-primary"
       >
         {/* Six blades, alternating tones for iris depth */}
         <path d="M 30 16 L 23 3.88 L 16 10.5 L 20.76 13.25 Z" fill="currentColor" />
@@ -38,12 +42,11 @@ export function Wordmark({ className }: WordmarkProps) {
         />
       </svg>
 
-      {/* Wordmark text — color via Tailwind classes only.
-          Previously had `color: hsl(222 47% 22%)` as an inline style with
-          `dark:!text-...` to override, but inline styles can outrank the
-          arbitrary-value Tailwind variant in the cascade, leaving the
-          word "MyCargoLens" near-invisible against the dark background
-          when the user switched themes. */}
+      {/* Wordmark text uses the CSS-variable-driven `text-foreground`
+          token (driven by --foreground in globals.css). This auto-flips
+          with theme without relying on Tailwind generating arbitrary
+          dark: variants — and avoids any FOUC where the cached light
+          color would leak into a dark-mode first paint. */}
       <span
         style={{
           fontFamily: "'Inter', ui-sans-serif, sans-serif",
@@ -52,7 +55,7 @@ export function Wordmark({ className }: WordmarkProps) {
           letterSpacing: "-0.01em",
           lineHeight: 1,
         }}
-        className="text-[hsl(222_47%_22%)] dark:text-[hsl(210_40%_96%)]"
+        className="text-foreground"
       >
         MyCargoLens
       </span>
