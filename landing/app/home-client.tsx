@@ -125,7 +125,7 @@ export default function HomeClient() {
                         }}
                         className={
                           isLast
-                            ? "relative inline-block mr-[0.18em] text-gradient-gold shimmer-on-mount"
+                            ? "relative inline-block mr-[0.18em] text-gold-word font-semibold"
                             : "inline-block mr-[0.18em]"
                         }
                       >

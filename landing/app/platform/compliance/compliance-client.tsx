@@ -103,10 +103,7 @@ function entryStatus(d: number): { tone: Severity; label: string } {
 }
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const GOLD = "hsl(43 96% 56%)";
-const ROSE = "hsl(0 72% 51%)";
-const AMBER = "hsl(38 92% 50%)";
-const EMERALD = "hsl(160 84% 39%)";
+import { GOLD, ROSE, AMBER, EMERALD } from "@/lib/colors";
 
 function ComplianceHeroIllustration() {
   return (

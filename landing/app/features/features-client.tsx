@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const GOLD = "hsl(43 96% 56%)";
+import { GOLD } from "@/lib/colors";
 
 /**
  * Features overview hero — 5 floating tiles (one per platform surface) +

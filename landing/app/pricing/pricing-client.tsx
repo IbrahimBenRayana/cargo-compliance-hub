@@ -10,8 +10,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const GOLD = "hsl(43 96% 56%)";
-const EMERALD = "hsl(160 84% 39%)";
+import { GOLD, EMERALD } from "@/lib/colors";
 
 /**
  * Pricing hero — a stylized "shopping decision" composition. Three tier

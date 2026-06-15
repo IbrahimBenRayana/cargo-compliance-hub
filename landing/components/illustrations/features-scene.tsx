@@ -7,7 +7,7 @@ interface FeaturesSceneProps {
 }
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const GOLD = "hsl(43 96% 56%)";
+import { GOLD } from "@/lib/colors";
 
 // 3x3 grid — indices 0 (ISF) and 4 (Compliance) are gold
 const NODES: Array<{ x: number; y: number; gold: boolean }> = [

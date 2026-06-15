@@ -382,9 +382,12 @@ function ChromeBar({
   );
 }
 
+// CRT-terminal mockup. Background is brand-tinted near-black
+// (hsl 222 47% 2%) rather than pure #000, so the chaos act still
+// belongs to the dark-mode color system instead of escaping it.
 function As400Terminal() {
   return (
-    <div className="overflow-hidden rounded-sm border border-black/70 bg-black shadow-[0_18px_40px_-12px_rgba(0,0,0,0.6)]">
+    <div className="overflow-hidden rounded-sm border border-black/70 bg-[hsl(222_47%_2%)] shadow-[0_18px_40px_-12px_rgba(0,0,0,0.6)]">
       <ChromeBar title="ABI Terminal — abi.cbp.gov:9090" />
       <div
         className="px-3 py-2.5 font-mono text-[11px] leading-[16px] tabular-nums text-[hsl(120_70%_70%)]"

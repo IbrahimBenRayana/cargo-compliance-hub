@@ -17,9 +17,7 @@ import { SeverityPill } from "@/components/ui/severity-pill";
 import { cn } from "@/lib/utils";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const GOLD = "hsl(43 96% 56%)";
-const ROSE = "hsl(0 72% 51%)";
-const EMERALD = "hsl(160 84% 39%)";
+import { GOLD, ROSE, EMERALD } from "@/lib/colors";
 
 /**
  * Animated lifecycle hero — a journey of milestone nodes connected by a

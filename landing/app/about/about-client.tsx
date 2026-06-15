@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Compass,
   Eye,
@@ -19,8 +19,7 @@ import { IconTile } from "@/components/ui/icon-tile";
 import { SeverityPill } from "@/components/ui/severity-pill";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const GOLD = "hsl(43 96% 56%)";
-const EMERALD = "hsl(160 84% 39%)";
+import { GOLD, EMERALD } from "@/lib/colors";
 
 /**
  * About hero — three concentric rings labeled with our principles
@@ -28,6 +27,11 @@ const EMERALD = "hsl(160 84% 39%)";
  * suggesting direction and care. No bg box, just floating geometry.
  */
 function AboutHeroIllustration() {
+  // SMIL animations (animateTransform / animate) do not respect
+  // prefers-reduced-motion. Gate them on useReducedMotion so users who
+  // ask for reduced motion see a static illustration instead of an
+  // infinite-loop rotation they cannot pause.
+  const reduceMotion = useReducedMotion();
   return (
     <motion.svg
       viewBox="0 0 480 360"
@@ -79,14 +83,16 @@ function AboutHeroIllustration() {
           centre is the SVG-native way to pin the pivot exactly to
           (240,180) — no transform-origin guesswork. */}
       <g>
-        <animateTransform
-          attributeName="transform"
-          type="rotate"
-          from="0 240 180"
-          to="360 240 180"
-          dur="60s"
-          repeatCount="indefinite"
-        />
+        {!reduceMotion && (
+          <animateTransform
+            attributeName="transform"
+            type="rotate"
+            from="0 240 180"
+            to="360 240 180"
+            dur="60s"
+            repeatCount="indefinite"
+          />
+        )}
         {[0, 120, 240].map((deg) => {
           const rad = (deg - 90) * (Math.PI / 180);
           const x = 240 + Math.cos(rad) * 120;
@@ -95,8 +101,12 @@ function AboutHeroIllustration() {
             <g key={deg}>
               <circle cx={x} cy={y} r="6" fill={GOLD} stroke="none" />
               <circle cx={x} cy={y} r="6" stroke={GOLD} strokeOpacity="0.45" fill="none">
-                <animate attributeName="r" values="6;14;6" dur="3s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="0.5;0;0.5" dur="3s" repeatCount="indefinite" />
+                {!reduceMotion && (
+                  <>
+                    <animate attributeName="r" values="6;14;6" dur="3s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.5;0;0.5" dur="3s" repeatCount="indefinite" />
+                  </>
+                )}
               </circle>
             </g>
           );

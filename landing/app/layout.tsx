@@ -5,6 +5,7 @@ import { Nav } from "@/components/nav";
 import { Footer } from "@/components/footer";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BfcacheFix } from "@/components/bfcache-fix";
+import { MotionRoot } from "@/components/motion-root";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -57,10 +58,12 @@ export default function RootLayout({
     <html lang="en" className={`${inter.className} antialiased`} suppressHydrationWarning>
       <body className="bg-mesh min-h-screen flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <BfcacheFix />
-          <Nav />
-          <main className="flex-1">{children}</main>
-          <Footer />
+          <MotionRoot>
+            <BfcacheFix />
+            <Nav />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </MotionRoot>
         </ThemeProvider>
       </body>
     </html>

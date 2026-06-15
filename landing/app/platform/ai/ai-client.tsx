@@ -46,7 +46,7 @@ const FAQ = [
 ];
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const GOLD = "hsl(43 96% 56%)";
+import { GOLD } from "@/lib/colors";
 
 function HeroAIIllustration() {
   return (
