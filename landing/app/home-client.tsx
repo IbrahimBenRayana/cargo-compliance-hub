@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
+import { Magnetic } from "@/components/ui/magnetic";
 import { HeroBackground } from "@/components/sections/hero-background";
 import { HeroScene } from "@/components/illustrations/hero-scene";
 import { ActChaos } from "@/components/sections/home/act-chaos";
@@ -165,9 +166,11 @@ export default function HomeClient() {
                 }}
                 className="flex flex-col sm:flex-row items-center gap-3 mb-5"
               >
-                <Button variant="gold" size="lg" asChild>
-                  <a href="https://app.mycargolens.com/register">Start free</a>
-                </Button>
+                <Magnetic strength={6}>
+                  <Button variant="gold" size="lg" asChild>
+                    <a href="https://app.mycargolens.com/register">Start free</a>
+                  </Button>
+                </Magnetic>
                 <Button variant="outline" size="lg" asChild>
                   <Link href="/features">See what shipped</Link>
                 </Button>

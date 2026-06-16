@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 import { Container } from "@/components/ui/container";
+import { Magnetic } from "@/components/ui/magnetic";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -315,25 +316,30 @@ export function Nav() {
               <Button variant="outline" size="sm" asChild>
                 <a href="https://app.mycargolens.com/login">Log in</a>
               </Button>
-              <Button variant="gold" size="sm" asChild className="group relative overflow-hidden">
-                <a href="https://app.mycargolens.com/register">
-                  <span className="relative z-10 inline-flex items-center gap-1.5">
-                    Start free
-                    <motion.span
+              {/* Magnetic wrapper pulls the gold CTA a few pixels toward
+                  the cursor while it's near. Subtle on top of the existing
+                  sheen, never bouncy. Touch and reduced-motion pass through. */}
+              <Magnetic strength={5}>
+                <Button variant="gold" size="sm" asChild className="group relative overflow-hidden">
+                  <a href="https://app.mycargolens.com/register">
+                    <span className="relative z-10 inline-flex items-center gap-1.5">
+                      Start free
+                      <motion.span
+                        aria-hidden
+                        className="inline-flex"
+                        whileHover={reducedMotion ? undefined : { x: 2 }}
+                      >
+                        <ArrowRight size={13} />
+                      </motion.span>
+                    </span>
+                    {/* Sheen overlay on hover, subtle, big-tech feel. */}
+                    <span
                       aria-hidden
-                      className="inline-flex"
-                      whileHover={reducedMotion ? undefined : { x: 2 }}
-                    >
-                      <ArrowRight size={13} />
-                    </motion.span>
-                  </span>
-                  {/* Sheen overlay on hover — subtle, big-tech feel. */}
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                  />
-                </a>
-              </Button>
+                      className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    />
+                  </a>
+                </Button>
+              </Magnetic>
             </div>
 
             {/* Mobile hamburger — animated icon swap */}
