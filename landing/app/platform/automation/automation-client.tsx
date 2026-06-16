@@ -10,8 +10,7 @@ import { IconTile, type IconTileHover } from "@/components/ui/icon-tile";
 import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const GOLD = "hsl(43 96% 56%)";
-const EMERALD = "hsl(160 84% 39%)";
+import { GOLD, EMERALD } from "@/lib/colors";
 
 /**
  * Animated hero — four clock faces, one per background schedule. Each

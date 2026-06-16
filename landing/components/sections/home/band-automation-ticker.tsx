@@ -47,8 +47,10 @@ export function BandAutomationTicker() {
           ))}
         </ul>
 
-        {/* Mobile: one item at a time, crossfade */}
-        <div className="relative flex items-center justify-center md:hidden">
+        {/* Mobile: one item at a time, crossfade, plus a row of position
+            dots so the rotation is legible (the surface IS alive, the
+            user just couldn't tell before this dot row landed). */}
+        <div className="flex flex-col items-center gap-2 md:hidden">
           <div className="relative h-6 w-full">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
@@ -63,6 +65,23 @@ export function BandAutomationTicker() {
               </motion.div>
             </AnimatePresence>
           </div>
+          <ul
+            className="flex items-center gap-1.5"
+            aria-label={`Showing item ${index + 1} of ${ITEMS.length}`}
+          >
+            {ITEMS.map((item, i) => (
+              <li
+                key={item.label}
+                aria-current={i === index ? "true" : undefined}
+                className={cn(
+                  "h-1 rounded-full transition-all duration-500 ease-out",
+                  i === index
+                    ? "w-4 bg-gold"
+                    : "w-1 bg-muted-foreground/30"
+                )}
+              />
+            ))}
+          </ul>
         </div>
       </Container>
     </section>

@@ -173,45 +173,15 @@
   .glow-gold {
     box-shadow: 0 0 0 1px hsl(43 96% 56% / 0.15), 0 0 16px hsl(43 96% 56% / 0.2), 0 0 32px hsl(43 96% 56% / 0.08);
   }
-  .text-gradient-gold {
-    background: linear-gradient(135deg, hsl(43 96% 62%) 0%, hsl(38 92% 50%) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  /* Solid gold word for the home headline highlight. Replaces a pair
+     of deprecated utilities that used the bg-clip-text trick with an
+     animated linear gradient (impeccable gradient-text tell). Single
+     solid color now; emphasis through weight and size only. */
+  .text-gold-word {
+    color: hsl(43 96% 56%);
   }
-  /* One-shot sheen sweep across the gold-gradient word on mount.
-     Uses an animated 200%-wide gradient so the highlight band glides through. */
-  .shimmer-on-mount {
-    background: linear-gradient(
-      100deg,
-      hsl(43 96% 62%) 0%,
-      hsl(38 92% 50%) 30%,
-      hsl(48 100% 80%) 50%,
-      hsl(38 92% 50%) 70%,
-      hsl(43 96% 62%) 100%
-    );
-    background-size: 220% 100%;
-    background-position: 100% 0;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    animation: shimmer-sweep 1800ms cubic-bezier(0.16, 1, 0.3, 1) 1100ms 1 both;
-  }
-  @keyframes shimmer-sweep {
-    0%   { background-position: 100% 0; }
-    100% { background-position: -20% 0; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .shimmer-on-mount {
-      animation: none;
-      background-position: 50% 0;
-    }
-  }
-  .text-gradient-navy {
-    background: linear-gradient(135deg, hsl(222 47% 22%) 0%, hsl(222 47% 35%) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  :is(.dark) .text-gold-word {
+    color: hsl(43 96% 62%);
   }
 }
 

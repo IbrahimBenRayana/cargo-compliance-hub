@@ -16,6 +16,7 @@ import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
 import { SeverityPill } from "@/components/ui/severity-pill";
+import { GOLD, ROSE, EMERALD } from "@/lib/colors";
 
 const EASE_OUT_QUART = [0.25, 1, 0.5, 1] as const;
 
@@ -96,10 +97,17 @@ function PersonaCard({ persona, index }: { persona: Persona; index: number }) {
         <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground leading-tight mb-5">
           {persona.title}
         </h2>
-        <figure className="rounded-2xl border-l-4 border-gold bg-card/60 px-5 py-4 my-5">
+        {/* Pull-quote uses a clean full border + an italic body, with
+            the persona role re-stated as figcaption so the quote is
+            grounded instead of disembodied. Earlier revision used a
+            thick gold left-rail accent (impeccable side-tab tell). */}
+        <figure className="rounded-xl border border-border/60 bg-card/40 px-5 py-4 my-5">
           <blockquote className="text-sm italic text-foreground leading-relaxed">
             "{persona.pullquote}"
           </blockquote>
+          <figcaption className="mt-2.5 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            {persona.badge}
+          </figcaption>
         </figure>
         <p className="text-[13px] text-muted-foreground mb-2 font-semibold uppercase tracking-[0.14em]">
           Before MyCargoLens
@@ -139,9 +147,6 @@ function PersonaCard({ persona, index }: { persona: Persona; index: number }) {
 }
 
 function SolutionsHeroIllustration() {
-  const GOLD = "hsl(43 96% 56%)";
-  const ROSE = "hsl(0 72% 51%)";
-  const EMERALD = "hsl(160 84% 39%)";
 
   // Three persona panels — each shows a snippet of "what they see"
   // (rather than just a labeled circle). Center is the shared product.

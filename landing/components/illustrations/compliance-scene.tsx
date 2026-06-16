@@ -7,7 +7,7 @@ interface ComplianceSceneProps {
 }
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const GOLD = "hsl(43 96% 56%)";
+import { GOLD } from "@/lib/colors";
 
 // Semi-circular gauge: center (200, 240), radius 110
 // Arc spans 180° from left (-180°) to right (0°) — standard speedometer
