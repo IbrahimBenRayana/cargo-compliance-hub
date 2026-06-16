@@ -61,19 +61,34 @@ export function BandBuiltOnRails() {
           </h2>
         </motion.header>
 
-        <ul className="mt-8 grid grid-cols-2 gap-3 md:mt-10 md:grid-cols-3 md:gap-4 lg:grid-cols-5">
-          {RAILS.map((rail, i) => (
-            <motion.li
-              key={rail.name}
-              initial={{ opacity: 0, y: 12 }}
-              animate={inView ? { opacity: 1, y: 0 } : undefined}
-              transition={{
-                duration: 0.5,
-                ease: EASE_OUT_QUART,
-                delay: 0.08 * i + 0.15,
-              }}
-              className="group rounded-2xl border border-border/60 bg-card px-5 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
-            >
+        {/* Marquee. The track holds two identical lists end-to-end and
+            translates by -50% over the duration, which puts the start of
+            list-2 exactly where list-1 began — seamless loop. Pure
+            transform animation (no layout properties). Edge mask gradient
+            fades content in and out so the loop seam is never visible.
+            MotionRoot's reducedMotion="user" handles accessibility: under
+            prefers-reduced-motion the animation is collapsed to a no-op
+            and the rails sit static. */}
+        <div
+          className="mt-8 overflow-hidden md:mt-10 [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]"
+          aria-label="Integration partners"
+        >
+          <motion.div
+            className="flex w-max gap-4"
+            animate={inView ? { x: ["0%", "-50%"] } : undefined}
+            transition={{
+              duration: 38,
+              ease: "linear",
+              repeat: Infinity,
+              repeatType: "loop",
+            }}
+          >
+            {[...RAILS, ...RAILS].map((rail, i) => (
+              <div
+                key={`${rail.name}-${i}`}
+                aria-hidden={i >= RAILS.length}
+                className="group flex w-[220px] shrink-0 rounded-2xl border border-border/60 bg-card px-5 py-4"
+              >
               <div className="flex items-start gap-3">
                 <span
                   className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-[hsl(43_96%_44%)] ring-1 ring-amber-500/20 dark:text-[hsl(43_96%_62%)]"
@@ -90,9 +105,10 @@ export function BandBuiltOnRails() {
                   </div>
                 </div>
               </div>
-            </motion.li>
-          ))}
-        </ul>
+              </div>
+            ))}
+          </motion.div>
+        </div>
       </Container>
     </section>
   );
