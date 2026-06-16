@@ -1,7 +1,15 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import {
+  motion,
+  useReducedMotion,
+  useScroll,
+  useTime,
+  useTransform,
+  type MotionValue,
+} from "framer-motion";
 import { BellRing, Clock, Database, Mail, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
@@ -12,27 +20,59 @@ import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
 const EASE = [0.22, 1, 0.36, 1] as const;
 import { GOLD, EMERALD } from "@/lib/colors";
 
+type ClockSpec = {
+  cx: number;
+  cy: number;
+  label: string;
+  sub: string;
+  /** Seconds for one full revolution at idle (no scrolling). */
+  rotationDur: number;
+  delay: number;
+};
+
+const CLOCKS: ClockSpec[] = [
+  { cx: 100, cy: 110, label: "5 min", sub: "CBP poll", rotationDur: 4, delay: 0 },
+  { cx: 240, cy: 110, label: "1 h", sub: "Deadlines", rotationDur: 8, delay: 0.3 },
+  { cx: 380, cy: 110, label: "6 h", sub: "Stale check", rotationDur: 14, delay: 0.6 },
+  // Bottom clock was at cy=270, putting its sub-label at y=342 — only
+  // 4px above the y=346 heartbeat strip, so the two texts collided.
+  // Lifting to cy=244 leaves the labels at y=302/316, ~30px of breathing
+  // room above the strip. Connector line below was shortened to match.
+  { cx: 240, cy: 244, label: "04:00 UTC", sub: "Fed Register", rotationDur: 22, delay: 0.9 },
+];
+
 /**
- * Animated hero — four clock faces, one per background schedule. Each
- * clock's hand rotates at its own cadence (faster for the 5-min poll,
- * slower for the daily sync) so the illustration *is* the system: live.
+ * Animated hero, four clock faces, one per background schedule.
+ *
+ * Each hand has TWO drivers combined:
+ *   1. An idle continuous rotation. Speed comes from `rotationDur` (the
+ *      faster the cadence, the faster the hand). Drives the "system is
+ *      alive" feel when the user isn't interacting.
+ *   2. A scroll-linked boost. As the user scrolls past the section, the
+ *      hands sweep proportionally to scroll progress. The 5-min clock
+ *      gets a bigger boost than the daily-sync clock so the
+ *      faster-cadence pieces visibly outrun the slower ones, matching
+ *      the system metaphor.
+ *
+ * Replaces the previous SMIL `<animateTransform>` which did not respect
+ * `prefers-reduced-motion: reduce`. The framer-motion path now collapses
+ * to a static dial via `useReducedMotion()`.
  */
 function AutomationHeroIllustration() {
-  const clocks = [
-    { cx: 100, cy: 110, label: "5 min", sub: "CBP poll", rotationDur: 4, delay: 0 },
-    { cx: 240, cy: 110, label: "1 h", sub: "Deadlines", rotationDur: 8, delay: 0.3 },
-    { cx: 380, cy: 110, label: "6 h", sub: "Stale check", rotationDur: 14, delay: 0.6 },
-    // Bottom clock was at cy=270, putting its sub-label at y=342 — only
-    // 4px above the y=346 heartbeat strip, so the two texts collided.
-    // Lifting to cy=244 leaves the labels at y=302/316, ~30px of breathing
-    // room above the strip. Connector line below was shortened to match.
-    { cx: 240, cy: 244, label: "04:00 UTC", sub: "Fed Register", rotationDur: 22, delay: 0.9 },
-  ];
+  // useScroll's `target` accepts an HTMLElement ref. SVG refs are not
+  // compatible (different element type), so we wrap the svg in a div
+  // and put the ref there.
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: wrapperRef,
+    offset: ["start end", "end start"],
+  });
 
   return (
+    <div ref={wrapperRef} className="w-full max-w-md">
     <motion.svg
       viewBox="0 0 480 360"
-      className="w-full max-w-md h-auto text-foreground/90"
+      className="w-full h-auto text-foreground/90"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
@@ -66,111 +106,8 @@ function AutomationHeroIllustration() {
       </motion.g>
 
       {/* === Four clocks ============================================= */}
-      {clocks.map((c) => (
-        <motion.g
-          key={c.label}
-          variants={{
-            hidden: { opacity: 0, scale: 0.7 },
-            visible: {
-              opacity: 1,
-              scale: 1,
-              transition: { duration: 0.55, ease: EASE, delay: c.delay },
-            },
-          }}
-        >
-          {/* Pulsing halo */}
-          <motion.circle
-            cx={c.cx}
-            cy={c.cy}
-            r="42"
-            stroke={GOLD}
-            strokeOpacity="0.25"
-            strokeWidth="1.2"
-            fill="none"
-            animate={{ scale: [1, 1.18, 1], opacity: [0.3, 0, 0.3] }}
-            transition={{ duration: 3 + c.delay, repeat: Infinity, ease: "easeInOut", delay: 1 + c.delay }}
-            style={{ transformOrigin: `${c.cx}px ${c.cy}px` }}
-          />
-          {/* Outer clock face */}
-          <circle
-            cx={c.cx}
-            cy={c.cy}
-            r="38"
-            fill="currentColor"
-            fillOpacity="0.03"
-            strokeOpacity="0.7"
-          />
-          {/* Inner ring */}
-          <circle
-            cx={c.cx}
-            cy={c.cy}
-            r="32"
-            stroke="currentColor"
-            strokeOpacity="0.15"
-            fill="none"
-          />
-          {/* 12 / 3 / 6 / 9 tick marks */}
-          {[0, 90, 180, 270].map((deg) => {
-            const rad = (deg - 90) * (Math.PI / 180);
-            const x1 = c.cx + Math.cos(rad) * 32;
-            const y1 = c.cy + Math.sin(rad) * 32;
-            const x2 = c.cx + Math.cos(rad) * 26;
-            const y2 = c.cy + Math.sin(rad) * 26;
-            return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} strokeOpacity="0.6" />;
-          })}
-          {/* Rotating hand — SMIL animateTransform pins the rotation centre
-              to (c.cx, c.cy). framer-motion's `rotate` orbits the element's
-              bounding-box centre (here: c.cx, c.cy - 11), which makes the
-              hand swing wildly off the dial instead of sweeping like a real
-              clock. SVG's native rotate-with-centre fixes the pivot exactly. */}
-          <line
-            x1={c.cx}
-            y1={c.cy}
-            x2={c.cx}
-            y2={c.cy - 22}
-            stroke={GOLD}
-            strokeWidth="2.5"
-          >
-            <animateTransform
-              attributeName="transform"
-              type="rotate"
-              from={`0 ${c.cx} ${c.cy}`}
-              to={`360 ${c.cx} ${c.cy}`}
-              dur={`${c.rotationDur}s`}
-              repeatCount="indefinite"
-              begin={`${c.delay}s`}
-            />
-          </line>
-          {/* Center hub */}
-          <circle cx={c.cx} cy={c.cy} r="3.5" fill={GOLD} stroke="none" />
-          {/* Cadence label */}
-          <text
-            x={c.cx}
-            y={c.cy + 58}
-            textAnchor="middle"
-            fontSize="11"
-            fontFamily="ui-monospace, monospace"
-            fontWeight="700"
-            fill="currentColor"
-            stroke="none"
-          >
-            {c.label}
-          </text>
-          {/* Sub-label */}
-          <text
-            x={c.cx}
-            y={c.cy + 72}
-            textAnchor="middle"
-            fontSize="8.5"
-            fontFamily="ui-sans-serif, sans-serif"
-            fontWeight="600"
-            fill="currentColor"
-            fillOpacity="0.55"
-            stroke="none"
-          >
-            {c.sub}
-          </text>
-        </motion.g>
+      {CLOCKS.map((c) => (
+        <ClockGroup key={c.label} c={c} scrollProgress={scrollYProgress} />
       ))}
 
       {/* === Heartbeat strip at the bottom ============================ */}
@@ -216,6 +153,138 @@ function AutomationHeroIllustration() {
         </text>
       </motion.g>
     </motion.svg>
+    </div>
+  );
+}
+
+/**
+ * One clock face. The hand's rotation comes from useTime (continuous
+ * idle sweep) summed with a scroll-derived boost so faster-cadence
+ * clocks visibly outrun slower ones when the user scrolls past.
+ *
+ * Hand pivot: `transformOrigin` in CSS pixels on the motion.line. This
+ * is the framer-motion equivalent of SMIL's `rotate(deg cx cy)` and
+ * the reason the previous comment in this file warned against
+ * framer-motion's default bounding-box pivot. With explicit
+ * `transformOrigin` the pivot lands on the dial centre, which is what
+ * the eye reads as a real clock.
+ */
+function ClockGroup({
+  c,
+  scrollProgress,
+}: {
+  c: ClockSpec;
+  scrollProgress: MotionValue<number>;
+}) {
+  const reduce = useReducedMotion();
+  const time = useTime();
+  // Idle continuous rotation. degPerMs * elapsed ms = degrees.
+  const degPerMs = 360 / (c.rotationDur * 1000);
+  // Scroll-linked boost. Faster cadence = bigger boost. Multiplier is
+  // capped so the slowest clock still moves a noticeable amount.
+  const scrollMult = Math.max(0.4, 8 / c.rotationDur);
+  const scrollDeg = useTransform(scrollProgress, [0, 1], [0, 360 * scrollMult]);
+
+  const rotation = useTransform([time, scrollDeg], (latest) => {
+    if (reduce) return 0;
+    const [t, s] = latest as [number, number];
+    return t * degPerMs + s;
+  });
+
+  return (
+    <motion.g
+      variants={{
+        hidden: { opacity: 0, scale: 0.7 },
+        visible: {
+          opacity: 1,
+          scale: 1,
+          transition: { duration: 0.55, ease: EASE, delay: c.delay },
+        },
+      }}
+    >
+      {/* Pulsing halo */}
+      <motion.circle
+        cx={c.cx}
+        cy={c.cy}
+        r="42"
+        stroke={GOLD}
+        strokeOpacity="0.25"
+        strokeWidth="1.2"
+        fill="none"
+        animate={{ scale: [1, 1.18, 1], opacity: [0.3, 0, 0.3] }}
+        transition={{ duration: 3 + c.delay, repeat: Infinity, ease: "easeInOut", delay: 1 + c.delay }}
+        style={{ transformOrigin: `${c.cx}px ${c.cy}px` }}
+      />
+      {/* Outer clock face */}
+      <circle
+        cx={c.cx}
+        cy={c.cy}
+        r="38"
+        fill="currentColor"
+        fillOpacity="0.03"
+        strokeOpacity="0.7"
+      />
+      {/* Inner ring */}
+      <circle
+        cx={c.cx}
+        cy={c.cy}
+        r="32"
+        stroke="currentColor"
+        strokeOpacity="0.15"
+        fill="none"
+      />
+      {/* 12 / 3 / 6 / 9 tick marks */}
+      {[0, 90, 180, 270].map((deg) => {
+        const rad = (deg - 90) * (Math.PI / 180);
+        const x1 = c.cx + Math.cos(rad) * 32;
+        const y1 = c.cy + Math.sin(rad) * 32;
+        const x2 = c.cx + Math.cos(rad) * 26;
+        const y2 = c.cy + Math.sin(rad) * 26;
+        return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} strokeOpacity="0.6" />;
+      })}
+      {/* Rotating hand. CSS transformOrigin pins the pivot to (cx, cy). */}
+      <motion.line
+        x1={c.cx}
+        y1={c.cy}
+        x2={c.cx}
+        y2={c.cy - 22}
+        stroke={GOLD}
+        strokeWidth="2.5"
+        style={{
+          transformOrigin: `${c.cx}px ${c.cy}px`,
+          rotate: rotation,
+        }}
+      />
+      {/* Center hub */}
+      <circle cx={c.cx} cy={c.cy} r="3.5" fill={GOLD} stroke="none" />
+      {/* Cadence label */}
+      <text
+        x={c.cx}
+        y={c.cy + 58}
+        textAnchor="middle"
+        fontSize="11"
+        fontFamily="ui-monospace, monospace"
+        fontWeight="700"
+        fill="currentColor"
+        stroke="none"
+      >
+        {c.label}
+      </text>
+      {/* Sub-label */}
+      <text
+        x={c.cx}
+        y={c.cy + 72}
+        textAnchor="middle"
+        fontSize="8.5"
+        fontFamily="ui-sans-serif, sans-serif"
+        fontWeight="600"
+        fill="currentColor"
+        fillOpacity="0.55"
+        stroke="none"
+      >
+        {c.sub}
+      </text>
+    </motion.g>
   );
 }
 
