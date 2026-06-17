@@ -23,9 +23,14 @@ const router = Router();
 // Pre-Phase-6 the refresh token round-tripped through the JSON body and
 // was persisted in localStorage on the SPA — so any XSS gave an attacker
 // a 7-day login. Moving it to an httpOnly cookie scoped to the refresh
-// endpoint closes that window. SameSite=Strict is the primary CSRF
-// defence (the cookie won't ride along on cross-site requests); the
-// path scope keeps the cookie off every other request entirely.
+// endpoint closes that window. SameSite=Lax (not Strict) so the cookie
+// survives the return navigation from external redirects — notably the
+// Stripe Checkout flow (app → checkout.stripe.com → app/upgrade/success):
+// with Strict the cookie was withheld right after that cross-site return,
+// so the post-payment page couldn't refresh its in-memory access token and
+// every billing call 401'd. CSRF is still covered: Lax keeps the cookie off
+// cross-site subresource/POST requests, the path scope keeps it off every
+// other endpoint, and the /refresh route additionally Origin-checks.
 const REFRESH_COOKIE = 'mcl_refresh';
 const REFRESH_COOKIE_PATH = '/api/v1/auth/refresh';
 const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -36,7 +41,7 @@ function setRefreshCookie(res: Response, token: string): void {
     // Secure attribute requires HTTPS — required in prod, would break
     // dev over plain HTTP (browsers reject Secure cookies on http://).
     secure: env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     path: REFRESH_COOKIE_PATH,
     maxAge: REFRESH_COOKIE_MAX_AGE_MS,
   });
@@ -49,7 +54,7 @@ function clearRefreshCookie(res: Response): void {
     path: REFRESH_COOKIE_PATH,
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
   });
 }
 
@@ -371,17 +376,18 @@ router.post('/login', authLimiter, async (req: Request, res: Response): Promise<
 
 // ─── POST /api/v1/auth/refresh ────────────────────────────
 // Audit Phase 6: the refresh token now arrives in the mcl_refresh httpOnly
-// cookie (set by /login + /register), NOT in the JSON body. SameSite=Strict
-// on the cookie is the primary CSRF defence; we additionally Origin-check
-// the request as defense-in-depth because the refresh endpoint is the most
-// security-sensitive in the app.
+// cookie (set by /login + /register), NOT in the JSON body. With SameSite=Lax
+// (needed so the cookie survives the return from Stripe Checkout) the Origin
+// check below is the primary CSRF defence — the refresh endpoint is the most
+// security-sensitive in the app, so we reject any request whose Origin isn't
+// our SPA.
 router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
   try {
-    // Defense-in-depth CSRF check. SameSite=Strict already blocks the
-    // cookie from accompanying cross-site fetches in any modern browser,
-    // but we additionally reject any request whose Origin doesn't match
-    // our SPA. Allow no Origin (curl / native clients) only when the
-    // cookie is absent — those callers can't be CSRF victims either way.
+    // Primary CSRF check (with SameSite=Lax the cookie can ride along on a
+    // top-level cross-site GET navigation, so we don't rely on SameSite alone
+    // here): reject any request whose Origin doesn't match our SPA. Allow no
+    // Origin (curl / native clients) only when the cookie is absent — those
+    // callers can't be CSRF victims either way.
     const origin = req.get('origin');
     if (origin && env.FRONTEND_URL && origin !== env.FRONTEND_URL) {
       res.status(403).json({ error: 'Cross-origin refresh refused' });
