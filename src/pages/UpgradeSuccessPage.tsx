@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSubscription } from '@/hooks/useBilling';
+import { CAPABILITY_LABEL, type Capability } from '@/lib/planMeta';
 
 const MAX_WAIT_MS = 30_000;
 const POLL_INTERVAL_MS = 2_500;
@@ -48,8 +49,7 @@ export default function UpgradeSuccessPage() {
 
     const isActive =
       billing.subscription?.status === 'active' &&
-      billing.plan !== null &&
-      billing.plan.id !== 'starter';
+      billing.plan !== null;
 
     if (isActive) {
       if (toastId.current) toast.dismiss(toastId.current);
@@ -87,9 +87,11 @@ export default function UpgradeSuccessPage() {
     return () => clearInterval(interval);
   }, [activated, billing, navigate]);
 
-  const planName = billing?.plan?.name ?? 'Pro';
-  const filings = billing?.plan?.filingsIncluded ?? '–';
-  const seats = billing?.plan?.maxSeats ?? '–';
+  const planName = billing?.plan?.name ?? 'your plan';
+  const perFilingCents = billing?.plan?.perFilingCents ?? null;
+  const rateLabel =
+    perFilingCents != null ? `$${Math.round(perFilingCents / 100)}` : '–';
+  const capabilities = (billing?.plan?.capabilities ?? []) as Capability[];
 
   return (
     <div className="min-h-screen bg-mesh flex items-center justify-center p-6">
@@ -166,9 +168,23 @@ export default function UpgradeSuccessPage() {
                 <h1 className="text-3xl font-bold text-foreground mb-2">
                   Welcome to {planName}!
                 </h1>
-                <p className="text-muted-foreground mb-6 text-sm">
-                  {filings} filings per month · {seats} team members
+                <p className="text-muted-foreground mb-4 text-sm">
+                  {rateLabel} per shipment filed · no monthly fee
                 </p>
+
+                {capabilities.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2 mb-6">
+                    {capabilities.map((cap) => (
+                      <span
+                        key={cap}
+                        className="inline-flex items-center gap-1 rounded-full bg-gold/10 border border-gold/30 px-3 py-1 text-xs font-medium text-foreground/85"
+                      >
+                        <Check className="h-3 w-3 text-gold" strokeWidth={3} />
+                        {CAPABILITY_LABEL[cap] ?? cap}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 <motion.p
                   key={countdown}

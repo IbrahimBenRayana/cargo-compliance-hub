@@ -16,6 +16,8 @@
 import { Router, type Response } from 'express';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { requireCapability } from '../middleware/requireCapability.js';
+import { CAPABILITIES } from '../config/plans.js';
 import { ccClient } from '../services/customscity.js';
 import { ccApiLimiter } from '../middleware/rateLimiter.js';
 import {
@@ -29,6 +31,10 @@ import logger from '../config/logger.js';
 
 const router = Router();
 router.use(authMiddleware);
+// The Duty Calculator is part of the gated HTS Classification capability
+// (Complete tier). Basic HTS code entry while filing an ISF uses the separate,
+// ungated /integrations/hts-classify endpoint, so ISF filers are unaffected.
+router.use(requireCapability(CAPABILITIES.HTS_CLASSIFICATION));
 
 /** Pull a human message out of CC's error responses (matches abiDocuments helper). */
 function extractCCErrorMessage(body: any, httpStatus: number, label: string): string {

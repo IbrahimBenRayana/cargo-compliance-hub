@@ -33,7 +33,7 @@ model Organization {
   filingTemplates FilingTemplate[]
   invitations     OrgInvitation[]
   subscription    Subscription?
-  filingUsage     FilingUsage[]
+  shipmentCharges ShipmentCharge[]
   manifestQueries ManifestQuery[]
   abiDocuments    AbiDocument[]
   trackedShipments TrackedShipment[]
@@ -186,6 +186,7 @@ model Filing {
   manifestQueries ManifestQuery[]
   abiDocuments    AbiDocument[]
   trackedShipments TrackedShipment[]
+  shipmentCharge  ShipmentCharge?
 
   @@index([orgId])
   @@index([status])
@@ -476,26 +477,28 @@ model FilingDocument {
 
 // Plan: a subscription tier (e.g., Grower Monthly, Scale Annual).
 // Seeded from DB seed script; each plan maps to a Stripe Price via stripePriceId.
+// Plan = a per-filing pricing tier. There is no monthly fee; `perFilingCents`
+// is the metered Stripe Price unit_amount charged per billed shipment, and
+// `capabilities` lists the product surfaces the tier unlocks. Source of truth
+// for the values: server/src/config/plans.ts.
 model Plan {
-  id              String   @id // e.g., "grower_monthly"
-  name            String // "Grower"
+  id              String   @id // "isf" | "entry" | "full" | "enterprise"
+  name            String // "ISF Filing"
   description     String?
-  stripePriceId   String?  @unique @map("stripe_price_id") // null for Free
+  stripePriceId   String?  @unique @map("stripe_price_id") // metered Price; null until bootstrapped
   stripeProductId String?  @map("stripe_product_id")
-  priceCents      Int      @map("price_cents") // e.g., 9900 for $99
+  perFilingCents  Int      @map("per_filing_cents") // 4500 | 18000 | 28000 | 0 (enterprise/custom)
   currency        String   @default("usd") @db.VarChar(3)
-  billingInterval String   @map("billing_interval") @db.VarChar(20) // "month" | "year" | "free"
-  filingsIncluded Int      @map("filings_included") // 2, 15, 60, or large number for enterprise
-  maxSeats        Int      @map("max_seats")
-  overageCents    Int      @default(0) @map("overage_cents") // per-filing overage (0 for free/enterprise)
-  features        String[] // JSON list of feature keys
+  capabilities    String[] // unlocked capability keys (see CAPABILITIES)
+  features        String[] // marketing bullet keys for the pricing UI
   isActive        Boolean  @default(true) @map("is_active")
   isPublic        Boolean  @default(true) @map("is_public") // show in pricing UI
   sortOrder       Int      @default(0) @map("sort_order")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  subscriptions Subscription[]
+  subscriptions  Subscription[]
+  shipmentCharges ShipmentCharge[]
 
   @@map("plans")
 }
@@ -525,21 +528,38 @@ model Subscription {
   @@map("subscriptions")
 }
 
-// FilingUsage: per-org monthly counter of "billable filings" (successful submits).
-// Keyed by calendar month in YYYY-MM format for fast lookup + simple reporting.
-model FilingUsage {
-  id        String   @id @default(uuid()) @db.Uuid
-  orgId     String   @map("org_id") @db.Uuid
-  month     String   @db.VarChar(7) // "2026-04"
-  count     Int      @default(0)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+// ShipmentCharge: the per-filing billing ledger. One row per billed shipment.
+// The shipment is anchored on EITHER the ISF Filing (when present) OR a
+// standalone ABI Entry — exactly one of filingId / abiDocumentId is set. An ABI
+// Entry that is linked to an ISF Filing anchors on that filingId, so the ISF
+// submit and the Entry send resolve to the SAME charge (no double-billing). The
+// unique constraint on each anchor guarantees "one charge per shipment".
+// `amountCents` locks the tier rate at first-bill time so a later tier change
+// doesn't retro-price the shipment. Each row maps to one Stripe metered event;
+// `status` tracks whether that event was reported.
+model ShipmentCharge {
+  id                 String   @id @default(uuid()) @db.Uuid
+  orgId              String   @map("org_id") @db.Uuid
+  filingId           String?  @unique @map("filing_id") @db.Uuid
+  abiDocumentId      String?  @unique @map("abi_document_id") @db.Uuid
+  planId             String   @map("plan_id") // tier at bill time
+  amountCents        Int      @map("amount_cents") // locked per-filing rate
+  stripeCustomerId   String?  @map("stripe_customer_id")
+  stripeMeterEventId String?  @map("stripe_meter_event_id")
+  // pending → reported (sent to Stripe) | failed (retry later) | skipped (no Stripe customer, e.g. enterprise)
+  status             String   @default("pending") @db.VarChar(20)
+  billedAt           DateTime @default(now()) @map("billed_at") @db.Timestamptz()
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  filing       Filing?      @relation(fields: [filingId], references: [id], onDelete: Cascade)
+  abiDocument  AbiDocument? @relation(fields: [abiDocumentId], references: [id], onDelete: Cascade)
+  plan         Plan         @relation(fields: [planId], references: [id])
 
-  @@unique([orgId, month])
-  @@index([orgId, month])
-  @@map("filing_usage")
+  @@index([orgId, billedAt])
+  @@index([status])
+  @@map("shipment_charges")
 }
 
 // ─── Manifest Queries ─────────────────────────────────────
@@ -621,11 +641,12 @@ model AbiDocument {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  organization  Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  user          User           @relation(fields: [userId], references: [id])
-  filing        Filing?        @relation(fields: [filingId], references: [id], onDelete: SetNull)
-  manifestQuery ManifestQuery? @relation(fields: [manifestQueryId], references: [id], onDelete: SetNull)
-  notifications Notification[]
+  organization   Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id])
+  filing         Filing?         @relation(fields: [filingId], references: [id], onDelete: SetNull)
+  manifestQuery  ManifestQuery?  @relation(fields: [manifestQueryId], references: [id], onDelete: SetNull)
+  notifications  Notification[]
+  shipmentCharge ShipmentCharge?
 
   @@index([orgId, status])
   @@index([mbolNumber])

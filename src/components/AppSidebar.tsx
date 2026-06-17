@@ -16,6 +16,8 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import { useCapabilities } from '@/hooks/useBilling';
+import { CAPABILITIES, type Capability } from '@/lib/planMeta';
 
 // ─── Navigation grouped by purpose, not feature type ────────────────
 //
@@ -37,6 +39,8 @@ interface NavItem {
   url: string;
   icon: typeof LayoutDashboard;
   end?: boolean;
+  /** When set, the item is hidden unless the org's plan includes this capability. */
+  requiredCapability?: Capability;
 }
 
 interface NavSection {
@@ -55,15 +59,15 @@ const navSections: NavSection[] = [
     label: 'Operations',
     items: [
       { title: 'Shipments',       url: '/shipments',     icon: Ship },
-      { title: 'Entry Documents', url: '/abi-documents', icon: FileCheck },
+      { title: 'Entry Documents', url: '/abi-documents', icon: FileCheck, requiredCapability: CAPABILITIES.ABI_ENTRY },
     ],
   },
   {
     label: 'Lookups',
     items: [
-      { title: 'Tracking',        url: '/tracking',        icon: Container },
+      { title: 'Tracking',        url: '/tracking',        icon: Container, requiredCapability: CAPABILITIES.CONTAINER_TRACKING },
       { title: 'Manifest Query',  url: '/manifest-query',  icon: Search },
-      { title: 'Duty Calculator', url: '/duty-calculator', icon: Calculator },
+      { title: 'Duty Calculator', url: '/duty-calculator', icon: Calculator, requiredCapability: CAPABILITIES.HTS_CLASSIFICATION },
     ],
   },
   {
@@ -101,11 +105,27 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
+  const { isLoading: capsLoading, can } = useCapabilities();
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
+
+  // Hide nav items the org's plan doesn't unlock. While entitlements load we
+  // keep gated items hidden to avoid a flash of links that then vanish; items
+  // without a requiredCapability always show. Sections that end up empty are
+  // dropped entirely.
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (!item.requiredCapability) return true;
+        if (capsLoading) return false;
+        return can(item.requiredCapability);
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <Sidebar collapsible="icon">
@@ -153,7 +173,7 @@ export function AppSidebar() {
         {/* Render all sections from the navSections array. The previous
             implementation had four near-identical JSX blocks; this is one
             map so adding/reordering groups is a one-line change. */}
-        {navSections.map((section) => (
+        {visibleSections.map((section) => (
           <SidebarGroup key={section.label}>
             {!collapsed && (
               <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1 px-3">

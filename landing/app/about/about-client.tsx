@@ -181,7 +181,7 @@ const PRINCIPLES = [
   {
     icon: Zap,
     title: "Honest pricing",
-    body: "No per-feature gotchas. No \"talk to sales\" walls. No hidden filings markup. Free for the first 2 filings/month, transparent overage rates after.",
+    body: "No per-feature gotchas. No \"talk to sales\" walls. No hidden filings markup. No monthly fee — sign up free and pay a flat rate per shipment you file.",
   },
   {
     icon: Lock,

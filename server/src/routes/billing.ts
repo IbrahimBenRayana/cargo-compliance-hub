@@ -234,7 +234,11 @@ async function onSubscriptionChanged(sub: Stripe.Subscription): Promise<void> {
 }
 
 async function onSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
-  // Downgrade org to Starter (free) plan
+  // There is no free tier in the per-filing model. On cancellation the org
+  // simply loses its active tier: we keep the last planId for the audit trail
+  // but flip status to 'canceled' (the capability check gates on an active
+  // status, so a canceled org has zero capabilities and cannot file until it
+  // re-subscribes).
   const existing = await prisma.subscription.findUnique({
     where: { stripeSubscriptionId: sub.id },
   });
@@ -251,13 +255,12 @@ async function onSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
   await prisma.subscription.update({
     where: { stripeSubscriptionId: sub.id },
     data: {
-      planId: 'starter',
       status: 'canceled',
       canceledAt,
       stripeSubscriptionId: null, // allow the org to resubscribe
     },
   });
-  logger.info({ orgId: existing.orgId }, '✓ Subscription canceled, downgraded to Starter');
+  logger.info({ orgId: existing.orgId }, '✓ Subscription canceled — org has no active tier');
 
   writeAuditLog({
     orgId: existing.orgId,
@@ -265,16 +268,17 @@ async function onSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
     entityType: 'subscription',
     entityId: sub.id,
     oldValue: { planId: existing.planId, status: existing.status },
-    newValue: { planId: 'starter', status: 'canceled', canceledAt },
+    newValue: { planId: existing.planId, status: 'canceled', canceledAt },
   });
 
-  // Phase 3: warn owners + admins. Severity is 'warning' (default for kind),
-  // not 'critical' — the org has been downgraded but is not blocked.
+  // Phase 3: warn owners + admins. Severity is 'warning' (default for kind) —
+  // the org isn't blocked retroactively, but new filings will be gated until
+  // they re-subscribe.
   await notify({
     kind:     'billing_subscription_canceled',
     audience: { orgId: existing.orgId, roles: ['ADMIN', 'OWNER'] },
     title:    'Subscription Canceled',
-    message:  'Your plan has been canceled. The org has been downgraded to Starter.',
+    message:  'Your plan has been canceled. Choose a plan to continue filing.',
     linkUrl:  '/settings?tab=billing',
     metadata: { previousPlanId: existing.planId },
   });
@@ -354,7 +358,9 @@ router.post('/checkout-session', requireVerifiedEmail, async (req: AuthRequest, 
 
   const session = await getStripe().checkout.sessions.create({
     mode: 'subscription',
-    line_items: [{ price: plan.stripePriceId, quantity: 1 }],
+    // Metered prices must NOT carry a quantity — usage is reported per filing
+    // via the Billing Meter, and Stripe rejects `quantity` on usage_type=metered.
+    line_items: [{ price: plan.stripePriceId }],
     customer: sub?.stripeCustomerId || undefined,
     customer_email: sub?.stripeCustomerId ? undefined : req.user!.email,
     client_reference_id: orgId,
@@ -373,7 +379,11 @@ router.post('/checkout-session', requireVerifiedEmail, async (req: AuthRequest, 
 });
 
 // GET /api/v1/billing/subscription
-// Returns: { plan, subscription, usage }
+// Returns: { plan, capabilities, subscription, usage }
+// In the per-filing model there is no implicit free plan: an org with no active
+// subscription has `plan: null` and `capabilities: []`, and the UI prompts it
+// to choose a tier. `usage` reflects the current billing period's billed
+// shipments and the running (uninvoiced) total.
 router.get('/subscription', async (req: AuthRequest, res: Response): Promise<void> => {
   const orgId = req.user!.orgId;
   const sub = await prisma.subscription.findUnique({
@@ -381,13 +391,21 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
     include: { plan: true },
   });
 
-  // If no subscription yet, the org is on the free Starter plan implicitly.
-  // Return the Starter plan + zero usage so frontend always has a consistent shape.
-  const plan = sub?.plan ?? (await prisma.plan.findUnique({ where: { id: 'starter' } }));
+  // A tier only confers capabilities while the subscription is usable.
+  const ACTIVE_STATUSES = ['active', 'trialing', 'past_due'];
+  const tierActive = !!sub && ACTIVE_STATUSES.includes(sub.status);
+  const plan = tierActive ? sub!.plan : null;
 
-  const month = new Date().toISOString().slice(0, 7); // YYYY-MM
-  const usage = await prisma.filingUsage.findUnique({
-    where: { orgId_month: { orgId, month } },
+  // Current billing period window — fall back to the calendar month when there
+  // is no Stripe period yet (e.g. brand-new or canceled subscription).
+  const now = new Date();
+  const periodStart = sub?.currentPeriodStart ?? new Date(now.getFullYear(), now.getMonth(), 1);
+  const periodEnd = sub?.currentPeriodEnd ?? new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+  const agg = await prisma.shipmentCharge.aggregate({
+    where: { orgId, billedAt: { gte: periodStart, lt: periodEnd } },
+    _count: { _all: true },
+    _sum: { amountCents: true },
   });
 
   res.json({
@@ -396,14 +414,12 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
           id: plan.id,
           name: plan.name,
           description: plan.description,
-          priceCents: plan.priceCents,
-          billingInterval: plan.billingInterval,
-          filingsIncluded: plan.filingsIncluded,
-          maxSeats: plan.maxSeats,
-          overageCents: plan.overageCents,
+          perFilingCents: plan.perFilingCents,
+          capabilities: plan.capabilities,
           features: plan.features,
         }
       : null,
+    capabilities: plan?.capabilities ?? [],
     subscription: sub
       ? {
           status: sub.status,
@@ -413,9 +429,10 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
         }
       : null,
     usage: {
-      month,
-      count: usage?.count ?? 0,
-      limit: plan?.filingsIncluded ?? 0,
+      periodStart,
+      periodEnd,
+      filingsBilled: agg._count._all,
+      amountCents: agg._sum.amountCents ?? 0,
     },
   });
 });

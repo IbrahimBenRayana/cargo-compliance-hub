@@ -14,9 +14,9 @@ import { GOLD, EMERALD } from "@/lib/colors";
 
 /**
  * Pricing hero — a stylized "shopping decision" composition. Three tier
- * tablets fanned out, the featured Grower tier rising, an animated gold
- * spotlight tracking across it, a counting "$49" big number, a tiny bar
- * chart suggesting filing volume → price, and an arrow nudging toward
+ * tablets fanned out, the featured ISF + Entry tier rising, an animated gold
+ * spotlight tracking across it, a counting "$180" big number, a tiny bar
+ * chart suggesting per-shipment scaling, and an arrow nudging toward
  * the recommended pick. More dynamic + sells the "this is the one" feel.
  */
 function PricingHeroIllustration() {
@@ -24,7 +24,7 @@ function PricingHeroIllustration() {
   const animatedPrice = useMotionValue(0);
   const displayPrice = useTransform(animatedPrice, (v) => `$${Math.round(v)}`);
   React.useEffect(() => {
-    const controls = animate(animatedPrice, 49, {
+    const controls = animate(animatedPrice, 180, {
       duration: 1.4,
       delay: 0.6,
       ease: EASE,
@@ -33,9 +33,9 @@ function PricingHeroIllustration() {
   }, [animatedPrice]);
 
   const tiers = [
-    { x: 36, y: 144, w: 110, h: 156, tag: "STARTER", price: "$0", per: "free", rotate: -6, delay: 0 },
-    { x: 178, y: 80, w: 138, h: 222, tag: "GROWER", price: "$49", per: "/mo", rotate: 0, delay: 0.15, featured: true },
-    { x: 340, y: 144, w: 110, h: 156, tag: "SCALE", price: "$149", per: "/mo", rotate: 6, delay: 0.3 },
+    { x: 36, y: 144, w: 110, h: 156, tag: "ISF FILING", price: "$45", per: "/ shipment", rotate: -6, delay: 0 },
+    { x: 178, y: 80, w: 138, h: 222, tag: "ISF + ENTRY", price: "$180", per: "/ shipment", rotate: 0, delay: 0.15, featured: true },
+    { x: 340, y: 144, w: 110, h: 156, tag: "COMPLETE", price: "$280", per: "/ shipment", rotate: 6, delay: 0.3 },
   ];
 
   return (
@@ -211,8 +211,8 @@ function PricingHeroIllustration() {
           </text>
 
           {/* Tag */}
-          <text x="247" y="106" textAnchor="middle" fontSize="10" fontFamily="ui-sans-serif, sans-serif" fontWeight="800" letterSpacing="1.6" fill={GOLD} stroke="none">
-            GROWER
+          <text x="247" y="106" textAnchor="middle" fontSize="10" fontFamily="ui-sans-serif, sans-serif" fontWeight="800" letterSpacing="1.4" fill={GOLD} stroke="none">
+            ISF + ENTRY
           </text>
           <line x1="194" y1="116" x2="300" y2="116" stroke={GOLD} strokeOpacity="0.35" />
 
@@ -230,7 +230,7 @@ function PricingHeroIllustration() {
             {displayPrice}
           </motion.text>
           <text x="247" y="190" textAnchor="middle" fontSize="10" fontFamily="ui-sans-serif, sans-serif" fontWeight="500" fill="currentColor" fillOpacity="0.55" stroke="none">
-            per month
+            per shipment filed
           </text>
 
           {/* Feature lines */}
@@ -279,7 +279,7 @@ function PricingHeroIllustration() {
           />
         ))}
         <text x="404" y="84" textAnchor="middle" fontSize="7" fontFamily="ui-monospace, monospace" fontWeight="600" fill="currentColor" fillOpacity="0.55" stroke="none">
-          FILINGS / MO
+          PAY PER SHIPMENT
         </text>
       </motion.g>
 
@@ -313,7 +313,7 @@ function PricingHeroIllustration() {
           <animate attributeName="opacity" values="1;0.3;1" dur="1.6s" repeatCount="indefinite" />
         </circle>
         <text x="72" y="342" fontSize="8.5" fontFamily="ui-monospace, monospace" fontWeight="600" fill="currentColor" fillOpacity="0.55" stroke="none">
-          no credit card · cancel anytime
+          no monthly fee · billed per shipment
         </text>
       </motion.g>
     </motion.svg>
@@ -326,8 +326,7 @@ type Tier = {
   blurb: string;
   price: string;
   per: string;
-  filingsIncluded: string;
-  overage: string;
+  priceNote: string;
   cta: string;
   ctaHref: string;
   featured?: boolean;
@@ -336,61 +335,54 @@ type Tier = {
 
 const TIERS: Tier[] = [
   {
-    id: "starter",
-    name: "Starter",
-    blurb: "For your first shipments. Forever free.",
-    price: "$0",
-    per: "forever",
-    filingsIncluded: "2 filings / mo",
-    overage: "Upgrade after",
+    id: "isf",
+    name: "ISF Filing",
+    blurb: "Get your importer security filings transmitted on time.",
+    price: "$45",
+    per: "per shipment filed",
+    priceNote: "No monthly fee",
     cta: "Start free",
     ctaHref: "https://app.mycargolens.com/register",
     features: [
-      "ISF-10, ISF-5, Entry, In-Bond",
-      "AI Coach — rejection mode",
-      "Action queue + Today's brief",
-      "PDF export at any stage",
-      "1 user",
+      "ISF-10 (10+2) & ISF-5 filing",
+      "Templates & bulk duplicate",
+      "Manifest (MBOL) query",
+      "Deadline tracking",
+      "Email support",
     ],
   },
   {
-    id: "grower",
-    name: "Grower",
-    blurb: "When the volume picks up. Most teams start here.",
-    price: "$49",
-    per: "per month",
-    filingsIncluded: "25 filings / mo",
-    overage: "$2 / filing after",
-    cta: "Start free trial",
+    id: "isf-entry",
+    name: "ISF + Entry",
+    blurb: "Clear the cargo too — ISF plus your ABI entry, billed once per shipment.",
+    price: "$180",
+    per: "per shipment filed",
+    priceNote: "No monthly fee",
+    cta: "Start free",
     ctaHref: "https://app.mycargolens.com/register",
     featured: true,
     features: [
-      "Everything in Starter, plus",
-      "AI Pre-flight on every draft",
-      "Templates + duplicate + bulk submit",
-      "UFLPA Risk Inbox + PGA flags",
-      "ADD/CVD daily sync from Federal Register",
-      "Up to 5 users with RBAC",
-      "Email notifications",
+      "Everything in ISF Filing, plus",
+      "ABI Entry Summary (7501)",
+      "ABI Cargo Release (3461)",
+      "Linked ISF + Entry billed once",
+      "Chat support",
     ],
   },
   {
-    id: "scale",
-    name: "Scale",
-    blurb: "Brokerages and high-volume importers.",
-    price: "$149",
-    per: "per month",
-    filingsIncluded: "100 filings / mo",
-    overage: "$1 / filing after",
-    cta: "Start free trial",
+    id: "complete",
+    name: "Complete",
+    blurb: "The full compliance workflow — filing, tracking, and classification.",
+    price: "$280",
+    per: "per shipment filed",
+    priceNote: "No monthly fee",
+    cta: "Start free",
     ctaHref: "https://app.mycargolens.com/register",
     features: [
-      "Everything in Grower, plus",
-      "Liquidation pipeline (314-day clock)",
-      "Manifest queries by Master BOL",
-      "FTA Preference Calculator (17 programs)",
-      "Unlimited users with RBAC",
-      "Audit log export (CSV)",
+      "Everything in ISF + Entry, plus",
+      "Container tracking (Terminal 49)",
+      "HTS Classification",
+      "Duty Calculator",
       "Priority support",
     ],
   },
@@ -398,9 +390,9 @@ const TIERS: Tier[] = [
 
 type CompareRow = {
   feature: string;
-  starter: string | boolean;
-  grower: string | boolean;
-  scale: string | boolean;
+  isf: string | boolean;
+  isfEntry: string | boolean;
+  complete: string | boolean;
 };
 
 type CompareGroup = {
@@ -411,74 +403,72 @@ type CompareGroup = {
 
 const COMPARE_GROUPS: CompareGroup[] = [
   {
-    id: "limits",
-    label: "Limits & billing",
+    id: "pricing",
+    label: "Pricing",
     rows: [
-      { feature: "Monthly filings included", starter: "2", grower: "25", scale: "100" },
-      { feature: "Overage rate", starter: "—", grower: "$2/filing", scale: "$1/filing" },
-      { feature: "Users", starter: "1", grower: "Up to 5", scale: "Unlimited" },
+      { feature: "Per shipment filed", isf: "$45", isfEntry: "$180", complete: "$280" },
+      { feature: "Monthly subscription fee", isf: "None", isfEntry: "None", complete: "None" },
     ],
   },
   {
-    id: "filings",
-    label: "Filing types",
+    id: "filing",
+    label: "Filing",
     rows: [
-      { feature: "ISF-10 / ISF-5 / Entry / In-Bond", starter: true, grower: true, scale: true },
-      { feature: "Templates + bulk submit", starter: false, grower: true, scale: true },
-      { feature: "Manifest queries by MBOL", starter: false, grower: false, scale: true },
+      { feature: "ISF-10 (10+2)", isf: true, isfEntry: true, complete: true },
+      { feature: "ISF-5", isf: true, isfEntry: true, complete: true },
+      { feature: "Templates & bulk duplicate", isf: true, isfEntry: true, complete: true },
+      { feature: "Manifest (MBOL) query", isf: true, isfEntry: true, complete: true },
+      { feature: "Deadline tracking", isf: true, isfEntry: true, complete: true },
     ],
   },
   {
-    id: "ai",
-    label: "AI",
+    id: "entry",
+    label: "Entry",
     rows: [
-      { feature: "AI Coach (rejection mode)", starter: true, grower: true, scale: true },
-      { feature: "AI Pre-flight (before submit)", starter: false, grower: true, scale: true },
-      { feature: "Today's AI brief", starter: true, grower: true, scale: true },
+      { feature: "ABI Entry Summary (7501)", isf: false, isfEntry: true, complete: true },
+      { feature: "ABI Cargo Release (3461)", isf: false, isfEntry: true, complete: true },
     ],
   },
   {
-    id: "compliance",
-    label: "Compliance Center",
+    id: "tracking",
+    label: "Tracking & classification",
     rows: [
-      { feature: "Action queue + Today's brief", starter: true, grower: true, scale: true },
-      { feature: "UFLPA Risk Inbox", starter: false, grower: true, scale: true },
-      { feature: "ADD/CVD daily sync (Fed Register)", starter: false, grower: true, scale: true },
-      { feature: "FTA Preference Calculator (17)", starter: false, grower: false, scale: true },
-      { feature: "Liquidation pipeline (314-day clock)", starter: false, grower: false, scale: true },
+      { feature: "Container tracking (Terminal 49)", isf: false, isfEntry: false, complete: true },
+      { feature: "HTS Classification", isf: false, isfEntry: false, complete: true },
+      { feature: "Duty Calculator", isf: false, isfEntry: false, complete: true },
     ],
   },
   {
-    id: "ops",
-    label: "Team & operations",
+    id: "support",
+    label: "Support",
     rows: [
-      { feature: "Email notifications", starter: false, grower: true, scale: true },
-      { feature: "Audit log export (CSV)", starter: false, grower: false, scale: true },
-      { feature: "Priority support", starter: false, grower: false, scale: true },
+      { feature: "Email support", isf: true, isfEntry: true, complete: true },
+      { feature: "Chat support", isf: false, isfEntry: true, complete: true },
+      { feature: "Priority support", isf: false, isfEntry: false, complete: true },
     ],
   },
 ];
 
 const FAQ = [
   {
-    q: "What counts as a \"filing\"?",
-    a: "Any successful submission to CBP — ISF-10, ISF-5, Entry Summary (7501), Entry (3461), or In-Bond. Rejected re-submits of the same filing don't count again. Manifest queries are free.",
+    q: "How does per-filing pricing work?",
+    a: "There's no monthly subscription fee. You pick an account tier — ISF Filing, ISF + Entry, or Complete — which sets your per-shipment rate and unlocks the features for that tier. We meter the shipments you file and invoice you once a month. You only pay for what you actually file.",
   },
   {
-    q: "What happens if I hit my plan limit mid-month?",
-    a: "On paid plans a calm plan-limit modal appears with overage pricing — your shipments don't wait for billing. The free Starter tier has a 2-filing monthly cap so we can keep offering it free.",
+    q: "What counts as a billable shipment?",
+    a: "One charge per shipment filed. A linked ISF and ABI Entry on the same shipment is billed once, not twice. Attempts that are rejected before transmission don't count, and manifest (MBOL) queries are always free.",
   },
   {
-    q: "Can I downgrade?",
-    a: "Anytime. Downgrades take effect at the next billing cycle. Your existing data stays exactly where it is.",
+    q: "Can I change tiers?",
+    a: "Yes — anytime, from your billing portal. The new per-shipment rate and feature set apply to shipments you file after the change. Your existing data stays exactly where it is.",
   },
   {
-    q: "Is there a setup fee?",
-    a: "No. No setup fee, no onboarding fee, no per-user fee (within plan limits), no implementation contract.",
+    q: "Is there a free tier?",
+    a: "There's no monthly fee on any tier. Signing up is free — you can browse and draft at no cost — but submitting a filing requires choosing a tier and adding a card. You pay from your first filing, nothing before it.",
   },
   {
-    q: "Do you offer enterprise pricing for high-volume brokerages?",
-    a: "Yes — for 250+ filings/month or 25+ users, talk to us about Scale+. Same product, custom volume terms.",
+    q: "What about high volume?",
+    a: "For high-volume importers and brokerages, our Enterprise / volume option offers custom per-shipment pricing plus SSO and SLAs. Talk to us about terms that fit your numbers.",
   },
 ];
 
@@ -577,9 +567,9 @@ function TierCard({ tier, index }: { tier: Tier; index: number }) {
                 : "bg-secondary text-foreground/75",
             )}
           >
-            {tier.filingsIncluded}
+            {tier.priceNote}
           </span>
-          <span className="text-muted-foreground/70">{tier.overage}</span>
+          <span className="text-muted-foreground/70">Billed monthly</span>
         </div>
       </div>
 
@@ -664,8 +654,8 @@ export function PricingPageClient() {
     <>
       <PageHero
         label="Pricing"
-        title="Priced by filings. Nothing sneaky."
-        description="Start free with 2 filings per month. Upgrade when you need more volume. No per-feature gotchas, no setup fees, no long-term contracts. Cancel anytime."
+        title="Priced per shipment. Nothing sneaky."
+        description="No monthly subscription. Pick a tier, add a card, and pay only for the shipments you file — invoiced monthly. A linked ISF and Entry on the same shipment is billed once. Sign up free to browse and draft."
         breadcrumbs={[{ label: "Pricing", href: "/pricing" }]}
         illustration={<PricingHeroIllustration />}
       />
@@ -680,10 +670,10 @@ export function PricingPageClient() {
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3 text-sm">
           {[
-            { icon: Wallet, text: "No credit card required" },
-            { icon: Zap, text: "Cancel any time" },
-            { icon: Sparkles, text: "Transparent overage pricing" },
-            { icon: Layers, text: "Free forever Starter" },
+            { icon: Wallet, text: "No monthly subscription" },
+            { icon: Zap, text: "Pay only for what you file" },
+            { icon: Layers, text: "ISF + Entry billed once" },
+            { icon: Sparkles, text: "Free to sign up & draft" },
           ].map(({ icon: Icon, text }) => (
             <span
               key={text}
@@ -699,12 +689,12 @@ export function PricingPageClient() {
       {/* COMPARISON */}
       <SectionShell
         tone="muted"
-        eyebrow="Compare every feature"
+        eyebrow="Compare every capability"
         title="Side by side."
-        intro="Grouped by category so you can scan for the capabilities that matter to you."
+        intro="Each tier sets your per-shipment rate and unlocks a set of capabilities. Scan for the ones that matter to you."
       >
         <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card shadow-card-hover">
-          {/* Subtle gold halo behind the Grower column on lg+ */}
+          {/* Subtle gold halo behind the featured ISF + Entry column on lg+ */}
           <span
             aria-hidden
             className="pointer-events-none absolute inset-y-0 left-1/2 hidden w-[33.333%] -translate-x-1/2 lg:block"
@@ -746,9 +736,7 @@ export function PricingPageClient() {
                           )}
                         >
                           {t.price}
-                          {t.per !== "forever" && (
-                            <span className="opacity-60"> {t.per}</span>
-                          )}
+                          <span className="opacity-60"> / shipment</span>
                         </span>
                       </div>
                     </th>
@@ -777,13 +765,13 @@ export function PricingPageClient() {
                           {row.feature}
                         </td>
                         <td className="px-5 py-3 text-center">
-                          <CellValue value={row.starter} />
+                          <CellValue value={row.isf} />
                         </td>
                         <td className="px-5 py-3 text-center">
-                          <CellValue value={row.grower} featured />
+                          <CellValue value={row.isfEntry} featured />
                         </td>
                         <td className="px-5 py-3 text-center">
-                          <CellValue value={row.scale} />
+                          <CellValue value={row.complete} />
                         </td>
                       </tr>
                     ))}
@@ -810,8 +798,9 @@ export function PricingPageClient() {
       </SectionShell>
 
       {/* CLOSING — two complementary cards in a single section:
-          a prominent gold-accented "Start free" + a smaller navy "Scale+"
-          for high-volume buyers. Avoids the previous stacked-CTA look. */}
+          a prominent gold-accented "Start free" + a smaller navy
+          "Enterprise" card for high-volume buyers. Avoids the previous
+          stacked-CTA look. */}
       <SectionShell tone="muted">
         <div className="mx-auto grid max-w-5xl gap-4 md:grid-cols-5">
           {/* Primary — Start free */}
@@ -828,10 +817,10 @@ export function PricingPageClient() {
               Start free
             </span>
             <h3 className="mt-2 text-2xl font-semibold tracking-tight">
-              Two filings a month, no card.
+              Sign up free. Pay per shipment.
             </h3>
             <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-              Stay on Starter forever, or upgrade the moment volume picks up. Cancel anytime.
+              No monthly fee. Browse and draft for free — you only pay when you file, billed monthly. Change tiers anytime.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button variant="gold" size="lg" asChild>
@@ -843,7 +832,7 @@ export function PricingPageClient() {
             </div>
           </div>
 
-          {/* Secondary — Scale+ (dark navy) */}
+          {/* Secondary — Enterprise (dark navy) */}
           <div className="relative overflow-hidden rounded-2xl bg-[hsl(222_47%_11%)] p-8 text-white md:col-span-2">
             <span
               aria-hidden
@@ -854,13 +843,13 @@ export function PricingPageClient() {
               }}
             />
             <span className="relative text-[10px] font-semibold uppercase tracking-[0.18em] text-gold">
-              Scale+
+              Enterprise
             </span>
             <h3 className="relative mt-2 text-2xl font-semibold tracking-tight">
               High-volume?
             </h3>
             <p className="relative mt-2 text-sm leading-relaxed text-white/70">
-              250+ filings/mo or 25+ users. Annual contracts, dedicated support. SSO/SAML on the Q4 2026 roadmap.
+              Custom per-shipment pricing for high-volume importers and brokerages, with SSO and SLAs. Talk to us about volume terms.
             </p>
             <Button
               variant="outline"

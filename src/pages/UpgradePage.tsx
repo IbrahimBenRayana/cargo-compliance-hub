@@ -1,13 +1,13 @@
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Check, Lock, ShieldCheck, RefreshCw, Users, FileText, Loader2,
-  ExternalLink,
+  Check, Lock, ShieldCheck, RefreshCw, Receipt, Loader2,
+  ExternalLink, ArrowRight, Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useSubscription, useCreateCheckoutSession, useCreatePortalSession } from '@/hooks/useBilling';
-import { PLAN_META, KNOWN_PLAN_IDS } from '@/lib/planMeta';
+import { PLAN_META, KNOWN_PLAN_IDS, PUBLIC_TIERS } from '@/lib/planMeta';
 import { cn } from '@/lib/utils';
 
 const PRICING_URL = 'https://mycargolens.com/pricing';
@@ -23,35 +23,6 @@ export default function UpgradePage() {
   const meta = PLAN_META[planId];
   const isKnown = KNOWN_PLAN_IDS.includes(planId);
 
-  // Unknown / missing plan
-  if (!isKnown) {
-    return (
-      <div className="min-h-screen bg-mesh flex items-center justify-center p-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass rounded-2xl p-10 max-w-md w-full text-center"
-        >
-          <p className="text-sm uppercase tracking-widest text-muted-foreground mb-3">Invalid Plan</p>
-          <h1 className="text-2xl font-semibold text-foreground mb-4">Plan not found</h1>
-          <p className="text-muted-foreground mb-8 text-sm">
-            The plan you're looking for doesn't exist. Head back to pricing to choose a plan.
-          </p>
-          <Button asChild variant="outline" className="w-full">
-            <a href={PRICING_URL} target="_blank" rel="noreferrer">
-              <ExternalLink className="h-4 w-4 mr-2" />
-              View pricing plans
-            </a>
-          </Button>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // Already on this plan
-  const currentPlanId = billing?.plan?.id;
-  const isAlreadyOnPlan = !subLoading && currentPlanId === planId;
-
   function handleOpenPortal() {
     portalMutation.mutate(undefined, {
       onSuccess: (data) => {
@@ -63,13 +34,13 @@ export default function UpgradePage() {
     });
   }
 
-  function handleCheckout() {
+  function handleCheckout(id: string) {
     const successUrl =
       `${window.location.origin}/upgrade/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${window.location.origin}/upgrade/cancel`;
 
     checkoutMutation.mutate(
-      { planId, successUrl, cancelUrl },
+      { planId: id, successUrl, cancelUrl },
       {
         onSuccess: (data) => {
           window.location.href = data.url;
@@ -84,6 +55,120 @@ export default function UpgradePage() {
 
   const isPending = checkoutMutation.isPending || portalMutation.isPending;
 
+  // ── No / unknown plan → tier picker ───────────────────────────────────
+  if (!isKnown) {
+    return (
+      <div className="min-h-screen bg-mesh flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="glass rounded-2xl p-8 md:p-12 max-w-5xl w-full shadow-xl"
+        >
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-gradient-gold mb-3">
+            Choose your tier
+          </p>
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
+            Pick a plan to start filing
+          </h1>
+          <p className="text-muted-foreground text-sm mb-8 max-w-xl">
+            No monthly fee — you're billed per shipment filed, invoiced monthly.
+            Your tier sets your per-shipment rate and unlocks the features you need.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {PUBLIC_TIERS.map((tier) => {
+              const isCurrent = !subLoading && billing?.plan?.id === tier.id;
+              return (
+                <div
+                  key={tier.id}
+                  className={cn(
+                    'relative flex flex-col rounded-2xl border bg-muted/30 p-6',
+                    tier.featured
+                      ? 'border-gold/60 ring-1 ring-gold/30'
+                      : 'border-border/60'
+                  )}
+                >
+                  {tier.featured && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-gold px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-yellow-950">
+                      <Star className="h-3 w-3" /> Most popular
+                    </span>
+                  )}
+                  <h2 className="text-lg font-semibold text-foreground">{tier.name}</h2>
+                  <p className="text-xs text-muted-foreground mb-4 min-h-[2rem]">{tier.blurb}</p>
+                  <div className="mb-4">
+                    <span className="text-4xl font-bold text-foreground">{tier.priceLabel}</span>
+                    <p className="text-xs text-muted-foreground mt-1">{tier.priceFooter}</p>
+                  </div>
+                  <ul className="space-y-2 mb-6 flex-1">
+                    {tier.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2">
+                        <Check className="h-3.5 w-3.5 text-gold shrink-0 mt-0.5" strokeWidth={2.5} />
+                        <span className="text-xs text-foreground/85 leading-relaxed">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {isCurrent ? (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleOpenPortal}
+                      disabled={isPending}
+                    >
+                      {portalMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : null}
+                      Manage subscription
+                    </Button>
+                  ) : (
+                    <Button
+                      className={cn(
+                        'w-full font-semibold',
+                        tier.featured
+                          ? 'bg-gold text-yellow-950 hover:bg-gold/90'
+                          : ''
+                      )}
+                      variant={tier.featured ? 'default' : 'outline'}
+                      onClick={() => handleCheckout(tier.id)}
+                      disabled={isPending}
+                    >
+                      {checkoutMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                      )}
+                      Choose {tier.name}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Trust badges */}
+          <div className="flex flex-wrap items-center gap-4 mt-8 pt-6 border-t border-border/60">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Lock className="h-3.5 w-3.5" />
+              TLS encrypted
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Powered by Stripe
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Receipt className="h-3.5 w-3.5" />
+              No monthly fee · billed per shipment
+            </span>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ── Known plan ────────────────────────────────────────────────────────
+  const currentPlanId = billing?.plan?.id;
+  const isAlreadyOnPlan = !subLoading && currentPlanId === planId;
+
   return (
     <div className="min-h-screen bg-mesh flex items-center justify-center p-6">
       <motion.div
@@ -94,7 +179,7 @@ export default function UpgradePage() {
       >
         {/* Top label */}
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-gradient-gold mb-6">
-          Upgrade your plan
+          {isAlreadyOnPlan ? 'Your plan' : 'Activate your tier'}
         </p>
 
         {isAlreadyOnPlan ? (
@@ -104,7 +189,8 @@ export default function UpgradePage() {
               You're already on {meta.name}
             </h2>
             <p className="text-muted-foreground mb-8 text-sm">
-              You're all set — your {meta.name} plan is active.
+              You're all set — your {meta.name} tier is active. You're billed{' '}
+              {meta.priceLabel} {meta.priceFooter}, with no monthly fee.
             </p>
             <Button
               onClick={handleOpenPortal}
@@ -122,11 +208,7 @@ export default function UpgradePage() {
             {/* Plan name + tagline */}
             <div className="mb-6">
               <h1 className="text-4xl font-bold text-foreground mb-1">{meta.name}</h1>
-              <p className="text-muted-foreground text-sm">
-                {meta.tier === 'Grower'
-                  ? 'For small importers with consistent volume'
-                  : 'For growing teams and 3PLs'}
-              </p>
+              <p className="text-muted-foreground text-sm">{meta.blurb}</p>
             </div>
 
             {/* Price block */}
@@ -135,24 +217,13 @@ export default function UpgradePage() {
               <p className="text-muted-foreground text-sm mt-2">{meta.priceFooter}</p>
             </div>
 
-            {/* Stats pills */}
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <div className="flex items-center gap-3 rounded-xl bg-muted/40 border border-border/60 px-4 py-3">
-                <FileText className="h-5 w-5 text-gold shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Filings</p>
-                  <p className="text-sm font-semibold text-foreground">
-                    {meta.filings}/month
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-xl bg-muted/40 border border-border/60 px-4 py-3">
-                <Users className="h-5 w-5 text-gold shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Team seats</p>
-                  <p className="text-sm font-semibold text-foreground">Up to {meta.seats}</p>
-                </div>
-              </div>
+            {/* No-monthly-fee callout */}
+            <div className="flex items-start gap-3 rounded-xl bg-muted/40 border border-border/60 px-4 py-3 mb-8">
+              <Receipt className="h-5 w-5 text-gold shrink-0 mt-0.5" />
+              <p className="text-sm text-foreground/85 leading-relaxed">
+                No monthly fee — you're only charged when you file. Usage is
+                metered and invoiced monthly through Stripe.
+              </p>
             </div>
 
             {/* Feature list */}
@@ -192,7 +263,7 @@ export default function UpgradePage() {
                   'flex-1 font-semibold bg-gold text-yellow-950 hover:bg-gold/90',
                   isPending && 'opacity-70 pointer-events-none'
                 )}
-                onClick={handleCheckout}
+                onClick={() => handleCheckout(planId)}
                 disabled={isPending}
               >
                 {checkoutMutation.isPending ? (

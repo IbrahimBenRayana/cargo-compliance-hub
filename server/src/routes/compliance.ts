@@ -18,6 +18,8 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
+import { requireCapability } from '../middleware/requireCapability.js';
+import { CAPABILITIES } from '../config/plans.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import * as ai from '../services/ai.js';
 import { lookupPgaFlags, lookupMetadata as pgaMeta } from '../services/compliance/pgaFlags.js';
@@ -968,7 +970,7 @@ const classifyHtsSchema = z.object({
   description: z.string().min(3).max(500),
 });
 
-router.post('/classify-hts', authLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/classify-hts', authLimiter, requireCapability(CAPABILITIES.HTS_CLASSIFICATION), async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = classifyHtsSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Description must be 3-500 characters' });

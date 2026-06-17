@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { CapabilityGate } from "@/components/CapabilityGate";
+import { CAPABILITIES } from "@/lib/planMeta";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
@@ -77,14 +79,14 @@ const App = () => (
                 <Route path="/shipments/:id" element={<ErrorBoundary><ShipmentDetails /></ErrorBoundary>} />
                 <Route path="/shipments/:id/edit" element={<ErrorBoundary><ShipmentWizard /></ErrorBoundary>} />
                 <Route path="/compliance" element={<ErrorBoundary><CompliancePage /></ErrorBoundary>} />
-                <Route path="/tracking" element={<ErrorBoundary><TrackingPage /></ErrorBoundary>} />
-                <Route path="/tracking/:id" element={<ErrorBoundary><TrackingDetailPage /></ErrorBoundary>} />
+                <Route path="/tracking" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.CONTAINER_TRACKING}><TrackingPage /></CapabilityGate></ErrorBoundary>} />
+                <Route path="/tracking/:id" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.CONTAINER_TRACKING}><TrackingDetailPage /></CapabilityGate></ErrorBoundary>} />
                 <Route path="/manifest-query" element={<ErrorBoundary><ManifestQueryPage /></ErrorBoundary>} />
-                <Route path="/duty-calculator" element={<ErrorBoundary><DutyCalculatorPage /></ErrorBoundary>} />
-                <Route path="/abi-documents" element={<ErrorBoundary><ABIDocumentsListPage /></ErrorBoundary>} />
-                <Route path="/abi-documents/new" element={<ErrorBoundary><ABIDocumentWizard /></ErrorBoundary>} />
-                <Route path="/abi-documents/:id" element={<ErrorBoundary><ABIDocumentDetailPage /></ErrorBoundary>} />
-                <Route path="/abi-documents/:id/edit" element={<ErrorBoundary><ABIDocumentWizard /></ErrorBoundary>} />
+                <Route path="/duty-calculator" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.HTS_CLASSIFICATION}><DutyCalculatorPage /></CapabilityGate></ErrorBoundary>} />
+                <Route path="/abi-documents" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.ABI_ENTRY}><ABIDocumentsListPage /></CapabilityGate></ErrorBoundary>} />
+                <Route path="/abi-documents/new" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.ABI_ENTRY}><ABIDocumentWizard /></CapabilityGate></ErrorBoundary>} />
+                <Route path="/abi-documents/:id" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.ABI_ENTRY}><ABIDocumentDetailPage /></CapabilityGate></ErrorBoundary>} />
+                <Route path="/abi-documents/:id/edit" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.ABI_ENTRY}><ABIDocumentWizard /></CapabilityGate></ErrorBoundary>} />
                 <Route path="/integrations/api" element={<ErrorBoundary><IntegrationsApi /></ErrorBoundary>} />
                 <Route path="/integrations/logs" element={<ErrorBoundary><SubmissionLogs /></ErrorBoundary>} />
                 <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />

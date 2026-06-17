@@ -36,6 +36,16 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().default(''),
   STRIPE_PUBLISHABLE_KEY: z.string().default(''),
+  // Per-filing pricing (metered billing). Each tier is a $0-base Stripe
+  // subscription to a metered Price; every billed shipment reports one event
+  // to the shared meter (STRIPE_FILING_METER_EVENT) at the tier's per-unit
+  // rate, and Stripe invoices the sum monthly. Run `npm run stripe:bootstrap`
+  // to create the meter + products + prices, then paste the price ids here.
+  // Empty default → billing self-disables (checkout returns "not configured").
+  STRIPE_PRICE_ISF: z.string().default(''),
+  STRIPE_PRICE_ENTRY: z.string().default(''),
+  STRIPE_PRICE_FULL: z.string().default(''),
+  STRIPE_FILING_METER_EVENT: z.string().default('filing'),
   // Sentry (audit Phase 10). Empty default → Sentry is off in dev / CI
   // and the SDK never initializes. Set to a real DSN in prod via GitHub
   // Secrets → upsert_env → VPS .env. Release tag flows from the deploy

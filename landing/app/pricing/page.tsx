@@ -4,7 +4,7 @@ import { PricingPageClient } from "./pricing-client";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Simple, filings-based pricing for CBP compliance. Start free with 2 filings per month. Scale when you're ready.",
+    "Per-shipment pricing for CBP compliance. No monthly fee — sign up free and pay per shipment filed, from $45.",
 };
 
 export default function PricingPage() {
