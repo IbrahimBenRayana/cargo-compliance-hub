@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   AlertCircle,
   ClipboardList,
@@ -17,6 +18,171 @@ import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
 import { IconTile } from "@/components/ui/icon-tile";
 import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
+import { GOLD, EMERALD } from "@/lib/colors";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+/**
+ * Security hero — a central shield with a checkmark, wrapped in three
+ * concentric "defense-in-depth" rings. A slow-rotating outer ring carries
+ * three gold nodes labeled with our layers (Verified · Encrypted · Audited).
+ *
+ * Mirrors the About hero idiom: framer-motion staggered draw-on for the rings
+ * + shield, SMIL animateTransform / animate for the infinite rotation and node
+ * pulse. SMIL ignores prefers-reduced-motion, so every looping animation is
+ * gated on useReducedMotion — reduced-motion users get the static composition.
+ */
+function SecurityHeroIllustration() {
+  const reduceMotion = useReducedMotion();
+  return (
+    <motion.svg
+      viewBox="0 0 480 360"
+      className="w-full max-w-md h-auto text-foreground/90"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      initial="hidden"
+      animate="visible"
+      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}
+    >
+      <defs>
+        <radialGradient id="sec-glow" cx="50%" cy="50%" r="55%">
+          <stop offset="0%" stopColor={GOLD} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <ellipse cx="240" cy="180" rx="200" ry="140" fill="url(#sec-glow)" stroke="none" />
+
+      {/* Three concentric defense-in-depth rings */}
+      {[120, 86, 52].map((r, i) => (
+        <motion.circle
+          key={r}
+          cx="240"
+          cy="180"
+          r={r}
+          stroke="currentColor"
+          strokeOpacity={0.18 + i * 0.08}
+          fill="none"
+          variants={{
+            hidden: { pathLength: 0, opacity: 0 },
+            visible: {
+              pathLength: 1,
+              opacity: 1,
+              transition: { duration: 1.2, delay: i * 0.2, ease: EASE },
+            },
+          }}
+        />
+      ))}
+
+      {/* Slow-rotating outer ring with 3 gold nodes = our 3 security layers.
+          SMIL animateTransform with an explicit rotate centre pins the pivot to
+          (240,180) exactly — no transform-origin guesswork. */}
+      <g>
+        {!reduceMotion && (
+          <animateTransform
+            attributeName="transform"
+            type="rotate"
+            from="0 240 180"
+            to="360 240 180"
+            dur="60s"
+            repeatCount="indefinite"
+          />
+        )}
+        {[0, 120, 240].map((deg) => {
+          const rad = (deg - 90) * (Math.PI / 180);
+          const x = 240 + Math.cos(rad) * 120;
+          const y = 180 + Math.sin(rad) * 120;
+          return (
+            <g key={deg}>
+              <circle cx={x} cy={y} r="6" fill={GOLD} stroke="none" />
+              <circle cx={x} cy={y} r="6" stroke={GOLD} strokeOpacity="0.45" fill="none">
+                {!reduceMotion && (
+                  <>
+                    <animate attributeName="r" values="6;14;6" dur="3s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.5;0;0.5" dur="3s" repeatCount="indefinite" />
+                  </>
+                )}
+              </circle>
+            </g>
+          );
+        })}
+      </g>
+
+      {/* Static labels at outer-ring positions = the three layers */}
+      {[
+        { label: "VERIFIED", x: 240, y: 50 },
+        { label: "ENCRYPTED", x: 372, y: 240 },
+        { label: "AUDITED", x: 108, y: 240 },
+      ].map((l) => (
+        <motion.text
+          key={l.label}
+          x={l.x}
+          y={l.y}
+          textAnchor="middle"
+          fontSize="11"
+          fontFamily="ui-sans-serif, sans-serif"
+          fontWeight="700"
+          letterSpacing="2"
+          fill="currentColor"
+          fillOpacity="0.7"
+          stroke="none"
+          variants={{
+            hidden: { opacity: 0 },
+            visible: { opacity: 1, transition: { duration: 0.6, delay: 0.8 } },
+          }}
+        >
+          {l.label}
+        </motion.text>
+      ))}
+
+      {/* Central shield with a check — draws on, then the check scales in */}
+      <motion.g
+        variants={{
+          hidden: { opacity: 0, scale: 0.8 },
+          visible: { opacity: 1, scale: 1, transition: { duration: 0.55, ease: EASE, delay: 0.7 } },
+        }}
+      >
+        <motion.path
+          d="M 240 132 L 292 151 L 292 190 C 292 220 269 239 240 248 C 211 239 188 220 188 190 L 188 151 Z"
+          fill={`${GOLD}26`}
+          stroke={GOLD}
+          strokeWidth="2"
+          variants={{
+            hidden: { pathLength: 0 },
+            visible: { pathLength: 1, transition: { duration: 1, ease: EASE, delay: 0.75 } },
+          }}
+        />
+        {/* Checkmark */}
+        <motion.path
+          d="M 217 189 L 233 207 L 266 168"
+          stroke={GOLD}
+          strokeWidth="3"
+          fill="none"
+          variants={{
+            hidden: { pathLength: 0, opacity: 0 },
+            visible: { pathLength: 1, opacity: 1, transition: { duration: 0.5, ease: EASE, delay: 1.3 } },
+          }}
+        />
+      </motion.g>
+
+      {/* "encrypted in transit & at rest" stamp top-left */}
+      <motion.g
+        variants={{
+          hidden: { opacity: 0 },
+          visible: { opacity: 1, transition: { duration: 0.5, delay: 1.2 } },
+        }}
+      >
+        <circle cx="60" cy="56" r="2.5" fill={EMERALD} stroke="none" />
+        <text x="72" y="60" fontSize="8.5" fontFamily="ui-monospace, monospace" fontWeight="600" fill="currentColor" fillOpacity="0.55" stroke="none">
+          encrypted in transit &amp; at rest
+        </text>
+      </motion.g>
+    </motion.svg>
+  );
+}
 
 const AUTH_ITEMS = [
   { icon: Mail, title: "Email-verified accounts", body: "Sign-up requires a 6-digit code sent to your work email. Account isn't usable until verified." },
@@ -63,6 +229,7 @@ export function SecurityClient() {
         title="Security at a glance."
         description="Customs data is regulatory data. Here's how we handle yours: the people who can see it, the encryption around it, the vendors who touch it, and the trail it leaves."
         breadcrumbs={[{ label: "Security", href: "/security" }]}
+        illustration={<SecurityHeroIllustration />}
       />
 
       {/* AUTH */}
