@@ -321,9 +321,9 @@ export function Nav() {
                   sheen, never bouncy. Touch and reduced-motion pass through. */}
               <Magnetic strength={5}>
                 <Button variant="gold" size="sm" asChild className="group relative overflow-hidden">
-                  <a href="https://app.mycargolens.com/register">
+                  <Link href="/book-a-demo">
                     <span className="relative z-10 inline-flex items-center gap-1.5">
-                      Start free
+                      Request a demo
                       <motion.span
                         aria-hidden
                         className="inline-flex"
@@ -337,7 +337,7 @@ export function Nav() {
                       aria-hidden
                       className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out bg-gradient-to-r from-transparent via-white/20 to-transparent"
                     />
-                  </a>
+                  </Link>
                 </Button>
               </Magnetic>
             </div>
@@ -472,7 +472,7 @@ export function Nav() {
                     <a href="https://app.mycargolens.com/login">Log in</a>
                   </Button>
                   <Button variant="gold" size="sm" className="w-full" asChild>
-                    <a href="https://app.mycargolens.com/register">Start free</a>
+                    <Link href="/book-a-demo">Request a demo</Link>
                   </Button>
                 </motion.div>
               </motion.div>

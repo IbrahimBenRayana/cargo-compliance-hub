@@ -302,7 +302,7 @@ export function AboutClient() {
       <SectionShell tone="default" headingAlign="center" title="Try the product we'd want to use.">
         <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button variant="gold" size="lg" asChild>
-            <a href="https://app.mycargolens.com/register">Start free</a>
+            <Link href="/book-a-demo">Request a demo</Link>
           </Button>
           <Button variant="outline" size="lg" asChild>
             <Link href="/pricing">See pricing</Link>

@@ -168,7 +168,7 @@ export default function HomeClient() {
               >
                 <Magnetic strength={6}>
                   <Button variant="gold" size="lg" asChild>
-                    <a href="https://app.mycargolens.com/register">Start free</a>
+                    <Link href="/book-a-demo">Request a demo</Link>
                   </Button>
                 </Magnetic>
                 <Button variant="outline" size="lg" asChild>

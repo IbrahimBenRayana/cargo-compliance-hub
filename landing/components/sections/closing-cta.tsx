@@ -77,7 +77,7 @@ export function ClosingCta() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="mb-10 text-base text-muted-foreground md:text-lg"
           >
-            No credit card. No sales calls. Cancel anytime.
+            A 20-minute demo. No credit card. Cancel anytime.
           </motion.p>
 
           <motion.div
@@ -87,7 +87,7 @@ export function ClosingCta() {
             className="flex flex-col items-center gap-3 sm:flex-row"
           >
             <Button variant="gold" size="lg" asChild>
-              <a href="https://app.mycargolens.com/register">Start free</a>
+              <Link href="/book-a-demo">Request a demo</Link>
             </Button>
             <Button variant="outline" size="lg" asChild>
               <Link href="/contact">Talk to founders</Link>

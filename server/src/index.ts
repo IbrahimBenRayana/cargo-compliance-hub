@@ -14,6 +14,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { authMiddleware, requireRole } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.js';
 import complianceRoutes from './routes/compliance.js';
 import filingRoutes from './routes/filings.js';
 import submissionLogRoutes from './routes/submissionLogs.js';
@@ -110,6 +111,7 @@ app.get('/api/health', async (_req, res) => {
 
 // ─── API Routes (v1) ─────────────────────────────────────
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/filings', filingRoutes);
 app.use('/api/v1/submission-logs', submissionLogRoutes);
 app.use('/api/v1/notifications', notificationRoutes);

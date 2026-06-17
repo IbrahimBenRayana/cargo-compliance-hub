@@ -341,8 +341,8 @@ const TIERS: Tier[] = [
     price: "$45",
     per: "per shipment filed",
     priceNote: "No monthly fee",
-    cta: "Start free",
-    ctaHref: "https://app.mycargolens.com/register",
+    cta: "Request a demo",
+    ctaHref: "/book-a-demo",
     features: [
       "ISF-10 (10+2) & ISF-5 filing",
       "Templates & bulk duplicate",
@@ -358,8 +358,8 @@ const TIERS: Tier[] = [
     price: "$180",
     per: "per shipment filed",
     priceNote: "No monthly fee",
-    cta: "Start free",
-    ctaHref: "https://app.mycargolens.com/register",
+    cta: "Request a demo",
+    ctaHref: "/book-a-demo",
     featured: true,
     features: [
       "Everything in ISF Filing, plus",
@@ -376,8 +376,8 @@ const TIERS: Tier[] = [
     price: "$280",
     per: "per shipment filed",
     priceNote: "No monthly fee",
-    cta: "Start free",
-    ctaHref: "https://app.mycargolens.com/register",
+    cta: "Request a demo",
+    ctaHref: "/book-a-demo",
     features: [
       "Everything in ISF + Entry, plus",
       "Container tracking (Terminal 49)",
@@ -579,7 +579,7 @@ function TierCard({ tier, index }: { tier: Tier; index: number }) {
         className="mb-6 w-full"
         asChild
       >
-        <a href={tier.ctaHref}>{tier.cta}</a>
+        <Link href={tier.ctaHref}>{tier.cta}</Link>
       </Button>
 
       {/* Feature list */}
@@ -798,12 +798,12 @@ export function PricingPageClient() {
       </SectionShell>
 
       {/* CLOSING — two complementary cards in a single section:
-          a prominent gold-accented "Start free" + a smaller navy
+          a prominent gold-accented "Request a demo" + a smaller navy
           "Enterprise" card for high-volume buyers. Avoids the previous
           stacked-CTA look. */}
       <SectionShell tone="muted">
         <div className="mx-auto grid max-w-5xl gap-4 md:grid-cols-5">
-          {/* Primary — Start free */}
+          {/* Primary — Request a demo */}
           <div className="relative overflow-hidden rounded-2xl border-2 border-gold/40 bg-card p-8 md:col-span-3">
             <span
               aria-hidden
@@ -814,17 +814,17 @@ export function PricingPageClient() {
               }}
             />
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gold-dark dark:text-gold">
-              Start free
+              See it live
             </span>
             <h3 className="mt-2 text-2xl font-semibold tracking-tight">
-              Sign up free. Pay per shipment.
+              See it live. Pay per shipment.
             </h3>
             <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-              No monthly fee. Browse and draft for free — you only pay when you file, billed monthly. Change tiers anytime.
+              No monthly fee. Book a 20-minute demo and we will set you up on the right plan — you only pay when you file, billed monthly. Change tiers anytime.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button variant="gold" size="lg" asChild>
-                <a href="https://app.mycargolens.com/register">Start free</a>
+                <Link href="/book-a-demo">Request a demo</Link>
               </Button>
               <Button variant="outline" size="lg" asChild>
                 <Link href="/security">Security &amp; trust</Link>

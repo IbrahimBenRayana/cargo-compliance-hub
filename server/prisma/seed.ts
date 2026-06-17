@@ -34,7 +34,16 @@ async function main() {
       lastName: 'Ben Rayana',
       role: 'owner',
       emailVerified: true,
+      isPlatformAdmin: true, // demo account doubles as platform admin in dev
     },
+  });
+
+  // Grant platform-admin to the founder account if it exists (idempotent —
+  // safe to run against prod, where this account already exists). Platform
+  // admins reach the /admin area that provisions client organizations.
+  await prisma.user.updateMany({
+    where: { email: 'isiddique@sigmatechllc.com' },
+    data: { isPlatformAdmin: true },
   });
 
   // Create sample filings

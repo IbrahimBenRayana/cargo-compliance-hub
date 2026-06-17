@@ -15,8 +15,10 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Response, NextFunction } from 'express';
 import { requireRole, type AuthRequest } from '../auth.js';
 
-function buildReq(user?: AuthRequest['user']): AuthRequest {
-  return { user } as AuthRequest;
+function buildReq(
+  user?: Omit<NonNullable<AuthRequest['user']>, 'isPlatformAdmin'> & { isPlatformAdmin?: boolean },
+): AuthRequest {
+  return { user: user ? { isPlatformAdmin: false, ...user } : undefined } as AuthRequest;
 }
 
 function buildRes(): { res: Response; status: ReturnType<typeof vi.fn>; json: ReturnType<typeof vi.fn> } {

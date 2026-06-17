@@ -198,6 +198,42 @@ export async function sendInvitationEmail(params: {
 }
 
 /**
+ * Account Setup Email — sent to a newly provisioned client owner (sales-led
+ * onboarding) so they can set their first password via a one-time link.
+ */
+export async function sendAccountSetupEmail(params: {
+  to: string;
+  firstName?: string | null;
+  organizationName: string;
+  planName: string;
+  setupToken: string;
+  expiresInDays: number;
+}): Promise<boolean> {
+  const setupUrl = `${env.FRONTEND_URL}/set-password?token=${params.setupToken}`;
+  const greeting = params.firstName ? `Hi ${params.firstName},` : 'Welcome,';
+
+  const body = `
+    <h2 style="margin:0 0 16px; font-size:20px; color:#1e293b;">Your MyCargoLens account is ready</h2>
+    <p style="margin:0 0 8px; font-size:15px; line-height:1.6; color:#475569;">${greeting}</p>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      We've set up <strong>${params.organizationName}</strong> on MyCargoLens on the
+      <strong>${params.planName}</strong> plan. Set your password to get started.
+    </p>
+    ${buttonHtml('Set your password', setupUrl)}
+    <p style="margin:0; font-size:13px; color:#94a3b8;">
+      This link expires in ${params.expiresInDays} days. If the button doesn't work, paste this link in your browser:<br/>
+      <a href="${setupUrl}" style="color:#2563eb; word-break:break-all;">${setupUrl}</a>
+    </p>
+  `;
+
+  return sendMail({
+    to: params.to,
+    subject: `Set up your ${params.organizationName} account — MyCargoLens`,
+    html: wrapTemplate(body),
+  });
+}
+
+/**
  * Filing Accepted by CBP
  */
 export async function sendFilingAcceptedEmail(params: {

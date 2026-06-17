@@ -191,6 +191,20 @@ export const authApi = {
     return apiFetch<User>('/api/v1/auth/me');
   },
 
+  // Set-password (sales-led onboarding / reset). Public — the token is the credential.
+  validateSetupToken(token: string) {
+    return apiFetch<{ valid: boolean; email?: string; error?: string }>(
+      `/api/v1/auth/set-password/${encodeURIComponent(token)}`,
+    );
+  },
+
+  setPassword(token: string, password: string) {
+    return apiFetch<{ success: true }>('/api/v1/auth/set-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
+  },
+
   verifyEmailState() {
     return apiFetch<{
       emailVerified: boolean;
@@ -795,6 +809,70 @@ export const billingApi = {
 };
 
 export type BillingSubscription = Awaited<ReturnType<typeof billingApi.subscription>>;
+
+// ─── Platform Admin API (client provisioning) ─────────────
+// Only reachable by platform admins (server enforces requirePlatformAdmin).
+export interface AdminOrganization {
+  id: string;
+  name: string;
+  iorNumber: string | null;
+  maxUsers: number;
+  createdAt: string;
+  plan: { id: string; name: string } | null;
+  subscriptionStatus: string | null;
+  owner: { email: string; firstName: string | null; lastName: string | null; emailVerified: boolean } | null;
+  userCount: number;
+  filingCount: number;
+}
+
+export interface AdminPlan {
+  id: string;
+  name: string;
+  description: string | null;
+  perFilingCents: number;
+  capabilities: string[];
+  isPublic: boolean;
+}
+
+export const adminApi = {
+  plans() {
+    return apiFetch<{ plans: AdminPlan[] }>('/api/v1/admin/plans');
+  },
+
+  organizations() {
+    return apiFetch<{ organizations: AdminOrganization[] }>('/api/v1/admin/organizations');
+  },
+
+  provisionOrganization(body: {
+    companyName: string;
+    iorNumber?: string;
+    ownerEmail: string;
+    ownerFirstName: string;
+    ownerLastName: string;
+    planId: string;
+    maxUsers?: number;
+  }) {
+    return apiFetch<{
+      organization: { id: string; name: string; iorNumber: string | null };
+      owner: { id: string; email: string };
+      plan: { id: string; name: string };
+    }>('/api/v1/admin/organizations', { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  changePlan(orgId: string, planId: string) {
+    return apiFetch<{ orgId: string; plan: { id: string; name: string } }>(
+      `/api/v1/admin/organizations/${orgId}/plan`,
+      { method: 'PATCH', body: JSON.stringify({ planId }) },
+    );
+  },
+
+  resendSetup(orgId: string) {
+    return apiFetch<{ success: true; sentTo: string }>(
+      `/api/v1/admin/organizations/${orgId}/resend-setup`,
+      { method: 'POST' },
+    );
+  },
+};
 
 // ─── Manifest Query API ───────────────────────────────────
 // ─── Container Tracking (Terminal 49) ─────────────────────

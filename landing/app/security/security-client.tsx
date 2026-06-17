@@ -200,7 +200,7 @@ export function SecurityClient() {
             <Link href="/contact">Talk to founders</Link>
           </Button>
           <Button variant="outline" size="lg" asChild>
-            <a href="https://app.mycargolens.com/register">Start free</a>
+            <Link href="/book-a-demo">Request a demo</Link>
           </Button>
         </div>
       </SectionShell>
