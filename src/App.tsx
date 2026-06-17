@@ -5,11 +5,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { PlatformAdminRoute } from "@/components/PlatformAdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CapabilityGate } from "@/components/CapabilityGate";
 import { CAPABILITIES } from "@/lib/planMeta";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
+import { SetPasswordPage } from "@/pages/SetPasswordPage";
+import { AdminClientsPage } from "@/pages/AdminClientsPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import UpgradePage from "@/pages/UpgradePage";
@@ -55,6 +58,8 @@ const App = () => (
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            {/* Set first password (sales-led onboarding) — public; the token is the credential */}
+            <Route path="/set-password" element={<ErrorBoundary><SetPasswordPage /></ErrorBoundary>} />
 
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
@@ -91,6 +96,11 @@ const App = () => (
                 <Route path="/integrations/logs" element={<ErrorBoundary><SubmissionLogs /></ErrorBoundary>} />
                 <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
                 <Route path="/team" element={<ErrorBoundary><TeamPage /></ErrorBoundary>} />
+
+                {/* Platform-admin only — client provisioning console */}
+                <Route element={<PlatformAdminRoute />}>
+                  <Route path="/admin" element={<ErrorBoundary><AdminClientsPage /></ErrorBoundary>} />
+                </Route>
               </Route>
             </Route>
 

@@ -13,6 +13,9 @@ import { LogoMark } from '@/components/LogoMark';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
+// Marketing "Book a demo" page — lives on the marketing site, not the app.
+const DEMO_URL = 'https://mycargolens.com/book-a-demo';
+
 // Brand mark for the mobile header — uses the shared aperture LogoMark.
 function GoldMark() {
   return <LogoMark size={28} className="text-[hsl(222_47%_22%)] dark:text-[hsl(43_96%_70%)]" />;
@@ -32,6 +35,12 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const redirectTo = searchParams.get('redirect') || '/';
   const register = useRegister();
+
+  // Self-serve signup is disabled server-side. Without an invite token the page
+  // shows an invitation-only state; a 403 `signup_disabled` from the API (e.g.
+  // a stale/forged token) flips this on too.
+  const [signupDisabled, setSignupDisabled] = useState(false);
+  const invitationOnly = !inviteToken || signupDisabled;
 
   const update = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -54,6 +63,10 @@ export default function RegisterPage() {
       toast.success(inviteToken ? 'Welcome to the team!' : 'Account created! Welcome to MyCargoLens.');
       navigate(redirectTo);
     } catch (err: any) {
+      if (err?.body?.code === 'signup_disabled') {
+        setSignupDisabled(true);
+        return;
+      }
       toast.error(err.body?.error || 'Registration failed');
     }
   };
@@ -77,6 +90,35 @@ export default function RegisterPage() {
               <GoldMark />
             </div>
 
+            {/* ── Invitation-only state (no invite token, or signup disabled) ── */}
+            {invitationOnly ? (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: EASE }}
+              >
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                  By invitation only
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground mb-8">
+                  MyCargoLens accounts are set up after a demo. Book a walkthrough and our team
+                  will get you onboarded.
+                </p>
+                <Button asChild variant="default" size="lg" className="w-full">
+                  <a href={DEMO_URL}>Request a demo</a>
+                </Button>
+                <p className="mt-6 text-sm text-muted-foreground text-center">
+                  Already have an account?{' '}
+                  <Link
+                    to={redirectTo !== '/' ? `/login?redirect=${encodeURIComponent(redirectTo)}` : '/login'}
+                    className="text-foreground font-medium hover:underline transition-colors"
+                  >
+                    Log in
+                  </Link>
+                </p>
+              </motion.div>
+            ) : (
+            <>
             {/* Invite badge */}
             {inviteToken && (
               <div className="mb-4">
@@ -219,6 +261,8 @@ export default function RegisterPage() {
                 </Link>
               </p>
             </motion.div>
+            </>
+            )}
 
           </div>
         </div>

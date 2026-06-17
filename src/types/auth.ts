@@ -20,6 +20,8 @@ export interface User {
   firstName: string;
   lastName: string;
   role: UserRole;
+  /** Platform-level staff (MyCargoLens) — gates the /admin provisioning area. */
+  isPlatformAdmin?: boolean;
   emailVerified?: boolean;
   organization: UserOrganizationSummary;
 }

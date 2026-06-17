@@ -748,7 +748,7 @@ export function ComplianceClient() {
       <SectionShell tone="default" headingAlign="center" title="Want to see this for your shipments?">
         <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button variant="gold" size="lg" asChild>
-            <a href="https://app.mycargolens.com/register">Start free</a>
+            <Link href="/book-a-demo">Request a demo</Link>
           </Button>
           <Button variant="outline" size="lg" asChild>
             <Link href="/pricing">See pricing</Link>

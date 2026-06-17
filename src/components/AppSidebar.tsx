@@ -1,7 +1,8 @@
-import { LayoutDashboard, Ship, Shield, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator, Container } from 'lucide-react';
+import { LayoutDashboard, Ship, Shield, ShieldCheck, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator, Container } from 'lucide-react';
 import { LogoMark } from '@/components/LogoMark';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
+import { useAuthStore } from '@/hooks/useAuth';
 import {
   Sidebar,
   SidebarContent,
@@ -41,6 +42,8 @@ interface NavItem {
   end?: boolean;
   /** When set, the item is hidden unless the org's plan includes this capability. */
   requiredCapability?: Capability;
+  /** When true, the item is only shown to platform admins (MyCargoLens staff). */
+  platformAdminOnly?: boolean;
 }
 
 interface NavSection {
@@ -89,6 +92,12 @@ const navSections: NavSection[] = [
       { title: 'Team',         url: '/team',             icon: Users },
     ],
   },
+  {
+    label: 'Platform',
+    items: [
+      { title: 'Clients', url: '/admin', icon: ShieldCheck, platformAdminOnly: true },
+    ],
+  },
 ];
 
 const navItemClass = cn(
@@ -106,6 +115,7 @@ export function AppSidebar() {
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const { isLoading: capsLoading, can } = useCapabilities();
+  const isPlatformAdmin = useAuthStore((s) => s.user?.isPlatformAdmin ?? false);
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
@@ -120,6 +130,7 @@ export function AppSidebar() {
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
+        if (item.platformAdminOnly && !isPlatformAdmin) return false;
         if (!item.requiredCapability) return true;
         if (capsLoading) return false;
         return can(item.requiredCapability);

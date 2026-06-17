@@ -9,6 +9,7 @@ export interface AuthRequest extends Request {
     email: string;
     orgId: string;
     role: string;
+    isPlatformAdmin: boolean;
   };
 }
 
@@ -35,7 +36,7 @@ export async function authMiddleware(
     // Verify user still exists and is active
     const user = await prisma.user.findUnique({
       where: { id: decoded.sub },
-      select: { id: true, email: true, orgId: true, role: true, isActive: true },
+      select: { id: true, email: true, orgId: true, role: true, isActive: true, isPlatformAdmin: true },
     });
 
     if (!user || !user.isActive) {
@@ -48,6 +49,7 @@ export async function authMiddleware(
       email: user.email,
       orgId: user.orgId,
       role: user.role,
+      isPlatformAdmin: user.isPlatformAdmin,
     };
 
     next();
@@ -73,4 +75,19 @@ export function requireRole(...roles: string[]) {
     }
     next();
   };
+}
+
+// Platform-admin gate — MyCargoLens staff only (provisioning client orgs).
+// Distinct from the org-scoped requireRole: an org "owner" is NOT a platform
+// admin. Apply after authMiddleware.
+export function requirePlatformAdmin(req: AuthRequest, res: Response, next: NextFunction): void {
+  if (!req.user) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+  if (!req.user.isPlatformAdmin) {
+    res.status(403).json({ error: 'Platform administrator access required' });
+    return;
+  }
+  next();
 }

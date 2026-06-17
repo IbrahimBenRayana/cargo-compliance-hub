@@ -8,6 +8,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { sendWelcomeEmail, sendVerificationCodeEmail } from '../services/email.js';
+import { peekPasswordSetupToken, consumePasswordSetupToken } from '../services/passwordSetup.js';
 import { notify } from '../services/notifications.js';
 import {
   requestVerificationCode,
@@ -119,8 +120,14 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
         res.status(400).json({ error: 'This invitation was sent to a different email address' });
         return;
       }
-    } else if (!data.companyName) {
-      res.status(400).json({ error: 'Company name is required when creating a new organization' });
+    } else {
+      // Self-service signup is disabled. Accounts are provisioned by MyCargoLens
+      // staff after a demo (POST /api/v1/admin/organizations). Only invite-based
+      // registration — an existing client adding a teammate — is allowed here.
+      res.status(403).json({
+        error: 'Self-service signup is disabled. Request a demo to get started.',
+        code: 'signup_disabled',
+      });
       return;
     }
 
@@ -192,6 +199,7 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
         firstName: result.user.firstName,
         lastName: result.user.lastName,
         role: result.user.role,
+        isPlatformAdmin: result.user.isPlatformAdmin,
         emailVerified: result.user.emailVerified,
         organization: {
           id: result.org.id,
@@ -335,6 +343,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response): Promise<
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        isPlatformAdmin: user.isPlatformAdmin,
         organization: {
           id: user.organization.id,
           name: user.organization.name,
@@ -473,6 +482,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promi
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
+    isPlatformAdmin: user.isPlatformAdmin,
     emailVerified: user.emailVerified,
     organization: {
       id: user.organization.id,
@@ -597,6 +607,59 @@ function humanReasonFor(reason: ConfirmReason): string {
     default:                return 'That code is not correct. Please try again.';
   }
 }
+
+// ─── Password setup (sales-led onboarding) ────────────────────────────
+// A provisioned client owner receives an emailed link to set their first
+// password. These endpoints are public (the token IS the credential) and
+// rate-limited.
+
+// GET /api/v1/auth/set-password/:token — validate a link without consuming it
+// so the page can confirm the email + that the link is still good.
+router.get('/set-password/:token', authLimiter, async (req: Request, res: Response): Promise<void> => {
+  const peek = await peekPasswordSetupToken(String(req.params.token));
+  if (!peek) {
+    res.status(400).json({ valid: false, error: 'This link is invalid or has expired.' });
+    return;
+  }
+  res.json({ valid: true, email: peek.email });
+});
+
+// POST /api/v1/auth/set-password — { token, password } → set the password,
+// mark the email verified (the link proves email ownership), and consume the
+// token. The user then logs in normally.
+router.post('/set-password', authLimiter, async (req: Request, res: Response): Promise<void> => {
+  const schema = z.object({
+    token: z.string().min(10),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const userId = await consumePasswordSetupToken(parsed.data.token);
+  if (!userId) {
+    res.status(400).json({ error: 'This link is invalid or has expired.', code: 'invalid_setup_token' });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, emailVerified: true },
+  });
+
+  writeAuditLog({
+    userId,
+    action: 'user.password_set',
+    entityType: 'user',
+    entityId: userId,
+    ...getRequestMeta(req),
+  });
+
+  res.json({ success: true });
+});
 
 type ConfirmReason = 'invalid' | 'expired' | 'locked' | 'no_active_token' | undefined;
 

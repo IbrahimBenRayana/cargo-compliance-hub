@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLogin } from '@/hooks/useAuth';
 import { motion, MotionConfig } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -153,12 +153,12 @@ export default function LoginPage() {
               {/* Footer */}
               <p className="mt-6 text-sm text-muted-foreground text-center">
                 Don&apos;t have an account?{' '}
-                <Link
-                  to={redirectTo !== '/' ? `/register?redirect=${encodeURIComponent(redirectTo)}` : '/register'}
+                <a
+                  href="https://mycargolens.com/book-a-demo"
                   className="text-foreground font-medium hover:underline transition-colors"
                 >
-                  Sign up
-                </Link>
+                  Request a demo
+                </a>
               </p>
             </motion.div>
 
