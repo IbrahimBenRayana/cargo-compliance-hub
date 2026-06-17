@@ -115,6 +115,13 @@ services:
       STRIPE_SECRET_KEY:      ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET:  ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      # Per-filing metered pricing. Price ids come from `npm run stripe:bootstrap`
+      # (run per Stripe mode); the meter event name must match the bootstrapped
+      # meter. Empty defaults → checkout self-disables until set in .env.
+      STRIPE_PRICE_ISF:          ${STRIPE_PRICE_ISF:-}
+      STRIPE_PRICE_ENTRY:        ${STRIPE_PRICE_ENTRY:-}
+      STRIPE_PRICE_FULL:         ${STRIPE_PRICE_FULL:-}
+      STRIPE_FILING_METER_EVENT: ${STRIPE_FILING_METER_EVENT:-filing}
 
       # Sentry (audit Phase 10). Server-side only; empty DSN disables init.
       # The SPA bundle needs VITE_SENTRY_DSN at *build* time (Vite bakes
