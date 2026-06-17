@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useFilings, useSubmitFiling, useTemplates, useApplyTemplate, useBulkSubmit, useBulkDelete, useExportCsv, useExportSummaryPdf } from '@/hooks/useFilings';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlanLimitModal } from '@/components/PlanLimitModal';
+import { CAPABILITIES, type Capability } from '@/lib/planMeta';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -103,7 +104,9 @@ export default function ShipmentsList() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [planLimit, setPlanLimit] = useState<{ current: number; limit: number } | null>(null);
+  // Upgrade modal: null = closed. `capability` set = 403 feature_not_in_plan
+  // (missing capability); undefined capability = 402 subscription_required.
+  const [upgradePrompt, setUpgradePrompt] = useState<{ capability?: Capability } | null>(null);
   const submitFiling = useSubmitFiling();
   const navigate = useNavigate();
   const { data: templatesData } = useTemplates();
@@ -131,8 +134,10 @@ export default function ShipmentsList() {
       toast.success('Filing submitted to CBP successfully!');
     } catch (err: any) {
       const body = err.body || err;
-      if (body?.error === 'plan_limit_reached' && body?.usage) {
-        setPlanLimit(body.usage);
+      if (body?.code === 'subscription_required') {
+        setUpgradePrompt({});
+      } else if (body?.code === 'feature_not_in_plan') {
+        setUpgradePrompt({ capability: (body?.capability as Capability) ?? CAPABILITIES.ISF_FILING });
       } else if (body?.validationErrors) {
         const msgs = body.validationErrors.map((e: any) => `${e.field}: ${e.message}`).join('\n');
         toast.error(`Submission failed:\n${msgs}`, { duration: 8000 });
@@ -300,9 +305,9 @@ export default function ShipmentsList() {
   return (
     <div className="space-y-6">
       <PlanLimitModal
-        open={planLimit !== null}
-        onClose={() => setPlanLimit(null)}
-        usage={planLimit ?? { current: 0, limit: 0 }}
+        open={upgradePrompt !== null}
+        onClose={() => setUpgradePrompt(null)}
+        capability={upgradePrompt?.capability}
       />
       {/* Header */}
       <header className="space-y-4 animate-fade-in-up motion-reduce:animate-none" style={{ animationDelay: '0ms' }}>

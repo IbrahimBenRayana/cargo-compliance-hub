@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, FileStack, Users, Sparkles } from 'lucide-react';
+import { Check, Receipt, Sparkles } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { PLAN_META } from '@/lib/planMeta';
+import { PLAN_META, CAPABILITY_LABEL } from '@/lib/planMeta';
 
 interface CelebrationModalProps {
   planId: string | null;
@@ -27,10 +27,10 @@ export function CelebrationModal({ planId, onClose }: CelebrationModalProps) {
     navigate('/shipments/new');
   }
 
-  // "What's unlocked" — three stats. We surface the count of premium features
-  // beyond the headline filings/seats numbers so the user can immediately see
-  // the breadth of what they've bought, not just the volume tier.
-  const featureCount = meta.features.length;
+  // "What's unlocked" — per-filing model. Lead with the per-shipment rate
+  // (there's no monthly fee or seat/volume cap) and list the capabilities the
+  // tier unlocks so the user immediately sees what they can now do.
+  const capabilities = meta.capabilities;
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -72,24 +72,35 @@ export function CelebrationModal({ planId, onClose }: CelebrationModalProps) {
           </DialogHeader>
         </div>
 
-        {/* What's unlocked — 3-stat grid */}
-        <div className="px-6 pt-4 pb-4">
-          <div className="grid grid-cols-3 gap-2">
-            <Stat
-              icon={<FileStack className="h-3.5 w-3.5" />}
-              value={meta.filings}
-              label="filings / mo"
-            />
-            <Stat
-              icon={<Users className="h-3.5 w-3.5" />}
-              value={meta.seats}
-              label={meta.seats === 1 ? 'team seat' : 'team seats'}
-            />
-            <Stat
-              icon={<Sparkles className="h-3.5 w-3.5" />}
-              value={featureCount}
-              label="features"
-            />
+        {/* What's unlocked — per-shipment rate + capabilities */}
+        <div className="px-6 pt-4 pb-4 space-y-3">
+          <div className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 px-4 py-3">
+            <div className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400">
+              <Receipt className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-[20px] leading-none font-semibold tabular-nums text-slate-900 dark:text-slate-50">
+                {meta.priceLabel}
+                <span className="ml-1.5 text-[12px] font-medium text-slate-500 dark:text-slate-400">
+                  {meta.priceFooter}
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                No monthly fee — billed per shipment
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {capabilities.map((cap) => (
+              <span
+                key={cap}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11.5px] font-medium text-slate-700 dark:text-slate-300"
+              >
+                <Check className="h-3 w-3 text-amber-500" strokeWidth={3} />
+                {CAPABILITY_LABEL[cap] ?? cap}
+              </span>
+            ))}
           </div>
         </div>
 
@@ -113,29 +124,5 @@ export function CelebrationModal({ planId, onClose }: CelebrationModalProps) {
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Stat({
-  icon,
-  value,
-  label,
-}: {
-  icon: React.ReactNode;
-  value: number;
-  label: string;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 px-3 py-3 text-center">
-      <div className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 mb-1.5">
-        {icon}
-      </div>
-      <div className="text-[22px] leading-none font-semibold tabular-nums text-slate-900 dark:text-slate-50">
-        {value}
-      </div>
-      <div className="mt-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
-        {label}
-      </div>
-    </div>
   );
 }

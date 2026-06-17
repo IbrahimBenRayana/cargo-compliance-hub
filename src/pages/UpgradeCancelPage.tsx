@@ -21,7 +21,8 @@ export default function UpgradeCancelPage() {
 
         <h1 className="text-2xl font-bold text-foreground mb-3">Checkout canceled</h1>
         <p className="text-muted-foreground text-sm mb-10">
-          No charge was made. You can pick up where you left off any time.
+          No charge was made — there's no monthly fee, and you're only billed per
+          shipment once a tier is active. You can pick up where you left off any time.
         </p>
 
         {/* CTAs */}

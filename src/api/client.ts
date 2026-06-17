@@ -758,20 +758,25 @@ export const billingApi = {
         id: string;
         name: string;
         description: string | null;
-        priceCents: number;
-        billingInterval: string;
-        filingsIncluded: number;
-        maxSeats: number;
-        overageCents: number;
+        perFilingCents: number;
+        capabilities: string[];
         features: string[];
       } | null;
+      // Capabilities unlocked by the active tier (empty when no active plan).
+      capabilities: string[];
       subscription: {
         status: string;
         currentPeriodStart: string | null;
         currentPeriodEnd: string | null;
         cancelAtPeriodEnd: boolean;
       } | null;
-      usage: { month: string; count: number; limit: number };
+      // Current billing period usage: shipments billed + running uninvoiced total.
+      usage: {
+        periodStart: string | null;
+        periodEnd: string | null;
+        filingsBilled: number;
+        amountCents: number;
+      };
     }>('/api/v1/billing/subscription');
   },
 

@@ -25,3 +25,30 @@ export function getStripe(): Stripe {
 export function stripeConfigured(): boolean {
   return Boolean(env.STRIPE_SECRET_KEY);
 }
+
+/**
+ * Report one per-filing usage event to the shared Stripe Billing Meter.
+ * Stripe aggregates events per customer per billing period and the customer's
+ * subscribed metered Price applies the tier's per-unit rate, producing one
+ * monthly invoice.
+ *
+ * `identifier` is the Stripe-level idempotency key — passing the ShipmentCharge
+ * id (one per filing) means a retried call never double-bills the shipment.
+ * Returns the meter event identifier on success.
+ */
+export async function recordFilingMeterEvent(opts: {
+  stripeCustomerId: string;
+  identifier: string;
+  quantity?: number;
+}): Promise<string> {
+  const stripe = getStripe();
+  const event = await stripe.billing.meterEvents.create({
+    event_name: env.STRIPE_FILING_METER_EVENT,
+    identifier: opts.identifier,
+    payload: {
+      stripe_customer_id: opts.stripeCustomerId,
+      value: String(opts.quantity ?? 1),
+    },
+  });
+  return event.identifier ?? opts.identifier;
+}

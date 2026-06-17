@@ -23,11 +23,16 @@ import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
+import { requireCapability } from '../middleware/requireCapability.js';
+import { CAPABILITIES } from '../config/plans.js';
 import * as t49 from '../services/terminal49.js';
 import logger from '../config/logger.js';
 
 const router = Router();
 router.use(authMiddleware);
+// Container tracking is exclusive to the Complete tier. Lower tiers get 403
+// feature_not_in_plan on every tracking route (the UI hides the page too).
+router.use(requireCapability(CAPABILITIES.CONTAINER_TRACKING));
 
 // ─── helpers ───────────────────────────────────────────────
 

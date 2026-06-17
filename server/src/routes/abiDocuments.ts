@@ -2,6 +2,9 @@ import { Router, type Response } from 'express';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
+import { requireCapability } from '../middleware/requireCapability.js';
+import { CAPABILITIES } from '../config/plans.js';
+import { billShipment } from '../services/shipmentBilling.js';
 import { ccClient } from '../services/customscity.js';
 import { ccApiLimiter } from '../middleware/rateLimiter.js';
 import {
@@ -25,6 +28,9 @@ import { CC_POLL_INTERVAL_MS } from '../config/schedules.js';
 
 const router = Router();
 router.use(authMiddleware);
+// ABI Entry (7501/3461) is gated to the ISF+Entry and Complete tiers. ISF-only
+// orgs get 403 feature_not_in_plan on every route here (the UI also hides it).
+router.use(requireCapability(CAPABILITIES.ABI_ENTRY));
 
 // ── Helpers ─────────────────────────────────────────────
 
@@ -725,6 +731,15 @@ router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, async (req: AuthReq
       },
       abiDocumentId: sentDoc.id,
     }).catch(() => {});
+
+    // Bill the shipment (per-filing pricing). Anchor on the linked ISF Filing
+    // when present so an Entry on an already-filed ISF shares that shipment's
+    // charge (no double-bill); otherwise the standalone Entry is its own
+    // billable shipment. Idempotent and never throws.
+    await billShipment(
+      sentDoc.filingId ? { filingId: sentDoc.filingId } : { abiDocumentId: sentDoc.id },
+      sentDoc.orgId,
+    );
 
     // Fire-and-forget polling.
     pollABIDocumentStatus(

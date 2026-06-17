@@ -7,6 +7,7 @@ import { Filing, getPartyName, getFirstCommodity, ShipmentStatus } from '@/types
 import { StatusBadge } from '@/components/StatusBadge';
 import { LifecycleWidget } from '@/components/LifecycleWidget';
 import { PlanLimitModal } from '@/components/PlanLimitModal';
+import { CAPABILITIES, type Capability } from '@/lib/planMeta';
 import { RejectionDetailsCard } from '@/components/RejectionDetailsCard';
 import { RejectionCoachDrawer } from '@/components/compliance/RejectionCoachDrawer';
 import { ScoreHistoryCard } from '@/components/compliance/ScoreHistoryCard';
@@ -65,7 +66,9 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
   });
   const [currentStep, setCurrentStep] = useState<PipelineStep | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [planLimit, setPlanLimit] = useState<{ current: number; limit: number } | null>(null);
+  // Upgrade modal: null = closed. `capability` set = 403 feature_not_in_plan;
+  // undefined capability = 402 subscription_required (no active plan).
+  const [upgradePrompt, setUpgradePrompt] = useState<{ capability?: Capability } | null>(null);
 
   const updateStep = (step: PipelineStep, state: Partial<StepState>) => {
     setSteps(prev => ({ ...prev, [step]: { ...prev[step], ...state } }));
@@ -150,9 +153,14 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
     } catch (err: any) {
       const body = err.body || err;
 
-      // Plan-limit reached (HTTP 402) — surface upgrade modal
-      if (body?.error === 'plan_limit_reached' && body?.usage) {
-        setPlanLimit(body.usage);
+      // Plan gated (HTTP 402 subscription_required / 403 feature_not_in_plan) —
+      // surface the upgrade modal in the matching mode.
+      if (body?.code === 'subscription_required' || body?.code === 'feature_not_in_plan') {
+        setUpgradePrompt(
+          body.code === 'feature_not_in_plan'
+            ? { capability: (body?.capability as Capability) ?? CAPABILITIES.ISF_FILING }
+            : {},
+        );
         updateStep('send_cc', { status: 'idle' });
         updateStep('send_cbp', { status: 'idle' });
         setCurrentStep(null);
@@ -206,7 +214,7 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
 
   return (
     <>
-    <PlanLimitModal open={planLimit !== null} onClose={() => setPlanLimit(null)} usage={planLimit ?? { current: 0, limit: 0 }} />
+    <PlanLimitModal open={upgradePrompt !== null} onClose={() => setUpgradePrompt(null)} capability={upgradePrompt?.capability} />
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
@@ -597,7 +605,9 @@ export default function ShipmentDetails() {
   const [cancelReason, setCancelReason] = useState('');
   const [templateName, setTemplateName] = useState('');
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
-  const [planLimit, setPlanLimit] = useState<{ current: number; limit: number } | null>(null);
+  // Upgrade modal: null = closed. `capability` set = 403 feature_not_in_plan;
+  // undefined capability = 402 subscription_required (no active plan).
+  const [upgradePrompt, setUpgradePrompt] = useState<{ capability?: Capability } | null>(null);
   // Resubmit validation errors → shown in a Dialog with one row per field
   // (audit Phase 8.3). Pre-fix the user only saw "N validation errors" in
   // a toast and had no way to act on them; the full list now lives until
@@ -661,8 +671,12 @@ export default function ShipmentDetails() {
       toast.success('Filing resubmitted successfully!');
     } catch (err: any) {
       const body = err.body || err;
-      if (body?.error === 'plan_limit_reached' && body?.usage) {
-        setPlanLimit(body.usage);
+      if (body?.code === 'subscription_required') {
+        setUpgradePrompt({});
+        return;
+      }
+      if (body?.code === 'feature_not_in_plan') {
+        setUpgradePrompt({ capability: (body?.capability as Capability) ?? CAPABILITIES.ISF_FILING });
         return;
       }
       if (body?.validationErrors && Array.isArray(body.validationErrors)) {
@@ -787,9 +801,9 @@ export default function ShipmentDetails() {
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
       <PlanLimitModal
-        open={planLimit !== null}
-        onClose={() => setPlanLimit(null)}
-        usage={planLimit ?? { current: 0, limit: 0 }}
+        open={upgradePrompt !== null}
+        onClose={() => setUpgradePrompt(null)}
+        capability={upgradePrompt?.capability}
       />
 
       {/* Resubmit validation errors — shown when the server rejects the

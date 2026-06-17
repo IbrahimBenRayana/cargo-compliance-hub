@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { TIERS } from '../src/config/plans.js';
 
 const prisma = new PrismaClient();
 
@@ -198,117 +199,23 @@ async function main() {
 
   console.log(`✅ Created ${filings.length} sample filings`);
 
-  // ─── Plans ─────────────────────────────────────────────
-  // Pricing source of truth: the landing site at landing/app/pricing/pricing-client.tsx.
-  // Re-aligned in audit Phase 3 — pre-fix the seed (Grower $99, Scale $299,
-  // 15/60 filings, $8 overage) contradicted the marketing site (Grower $49,
-  // Scale $149, 25/100 filings, $2/$1 overage). A buyer couldn't self-correct.
-  //
-  // The old stripePriceId values pointed to the old prices in Stripe and have
-  // been NULLED here so a fresh seed doesn't reactivate them. The founder must:
-  //   1. Create new Prices in Stripe Dashboard at $49/$149 monthly + $470/$1430 annual.
-  //   2. Paste the price_xxx ids into the four placeholders below.
-  //   3. Re-run `npx prisma db seed` (or update the prod plan rows by hand).
-  // Existing customer subscriptions stay grandfathered on their original Stripe
-  // Price ids — only NEW signups see the new pricing.
-  const plans = [
-    {
-      id: 'starter',
-      name: 'Starter',
-      description: 'For evaluators and single-shipment importers',
-      stripePriceId: null,
-      stripeProductId: null,
-      priceCents: 0,
-      billingInterval: 'free',
-      filingsIncluded: 2,
-      maxSeats: 1,
-      overageCents: 0,
-      features: ['basic_dashboard', 'email_support', 'isf_10_2', 'isf_5'],
-      isPublic: true,
-      sortOrder: 0,
-    },
-    {
-      id: 'grower_monthly',
-      name: 'Grower',
-      description: 'For small importers with consistent volume',
-      // TODO(stripe): create new Price at $49/mo and paste the id here.
-      stripePriceId: null,
-      stripeProductId: null,
-      priceCents: 4900, // $49/mo
-      billingInterval: 'month',
-      filingsIncluded: 25,
-      maxSeats: 3,
-      overageCents: 200, // $2/filing
-      features: ['basic_dashboard', 'email_support', 'chat_support', 'isf_10_2', 'isf_5', 'audit_trail', 'csv_export', 'templates'],
-      isPublic: true,
-      sortOrder: 1,
-    },
-    {
-      id: 'grower_annual',
-      name: 'Grower',
-      description: 'For small importers with consistent volume (annual)',
-      // TODO(stripe): create new Price at $470/yr and paste the id here.
-      // $470/yr ≈ $39/mo (~20% off the $49 monthly tier).
-      stripePriceId: null,
-      stripeProductId: null,
-      priceCents: 47000, // $470/yr ≈ $39/mo
-      billingInterval: 'year',
-      filingsIncluded: 25,
-      maxSeats: 3,
-      overageCents: 200,
-      features: ['basic_dashboard', 'email_support', 'chat_support', 'isf_10_2', 'isf_5', 'audit_trail', 'csv_export', 'templates'],
-      isPublic: true,
-      sortOrder: 2,
-    },
-    {
-      id: 'scale_monthly',
-      name: 'Scale',
-      description: 'For growing teams and 3PLs',
-      // TODO(stripe): create new Price at $149/mo and paste the id here.
-      stripePriceId: null,
-      stripeProductId: null,
-      priceCents: 14900, // $149/mo
-      billingInterval: 'month',
-      filingsIncluded: 100,
-      maxSeats: 10,
-      overageCents: 100, // $1/filing
-      features: ['everything_in_grower', 'bulk_csv_import', 'api_access', 'priority_support_4h', 'custom_roles'],
-      isPublic: true,
-      sortOrder: 3,
-    },
-    {
-      id: 'scale_annual',
-      name: 'Scale',
-      description: 'For growing teams and 3PLs (annual)',
-      // TODO(stripe): create new Price at $1430/yr and paste the id here.
-      // $1430/yr ≈ $119/mo (~20% off the $149 monthly tier).
-      stripePriceId: null,
-      stripeProductId: null,
-      priceCents: 143000, // $1430/yr ≈ $119/mo
-      billingInterval: 'year',
-      filingsIncluded: 100,
-      maxSeats: 10,
-      overageCents: 100,
-      features: ['everything_in_grower', 'bulk_csv_import', 'api_access', 'priority_support_4h', 'custom_roles'],
-      isPublic: true,
-      sortOrder: 4,
-    },
-    {
-      id: 'enterprise',
-      name: 'Enterprise',
-      description: 'Unlimited filings, SSO, SLA, dedicated support',
-      stripePriceId: null, // negotiated per-contract
-      stripeProductId: null,
-      priceCents: 0, // custom
-      billingInterval: 'year',
-      filingsIncluded: 999999,
-      maxSeats: 999999,
-      overageCents: 0,
-      features: ['everything_in_scale', 'sso', 'dedicated_csm', 'uptime_sla', 'custom_integrations', 'soc2_report'],
-      isPublic: false, // show "Contact us" in UI, not in the card list
-      sortOrder: 5,
-    },
-  ];
+  // ─── Plans (per-filing tiers) ──────────────────────────
+  // Derived from the single source of truth in server/src/config/plans.ts so
+  // the seed can never drift from the billing logic. Stripe Price ids come from
+  // env (populated by `npm run stripe:bootstrap`); they stay null in dev until
+  // bootstrapped, which is fine — checkout self-disables without them.
+  const plans = TIERS.map((t) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description,
+    stripePriceId: t.stripePriceId(),
+    stripeProductId: null as string | null,
+    perFilingCents: t.perFilingCents,
+    capabilities: t.capabilities,
+    features: t.features,
+    isPublic: t.isPublic,
+    sortOrder: t.sortOrder,
+  }));
 
   for (const plan of plans) {
     await prisma.plan.upsert({
