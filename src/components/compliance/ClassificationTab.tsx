@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { useCapabilities } from '@/hooks/useBilling';
+import { CAPABILITIES } from '@/lib/planMeta';
 
 /**
  * Classification & Rules tab — three importer-facing tools, all card-based
@@ -27,11 +29,21 @@ import { cn } from '@/lib/utils';
  * so a user can use one without scrolling past the others.
  */
 export function ClassificationTab() {
+  // The HTS Classifier hits POST /compliance/classify-hts, which the server
+  // gates on HTS_CLASSIFICATION (Complete tier). Hide the card for tiers that
+  // don't have it so it doesn't show only to 403 on use. ADD/CVD + FTA lookups
+  // are ungated, so they stay visible to every tier. `can` is false while
+  // entitlements load, so the card appears once confirmed rather than flashing
+  // then vanishing.
+  const { can } = useCapabilities();
+  const canClassify = can(CAPABILITIES.HTS_CLASSIFICATION);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="lg:col-span-2">
-        <HtsClassifierCard />
-      </div>
+      {canClassify && (
+        <div className="lg:col-span-2">
+          <HtsClassifierCard />
+        </div>
+      )}
       <AddCvdLookupCard />
       <FtaPreferenceCard />
     </div>
