@@ -23,6 +23,8 @@ import { useAbiDocumentsList } from '@/hooks/useAbiDocument';
 import { useManifestQueries } from '@/hooks/useManifestQuery';
 import { Filing } from '@/types/shipment';
 import { useCurrentUser } from '@/hooks/useAuth';
+import { useCapabilities } from '@/hooks/useBilling';
+import { CAPABILITIES } from '@/lib/planMeta';
 import { CelebrationModal } from '@/components/CelebrationModal';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -680,6 +682,7 @@ export default function Dashboard() {
   const { data: abiData, isLoading: abiLoading } = useAbiDocumentsList({ take: 100 });
   const { data: mqData, isLoading: mqLoading } = useManifestQueries({ limit: 30 });
   const { data: profile } = useCurrentUser();
+  const { can } = useCapabilities();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const welcomePlanId = searchParams.get('welcome');
@@ -901,11 +904,13 @@ export default function Dashboard() {
                 <Plus className="h-4 w-4" strokeWidth={2.5} /> New Shipment
               </Button>
             </Link>
-            <Link to="/abi-documents/new">
-              <Button variant="outline" size="default" className="gap-1.5 h-9 rounded-lg font-medium transition-colors duration-150">
-                <FileCheck className="h-3.5 w-3.5" /> New Entry
-              </Button>
-            </Link>
+            {can(CAPABILITIES.ABI_ENTRY) && (
+              <Link to="/abi-documents/new">
+                <Button variant="outline" size="default" className="gap-1.5 h-9 rounded-lg font-medium transition-colors duration-150">
+                  <FileCheck className="h-3.5 w-3.5" /> New Entry
+                </Button>
+              </Link>
+            )}
             <Link to="/manifest-query">
               <Button variant="outline" size="default" className="gap-1.5 h-9 rounded-lg font-medium transition-colors duration-150">
                 <Search className="h-3.5 w-3.5" /> Manifest Query

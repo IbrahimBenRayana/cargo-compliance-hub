@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { useManifestQuery, useManifestQueries, useCreateManifestQuery, usePollManifestQuery } from '@/hooks/useManifestQuery';
+import { useCapabilities } from '@/hooks/useBilling';
+import { CAPABILITIES } from '@/lib/planMeta';
 import { getDispositionInfo, getDispositionBadgeColor } from '@/data/dispositionCodes';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -41,6 +43,7 @@ function StatusBadge({ status }: { status: string }) {
 // ── Result display ─────────────────────────────────────────────
 function ManifestResult({ queryData }: { queryData: any }) {
   const response = queryData?.response;
+  const { can } = useCapabilities();
   // CC returns `response` as either an array (multi-result) or a single
   // object (single BOL — including the "BILL NBR NOT ON FILE" case where
   // the only meaningful field is `errorMessage`). Normalise to an object.
@@ -182,6 +185,7 @@ function ManifestResult({ queryData }: { queryData: any }) {
             </Button>
           </div>
 
+          {can(CAPABILITIES.ABI_ENTRY) && (
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -201,6 +205,7 @@ function ManifestResult({ queryData }: { queryData: any }) {
               </Link>
             </Button>
           </div>
+          )}
         </div>
       )}
     </div>

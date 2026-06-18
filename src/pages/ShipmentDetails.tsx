@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { LifecycleWidget } from '@/components/LifecycleWidget';
 import { PlanLimitModal } from '@/components/PlanLimitModal';
 import { CAPABILITIES, type Capability } from '@/lib/planMeta';
+import { useCapabilities } from '@/hooks/useBilling';
 import { RejectionDetailsCard } from '@/components/RejectionDetailsCard';
 import { RejectionCoachDrawer } from '@/components/compliance/RejectionCoachDrawer';
 import { ScoreHistoryCard } from '@/components/compliance/ScoreHistoryCard';
@@ -602,6 +603,7 @@ export default function ShipmentDetails() {
   const submitFiling = useSubmitFiling();
   const duplicateFiling = useDuplicateFiling();
   const saveAsTemplate = useSaveFilingAsTemplate();
+  const { can } = useCapabilities();
   const [cancelReason, setCancelReason] = useState('');
   const [templateName, setTemplateName] = useState('');
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
@@ -927,7 +929,7 @@ export default function ShipmentDetails() {
           {/* File Entry Documents — once ISF is accepted, file the
               7501 + 3461 entry. Server prefills IOR, consignee, MBOL,
               carrier, and bond from this filing. */}
-          {filing.status === 'accepted' && (
+          {filing.status === 'accepted' && can(CAPABILITIES.ABI_ENTRY) && (
             <Button variant="outline" className="gap-1.5" asChild>
               <Link to={`/abi-documents/new?fromShipment=${filing.id}`}>
                 <FileCheck className="h-4 w-4" />

@@ -24,6 +24,8 @@ import { Filing } from '@/types/shipment';
 import { Button } from '@/components/ui/button';
 import { Check, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useCapabilities } from '@/hooks/useBilling';
+import { CAPABILITIES } from '@/lib/planMeta';
 import { parseRejectionReason } from '@/components/RejectionDetailsCard';
 
 /** One-line label for the lifecycle stage when a filing is rejected.
@@ -144,8 +146,13 @@ export function computeShipmentLifecycle(args: {
   filing: Filing;
   linkedAbi: AbiLite | null;
   linkedMq: MqLite | null;
+  // ABI Entry is a gated capability (Entry+ tiers). When false, the Entry
+  // stage still shows as part of the lifecycle but we omit the "File Entry"
+  // action so ISF-only orgs aren't sent to a feature they can't use. Defaults
+  // true to preserve behavior for any caller that doesn't pass it.
+  canFileEntry?: boolean;
 }): StageNode[] {
-  const { filing, linkedAbi, linkedMq } = args;
+  const { filing, linkedAbi, linkedMq, canFileEntry = true } = args;
 
   // ── Stage 1: ISF Filed
   const isfState: State =
@@ -209,7 +216,9 @@ export function computeShipmentLifecycle(args: {
   } else if (!linkedAbi) {
     entryState = 'active';
     entryDetail = 'Ready to file 7501 + 3461';
-    entryCta = { label: 'File Entry', to: `/abi-documents/new?fromShipment=${filing.id}` };
+    if (canFileEntry) {
+      entryCta = { label: 'File Entry', to: `/abi-documents/new?fromShipment=${filing.id}` };
+    }
   } else if (linkedAbi.status === 'ACCEPTED') {
     entryState = 'done';
     entryDetail = 'Transmitted to CBP';
@@ -363,7 +372,13 @@ export function LifecycleWidget({ filing, abiDocs = [], manifestQueries = [] }: 
         ?? null
     : null;
 
-  const stages = computeShipmentLifecycle({ filing, linkedAbi, linkedMq });
+  const { can } = useCapabilities();
+  const stages = computeShipmentLifecycle({
+    filing,
+    linkedAbi,
+    linkedMq,
+    canFileEntry: can(CAPABILITIES.ABI_ENTRY),
+  });
   const doneCount = stages.filter(s => s.state === 'done').length;
   const blocked = stages.find(s => s.state === 'blocked');
 
