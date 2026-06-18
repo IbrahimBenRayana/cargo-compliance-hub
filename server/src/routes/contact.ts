@@ -6,8 +6,9 @@
  * Pre-Phase-3, ContactPage.handleSubmit was a setTimeout + console.log
  * stub — every demo request, enterprise inquiry, and bug report was
  * silently dropped. This route accepts the submission, validates it,
- * and emails support@mycargolens.com via the same Azure SMTP transport
- * the rest of the app uses.
+ * and emails the team via the same Azure SMTP transport the rest of the app
+ * uses — "Request a demo" (subject=demo) routes to contact@mycargolens.com,
+ * all other subjects to support@mycargolens.com.
  *
  * Rate-limited to 5/hr/IP via contactFormLimiter (see middleware).
  * Validated with strict Zod — unexpected fields are rejected.
@@ -80,6 +81,10 @@ router.post('/', contactFormLimiter, async (req: Request, res: Response): Promis
   };
   const subjectLabel = subjectLabels[subject];
 
+  // Route by subject: "Request a demo" submissions go to the sales inbox;
+  // everything else continues to support.
+  const to = subject === 'demo' ? 'contact@mycargolens.com' : 'support@mycargolens.com';
+
   const safeName = escapeHtml(name);
   const safeEmail = escapeHtml(email);
   const safeMessage = escapeHtml(message).replace(/\n/g, '<br>');
@@ -105,7 +110,7 @@ router.post('/', contactFormLimiter, async (req: Request, res: Response): Promis
   // is misconfigured we don't want the form to error and turn legitimate
   // inquiries into "send failed" toast spam.
   const ok = await sendMail({
-    to: 'support@mycargolens.com',
+    to,
     subject: `[Contact] ${subjectLabel} — ${name}`,
     html,
     text,
