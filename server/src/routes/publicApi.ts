@@ -11,10 +11,13 @@
  * logic from the route handlers into reusable services first.
  */
 import { Router, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { apiKeyAuth, requireScope, ApiRequest } from '../middleware/apiKeyAuth.js';
 import { generalLimiter } from '../middleware/rateLimiter.js';
 import { CAPABILITIES } from '../config/plans.js';
+import { createFilingSchema } from '../schemas/filing.js';
+import { createFilingForOrg, submitFilingToCBP } from '../services/filingWrite.js';
 
 const router = Router();
 router.use(generalLimiter);
@@ -52,6 +55,36 @@ router.get('/shipments', requireScope('filings:read'), async (req: ApiRequest, r
     },
   });
   res.json({ data });
+});
+
+// POST /shipments — create an ISF draft (ISF-10 / ISF-5).
+router.post('/shipments', requireScope('filings:write'), async (req: ApiRequest, res: Response): Promise<void> => {
+  try {
+    const data = createFilingSchema.parse(req.body);
+    const filing = await createFilingForOrg({
+      data,
+      orgId: req.apiContext!.orgId,
+      userId: req.apiContext!.actorUserId,
+    });
+    res.status(201).json({ data: filing });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation failed', details: err.flatten() });
+      return;
+    }
+    throw err;
+  }
+});
+
+// POST /shipments/:id/submit — submit a filing to CBP. Billed per shipment;
+// requires an active tier (the service enforces the ISF_FILING capability).
+router.post('/shipments/:id/submit', requireScope('filings:write'), async (req: ApiRequest, res: Response): Promise<void> => {
+  const outcome = await submitFilingToCBP({
+    filingId: String(req.params.id),
+    orgId: req.apiContext!.orgId,
+    userId: req.apiContext!.actorUserId,
+  });
+  res.status(outcome.httpStatus).json(outcome.body);
 });
 
 // GET /shipments/:id — one filing.

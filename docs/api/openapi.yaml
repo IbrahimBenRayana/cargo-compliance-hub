@@ -9,9 +9,9 @@ info:
     only do what the org's plan unlocks.
 
 
-    Status: this is the FOUNDATION release — authentication + read endpoints.
-    Write endpoints (create/submit ISF, create/send ABI Entry), XML
-    content-negotiation, and status webhooks are coming in the next release.
+    Status: authentication + read endpoints + ISF write (create draft, submit to
+    CBP). ABI Entry write (create/send), XML content-negotiation, and status
+    webhooks are coming next.
 servers:
   - url: https://app.mycargolens.com/api/public/v1
     description: Production
@@ -86,6 +86,32 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
   /shipments:
+    post:
+      summary: Create an ISF draft (ISF-10 / ISF-5).
+      description: Requires scope `filings:write`. Body matches the ISF filing schema (parties, BOLs, commodities, containers). Returns the created draft; it is not submitted to CBP until you call /shipments/{id}/submit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filingType: { type: string, enum: [ISF-10, ISF-5], default: ISF-10 }
+                masterBol: { type: string }
+                houseBol: { type: string }
+                commodities: { type: array, items: { type: object } }
+                containers: { type: array, items: { type: object } }
+              description: "Full schema in server/src/schemas/filing.ts (createFilingSchema)."
+      responses:
+        "201":
+          description: Draft created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Shipment" } }
+        "400": { description: Validation failed }
+        "403": { description: Missing required scope }
     get:
       summary: List ISF filings for the organization.
       description: Requires scope `filings:read`.
@@ -128,6 +154,32 @@ paths:
                 type: object
                 properties: { data: { $ref: "#/components/schemas/Shipment" } }
         "404": { description: Filing not found }
+  /shipments/{id}/submit:
+    post:
+      summary: Submit an ISF filing to CBP.
+      description: >
+        Requires scope `filings:write` and an active plan (the ISF_FILING
+        capability). Bills one charge per shipment on success (idempotent). The
+        response mirrors the app: 200 with the updated filing on success, 422 on
+        CBP validation errors, 400 on a CBP system error or invalid state, 402
+        if no active plan.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Submitted (or transmitted-and-rejected — see filing.status)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filing: { $ref: "#/components/schemas/Shipment" }
+                  ccFilingId: { type: string, nullable: true }
+        "402": { description: No active plan (code subscription_required) }
+        "422": { description: CBP validation errors }
   /entries:
     get:
       summary: List ABI Entry documents for the organization.
@@ -168,8 +220,6 @@ paths:
                 properties: { data: { $ref: "#/components/schemas/Entry" } }
         "404": { description: Entry not found }
 # ── Coming next release ──────────────────────────────────────────────
-# POST /shipments              create an ISF draft            (filings:write)
-# POST /shipments/{id}/submit  submit an ISF to CBP           (filings:write)
 # POST /entries                create an ABI Entry draft      (entries:write + ABI_ENTRY)
 # POST /entries/{id}/send      transmit an ABI Entry to CBP   (entries:write + ABI_ENTRY)
 # + XML content-negotiation (Accept/Content-Type: application/xml) and status webhooks.
