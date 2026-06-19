@@ -88,6 +88,7 @@ const platformColumns: Array<{
 // users still need to find from the Platform menu.
 const platformMoreLinks: Array<{ title: string; href: string; description?: string }> = [
   { title: "All features", href: "/features", description: "Overview of every capability" },
+  { title: "Why MyCargoLens", href: "/why-mycargolens", description: "Our value vs. legacy customs software" },
   { title: "Security", href: "/security", description: "Auth, encryption, audit trail" },
   { title: "Pricing", href: "/pricing", description: "Plans + plan-limit details" },
 ];
