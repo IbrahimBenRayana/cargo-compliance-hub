@@ -37,6 +37,7 @@ model Organization {
   manifestQueries ManifestQuery[]
   abiDocuments    AbiDocument[]
   trackedShipments TrackedShipment[]
+  apiKeys         ApiKey[]
 
   @@map("organizations")
 }
@@ -77,10 +78,37 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   passwordSetupTokens    PasswordSetupToken[]
   trackedShipments       TrackedShipment[]
+  apiKeys                ApiKey[]                 @relation("ApiKeyCreator")
 
   @@index([orgId])
   @@index([email])
   @@map("users")
+}
+
+// ─── API Keys (public API) ─────────────────────────────────
+// Customer-issued credentials for the public /api/public/v1 surface (brokers,
+// 3PLs, ERP integrations). The full key (mcl_live_…) is shown ONCE at creation
+// and stored only as a SHA-256 hash; `prefix` is a non-secret display fragment.
+// `scopes` gate what the key can do (e.g. filings:read, filings:write,
+// entries:read, entries:write). Requests run under the key's org + tier
+// capabilities, exactly like the app UI.
+model ApiKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  name        String    @db.VarChar(120)
+  prefix      String    @db.VarChar(24) // non-secret, e.g. "mcl_live_a1b2"
+  keyHash     String    @unique @map("key_hash") @db.VarChar(255) // sha256(full key)
+  scopes      String[]
+  createdById String    @map("created_by") @db.Uuid
+  lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz()
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz()
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("ApiKeyCreator", fields: [createdById], references: [id])
+
+  @@index([orgId])
+  @@map("api_keys")
 }
 
 // ─── Password Setup Tokens ─────────────────────────────────

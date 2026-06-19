@@ -15,6 +15,7 @@ const ROUTES: Array<{ path: string; priority?: number; changeFrequency?: Metadat
   { path: "/platform/ai",            priority: 0.8,  changeFrequency: "monthly" },
   { path: "/platform/lifecycle",     priority: 0.8,  changeFrequency: "monthly" },
   { path: "/platform/automation",    priority: 0.8,  changeFrequency: "monthly" },
+  { path: "/why-mycargolens",        priority: 0.8,  changeFrequency: "monthly" },
   { path: "/solutions",              priority: 0.7,  changeFrequency: "monthly" },
   { path: "/pricing",                priority: 0.9,  changeFrequency: "monthly" },
   { path: "/book-a-demo",            priority: 0.9,  changeFrequency: "yearly"  },

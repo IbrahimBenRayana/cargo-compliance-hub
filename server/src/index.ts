@@ -15,6 +15,8 @@ import { generalLimiter } from './middleware/rateLimiter.js';
 import { authMiddleware, requireRole } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
+import apiKeyRoutes from './routes/apiKeys.js';
+import publicApiRoutes from './routes/publicApi.js';
 import complianceRoutes from './routes/compliance.js';
 import filingRoutes from './routes/filings.js';
 import submissionLogRoutes from './routes/submissionLogs.js';
@@ -112,6 +114,9 @@ app.get('/api/health', async (_req, res) => {
 // ─── API Routes (v1) ─────────────────────────────────────
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/api-keys', apiKeyRoutes);
+// Public, API-key-authenticated surface for broker/3PL/ERP integrations.
+app.use('/api/public/v1', publicApiRoutes);
 app.use('/api/v1/filings', filingRoutes);
 app.use('/api/v1/submission-logs', submissionLogRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
