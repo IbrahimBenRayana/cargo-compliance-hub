@@ -17,6 +17,8 @@ export interface ApiRequest extends Request {
   apiContext?: {
     orgId: string;
     keyId: string;
+    /** The user who created the key — actions taken via the API are attributed to them. */
+    actorUserId: string;
     scopes: string[];
     capabilities: Capability[];
     planId: string | null;
@@ -52,6 +54,7 @@ export async function apiKeyAuth(req: ApiRequest, res: Response, next: NextFunct
   req.apiContext = {
     orgId: key.orgId,
     keyId: key.id,
+    actorUserId: key.createdById,
     scopes: key.scopes,
     capabilities: ent.capabilities,
     planId: ent.planId,

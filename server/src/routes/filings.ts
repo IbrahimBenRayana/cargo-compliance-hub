@@ -14,6 +14,8 @@ import { translateValidationErrors, translateCBPRejection, sanitizeErrorMessage 
 import { getOrgEntitlements } from '../services/entitlements.js';
 import { billShipmentForFiling } from '../services/shipmentBilling.js';
 import { CAPABILITIES } from '../config/plans.js';
+import { addressSchema, commoditySchema, containerSchema, createFilingSchema } from '../schemas/filing.js';
+import { createFilingForOrg, submitFilingToCBP } from '../services/filingWrite.js';
 
 const router = Router();
 
@@ -27,101 +29,10 @@ const paramId = (req: AuthRequest): string => {
 };
 
 // ─── Zod Schemas ──────────────────────────────────────────
-// Each schema mirrors what the ISF wizard actually sends (see
-// src/pages/ShipmentWizard.tsx → buildPayload). Tighter than `z.any()`
-// so bad data is caught at the route boundary instead of being silently
-// passed to CC and rejected there.
-
-const addressSchema = z.object({
-  name: z.string().min(1).max(35, 'Party name must be 35 characters or fewer (CC limit)'),
-  address1: z.string().max(100).optional(),
-  address2: z.string().max(100).optional(),
-  city: z.string().max(100).optional(),
-  state: z.string().max(50).optional(),
-  zip: z.string().max(20).optional(),
-  country: z.string().max(2).optional(), // ISO-2 when present; loose for drafts
-}).or(z.string()); // Plain string accepted for legacy / partial drafts
-
-const commoditySchema = z.object({
-  // Wizard sends digits-only, max 6 chars (ISF requires HTS-6 prefix).
-  // We accept 4-10 digits at the boundary so callers other than the wizard
-  // (e.g., AI prefill, API) work too. Strict format check at /submit time.
-  htsCode: z.string().regex(/^\d{4,10}$/, 'HTS code must be 4–10 digits (no dots/dashes)').or(
-    z.string().regex(/^[\d\.\-\s]+$/, 'HTS code may include digits, dots, dashes, or spaces').refine(
-      (s) => /^\d{4,10}$/.test(s.replace(/[\.\-\s]/g, '')),
-      'HTS code must be 4–10 digits after stripping separators',
-    ),
-  ),
-  countryOfOrigin: z.string().regex(/^[A-Z]{2}$/i, 'Country of origin must be a 2-letter ISO code (e.g., CN, US)'),
-  description: z.string().max(45, 'Commodity description must be 45 characters or fewer (CC limit)').optional(),
-  quantity: z.number().nonnegative().optional(),
-  quantityUOM: z.string().max(10).optional(),
-  weight: z.object({
-    value: z.number().nonnegative(),
-    // CC accepts only K (kilograms) or L (pounds). 'KG' / 'LB' / freeform = rejected.
-    unit: z.enum(['K', 'L'], { errorMap: () => ({ message: 'Weight unit must be "K" (kilograms) or "L" (pounds)' }) }).default('K'),
-  }).optional(),
-  value: z.object({
-    amount: z.number().nonnegative(),
-    currency: z.string().regex(/^[A-Z]{3}$/, 'Currency must be a 3-letter ISO code (e.g., USD)').default('USD'),
-  }).optional(),
-});
-
-const containerSchema = z.object({
-  number: z.string().min(1).max(20, 'Container number must be 20 characters or fewer'),
-  // CC container types (CN = standard, NC = none/no-container, 20/40/40HC = sizes).
-  // Wizard defaults to 'CN' when type is missing — schema reflects that.
-  type: z.enum(['CN', 'NC', '20', '40', '40HC', '20GP', '40GP', 'TW', 'CL', 'R0']).optional(),
-  sealNumber: z.string().max(50).optional(),
-});
-
-const createFilingSchema = z.object({
-  filingType: z.enum(['ISF-10', 'ISF-5']).default('ISF-10'),
-
-  // Importer (string fields stay loose at create time so partial drafts can save).
-  // Strict checks run at /submit via validateFiling().
-  importerName: z.string().max(35, 'Importer name must be 35 characters or fewer (CC limit)').optional(),
-  importerNumber: z.string().max(50).optional(),
-
-  // Consignee
-  consigneeName: z.string().max(35, 'Consignee name must be 35 characters or fewer').optional(),
-  consigneeNumber: z.string().max(50).optional(),
-  consigneeAddress: addressSchema.optional(),
-
-  // Parties — wizard sends `manufacturer` as a single-element array; everything
-  // else as a single object. Both shapes work via `.or(z.array(addressSchema))`.
-  manufacturer: addressSchema.or(z.array(addressSchema)).optional(),
-  seller: addressSchema.optional(),
-  buyer: addressSchema.optional(),
-  shipToParty: addressSchema.optional(),
-  containerStuffingLocation: addressSchema.optional(),
-  consolidator: addressSchema.optional(),
-
-  // Shipment details
-  masterBol: z.string().max(100).optional(),
-  houseBol: z.string().max(100).optional(),
-  scacCode: z.string().max(10).optional(),
-  vesselName: z.string().max(100).optional(),
-  voyageNumber: z.string().max(50).optional(),
-  foreignPortOfUnlading: z.string().max(10).optional(),
-  placeOfDelivery: z.string().max(10).optional(),
-  estimatedDeparture: z.string().optional(),
-  estimatedArrival: z.string().optional(),
-
-  // Bond
-  bondType: z.string().max(50).optional(),
-  bondSuretyCode: z.string().max(10).optional(),
-
-  // ISF-5 specific data (JSONB) — kept loose since the shape is heterogeneous;
-  // validateFiling() does the field-by-field checks at /submit.
-  isf5Data: z.any().optional(),
-
-  // Commodities & containers — now use the structured sub-schemas above.
-  // Bad data (HTS-non-numeric, weight unit "KG", description > 45 chars,
-  // country "USA" instead of "US") is rejected here at the route boundary.
-  commodities: z.array(commoditySchema).default([]),
-  containers: z.array(containerSchema).default([]),
-});
+// The ISF schemas (addressSchema, commoditySchema, containerSchema,
+// createFilingSchema) now live in ../schemas/filing.ts so the write services
+// and the public API can validate against the same contract. The
+// consolidation-only schemas that EXTEND them stay here.
 
 // One Master BOL + N House BOLs → N draft filings sharing a generated
 // consolidationId. Shared fields (vessel, voyage, port, bond...) come from
@@ -185,68 +96,12 @@ const createConsolidationSchema = createFilingSchema.extend({
 router.post('/', filingMutationLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const data = createFilingSchema.parse(req.body);
-
-    // Calculate filing deadline (24h before departure)
-    let filingDeadline: Date | null = null;
-    if (data.estimatedDeparture) {
-      filingDeadline = new Date(data.estimatedDeparture);
-      filingDeadline.setHours(filingDeadline.getHours() - 24);
-    }
-
-    const filing = await prisma.filing.create({
-      data: {
-        orgId: req.user!.orgId,
-        createdById: req.user!.id,
-        filingType: data.filingType,
-        status: 'draft',
-        importerName: data.importerName,
-        importerNumber: data.importerNumber,
-        consigneeName: data.consigneeName,
-        consigneeNumber: data.consigneeNumber,
-        consigneeAddress: data.consigneeAddress ?? undefined,
-        manufacturer: data.manufacturer ?? undefined,
-        seller: data.seller ?? undefined,
-        buyer: data.buyer ?? undefined,
-        shipToParty: data.shipToParty ?? undefined,
-        containerStuffingLocation: data.containerStuffingLocation ?? undefined,
-        consolidator: data.consolidator ?? undefined,
-        masterBol: data.masterBol,
-        houseBol: data.houseBol,
-        scacCode: data.scacCode,
-        vesselName: data.vesselName,
-        voyageNumber: data.voyageNumber,
-        foreignPortOfUnlading: data.foreignPortOfUnlading,
-        placeOfDelivery: data.placeOfDelivery,
-        estimatedDeparture: data.estimatedDeparture ? new Date(data.estimatedDeparture) : undefined,
-        estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
-        filingDeadline: filingDeadline ?? undefined,
-        bondType: data.bondType,
-        bondSuretyCode: data.bondSuretyCode,
-        isf5Data: data.isf5Data ?? undefined,
-        commodities: data.commodities,
-        containers: data.containers,
-        statusHistory: {
-          create: {
-            status: 'draft',
-            message: 'Filing created',
-            changedById: req.user!.id,
-          },
-        },
-      },
+    const filing = await createFilingForOrg({
+      data,
+      orgId: req.user!.orgId,
+      userId: req.user!.id,
+      meta: getRequestMeta(req),
     });
-
-    // Audit log
-    const meta = getRequestMeta(req);
-    writeAuditLog({
-      orgId: req.user!.orgId, userId: req.user!.id,
-      action: 'filing.created', entityType: 'filing', entityId: filing.id,
-      newValue: { filingType: data.filingType, masterBol: data.masterBol },
-      ...meta,
-    });
-
-    // Seed the score-history trajectory with a 'created' snapshot.
-    await recordScoreSnapshot(filing.id, 'created');
-
     res.status(201).json(filing);
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -545,273 +400,13 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
 // ─── POST /api/v1/filings/:id/submit — Submit to CBP ──────
 router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
-  const filing = await prisma.filing.findFirst({
-    where: { id: paramId(req), orgId: req.user!.orgId },
+  const outcome = await submitFilingToCBP({
+    filingId: paramId(req),
+    orgId: req.user!.orgId,
+    userId: req.user!.id,
+    requestMeta: getRequestMeta(req),
   });
-
-  if (!filing) {
-    res.status(404).json({ error: 'Filing not found' });
-    return;
-  }
-
-  // State machine check
-  if (!isValidTransition(filing.status, 'submitted')) {
-    res.status(400).json({
-      error: `Filing cannot be submitted from "${filing.status}" status`,
-      allowedTransitions: getAllowedTransitions(filing.status),
-    });
-    return;
-  }
-
-  // Run validation before submitting
-  const validation = validateFiling(filing);
-  if (!validation.valid) {
-    res.status(400).json({
-      error: 'Filing has validation errors',
-      validationErrors: validation.errors,
-      score: validation.score,
-    });
-    return;
-  }
-
-  // ─── Capability gate (per-filing pricing) ────────────────
-  // ISF filing is included in every tier, so submitting just requires an
-  // active tier. There is NO monthly cap to reserve against — billing is per
-  // shipment and happens AFTER a successful CBP submission via
-  // billShipmentForFiling (idempotent on filingId, so re-submits and a later
-  // ABI Entry send on the same shipment never double-charge).
-  const ent = await getOrgEntitlements(req.user!.orgId);
-  if (!ent.hasActiveTier || !ent.capabilities.includes(CAPABILITIES.ISF_FILING)) {
-    res.status(402).json({
-      error: 'Choose a plan to submit filings.',
-      code: 'subscription_required',
-      upgradeUrl: '/settings?tab=billing',
-    });
-    return;
-  }
-
-  try {
-    // Map to CustomsCity format (auto-detect ISF-10 vs ISF-5)
-    const ccPayload = mapFilingToCCPayload(filing);
-
-    // Create document in CustomsCity
-    const createResult = await ccClient.createDocument(ccPayload);
-
-    // Log the API call
-    await prisma.submissionLog.create({
-      data: {
-        orgId: req.user!.orgId,
-        filingId: filing.id,
-        userId: req.user!.id,
-        method: 'POST',
-        url: '/api/documents',
-        requestPayload: ccPayload as any,
-        responseStatus: createResult.status,
-        responseBody: (createResult.validationErrors ?? createResult.data) as any,
-        latencyMs: createResult.latencyMs,
-      },
-    });
-
-    // Handle CC validation failures (201 + array of validation messages)
-    if (!createResult.persisted) {
-      const rawErrorObjects = createResult.validationErrors
-        ?.filter((e: any) => e.field) || [];
-
-      const rawErrors = rawErrorObjects.map((e: any) => `${e.field}: ${e.message}`);
-      const errorSummary = rawErrors.join('; ') || 'Filing validation failed';
-
-      // Pass original objects to translator for better field extraction
-      const translatedErrors = translateValidationErrors(rawErrorObjects);
-
-      // Store both human-readable summary and structured translated errors
-      const rejectionData = JSON.stringify({
-        summary: errorSummary,
-        errors: translatedErrors,
-      });
-
-      await prisma.filing.update({
-        where: { id: filing.id },
-        data: {
-          status: 'rejected',
-          rejectedAt: new Date(),
-          rejectionReason: rejectionData,
-        },
-      });
-
-      await prisma.filingStatusHistory.create({
-        data: {
-          filingId: filing.id,
-          status: 'rejected',
-          message: `CBP filing validation failed (${createResult.validationErrors?.length ?? 0} issues)`,
-          ccResponse: (createResult.validationErrors ?? createResult.data) as any,
-          changedById: req.user!.id,
-        },
-      });
-      await recordScoreSnapshot(filing.id, 'rejected');
-
-      // Rejected before transmission to CBP — not billable (no charge created).
-
-      res.status(422).json({
-        error: 'Filing was rejected due to validation errors. Please review and correct the issues below.',
-        validationErrors: translatedErrors,
-        rawErrors: createResult.validationErrors,
-        filing: await prisma.filing.findUnique({ where: { id: filing.id } }),
-      });
-      return;
-    }
-
-    if (createResult.status >= 400) {
-      // API returned an error
-      await prisma.filing.update({
-        where: { id: filing.id },
-        data: {
-          status: 'rejected',
-          rejectedAt: new Date(),
-          rejectionReason: JSON.stringify(createResult.data),
-        },
-      });
-
-      await prisma.filingStatusHistory.create({
-        data: {
-          filingId: filing.id,
-          status: 'rejected',
-          message: `CBP filing system error: ${createResult.status}`,
-          ccResponse: createResult.data as any,
-          changedById: req.user!.id,
-        },
-      });
-      await recordScoreSnapshot(filing.id, 'rejected');
-
-      // CC returned a hard error before our filing made it to CBP — not billable.
-
-      res.status(400).json({
-        error: 'The filing was rejected by the CBP filing system. Please review your data and try again.',
-        apiResponse: createResult.data,
-      });
-      return;
-    }
-
-    const ccFilingId = createResult.processId ?? createResult.data?._id ?? createResult.data?.id;
-
-    // ISF-5 creates with send=true (one-step create+send), so skip the separate send call.
-    // ISF-10 creates with send=false and requires a separate /api/send call.
-    const isISF5 = filing.filingType === 'ISF-5';
-    const wasSentDuringCreate = createResult.data?.send === 'add' || isISF5;
-
-    let sendResult: { data: any; status: number; latencyMs: number } | null = null;
-    if (!wasSentDuringCreate) {
-      // ISF-10: separate send step
-      const docType = 'isf';
-      const sendPayload = {
-        type: docType,
-        sendAs: 'add',
-        BOLNumber: [filing.houseBol ?? filing.masterBol],
-      };
-      sendResult = await ccClient.sendDocument(sendPayload);
-
-      // Log the send call
-      await prisma.submissionLog.create({
-        data: {
-          orgId: req.user!.orgId,
-          filingId: filing.id,
-          userId: req.user!.id,
-          method: 'POST',
-          url: '/api/send',
-          requestPayload: sendPayload as any,
-          responseStatus: sendResult.status,
-          responseBody: sendResult.data as any,
-          latencyMs: sendResult.latencyMs,
-        },
-      });
-    }
-
-    // Determine status: if ISF-5 (sent during create), success is based on createResult
-    const sendOk = wasSentDuringCreate ? true : (sendResult!.status < 400);
-
-    // Update filing status. When transitioning OUT of 'rejected' (i.e. user
-    // resubmitted a previously-rejected filing and the submit succeeded), we
-    // explicitly clear rejectionReason + rejectedAt so stale rejection text
-    // doesn't keep appearing as "Previous rejection" on the now-accepted view.
-    const newStatus = sendOk ? 'submitted' : 'rejected';
-    const updatedFiling = await prisma.filing.update({
-      where: { id: filing.id },
-      data: {
-        status: newStatus,
-        ccFilingId: ccFilingId ?? null,
-        submittedAt: newStatus === 'submitted' ? new Date() : undefined,
-        // On rejection: stamp the new metadata. On success (submitted): clear
-        // both fields so we don't carry forward a prior cycle's leftovers.
-        rejectedAt: newStatus === 'rejected' ? new Date() : null,
-        rejectionReason: newStatus === 'rejected'
-          ? JSON.stringify(sendResult?.data ?? createResult.data)
-          : null,
-      },
-    });
-
-    await prisma.filingStatusHistory.create({
-      data: {
-        filingId: filing.id,
-        status: newStatus,
-        message: newStatus === 'submitted'
-          ? 'Filing submitted to CBP'
-          : `Submission failed: ${sendResult?.status ?? createResult.status}`,
-        ccResponse: (sendResult?.data ?? createResult.data) as any,
-        changedById: req.user!.id,
-      },
-    });
-    await recordScoreSnapshot(filing.id, triggerForStatus(newStatus));
-
-    res.json({
-      filing: updatedFiling,
-      ccFilingId,
-      sendResponse: sendResult?.data ?? createResult.data,
-    });
-
-    // Bill the shipment on a successful submission. Idempotent on filingId, so
-    // a re-submit (or a later ABI Entry send on the same shipment) never
-    // double-charges. Runs after the response is sent; never throws.
-    if (newStatus === 'submitted') {
-      await billShipmentForFiling(filing.id, req.user!.orgId);
-    }
-
-    // Audit log + notifications (fire-and-forget)
-    const meta = getRequestMeta(req);
-    writeAuditLog({
-      orgId: req.user!.orgId, userId: req.user!.id,
-      action: `filing.${newStatus}`, entityType: 'filing', entityId: filing.id,
-      oldValue: { status: filing.status },
-      newValue: { status: newStatus, ccFilingId },
-      ...meta,
-    });
-    if (newStatus === 'submitted') {
-      notifyFilingSubmitted(req.user!.orgId, req.user!.id, filing.id, filing.masterBol || '');
-    } else {
-      notifyFilingRejected(req.user!.orgId, filing.id, filing.masterBol || '', JSON.stringify(sendResult?.data ?? createResult.data));
-    }
-  } catch (err: any) {
-    // CC call (or downstream DB write) threw — nothing was billed (the charge
-    // is only created on a successful submit), so there is nothing to release.
-
-    // Log failed attempt
-    await prisma.submissionLog.create({
-      data: {
-        orgId: req.user!.orgId,
-        filingId: filing.id,
-        userId: req.user!.id,
-        method: 'POST',
-        url: '/api/documents',
-        errorMessage: err.message,
-        latencyMs: 0,
-      },
-    });
-
-    res.status(502).json({
-      error: 'Failed to communicate with the CBP filing system. Please try again later.',
-      message: err.message,
-    });
-
-    notifyApiError(req.user!.orgId, req.user!.id, `Failed to submit filing: ${err.message}`);
-  }
+  res.status(outcome.httpStatus).json(outcome.body);
 });
 
 // ─── POST /api/v1/filings/:id/amend — Submit amendment ─────
