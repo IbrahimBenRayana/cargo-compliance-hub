@@ -810,6 +810,46 @@ export const billingApi = {
 
 export type BillingSubscription = Awaited<ReturnType<typeof billingApi.subscription>>;
 
+// ─── API Keys API (public API credentials) ────────────────
+// Customer-managed credentials for the public API. Create/revoke are
+// owner/admin only (server enforces). The full secret `key` is returned
+// exactly once on create and never again — surface it to the user immediately.
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+/** Create response: same shape as a list row plus the one-time secret. */
+export interface ApiKeyCreated {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  key: string;
+}
+
+export const apiKeysApi = {
+  list() {
+    return apiFetch<{ apiKeys: ApiKey[] }>('/api/v1/api-keys');
+  },
+
+  create(body: { name: string; scopes: string[] }) {
+    return apiFetch<ApiKeyCreated>('/api/v1/api-keys', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  revoke(id: string) {
+    return apiFetch<{ success: true }>(`/api/v1/api-keys/${id}`, { method: 'DELETE' });
+  },
+};
+
 // ─── Platform Admin API (client provisioning) ─────────────
 // Only reachable by platform admins (server enforces requirePlatformAdmin).
 export interface AdminOrganization {
