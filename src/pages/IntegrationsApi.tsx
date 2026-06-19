@@ -1,15 +1,60 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
 import { useTestCCConnection } from '@/hooks/useFilings';
-import { integrationsApi } from '@/api/client';
+import { useAuthStore } from '@/hooks/useAuth';
+import { integrationsApi, apiKeysApi, type ApiKey, type ApiKeyCreated } from '@/api/client';
 import {
   CheckCircle2, XCircle, Loader2, Plug, Zap, Search, Activity, Globe,
   FileText, Mail, Send, Server, ShieldCheck, Radio, Sparkles, ArrowUpRight,
+  KeyRound, Copy, Trash2, Plus, AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+// ─── API Key scopes (must match server) ────────────────────
+const API_KEY_SCOPES: { value: string; label: string; desc: string }[] = [
+  { value: 'filings:read', label: 'filings:read', desc: 'Read filings and their status' },
+  { value: 'filings:write', label: 'filings:write', desc: 'Create, update & submit filings' },
+  { value: 'entries:read', label: 'entries:read', desc: 'Read entry summaries' },
+  { value: 'entries:write', label: 'entries:write', desc: 'Create & amend entry summaries' },
+];
+
+const PUBLIC_API_BASE_URL = 'https://app.mycargolens.com/api/public/v1';
+
+function fmtKeyDate(ts: string | null) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function fmtKeyRelative(ts: string | null) {
+  if (!ts) return 'Never';
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return fmtKeyDate(ts);
+}
 
 export default function IntegrationsApi() {
   const testConnection = useTestCCConnection();
@@ -310,7 +355,326 @@ export default function IntegrationsApi() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ─── API Keys Card ───────────────────────────────── */}
+      <ApiKeysCard />
     </div>
+  );
+}
+
+// ─── API Keys ───────────────────────────────────────────────
+
+function ApiKeysCard() {
+  const queryClient = useQueryClient();
+  const currentUser = useAuthStore((s) => s.user);
+  const canManage = currentUser?.role === 'owner' || currentUser?.role === 'admin';
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['apiKeys'],
+    queryFn: () => apiKeysApi.list(),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (body: { name: string; scopes: string[] }) => apiKeysApi.create(body),
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: (id: string) => apiKeysApi.revoke(id),
+    onSuccess: () => {
+      toast.success('API key revoked');
+      queryClient.invalidateQueries({ queryKey: ['apiKeys'] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.body?.error || err?.message || 'Failed to revoke API key');
+    },
+  });
+
+  // Create-dialog state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [scopes, setScopes] = useState<string[]>([]);
+  // The one-time secret, held only until the user dismisses it.
+  const [created, setCreated] = useState<ApiKeyCreated | null>(null);
+
+  const keys: ApiKey[] = data?.apiKeys ?? [];
+  const activeKeys = keys.filter((k) => !k.revokedAt);
+  const revokedKeys = keys.filter((k) => k.revokedAt);
+
+  const resetForm = () => {
+    setName('');
+    setScopes([]);
+  };
+
+  const toggleScope = (scope: string) => {
+    setScopes((prev) => (prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope]));
+  };
+
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      toast.error('Name is required');
+      return;
+    }
+    if (scopes.length === 0) {
+      toast.error('Select at least one scope');
+      return;
+    }
+    try {
+      const result = await createMutation.mutateAsync({ name: name.trim(), scopes });
+      setCreated(result);
+      setCreateOpen(false);
+      resetForm();
+    } catch (err: any) {
+      toast.error(err?.body?.error || err?.message || 'Failed to create API key');
+    }
+  };
+
+  // After the secret has been shown and dismissed, refresh the list.
+  const dismissSecret = () => {
+    setCreated(null);
+    queryClient.invalidateQueries({ queryKey: ['apiKeys'] });
+  };
+
+  const copySecret = async () => {
+    if (!created) return;
+    try {
+      await navigator.clipboard.writeText(created.key);
+      toast.success('API key copied to clipboard');
+    } catch {
+      toast.error('Could not copy — copy it manually');
+    }
+  };
+
+  return (
+    <Card className="opacity-0 animate-fade-in-up overflow-hidden" style={{ animationDelay: '540ms', animationFillMode: 'forwards' }}>
+      <CardHeader className="border-b bg-gradient-to-r from-violet-500/5 via-transparent to-transparent">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shadow-md shadow-violet-500/30">
+              <KeyRound className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-base">API Keys</CardTitle>
+              <CardDescription className="mt-0.5">
+                Programmatic credentials for the MyCargoLens public API
+              </CardDescription>
+            </div>
+          </div>
+          {canManage && (
+            <Dialog
+              open={createOpen}
+              onOpenChange={(open) => {
+                setCreateOpen(open);
+                if (!open) resetForm();
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button size="sm" className="cursor-pointer">
+                  <Plus className="h-3.5 w-3.5 mr-2" />
+                  Create API key
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create API key</DialogTitle>
+                  <DialogDescription>
+                    Give the key a name and choose the scopes it can access. The secret is shown only once.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="api-key-name">Name</Label>
+                    <Input
+                      id="api-key-name"
+                      placeholder="e.g. Production server"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Scopes</Label>
+                    <div className="grid gap-2">
+                      {API_KEY_SCOPES.map((scope) => (
+                        <label
+                          key={scope.value}
+                          htmlFor={`scope-${scope.value}`}
+                          className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/40 transition-colors cursor-pointer"
+                        >
+                          <Checkbox
+                            id={`scope-${scope.value}`}
+                            checked={scopes.includes(scope.value)}
+                            onCheckedChange={() => toggleScope(scope.value)}
+                            className="mt-0.5"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-mono font-semibold">{scope.label}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{scope.desc}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                  <Button onClick={handleCreate} disabled={createMutation.isPending}>
+                    {createMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <KeyRound className="mr-2 h-4 w-4" />
+                    )}
+                    Create key
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-6 space-y-5">
+        {/* How to use */}
+        <div className="flex items-start gap-3 p-3.5 rounded-xl border bg-violet-500/5 border-violet-500/20">
+          <Globe className="h-4 w-4 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Keys authenticate the public API at{' '}
+            <code className="font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground">{PUBLIC_API_BASE_URL}</code>{' '}
+            via the{' '}
+            <code className="font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground">Authorization: Bearer &lt;key&gt;</code>{' '}
+            header.
+          </p>
+        </div>
+
+        {isLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}
+          </div>
+        ) : keys.length === 0 ? (
+          <div className="text-center py-10">
+            <KeyRound className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground">No API keys yet</p>
+            {canManage && (
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-2 h-3.5 w-3.5" />
+                Create your first key
+              </Button>
+            )}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Key</TableHead>
+                <TableHead>Scopes</TableHead>
+                <TableHead>Last used</TableHead>
+                <TableHead>Created</TableHead>
+                {canManage && <TableHead className="w-[60px]" />}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...activeKeys, ...revokedKeys].map((k) => {
+                const isRevoked = !!k.revokedAt;
+                return (
+                  <TableRow key={k.id} className={cn(isRevoked && 'opacity-50')}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className={cn('font-medium text-sm', isRevoked && 'line-through')}>{k.name}</span>
+                        {isRevoked && (
+                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 uppercase font-bold tracking-wider bg-red-500/15 text-red-700 dark:text-red-400">
+                            Revoked
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <code className="font-mono text-xs text-muted-foreground">{k.prefix}…</code>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {k.scopes.map((s) => (
+                          <Badge key={s} variant="secondary" className="text-[10px] font-mono px-1.5 py-0">
+                            {s}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{fmtKeyRelative(k.lastUsedAt)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{fmtKeyDate(k.createdAt)}</TableCell>
+                    {canManage && (
+                      <TableCell>
+                        {!isRevoked && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" title="Revoke key">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Revoke "{k.name}"?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Any integration using this key will immediately stop working. This cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-red-600 hover:bg-red-700"
+                                  onClick={() => revokeMutation.mutate(k.id)}
+                                >
+                                  Revoke key
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      {/* One-time secret reveal dialog */}
+      <Dialog open={!!created} onOpenChange={(open) => { if (!open) dismissSecret(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>API key created</DialogTitle>
+            <DialogDescription>
+              Copy this key now — you won't be able to see it again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex items-start gap-3 p-3.5 rounded-xl border bg-amber-500/10 border-amber-500/30">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                This is the only time the full secret is shown. Store it somewhere safe.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="created-key">Secret key</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="created-key"
+                  readOnly
+                  value={created?.key ?? ''}
+                  className="font-mono text-xs"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <Button variant="outline" size="icon" className="shrink-0" onClick={copySecret} title="Copy key">
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={dismissSecret}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }
 

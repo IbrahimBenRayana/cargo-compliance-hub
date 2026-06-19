@@ -1,0 +1,175 @@
+openapi: 3.0.3
+info:
+  title: MyCargoLens Public API
+  version: "1.0.0-foundation"
+  description: >
+    Customer-facing API for brokers, 3PLs, and ERP integrations. Authenticate
+    with an API key (issued in the app under Settings → API). Requests run under
+    the key's organization and its subscription-tier capabilities — the API can
+    only do what the org's plan unlocks.
+
+
+    Status: this is the FOUNDATION release — authentication + read endpoints.
+    Write endpoints (create/submit ISF, create/send ABI Entry), XML
+    content-negotiation, and status webhooks are coming in the next release.
+servers:
+  - url: https://app.mycargolens.com/api/public/v1
+    description: Production
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: mcl_live_*
+      description: >
+        Send your key as `Authorization: Bearer mcl_live_…` (or the
+        `X-API-Key` header). Keys are scoped (filings:read, filings:write,
+        entries:read, entries:write) and can be revoked anytime.
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        code: { type: string, description: "e.g. api_key_required, api_key_invalid, insufficient_scope, feature_not_in_plan" }
+    Ping:
+      type: object
+      properties:
+        ok: { type: boolean }
+        orgId: { type: string, format: uuid }
+        plan: { type: string, nullable: true, description: "active tier id, or null if no active plan" }
+        capabilities:
+          type: array
+          items: { type: string, enum: [ISF_FILING, ABI_ENTRY, CONTAINER_TRACKING, HTS_CLASSIFICATION] }
+        scopes:
+          type: array
+          items: { type: string }
+    Shipment:
+      type: object
+      description: An ISF filing (the shipment record).
+      properties:
+        id: { type: string, format: uuid }
+        filingType: { type: string, enum: [ISF-10, ISF-5] }
+        status: { type: string, example: submitted }
+        masterBol: { type: string, nullable: true }
+        houseBol: { type: string, nullable: true }
+        ccFilingId: { type: string, nullable: true }
+        submittedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Entry:
+      type: object
+      description: An ABI Entry document (7501 / 3461). Requires the ABI_ENTRY capability.
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, example: SENT }
+        entryType: { type: string, example: "01" }
+        entryNumber: { type: string, nullable: true }
+        mbolNumber: { type: string, nullable: true }
+        sentAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+security:
+  - ApiKeyAuth: []
+paths:
+  /ping:
+    get:
+      summary: Auth check — returns the org, active plan, capabilities, and the key's scopes.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ping" }
+        "401":
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /shipments:
+    get:
+      summary: List ISF filings for the organization.
+      description: Requires scope `filings:read`.
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+          description: Filter by filing status (e.g. draft, submitted, accepted, rejected).
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Shipment" }
+        "401": { description: Missing or invalid API key }
+        "403": { description: Missing required scope }
+  /shipments/{id}:
+    get:
+      summary: Get a single ISF filing.
+      description: Requires scope `filings:read`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Shipment" } }
+        "404": { description: Filing not found }
+  /entries:
+    get:
+      summary: List ABI Entry documents for the organization.
+      description: Requires scope `entries:read` and the ABI_ENTRY capability (ISF+Entry / Complete tiers).
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Entry" }
+        "403":
+          description: Missing scope, or ABI Entry not in plan (code feature_not_in_plan)
+  /entries/{id}:
+    get:
+      summary: Get a single ABI Entry document.
+      description: Requires scope `entries:read` and the ABI_ENTRY capability.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Entry" } }
+        "404": { description: Entry not found }
+# ── Coming next release ──────────────────────────────────────────────
+# POST /shipments              create an ISF draft            (filings:write)
+# POST /shipments/{id}/submit  submit an ISF to CBP           (filings:write)
+# POST /entries                create an ABI Entry draft      (entries:write + ABI_ENTRY)
+# POST /entries/{id}/send      transmit an ABI Entry to CBP   (entries:write + ABI_ENTRY)
+# + XML content-negotiation (Accept/Content-Type: application/xml) and status webhooks.
