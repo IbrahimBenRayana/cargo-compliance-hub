@@ -4,18 +4,27 @@
  * to the original handlers; req/res-free (callers map the {httpStatus, body}
  * outcome to their response).
  *
- * NOTE: only the CREATE path lives here for now. The SEND path (which is
- * entangled with the polling subsystem) is extracted in a following increment.
+ * Covers CREATE (createAbiDocumentForOrg) and SEND (sendAbiDocumentToCBP).
+ * The send path's polling subsystem lives in ./abiPolling.ts.
  */
 import type { z } from 'zod';
 import { prisma } from '../config/database.js';
+import { abiGateway } from './abi/gateway.js';
 import {
   prefillFromFiling,
   prefillFromManifestQuery,
   extractDenormFromPayload,
+  extractCCErrorMessage,
+  mapABIDocumentToCC,
+  buildSendPayload,
+  canonicaliseEntryNumber,
 } from './abiDocumentMapper.js';
 import { sanitizeErrorMessage } from './errorTranslator.js';
-import { createABIDocumentSchema } from '../schemas/abiDocument.js';
+import { createABIDocumentSchema, abiDocumentBodySchema } from '../schemas/abiDocument.js';
+import { writeAuditLog } from './auditLog.js';
+import { notify } from './notifications.js';
+import { billShipment } from './shipmentBilling.js';
+import { pollABIDocumentStatus } from './abiPolling.js';
 import logger from '../config/logger.js';
 
 export interface AbiWriteOutcome {
@@ -83,5 +92,201 @@ export async function createAbiDocumentForOrg(params: {
   } catch (err: any) {
     logger.error({ err }, 'Failed to create ABI document');
     return { httpStatus: 500, body: { error: sanitizeErrorMessage(err.message || 'Failed to create ABI document') } };
+  }
+}
+
+type AuditMeta = Record<string, unknown>;
+
+// ─── Send (transmit) an ABI Entry to CBP ───────────────────
+// Two-step CC flow (create document → send), with atomic DRAFT→SENDING claim,
+// duplicate cleanup-and-retry, billing on success, fire-and-forget polling, and
+// rollback-to-DRAFT on failure. Extracted verbatim from routes/abiDocuments.ts.
+export async function sendAbiDocumentToCBP(params: {
+  docId: string;
+  orgId: string;
+  userId: string;
+  requestMeta?: AuditMeta;
+}): Promise<AbiWriteOutcome> {
+  const { docId, orgId, userId, requestMeta = {} } = params;
+
+  const doc = await prisma.abiDocument.findFirst({ where: { id: docId, orgId } });
+  if (!doc) {
+    return { httpStatus: 404, body: { error: 'ABI document not found' } };
+  }
+
+  // Idempotency — already transmitted / in-flight → return current state.
+  if (doc.status === 'SENDING' || doc.status === 'SENT' || doc.status === 'ACCEPTED' || doc.status === 'REJECTED') {
+    return { httpStatus: 200, body: { data: doc, note: `Already in status ${doc.status}` } };
+  }
+  if (doc.status !== 'DRAFT') {
+    return { httpStatus: 400, body: { error: `Cannot send document in status ${doc.status}` } };
+  }
+
+  // Full payload validation (deep) before we touch CC.
+  const bodyResult = abiDocumentBodySchema.safeParse(doc.payload);
+  if (!bodyResult.success) {
+    return { httpStatus: 400, body: { error: 'ABI document is incomplete or invalid', details: bodyResult.error.flatten() } };
+  }
+
+  const denorm = extractDenormFromPayload(doc.payload);
+  if (!denorm.mbolNumber) {
+    return { httpStatus: 400, body: { error: 'ABI document payload is missing manifest MBOL number' } };
+  }
+  if (!denorm.entryNumber) {
+    return { httpStatus: 400, body: { error: 'ABI document payload is missing filer-assigned entry number' } };
+  }
+
+  // Atomic DRAFT→SENDING (single UPDATE with a status predicate — exactly one
+  // concurrent caller wins; the loser short-circuits with the current status).
+  const claim = await prisma.abiDocument.updateMany({
+    where: { id: doc.id, status: 'DRAFT' },
+    data: { status: 'SENDING', sentAt: new Date(), lastError: null, ...denorm },
+  });
+  if (claim.count === 0) {
+    const current = await prisma.abiDocument.findUnique({ where: { id: doc.id } });
+    return {
+      httpStatus: 200,
+      body: { data: current, note: `Another request already transitioned the document (now ${current?.status}).` },
+    };
+  }
+  const sendingDoc = await prisma.abiDocument.findUniqueOrThrow({ where: { id: doc.id } });
+
+  try {
+    // Step 1 — POST /api/abi/documents
+    const createPayload = mapABIDocumentToCC(sendingDoc);
+    let createResult = await abiGateway.createABIDocument(createPayload);
+
+    await prisma.submissionLog.create({
+      data: {
+        orgId, userId, correlationId: sendingDoc.id,
+        method: 'POST', url: '/api/abi/documents',
+        requestPayload: createPayload as any,
+        responseStatus: createResult.status,
+        responseBody: createResult.data as any,
+        latencyMs: createResult.latencyMs,
+      },
+    });
+
+    // Auto-recover from CC "already exists" (500): delete the stale entry by
+    // entry number, then retry create. Idempotent transmit semantics.
+    const isDuplicate =
+      createResult.status === 500 && /already exist/i.test(String(createResult.data?.message ?? ''));
+
+    if (isDuplicate && sendingDoc.entryNumber) {
+      logger.info(
+        { docId: sendingDoc.id, entryNumber: sendingDoc.entryNumber },
+        'CC reports duplicate on create — attempting cleanup-then-retry',
+      );
+      const canonicalEntry = canonicaliseEntryNumber(sendingDoc.entryNumber);
+      const deleteResult = await abiGateway
+        .deleteABIDocument({ entryNumber: canonicalEntry })
+        .catch((err: any) => ({ status: 0, data: { error: err?.message ?? 'delete failed' }, latencyMs: 0 }));
+
+      await prisma.submissionLog.create({
+        data: {
+          orgId, userId, correlationId: sendingDoc.id,
+          method: 'DELETE', url: '/api/abi/documents',
+          requestPayload: { 'entry-number': canonicalEntry } as any,
+          responseStatus: deleteResult.status,
+          responseBody: deleteResult.data as any,
+          latencyMs: deleteResult.latencyMs ?? 0,
+        },
+      });
+
+      if (deleteResult.status >= 200 && deleteResult.status < 300) {
+        createResult = await abiGateway.createABIDocument(createPayload);
+        await prisma.submissionLog.create({
+          data: {
+            orgId, userId, correlationId: sendingDoc.id,
+            method: 'POST', url: '/api/abi/documents (retry after duplicate cleanup)',
+            requestPayload: createPayload as any,
+            responseStatus: createResult.status,
+            responseBody: createResult.data as any,
+            latencyMs: createResult.latencyMs,
+          },
+        });
+      }
+    }
+
+    // CC returns 2xx only when the document was actually accepted.
+    if (createResult.status < 200 || createResult.status >= 300) {
+      throw new Error(extractCCErrorMessage(createResult.data, createResult.status, 'create'));
+    }
+
+    const ccDocumentId: string | null = createResult.data?._id ?? createResult.data?.documentId ?? null;
+    const postCreateDoc = await prisma.abiDocument.update({
+      where: { id: sendingDoc.id },
+      data: { ...(ccDocumentId ? { ccDocumentId } : {}) },
+    });
+
+    // Step 2 — POST /api/abi/send
+    const sendPayload = buildSendPayload(postCreateDoc, 'add');
+    const sendResult = await abiGateway.sendABIDocument(sendPayload);
+
+    await prisma.submissionLog.create({
+      data: {
+        orgId, userId, correlationId: postCreateDoc.id,
+        method: 'POST', url: '/api/abi/send',
+        requestPayload: sendPayload as any,
+        responseStatus: sendResult.status,
+        responseBody: sendResult.data as any,
+        latencyMs: sendResult.latencyMs,
+      },
+    });
+
+    if (sendResult.status < 200 || sendResult.status >= 300) {
+      throw new Error(extractCCErrorMessage(sendResult.data, sendResult.status, 'send'));
+    }
+
+    const sentDoc = await prisma.abiDocument.update({
+      where: { id: postCreateDoc.id },
+      data: { status: 'SENT' },
+    });
+
+    writeAuditLog({
+      orgId, userId,
+      action: 'abi_document.sent', entityType: 'abi_document', entityId: sentDoc.id,
+      newValue: { entryNumber: sentDoc.entryNumber, mbolNumber: sentDoc.mbolNumber, ccDocumentId: sentDoc.ccDocumentId },
+      ...requestMeta,
+    });
+
+    notify({
+      kind: 'entry_submitted',
+      audience: { orgId, userIds: [userId] },
+      title: 'Entry Transmitted',
+      message: `Entry ${sentDoc.entryNumber || sentDoc.mbolNumber || sentDoc.id.slice(0, 8)} sent to CBP. Awaiting acceptance.`,
+      linkUrl: `/abi-documents/${sentDoc.id}`,
+      metadata: { entryNumber: sentDoc.entryNumber, entryType: sentDoc.entryType, mbolNumber: sentDoc.mbolNumber },
+      abiDocumentId: sentDoc.id,
+    }).catch(() => {});
+
+    // Bill the shipment — anchor on the linked ISF filing if present (so a
+    // linked ISF+Entry bills once); else the standalone Entry. Idempotent.
+    await billShipment(
+      sentDoc.filingId ? { filingId: sentDoc.filingId } : { abiDocumentId: sentDoc.id },
+      sentDoc.orgId,
+    );
+
+    // Fire-and-forget polling.
+    pollABIDocumentStatus(
+      sentDoc.id,
+      sentDoc.orgId,
+      sentDoc.entryType as '01' | '11',
+      sentDoc.entryNumber,
+      sentDoc.mbolNumber,
+    ).catch((err) => {
+      logger.error({ err, docId: sentDoc.id }, 'Background ABI poll failed');
+    });
+
+    return { httpStatus: 200, body: { data: sentDoc } };
+  } catch (err: any) {
+    logger.error({ err, docId: sendingDoc.id }, 'Failed to transmit ABI document');
+    const translated = sanitizeErrorMessage(err?.message || 'Failed to transmit ABI document');
+    // Rollback to DRAFT so the user can retry.
+    await prisma.abiDocument.update({
+      where: { id: sendingDoc.id },
+      data: { status: 'DRAFT', lastError: translated },
+    });
+    return { httpStatus: 502, body: { error: translated } };
   }
 }

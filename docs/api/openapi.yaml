@@ -9,9 +9,9 @@ info:
     only do what the org's plan unlocks.
 
 
-    Status: authentication + read endpoints + ISF write (create draft, submit to
-    CBP) + ABI Entry create. ABI Entry send, XML content-negotiation, and status
-    webhooks are coming next.
+    Status: authentication + read + ISF write (create draft, submit to CBP) +
+    ABI Entry write (create draft, send to CBP). XML content-negotiation and
+    status webhooks are coming next.
 servers:
   - url: https://app.mycargolens.com/api/public/v1
     description: Production
@@ -243,6 +243,31 @@ paths:
                 type: object
                 properties: { data: { $ref: "#/components/schemas/Entry" } }
         "404": { description: Entry not found }
+  /entries/{id}/send:
+    post:
+      summary: Transmit an ABI Entry to CBP.
+      description: >
+        Requires scope `entries:write` and the ABI_ENTRY capability. Two-step CC
+        flow (create document → send) with duplicate cleanup-and-retry; bills the
+        shipment on success (anchored to the linked ISF filing when present, so a
+        linked ISF+Entry bills once). 200 on success/idempotent, 400 on
+        incomplete payload or bad state, 502 on a CBP transmission error
+        (document rolls back to DRAFT for retry).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Transmitted (or already in a terminal/in-flight status)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Entry" } }
+        "400": { description: Incomplete payload or invalid state }
+        "403": { description: Missing scope or ABI Entry not in plan }
+        "502": { description: CBP transmission error (rolled back to DRAFT) }
 # ── Coming next release ──────────────────────────────────────────────
-# POST /entries/{id}/send      transmit an ABI Entry to CBP   (entries:write + ABI_ENTRY)
 # + XML content-negotiation (Accept/Content-Type: application/xml) and status webhooks.
