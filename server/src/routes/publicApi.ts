@@ -19,7 +19,7 @@ import { CAPABILITIES } from '../config/plans.js';
 import { createFilingSchema } from '../schemas/filing.js';
 import { createFilingForOrg, submitFilingToCBP } from '../services/filingWrite.js';
 import { createABIDocumentSchema } from '../schemas/abiDocument.js';
-import { createAbiDocumentForOrg } from '../services/abiWrite.js';
+import { createAbiDocumentForOrg, sendAbiDocumentToCBP } from '../services/abiWrite.js';
 
 const router = Router();
 router.use(generalLimiter);
@@ -114,6 +114,22 @@ router.post('/entries', requireScope('entries:write'), async (req: ApiRequest, r
   }
   const outcome = await createAbiDocumentForOrg({
     data: parsed.data,
+    orgId: req.apiContext!.orgId,
+    userId: req.apiContext!.actorUserId,
+  });
+  res.status(outcome.httpStatus).json(outcome.body);
+});
+
+// POST /entries/:id/send — transmit an ABI Entry to CBP. Bills the shipment on
+// success (anchored to the linked ISF filing when present, so an ISF+Entry on
+// the same shipment bills once).
+router.post('/entries/:id/send', requireScope('entries:write'), async (req: ApiRequest, res: Response): Promise<void> => {
+  if (!req.apiContext!.capabilities.includes(CAPABILITIES.ABI_ENTRY)) {
+    res.status(403).json({ error: "ABI Entry isn't included in your plan.", code: 'feature_not_in_plan' });
+    return;
+  }
+  const outcome = await sendAbiDocumentToCBP({
+    docId: String(req.params.id),
     orgId: req.apiContext!.orgId,
     userId: req.apiContext!.actorUserId,
   });
