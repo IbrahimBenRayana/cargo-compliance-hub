@@ -16,6 +16,7 @@ import { authMiddleware, requireRole } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import apiKeyRoutes from './routes/apiKeys.js';
+import webhookRoutes from './routes/webhooks.js';
 import publicApiRoutes from './routes/publicApi.js';
 import complianceRoutes from './routes/compliance.js';
 import filingRoutes from './routes/filings.js';
@@ -115,6 +116,7 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/api-keys', apiKeyRoutes);
+app.use('/api/v1/webhooks', webhookRoutes);
 // Public, API-key-authenticated surface for broker/3PL/ERP integrations.
 app.use('/api/public/v1', publicApiRoutes);
 app.use('/api/v1/filings', filingRoutes);

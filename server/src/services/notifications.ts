@@ -31,6 +31,7 @@ import { Prisma, type NotificationSeverity } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import logger from '../config/logger.js';
 import { publishNotificationEvents } from './notificationStream.js';
+import { emitWebhook } from './webhooks.js';
 // Email delivery moved to the queue worker (Phase 6) — no direct
 // send* imports here anymore.
 
@@ -387,6 +388,7 @@ export async function notifyFilingSubmitted(orgId: string, userId: string, filin
     metadata: { bolNumber: ref, submitterName },
     filingId,
   });
+  emitWebhook(orgId, 'filing.submitted', { filingId, bolNumber: ref });
 }
 
 export async function notifyFilingAccepted(orgId: string, filingId: string, bolNumber: string): Promise<void> {
@@ -411,6 +413,7 @@ export async function notifyFilingAccepted(orgId: string, filingId: string, bolN
     metadata: { bolNumber: ref, cbpTransactionId },
     filingId,
   });
+  emitWebhook(orgId, 'filing.accepted', { filingId, bolNumber: ref, cbpTransactionId });
 }
 
 export async function notifyFilingRejected(orgId: string, filingId: string, bolNumber: string, reason?: string): Promise<void> {
@@ -427,6 +430,7 @@ export async function notifyFilingRejected(orgId: string, filingId: string, bolN
     metadata: { bolNumber: ref, reason: reason ?? null },
     filingId,
   });
+  emitWebhook(orgId, 'filing.rejected', { filingId, bolNumber: ref, reason: reason ?? null });
 }
 
 export async function notifyFilingAmended(orgId: string, userId: string, filingId: string, bolNumber: string): Promise<void> {
