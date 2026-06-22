@@ -1,9 +1,9 @@
 /**
  * Step 1 — Entry & Shipment Info
  *
- * entryType is locked to "01" (Consumption Formal) for Phase 1. The "11"
- * Informal Entry option is still rendered so users see where it will appear
- * but selecting it is blocked via `disabledValues` + a tooltip hint.
+ * Supported entry types: "01" (Consumption Formal) and "86" (De Minimis,
+ * Section 321). "11" Informal Entry is still rendered but gated via
+ * `disabledValues` + a tooltip hint until its flow is validated.
  */
 import { Info, Ship } from 'lucide-react';
 import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
@@ -52,9 +52,9 @@ export default function Step1EntryShipment({ value, onChange, errors = {} }: Ste
           label="Entry Type"
           required
           value={value.entryType || '01'}
-          onChange={(v) => onChange({ entryType: v as '01' | '11' })}
+          onChange={(v) => onChange({ entryType: v as '01' | '11' | '86' })}
           options={ENTRY_TYPES}
-          hint="Phase 1 supports Consumption Entry (01) only. Informal entries are coming soon."
+          hint="Consumption (01) and De Minimis / Type 86 are supported. Informal (11) is coming soon."
           disabledValues={['11']}
           error={errors.entryType}
         />

@@ -202,7 +202,7 @@ paths:
   /entries:
     post:
       summary: Create a DRAFT ABI Entry document (7501 / 3461).
-      description: Requires scope `entries:write` and the ABI_ENTRY capability. Optionally pre-fills from a linked ISF filing (`filingId`) or a completed manifest query (`manifestQueryId`). Returns the created draft; transmit it later via /entries/{id}/send (coming next).
+      description: Requires scope `entries:write` and the ABI_ENTRY capability. Supports entry types 01 (consumption), 11 (informal), and 86 (de minimis / Section 321 — cargo-release only). Optionally pre-fills from a linked ISF filing (`filingId`) or a completed manifest query (`manifestQueryId`). Returns the created draft; transmit it via POST /entries/{id}/send.
       requestBody:
         required: true
         content:

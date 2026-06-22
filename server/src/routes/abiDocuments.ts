@@ -226,7 +226,7 @@ router.post('/:id/poll', ccApiLimiter, requireVerifiedEmail, async (req: AuthReq
       docId: doc.id,
       orgId: req.user!.orgId,
       userId: req.user!.id,
-      entryType: doc.entryType as '01' | '11',
+      entryType: doc.entryType as '01' | '11' | '86',
       entryNumber: doc.entryNumber,
       mbolNumber: doc.mbolNumber,
     });

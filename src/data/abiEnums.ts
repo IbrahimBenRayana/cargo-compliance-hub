@@ -86,10 +86,11 @@ export const ABI_DOCUMENT_STATUS_MAP: Record<AbiDocumentStatus, StatusOption> =
     {} as Record<AbiDocumentStatus, StatusOption>,
   );
 
-// ─── Entry Types (Phase 1 scope: "01"; "11" included for UI completeness) ──
+// ─── Entry Types (01 + 86 enabled; 11 still gated in the wizard) ──
 export const ENTRY_TYPES: EnumOption[] = [
   { value: '01', label: 'Consumption Entry (Formal)' },
   { value: '11', label: 'Informal Entry' },
+  { value: '86', label: 'De Minimis (Type 86)' },
 ];
 
 // ─── CBP Modes of Transport (common codes) ─────────────────────────────────

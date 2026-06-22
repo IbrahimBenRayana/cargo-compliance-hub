@@ -279,7 +279,7 @@ export async function sendAbiDocumentToCBP(params: {
     pollABIDocumentStatus(
       sentDoc.id,
       sentDoc.orgId,
-      sentDoc.entryType as '01' | '11',
+      sentDoc.entryType as '01' | '11' | '86',
       sentDoc.entryNumber,
       sentDoc.mbolNumber,
     ).catch((err) => {

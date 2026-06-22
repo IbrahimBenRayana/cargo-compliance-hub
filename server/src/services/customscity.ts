@@ -541,7 +541,7 @@ export interface CCABIManifest {
 
 /** ABI document body — the object inside `body: [<this>]`. */
 export interface CCABIDocumentBody {
-  entryType: '01' | '11';
+  entryType: '01' | '11' | '86';
   modeOfTransport: string;          // "40" vessel, "41" air
   entryNumber: string;              // filer-assigned; hyphens auto-stripped by CC
   dates: CCABIDates;
@@ -572,7 +572,7 @@ export interface CCABIListResponse {
 export interface CCABIListParams {
   dateFrom: string;                 // YYYY-MM-DD
   dateTo: string;                   // YYYY-MM-DD
-  entryType: '01' | '11';
+  entryType: '01' | '11' | '86';
   skip?: number;
   status?: 'ACCEPTED' | 'CANCELLED' | 'DRAFT' | 'REJECTED' | 'SENT' | 'SENDING';
   houseBOLNumber?: string[];
