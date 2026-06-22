@@ -7,6 +7,7 @@
 import { prisma } from '../config/database.js';
 import { abiGateway } from './abi/gateway.js';
 import { notify } from './notifications.js';
+import { emitWebhook } from './webhooks.js';
 import logger from '../config/logger.js';
 import { CC_POLL_INTERVAL_MS } from '../config/schedules.js';
 
@@ -151,6 +152,13 @@ export async function runSinglePoll(args: {
       metadata:      { entryNumber: ref, entryType, mbolNumber },
       abiDocumentId: docId,
       dedupeKey:     `abi_${docId}_${nextStatus.toLowerCase()}`,
+    });
+
+    emitWebhook(orgId, nextStatus === 'ACCEPTED' ? 'entry.accepted' : 'entry.rejected', {
+      abiDocumentId: docId,
+      entryNumber: ccEntryNumber || entryNumber,
+      entryType,
+      mbolNumber,
     });
   }
 

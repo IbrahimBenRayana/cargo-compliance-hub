@@ -10,8 +10,8 @@ info:
 
 
     Status: authentication + read + ISF write (create draft, submit to CBP) +
-    ABI Entry write (create draft, send to CBP) + XML content-negotiation.
-    Status webhooks are coming next.
+    ABI Entry write (create draft, send to CBP) + XML content-negotiation +
+    status webhooks.
 
 
     Content negotiation: JSON is the default. To send an XML request body set
@@ -20,6 +20,17 @@ info:
     `Accept: application/xml` (responses are wrapped in a `<response>` root).
     All values are treated as strings — customs identifiers keep their leading
     zeros. JSON remains recommended for deeply-nested payloads.
+
+
+    Webhooks: register callback URLs via the authed `/api/v1/webhooks` endpoints
+    to receive status pushes instead of polling.
+    Events: `filing.submitted`, `filing.accepted`, `filing.rejected`,
+    `entry.sent`, `entry.accepted`, `entry.rejected`. Each delivery is a POST
+    with body `{ event, createdAt, data }` and headers `X-MCL-Event` and
+    `X-MCL-Signature: sha256=<hex>` — an HMAC-SHA256 of the raw body keyed by the
+    endpoint's signing secret (`whsec_…`). Verify the signature by recomputing
+    the HMAC over the raw bytes and comparing in constant time. Delivery is
+    best-effort with retries; the last outcome is shown on the endpoint.
 servers:
   - url: https://app.mycargolens.com/api/public/v1
     description: Production
@@ -278,4 +289,5 @@ paths:
         "403": { description: Missing scope or ABI Entry not in plan }
         "502": { description: CBP transmission error (rolled back to DRAFT) }
 # ── Coming next release ──────────────────────────────────────────────
-# + Status webhooks (org-registered callbacks, HMAC-signed, on filing/entry status changes).
+# Phase 1 of the public API is complete (read + ISF/Entry write + XML + webhooks).
+# Phase 2 expands the ABI message-type suite (Type 86, In-Bond, FTZ, Drawback, AES).

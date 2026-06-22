@@ -38,6 +38,7 @@ model Organization {
   abiDocuments    AbiDocument[]
   trackedShipments TrackedShipment[]
   apiKeys         ApiKey[]
+  webhookEndpoints WebhookEndpoint[]
 
   @@map("organizations")
 }
@@ -109,6 +110,36 @@ model ApiKey {
 
   @@index([orgId])
   @@map("api_keys")
+}
+
+// ─── Webhook Endpoints ─────────────────────────────────────
+// Org-registered callback URLs for the public API. On a filing/entry status
+// change we POST a JSON event signed with HMAC-SHA256 (header X-MCL-Signature:
+// sha256=…) so integrators get push instead of polling. Best-effort delivery
+// with a couple of retries; the last delivery outcome is recorded for debugging.
+// The signing secret is stored as-is because the server must re-sign every
+// payload with it (a hash would not allow that); it is shown in full only on
+// create / rotate and masked elsewhere.
+model WebhookEndpoint {
+  id             String    @id @default(uuid()) @db.Uuid
+  orgId          String    @map("org_id") @db.Uuid
+  url            String    @db.VarChar(2048)
+  secret         String    @db.VarChar(255) // HMAC signing secret (whsec_…)
+  secretPrefix   String    @map("secret_prefix") @db.VarChar(24) // non-secret hint, e.g. "whsec_a1b2"
+  events         String[]  // subscribed event types; empty array = all events
+  active         Boolean   @default(true)
+  description    String?   @db.VarChar(200)
+  createdById    String?   @map("created_by") @db.Uuid
+  lastStatus     Int?      @map("last_status")
+  lastError      String?   @map("last_error") @db.VarChar(500)
+  lastDeliveryAt DateTime? @map("last_delivery_at") @db.Timestamptz()
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("webhook_endpoints")
 }
 
 // ─── Password Setup Tokens ─────────────────────────────────

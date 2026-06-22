@@ -25,6 +25,7 @@ import { writeAuditLog } from './auditLog.js';
 import { notify } from './notifications.js';
 import { billShipment } from './shipmentBilling.js';
 import { pollABIDocumentStatus } from './abiPolling.js';
+import { emitWebhook } from './webhooks.js';
 import logger from '../config/logger.js';
 
 export interface AbiWriteOutcome {
@@ -259,6 +260,13 @@ export async function sendAbiDocumentToCBP(params: {
       metadata: { entryNumber: sentDoc.entryNumber, entryType: sentDoc.entryType, mbolNumber: sentDoc.mbolNumber },
       abiDocumentId: sentDoc.id,
     }).catch(() => {});
+
+    emitWebhook(orgId, 'entry.sent', {
+      abiDocumentId: sentDoc.id,
+      entryNumber: sentDoc.entryNumber,
+      entryType: sentDoc.entryType,
+      mbolNumber: sentDoc.mbolNumber,
+    });
 
     // Bill the shipment — anchor on the linked ISF filing if present (so a
     // linked ISF+Entry bills once); else the standalone Entry. Idempotent.
