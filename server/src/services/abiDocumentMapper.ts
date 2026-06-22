@@ -57,14 +57,18 @@ export function mapABIDocumentToCC(
 }
 
 /**
- * Build the `POST /api/abi/send` body. Phase 1 only exercises
- * `action: 'add'` + `application: 'entry-summary-cargo-release'`.
+ * Build the `POST /api/abi/send` body. The CC action + application are derived
+ * from the entry type:
+ *   - 01 (consumption) / 11 (informal): `entry-summary-cargo-release` — these
+ *     carry a formal entry summary (7501).
+ *   - 86 (de minimis, Section 321): `cargo-release` only — there is no entry
+ *     summary, so an `add` becomes `add-cargo-release`.
  *
  * Requires `doc.mbolNumber` and `doc.entryNumber` — callers must have
  * already denormalised those from the payload before invoking this.
  */
 export function buildSendPayload(
-  doc: Pick<AbiDocument, 'mbolNumber' | 'entryNumber'>,
+  doc: Pick<AbiDocument, 'mbolNumber' | 'entryNumber' | 'entryType'>,
   action: CCABISendPayload['action']
 ): CCABISendPayload {
   if (!doc.mbolNumber) {
@@ -74,10 +78,20 @@ export function buildSendPayload(
     throw new Error('Cannot build ABI send payload: missing entry number');
   }
 
+  // Type 86 is release-only (no entry summary). Map the generic `add` intent to
+  // the cargo-release-specific action + application; other types keep the
+  // combined entry-summary + cargo-release transmission.
+  const isType86 = doc.entryType === '86';
+  const application: CCABISendPayload['application'] = isType86
+    ? 'cargo-release'
+    : 'entry-summary-cargo-release';
+  const resolvedAction: CCABISendPayload['action'] =
+    isType86 && action === 'add' ? 'add-cargo-release' : action;
+
   return {
     type: 'abi',
-    action,
-    application: 'entry-summary-cargo-release',
+    action: resolvedAction,
+    application,
     MBOLNumber: doc.mbolNumber,
     // Canonical hyphenated form so CC's send-time lookup finds the entry
     // we created. Storage normalises both ways but lookup is exact.

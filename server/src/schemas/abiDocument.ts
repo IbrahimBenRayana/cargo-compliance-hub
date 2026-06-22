@@ -161,7 +161,9 @@ const abiManifestSchema = z.object({
 
 // Base schema (a plain ZodObject so it stays `.deepPartial()`-able).
 const abiDocumentBodyBaseSchema = z.object({
-  entryType: z.enum(['01', '11']),
+  // 01 = consumption (formal), 11 = informal, 86 = de minimis (Section 321,
+  // sub-$800 — cargo-release only, no formal entry summary).
+  entryType: z.enum(['01', '11', '86']),
   modeOfTransport: TwoDigit,
   // Filer-assigned entry number. CBP / CustomsCity do NOT assign this —
   // the broker draws it from their pre-issued block (e.g. "S4G12580927" or

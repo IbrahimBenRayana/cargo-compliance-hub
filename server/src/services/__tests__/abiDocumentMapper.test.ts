@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { canonicaliseEntryNumber } from '../abiDocumentMapper.js';
+import { canonicaliseEntryNumber, buildSendPayload } from '../abiDocumentMapper.js';
 
 describe('canonicaliseEntryNumber', () => {
   it('inserts hyphens into a hyphen-less 11-char entry number', () => {
@@ -47,5 +47,33 @@ describe('canonicaliseEntryNumber', () => {
     const once = canonicaliseEntryNumber('ABC12345678');
     const twice = canonicaliseEntryNumber(once);
     expect(twice).toBe(once);
+  });
+});
+
+describe('buildSendPayload — entry-type-aware transmission', () => {
+  const base = { mbolNumber: 'MAEU123456789', entryNumber: 'ABC12345678' };
+
+  it('01 (consumption) sends the combined entry-summary + cargo-release', () => {
+    const p = buildSendPayload({ ...base, entryType: '01' }, 'add');
+    expect(p.application).toBe('entry-summary-cargo-release');
+    expect(p.action).toBe('add');
+    expect(p.entryNumber).toEqual(['ABC-1234567-8']);
+  });
+
+  it('11 (informal) also uses entry-summary + cargo-release', () => {
+    const p = buildSendPayload({ ...base, entryType: '11' }, 'add');
+    expect(p.application).toBe('entry-summary-cargo-release');
+    expect(p.action).toBe('add');
+  });
+
+  it('86 (de minimis) is cargo-release only and maps add → add-cargo-release', () => {
+    const p = buildSendPayload({ ...base, entryType: '86' }, 'add');
+    expect(p.application).toBe('cargo-release');
+    expect(p.action).toBe('add-cargo-release');
+  });
+
+  it('throws when MBOL or entry number is missing', () => {
+    expect(() => buildSendPayload({ mbolNumber: null, entryNumber: 'ABC12345678', entryType: '86' }, 'add')).toThrow();
+    expect(() => buildSendPayload({ mbolNumber: 'M', entryNumber: null, entryType: '86' }, 'add')).toThrow();
   });
 });

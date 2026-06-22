@@ -79,7 +79,7 @@ export async function runSinglePoll(args: {
   docId: string;
   orgId: string;
   userId: string | null;
-  entryType: '01' | '11';
+  entryType: '01' | '11' | '86';
   entryNumber: string | null;
   mbolNumber: string | null;
 }): Promise<{ terminal: boolean }> {
@@ -171,7 +171,7 @@ export async function runSinglePoll(args: {
 export async function pollABIDocumentStatus(
   docId: string,
   orgId: string,
-  entryType: '01' | '11',
+  entryType: '01' | '11' | '86',
   entryNumber: string | null,
   mbolNumber: string | null
 ): Promise<void> {
