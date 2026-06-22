@@ -219,3 +219,84 @@ export function prefillFromManifestQuery(
 
   return prefill;
 }
+
+// ─── Shared payload helpers ────────────────────────────────
+// Pure transforms used by the ABI write services + routes. Moved here from
+// routes/abiDocuments.ts so the create/send services can share them.
+
+/** Flatten a CC create/send error response into a human-readable message. */
+export function extractCCErrorMessage(
+  body: any,
+  httpStatus: number,
+  step: 'create' | 'send',
+): string {
+  const stepLabel = step === 'create' ? 'Create document' : 'Transmit';
+
+  // 422 with a structured `errors` map → flatten into a list.
+  if (body && typeof body.errors === 'object' && body.errors !== null) {
+    const flattened: string[] = [];
+    for (const [entryKey, entryErrs] of Object.entries(body.errors as Record<string, any>)) {
+      if (Array.isArray(entryErrs?.entry)) {
+        flattened.push(...(entryErrs.entry as string[]).map((m) => `${entryKey}: ${m}`));
+      }
+      if (entryErrs?.manifests && typeof entryErrs.manifests === 'object') {
+        for (const [manifestKey, manifestMsgs] of Object.entries(entryErrs.manifests as Record<string, any>)) {
+          if (Array.isArray(manifestMsgs)) {
+            flattened.push(...(manifestMsgs as string[]).map((m) => `${manifestKey}: ${m}`));
+          }
+        }
+      }
+    }
+    if (flattened.length > 0) {
+      return `${stepLabel} rejected (${httpStatus}): ${flattened.join('; ')}`;
+    }
+  }
+
+  // Generic message field (500s, 400s without structured errors).
+  if (typeof body?.message === 'string' && body.message.trim()) {
+    return `${stepLabel} failed (${httpStatus}): ${body.message}`;
+  }
+
+  return `${stepLabel} failed (${httpStatus})`;
+}
+
+/** Derive the denormalized columns (entry/MBOL/IOR/ports/dates) from a payload. */
+export function extractDenormFromPayload(payload: any): {
+  entryType: string;
+  modeOfTransport: string;
+  entryNumber: string | null;
+  mbolNumber: string | null;
+  hbolNumber: string | null;
+  iorNumber: string | null;
+  iorName: string | null;
+  consigneeName: string | null;
+  portOfEntry: string | null;
+  destinationStateUS: string | null;
+  entryDate: string | null;
+  importDate: string | null;
+  arrivalDate: string | null;
+} {
+  const p = payload ?? {};
+  const firstManifest = Array.isArray(p.manifest) ? p.manifest[0] : undefined;
+
+  // Filer-assigned entry number. Stored hyphen-stripped so the DELETE
+  // endpoint's auto-normalisation matches our denorm column.
+  const rawEntryNumber: string | undefined = p.entryNumber;
+  const entryNumber = rawEntryNumber ? rawEntryNumber.replace(/-/g, '') : null;
+
+  return {
+    entryType: p.entryType ?? '01',
+    modeOfTransport: p.modeOfTransport ?? '40',
+    entryNumber,
+    mbolNumber: firstManifest?.bill?.mBOL ?? null,
+    hbolNumber: firstManifest?.bill?.hBOL || null,
+    iorNumber: p.ior?.number ?? null,
+    iorName: p.ior?.name ?? null,
+    consigneeName: p.entryConsignee?.name ?? null,
+    portOfEntry: p.location?.portOfEntry ?? null,
+    destinationStateUS: p.location?.destinationStateUS ?? null,
+    entryDate: p.dates?.entryDate ?? null,
+    importDate: p.dates?.importDate ?? null,
+    arrivalDate: p.dates?.arrivalDate ?? null,
+  };
+}
