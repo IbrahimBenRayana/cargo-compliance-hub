@@ -10,11 +10,12 @@
  * webhooks are the next increment — they require extracting the create/submit
  * logic from the route handlers into reusable services first.
  */
-import { Router, Response } from 'express';
+import express, { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { apiKeyAuth, requireScope, ApiRequest } from '../middleware/apiKeyAuth.js';
 import { generalLimiter } from '../middleware/rateLimiter.js';
+import { xmlContentNegotiation } from '../middleware/xmlContent.js';
 import { CAPABILITIES } from '../config/plans.js';
 import { createFilingSchema } from '../schemas/filing.js';
 import { createFilingForOrg, submitFilingToCBP } from '../services/filingWrite.js';
@@ -22,6 +23,11 @@ import { createABIDocumentSchema } from '../schemas/abiDocument.js';
 import { createAbiDocumentForOrg, sendAbiDocumentToCBP } from '../services/abiWrite.js';
 
 const router = Router();
+// XML content-negotiation (Plan B Phase 1): parse XML request bodies and emit
+// XML responses when the client sends `Accept: application/xml`. JSON stays the
+// default. Mounted first so even auth/limiter errors honor the negotiated type.
+router.use(express.text({ type: ['application/xml', 'text/xml', 'application/*+xml'], limit: '1mb' }));
+router.use(xmlContentNegotiation);
 router.use(generalLimiter);
 router.use(apiKeyAuth);
 

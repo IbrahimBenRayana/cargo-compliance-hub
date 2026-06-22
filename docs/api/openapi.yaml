@@ -10,8 +10,16 @@ info:
 
 
     Status: authentication + read + ISF write (create draft, submit to CBP) +
-    ABI Entry write (create draft, send to CBP). XML content-negotiation and
-    status webhooks are coming next.
+    ABI Entry write (create draft, send to CBP) + XML content-negotiation.
+    Status webhooks are coming next.
+
+
+    Content negotiation: JSON is the default. To send an XML request body set
+    `Content-Type: application/xml` (a single root element such as
+    `<filing>…</filing>` is unwrapped); to receive XML set
+    `Accept: application/xml` (responses are wrapped in a `<response>` root).
+    All values are treated as strings — customs identifiers keep their leading
+    zeros. JSON remains recommended for deeply-nested payloads.
 servers:
   - url: https://app.mycargolens.com/api/public/v1
     description: Production
@@ -270,4 +278,4 @@ paths:
         "403": { description: Missing scope or ABI Entry not in plan }
         "502": { description: CBP transmission error (rolled back to DRAFT) }
 # ── Coming next release ──────────────────────────────────────────────
-# + XML content-negotiation (Accept/Content-Type: application/xml) and status webhooks.
+# + Status webhooks (org-registered callbacks, HMAC-signed, on filing/entry status changes).
