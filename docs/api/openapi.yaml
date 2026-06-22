@@ -10,7 +10,7 @@ info:
 
 
     Status: authentication + read endpoints + ISF write (create draft, submit to
-    CBP). ABI Entry write (create/send), XML content-negotiation, and status
+    CBP) + ABI Entry create. ABI Entry send, XML content-negotiation, and status
     webhooks are coming next.
 servers:
   - url: https://app.mycargolens.com/api/public/v1
@@ -181,6 +181,30 @@ paths:
         "402": { description: No active plan (code subscription_required) }
         "422": { description: CBP validation errors }
   /entries:
+    post:
+      summary: Create a DRAFT ABI Entry document (7501 / 3461).
+      description: Requires scope `entries:write` and the ABI_ENTRY capability. Optionally pre-fills from a linked ISF filing (`filingId`) or a completed manifest query (`manifestQueryId`). Returns the created draft; transmit it later via /entries/{id}/send (coming next).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payload: { type: object, description: "ABI entry body (7501/3461 fields)." }
+                filingId: { type: string, format: uuid, nullable: true, description: "Pre-fill from a linked ISF filing." }
+                manifestQueryId: { type: string, format: uuid, nullable: true, description: "Pre-fill from a manifest query." }
+      responses:
+        "201":
+          description: Draft created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Entry" } }
+        "400": { description: Validation failed }
+        "403": { description: Missing scope or ABI Entry not in plan }
+        "404": { description: Linked filing / manifest query not found }
     get:
       summary: List ABI Entry documents for the organization.
       description: Requires scope `entries:read` and the ABI_ENTRY capability (ISF+Entry / Complete tiers).
@@ -220,6 +244,5 @@ paths:
                 properties: { data: { $ref: "#/components/schemas/Entry" } }
         "404": { description: Entry not found }
 # ── Coming next release ──────────────────────────────────────────────
-# POST /entries                create an ABI Entry draft      (entries:write + ABI_ENTRY)
 # POST /entries/{id}/send      transmit an ABI Entry to CBP   (entries:write + ABI_ENTRY)
 # + XML content-negotiation (Accept/Content-Type: application/xml) and status webhooks.

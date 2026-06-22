@@ -19,8 +19,11 @@ import {
   canonicaliseEntryNumber,
   prefillFromFiling,
   prefillFromManifestQuery,
+  extractCCErrorMessage,
+  extractDenormFromPayload,
 } from '../services/abiDocumentMapper.js';
 import { sanitizeErrorMessage } from '../services/errorTranslator.js';
+import { createAbiDocumentForOrg } from '../services/abiWrite.js';
 import { notify } from '../services/notifications.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import logger from '../config/logger.js';
@@ -44,80 +47,8 @@ router.use(requireCapability(CAPABILITIES.ABI_ENTRY));
  * CC's 500 body shape: `{ details: { code, name }, message }`.
  * Falls back to the bare HTTP status if no structured message is present.
  */
-function extractCCErrorMessage(
-  body: any,
-  httpStatus: number,
-  step: 'create' | 'send'
-): string {
-  const stepLabel = step === 'create' ? 'Create document' : 'Transmit';
-
-  // 422 with a structured `errors` map → flatten into a list.
-  if (body && typeof body.errors === 'object' && body.errors !== null) {
-    const flattened: string[] = [];
-    for (const [entryKey, entryErrs] of Object.entries(body.errors as Record<string, any>)) {
-      if (Array.isArray(entryErrs?.entry)) {
-        flattened.push(...(entryErrs.entry as string[]).map((m) => `${entryKey}: ${m}`));
-      }
-      if (entryErrs?.manifests && typeof entryErrs.manifests === 'object') {
-        for (const [manifestKey, manifestMsgs] of Object.entries(entryErrs.manifests as Record<string, any>)) {
-          if (Array.isArray(manifestMsgs)) {
-            flattened.push(...(manifestMsgs as string[]).map((m) => `${manifestKey}: ${m}`));
-          }
-        }
-      }
-    }
-    if (flattened.length > 0) {
-      return `${stepLabel} rejected (${httpStatus}): ${flattened.join('; ')}`;
-    }
-  }
-
-  // Generic message field (500s, 400s without structured errors).
-  if (typeof body?.message === 'string' && body.message.trim()) {
-    return `${stepLabel} failed (${httpStatus}): ${body.message}`;
-  }
-
-  return `${stepLabel} failed (${httpStatus})`;
-}
-
-function extractDenormFromPayload(payload: any): {
-  entryType: string;
-  modeOfTransport: string;
-  entryNumber: string | null;
-  mbolNumber: string | null;
-  hbolNumber: string | null;
-  iorNumber: string | null;
-  iorName: string | null;
-  consigneeName: string | null;
-  portOfEntry: string | null;
-  destinationStateUS: string | null;
-  entryDate: string | null;
-  importDate: string | null;
-  arrivalDate: string | null;
-} {
-  const p = payload ?? {};
-  const firstManifest = Array.isArray(p.manifest) ? p.manifest[0] : undefined;
-
-  // Filer-assigned entry number. Stored hyphen-stripped so the DELETE
-  // endpoint's auto-normalisation matches our denorm column.
-  const rawEntryNumber: string | undefined = p.entryNumber;
-  const entryNumber = rawEntryNumber ? rawEntryNumber.replace(/-/g, '') : null;
-
-  return {
-    entryType: p.entryType ?? '01',
-    modeOfTransport: p.modeOfTransport ?? '40',
-    entryNumber,
-    mbolNumber: firstManifest?.bill?.mBOL ?? null,
-    hbolNumber: firstManifest?.bill?.hBOL || null,
-    iorNumber: p.ior?.number ?? null,
-    iorName: p.ior?.name ?? null,
-    consigneeName: p.entryConsignee?.name ?? null,
-    portOfEntry: p.location?.portOfEntry ?? null,
-    destinationStateUS: p.location?.destinationStateUS ?? null,
-    entryDate: p.dates?.entryDate ?? null,
-    importDate: p.dates?.importDate ?? null,
-    arrivalDate: p.dates?.arrivalDate ?? null,
-  };
-}
+// extractCCErrorMessage + extractDenormFromPayload moved to
+// ../services/abiDocumentMapper.ts (shared with the ABI write services).
 
 /**
  * Shallow-merge top-level keys. Nested arrays/objects are replaced wholesale
@@ -321,70 +252,12 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
     return;
   }
-
-  const { payload: providedPayload, manifestQueryId, filingId } = parsed.data;
-
-  let initialPayload: any = providedPayload ?? {};
-
-  // Optional pre-fill from an existing ISF Filing (same org only). Runs
-  // BEFORE manifest-query prefill so a manifest query's shipment-level
-  // fields (which are CBP-derived and authoritative) override the
-  // user-supplied ISF data on the few overlapping keys (e.g. mBOL).
-  if (filingId) {
-    const linkedFiling = await prisma.filing.findFirst({
-      where: { id: filingId, orgId: req.user!.orgId },
-    });
-    if (!linkedFiling) {
-      res.status(404).json({ error: 'Linked ISF filing not found' });
-      return;
-    }
-    const filingPrefill = prefillFromFiling(linkedFiling);
-    initialPayload = { ...filingPrefill, ...initialPayload };
-    // Don't lose the prefilled manifest if the user didn't send one.
-    if (filingPrefill.manifest && !providedPayload?.manifest) {
-      initialPayload.manifest = filingPrefill.manifest;
-    }
-  }
-
-  // Optional pre-fill from a completed manifest query (same org only).
-  if (manifestQueryId) {
-    const mq = await prisma.manifestQuery.findFirst({
-      where: { id: manifestQueryId, orgId: req.user!.orgId },
-    });
-    if (!mq) {
-      res.status(404).json({ error: 'Manifest query not found' });
-      return;
-    }
-    if (mq.response) {
-      const prefill = prefillFromManifestQuery({ response: mq.response });
-      // Merge: explicit user-supplied payload wins over prefill.
-      initialPayload = { ...prefill, ...initialPayload };
-      // For nested manifest array, prefer prefill shipment data unless user sent their own.
-      if (prefill.manifest && !providedPayload?.manifest) {
-        initialPayload.manifest = prefill.manifest;
-      }
-    }
-  }
-
-  const denorm = extractDenormFromPayload(initialPayload);
-
-  try {
-    const doc = await prisma.abiDocument.create({
-      data: {
-        orgId: req.user!.orgId,
-        userId: req.user!.id,
-        status: 'DRAFT',
-        payload: initialPayload,
-        filingId: filingId ?? null,
-        manifestQueryId: manifestQueryId ?? null,
-        ...denorm,
-      },
-    });
-    res.status(201).json({ data: doc });
-  } catch (err: any) {
-    logger.error({ err }, 'Failed to create ABI document');
-    res.status(500).json({ error: sanitizeErrorMessage(err.message || 'Failed to create ABI document') });
-  }
+  const outcome = await createAbiDocumentForOrg({
+    data: parsed.data,
+    orgId: req.user!.orgId,
+    userId: req.user!.id,
+  });
+  res.status(outcome.httpStatus).json(outcome.body);
 });
 
 // ── GET / — List with filters + pagination ─────────────

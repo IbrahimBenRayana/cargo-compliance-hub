@@ -18,6 +18,8 @@ import { generalLimiter } from '../middleware/rateLimiter.js';
 import { CAPABILITIES } from '../config/plans.js';
 import { createFilingSchema } from '../schemas/filing.js';
 import { createFilingForOrg, submitFilingToCBP } from '../services/filingWrite.js';
+import { createABIDocumentSchema } from '../schemas/abiDocument.js';
+import { createAbiDocumentForOrg } from '../services/abiWrite.js';
 
 const router = Router();
 router.use(generalLimiter);
@@ -97,6 +99,25 @@ router.get('/shipments/:id', requireScope('filings:read'), async (req: ApiReques
     return;
   }
   res.json({ data: filing });
+});
+
+// POST /entries — create a DRAFT ABI Entry document (requires the ABI_ENTRY capability).
+router.post('/entries', requireScope('entries:write'), async (req: ApiRequest, res: Response): Promise<void> => {
+  if (!req.apiContext!.capabilities.includes(CAPABILITIES.ABI_ENTRY)) {
+    res.status(403).json({ error: "ABI Entry isn't included in your plan.", code: 'feature_not_in_plan' });
+    return;
+  }
+  const parsed = createABIDocumentSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+    return;
+  }
+  const outcome = await createAbiDocumentForOrg({
+    data: parsed.data,
+    orgId: req.apiContext!.orgId,
+    userId: req.apiContext!.actorUserId,
+  });
+  res.status(outcome.httpStatus).json(outcome.body);
 });
 
 // GET /entries — list ABI Entry documents (requires the ABI_ENTRY capability).
