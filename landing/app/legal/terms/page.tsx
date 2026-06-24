@@ -53,12 +53,13 @@ export default function TermsOfServicePage() {
         </p>
         <p className="mb-4">
           You may not share your account credentials or allow others to access the platform using
-          your account, except as permitted by your subscription plan.
+          your account, except as permitted by your plan.
         </p>
 
-        <h2 className="text-xl font-semibold mt-10 mb-4">4. Subscription &amp; Billing</h2>
+        <h2 className="text-xl font-semibold mt-10 mb-4">4. Plans &amp; Billing</h2>
         <p className="mb-4">
-          Subscription plans are billed monthly or annually via Stripe. Current pricing is
+          There is no subscription and no monthly fee. You pick a plan tier, keep a payment method on
+          file, and are charged a flat rate per shipment you file via Stripe. Current pricing is
           available at{" "}
           <a
             href="/pricing"
@@ -66,9 +67,9 @@ export default function TermsOfServicePage() {
           >
             mycargolens.com/pricing
           </a>
-          . You may cancel your subscription at any time; access to the platform continues until
-          the end of the current billing period. Refunds are not provided for partial billing
-          periods unless required by applicable law.
+          . You may change your plan tier at any time, and remove your payment method or close your
+          account whenever you like. Per-shipment charges already incurred are non-refundable except
+          as required by applicable law.
         </p>
         <p className="mb-4">
           We reserve the right to update pricing with 30 days&apos; notice. Continued use after a

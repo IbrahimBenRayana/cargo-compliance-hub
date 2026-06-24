@@ -216,7 +216,7 @@ export default function HomeClient() {
                 }}
                 className="text-xs text-muted-foreground"
               >
-                Free plan &bull; No credit card required
+                Free to sign up &bull; Card only when you file
               </motion.p>
             </motion.div>
 

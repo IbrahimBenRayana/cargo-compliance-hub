@@ -51,8 +51,8 @@ export default function PrivacyPolicyPage() {
             and pages visited, collected automatically to improve the platform.
           </li>
           <li>
-            <strong>Payment information</strong> — billing details are processed by Stripe; we do
-            not store card numbers or full payment credentials on our servers.
+            <strong>Payment information</strong> — billing details for per-shipment charges are
+            processed by Stripe; we do not store card numbers or full payment credentials on our servers.
           </li>
         </ul>
 

@@ -96,7 +96,7 @@ export function BookADemoClient() {
 
     // Browser-side guards — the selects keep an empty-string default.
     if (!form.volume) {
-      setError("Please pick your monthly shipment volume.");
+      setError("Please pick your typical shipment volume.");
       return;
     }
     if (!form.filing) {
@@ -111,7 +111,7 @@ export function BookADemoClient() {
       FILING_OPTIONS.find((o) => o.value === form.filing)?.label ?? form.filing;
     const composedMessage = [
       `Company: ${form.company.trim() || "—"}`,
-      `Monthly shipment volume: ${form.volume}`,
+      `Typical shipment volume: ${form.volume}`,
       `What they file: ${filingLabel}`,
       "",
       form.message.trim() || "(no additional message)",
@@ -270,7 +270,7 @@ export function BookADemoClient() {
 
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="volume" className="text-sm font-medium">
-                      Monthly shipment volume
+                      Typical shipment volume
                     </label>
                     <select
                       id="volume"

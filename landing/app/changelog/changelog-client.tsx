@@ -192,8 +192,8 @@ export function ChangelogClient() {
 
       <SectionShell tone="muted" headingAlign="center" title="Try it out yourself.">
         <p className="mx-auto max-w-xl text-center text-base leading-relaxed mb-8 opacity-80">
-          Two filings a month on the free plan — no card, no time limit.
-          See the inbox we&apos;re building from the inside.
+          Sign up free and draft as much as you like — no card, no time limit.
+          You only pay per shipment when you file. See the inbox we&apos;re building from the inside.
         </p>
         <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button variant="gold" size="lg" asChild>
