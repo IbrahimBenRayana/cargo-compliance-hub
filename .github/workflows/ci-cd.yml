@@ -9,7 +9,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   pull_request:
     branches: [main]
 
@@ -123,7 +123,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-frontend, test-server]
     timeout-minutes: 20
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
     permissions:
       contents: read
       packages: write
@@ -166,7 +166,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-frontend, test-server]
     timeout-minutes: 20
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
     permissions:
       contents: read
       packages: write
@@ -203,12 +203,18 @@ jobs:
           cache-to: type=gha,mode=max,scope=landing
 
   # ── Deploy (customize per hosting provider) ──────────────
-  deploy:
-    name: Deploy to Production
+  # ── Deploy APP (server) — branch-aware ───────────────────
+  # main   → production environment → new VPS (prod app, app.mycargolens.com)
+  # staging→ staging environment    → current VPS (staging app, staging.mycargolens.com)
+  # Server ONLY. The prod marketing landing lives on the current VPS and is
+  # shipped by the separate deploy-landing job (main only) so a staging-app
+  # deploy never restarts prod marketing.
+  deploy-app:
+    name: Deploy app (main=prod / staging=staging)
     runs-on: ubuntu-latest
-    needs: [docker, docker-landing]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production
+    needs: [docker]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -385,25 +391,23 @@ jobs:
             # the server reads is enumerated in the committed file.
             # See Phase 5 of the audit hardening plan.
 
-            # ── Capture currently-deployed tags (rollback targets) ─────────
+            # ── Capture currently-deployed server tag (rollback target) ────
             OLD_TAG=$(grep '^IMAGE_TAG=' .env | cut -d= -f2)
-            OLD_LANDING_TAG=$(grep '^LANDING_IMAGE_TAG=' .env | cut -d= -f2 || echo "latest")
-            echo "▶ Deploying ${NEW_TAG:0:12} (previous server: ${OLD_TAG:0:12}, landing: ${OLD_LANDING_TAG:0:12})"
+            echo "▶ Deploying server ${NEW_TAG:0:12} (previous: ${OLD_TAG:0:12})"
 
-            # ── Point compose at the new images ───────────────────────────
+            # ── Point compose at the new server image (server only — the
+            #    landing tag is owned by the deploy-landing job) ────────────
             sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${NEW_TAG}|" .env
-            sed -i "s|^LANDING_IMAGE_TAG=.*|LANDING_IMAGE_TAG=${NEW_TAG}|" .env
 
-            # ── Pull both images ──────────────────────────────────────────
-            if ! docker compose pull server landing; then
+            # ── Pull the server image ─────────────────────────────────────
+            if ! docker compose pull server; then
               echo "❌ Pull failed — reverting .env"
               sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${OLD_TAG}|" .env
-              sed -i "s|^LANDING_IMAGE_TAG=.*|LANDING_IMAGE_TAG=${OLD_LANDING_TAG}|" .env
               exit 1
             fi
 
-            # ── Restart both services ─────────────────────────────────────
-            docker compose up -d server landing
+            # ── Restart the server only ───────────────────────────────────
+            docker compose up -d server
 
             # ── Wait for server /api/health (60s max) ─────────────────────
             HEALTHY=false
@@ -418,31 +422,14 @@ jobs:
             if [ "$HEALTHY" != "true" ]; then
               echo "❌ Server health check failed — rolling back"
               sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${OLD_TAG}|" .env
-              sed -i "s|^LANDING_IMAGE_TAG=.*|LANDING_IMAGE_TAG=${OLD_LANDING_TAG}|" .env
-              docker compose up -d server landing
+              docker compose up -d server
               docker compose logs --tail=40 server || true
               exit 1
             fi
 
-            # ── Wait for landing health (30s max) ─────────────────────────
-            LANDING_OK=false
-            for i in $(seq 1 15); do
-              if curl -fsS http://localhost:3000 > /dev/null 2>&1; then
-                LANDING_OK=true
-                break
-              fi
-              sleep 2
-            done
-
-            if [ "$LANDING_OK" != "true" ]; then
-              echo "⚠️ Landing health check failed — server is live but landing may need attention"
-              docker compose logs --tail=20 landing || true
-              # Don't roll back server — it's healthy. Just warn.
-            fi
-
-            echo "✅ Deploy complete — server + landing live (${NEW_TAG:0:12})"
+            echo "✅ Deploy complete — server live (${NEW_TAG:0:12})"
             docker image prune -f
-            docker compose ps
+            docker compose ps server
 
       - name: Deployment info (fallback when DEPLOY_METHOD unset)
         if: ${{ vars.DEPLOY_METHOD != 'ssh' }}
@@ -454,3 +441,71 @@ jobs:
           echo "  gh secret set DEPLOY_HOST    # VPS IP"
           echo "  gh secret set DEPLOY_USER    # e.g. deploy"
           echo "  gh secret set DEPLOY_SSH_KEY # private key contents"
+
+  # ── Deploy LANDING (marketing site) — main only, current VPS ─────────
+  # The prod marketing site (mycargolens.com / www) stays on the current VPS.
+  # It ships from main only, using the `staging` environment's secrets (the
+  # current VPS IS the staging host). Landing service ONLY — it never touches
+  # the server, so it can't disturb the staging app sharing the same box.
+  deploy-landing:
+    name: Deploy prod landing (current VPS)
+    runs-on: ubuntu-latest
+    needs: [docker-landing]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Sync deploy/docker-compose.prod.yml to VPS
+        if: ${{ vars.DEPLOY_METHOD == 'ssh' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: deploy/docker-compose.prod.yml
+          target: /opt/mycargolens/
+          strip_components: 1
+          overwrite: true
+
+      - name: Deploy landing via SSH (SHA-tagged, health-gated, auto-rollback)
+        if: ${{ vars.DEPLOY_METHOD == 'ssh' }}
+        uses: appleboy/ssh-action@v1
+        env:
+          NEW_TAG: ${{ github.sha }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: NEW_TAG
+          script: |
+            set -euo pipefail
+            cd /opt/mycargolens
+            if [ -f docker-compose.prod.yml ]; then
+              mv -f docker-compose.prod.yml docker-compose.yml
+            fi
+            OLD_LANDING_TAG=$(grep '^LANDING_IMAGE_TAG=' .env | cut -d= -f2 || echo "latest")
+            echo "▶ Deploying landing ${NEW_TAG:0:12} (previous: ${OLD_LANDING_TAG:0:12})"
+            sed -i "s|^LANDING_IMAGE_TAG=.*|LANDING_IMAGE_TAG=${NEW_TAG}|" .env
+            if ! docker compose pull landing; then
+              echo "❌ Landing pull failed — reverting"
+              sed -i "s|^LANDING_IMAGE_TAG=.*|LANDING_IMAGE_TAG=${OLD_LANDING_TAG}|" .env
+              exit 1
+            fi
+            docker compose up -d landing
+            OK=false
+            for i in $(seq 1 15); do
+              if curl -fsS http://localhost:3000 > /dev/null 2>&1; then OK=true; break; fi
+              sleep 2
+            done
+            if [ "$OK" != "true" ]; then
+              echo "❌ Landing health check failed — rolling back"
+              sed -i "s|^LANDING_IMAGE_TAG=.*|LANDING_IMAGE_TAG=${OLD_LANDING_TAG}|" .env
+              docker compose up -d landing
+              docker compose logs --tail=30 landing || true
+              exit 1
+            fi
+            echo "✅ Landing live (${NEW_TAG:0:12})"
+            docker image prune -f
+            docker compose ps landing
