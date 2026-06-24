@@ -596,9 +596,20 @@ model Subscription {
   planId               String    @map("plan_id")
   stripeCustomerId     String?   @unique @map("stripe_customer_id")
   stripeSubscriptionId String?   @unique @map("stripe_subscription_id")
-  // Stripe-reported status: "trialing" | "active" | "past_due" | "canceled" | "unpaid" | "incomplete"
-  // For the Free (Starter) plan: always "active" with no Stripe IDs.
-  status               String    @default("active") @db.VarChar(30)
+  // Card-on-file billing (no Stripe subscription). The org keeps a default
+  // payment method; each accepted shipment is charged immediately via a
+  // PaymentIntent. status values:
+  //   "card_on_file" — tier selected + a usable card saved (can file)
+  //   "incomplete"   — tier selected but no card yet (cannot file paid tiers)
+  //   "delinquent"   — a per-shipment charge failed; filing blocked until settled
+  //   "active"       — legacy (pre-migration metered subscription); treated as card_on_file
+  status               String    @default("incomplete") @db.VarChar(30)
+  // Default payment method on file (Stripe pm_… id) + display summary.
+  defaultPaymentMethodId String? @map("default_payment_method_id")
+  cardBrand            String?   @map("card_brand") @db.VarChar(20)
+  cardLast4            String?   @map("card_last4") @db.VarChar(4)
+  cardExpMonth         Int?      @map("card_exp_month")
+  cardExpYear          Int?      @map("card_exp_year")
   currentPeriodStart   DateTime? @map("current_period_start") @db.Timestamptz()
   currentPeriodEnd     DateTime? @map("current_period_end") @db.Timestamptz()
   cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
@@ -631,8 +642,11 @@ model ShipmentCharge {
   planId             String   @map("plan_id") // tier at bill time
   amountCents        Int      @map("amount_cents") // locked per-filing rate
   stripeCustomerId   String?  @map("stripe_customer_id")
-  stripeMeterEventId String?  @map("stripe_meter_event_id")
-  // pending → reported (sent to Stripe) | failed (retry later) | skipped (no Stripe customer, e.g. enterprise)
+  stripeMeterEventId String?  @map("stripe_meter_event_id") // legacy (metered model)
+  stripePaymentIntentId String? @map("stripe_payment_intent_id") // immediate-charge model
+  // Immediate-charge model: pending → paid (PaymentIntent succeeded) | failed
+  //   (declined/error, retry later) | requires_action (3DS — needs the customer) |
+  //   skipped (no charge, e.g. $0 enterprise tier).
   status             String   @default("pending") @db.VarChar(20)
   billedAt           DateTime @default(now()) @map("billed_at") @db.Timestamptz()
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz()
