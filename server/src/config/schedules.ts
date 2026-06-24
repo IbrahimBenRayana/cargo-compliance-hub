@@ -25,6 +25,8 @@ export const CRON = {
   ADD_CVD_SYNC: '0 4 * * *',
   /** Every 5 minutes — reap ABI documents stuck in SENDING > 15 min. */
   ABI_REAPER: '*/5 * * * *',
+  /** Hourly at :15 — retry per-shipment charges that failed (delinquent orgs). */
+  CHARGE_RETRY: '15 * * * *',
 } as const;
 
 /**

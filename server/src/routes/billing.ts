@@ -5,7 +5,15 @@ import Stripe from 'stripe';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
-import { getStripe, stripeConfigured } from '../services/stripe.js';
+import {
+  getStripe,
+  stripeConfigured,
+  createStripeCustomer,
+  createSetupIntent,
+  setDefaultCard,
+} from '../services/stripe.js';
+import { getOrgEntitlements } from '../services/entitlements.js';
+import { retryFailedCharges } from '../services/shipmentBilling.js';
 import { notify } from '../services/notifications.js';
 import { writeAuditLog } from '../services/auditLog.js';
 import { env } from '../config/env.js';
@@ -13,11 +21,16 @@ import logger from '../config/logger.js';
 
 const router = Router();
 
-// ─── Webhook (MUST be defined BEFORE router.use(authMiddleware) and BEFORE any body-parsing) ─────
-// This endpoint uses raw body for Stripe signature verification.
-// The raw() middleware is applied at the route level here, but index.ts also mounts
-// express.raw() at /api/v1/billing/webhook BEFORE express.json() to ensure the
-// body is never parsed as JSON first.
+// ════════════════════════════════════════════════════════════════════════
+// Billing model: card-on-file + immediate per-shipment charge.
+// The org keeps a Stripe Customer with a default payment method (saved via a
+// SetupIntent — no charge). Each shipment CBP ACCEPTS is charged immediately
+// (services/shipmentBilling.ts). There are NO Stripe subscriptions / invoices.
+// ════════════════════════════════════════════════════════════════════════
+
+// ─── Webhook (MUST be before authMiddleware and before any body-parsing) ───
+// index.ts mounts express.raw() at this path before express.json(), and we also
+// apply raw() here, so the body is a Buffer for Stripe signature verification.
 router.post(
   '/webhook',
   raw({ type: 'application/json' }),
@@ -33,11 +46,7 @@ router.post(
     }
     let event: Stripe.Event;
     try {
-      event = getStripe().webhooks.constructEvent(
-        req.body as Buffer, // raw Buffer — NOT parsed JSON
-        signature,
-        env.STRIPE_WEBHOOK_SECRET
-      );
+      event = getStripe().webhooks.constructEvent(req.body as Buffer, signature, env.STRIPE_WEBHOOK_SECRET);
     } catch (err) {
       logger.warn({ err }, 'Stripe webhook signature verification failed');
       res.status(400).json({ error: 'Invalid signature' });
@@ -49,31 +58,22 @@ router.post(
       res.json({ received: true });
     } catch (err) {
       logger.error({ err, eventType: event.type }, 'Stripe webhook handler error');
-      // Return 500 so Stripe retries. But don't leak details.
-      res.status(500).json({ error: 'Internal error' });
+      res.status(500).json({ error: 'Internal error' }); // 500 → Stripe retries
     }
-  }
+  },
 );
 
-// ─── Event handler (dispatch by type) ──────────────────────
-// Idempotency: Stripe retries delivery on 5xx and occasionally after 2xx
-// (the at-least-once contract). Without a ledger the same event runs our
-// handler twice — `onSubscriptionDeleted` would clobber canceledAt with
-// every retry, and notifications would fan out twice.
-// We INSERT event.id ON CONFLICT DO NOTHING at the top; if the row already
-// existed we treat it as a no-op success and return. processedAt is set
-// after the handler finishes so we can tell "received but not processed"
-// (likely crashed mid-handler) apart from "fully done".
+// ─── Event dispatch with an idempotency ledger ─────────────────────────────
+// Stripe delivers at-least-once. We INSERT event.id ON CONFLICT DO NOTHING; an
+// empty result means we already processed it. processedAt is set only after the
+// handler finishes (and nulled on failure) so a crashed handler can be retried.
 async function handleStripeEvent(event: Stripe.Event): Promise<void> {
-  // First-write wins. RETURNING returns the inserted row only on insert;
-  // empty result means this event was already seen.
   const inserted = await prisma.$queryRaw<Array<{ event_id: string }>>`
     INSERT INTO "stripe_webhook_events" ("event_id", "type", "received_at")
     VALUES (${event.id}, ${event.type}, NOW())
     ON CONFLICT ("event_id") DO NOTHING
     RETURNING "event_id"
   `;
-
   if (inserted.length === 0) {
     logger.info({ eventId: event.id, type: event.type }, 'Stripe webhook: duplicate event, ignoring');
     return;
@@ -81,329 +81,246 @@ async function handleStripeEvent(event: Stripe.Event): Promise<void> {
 
   try {
     switch (event.type) {
-      case 'checkout.session.completed':
-        await onCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+      case 'setup_intent.succeeded':
+        await onSetupIntentSucceeded(event.data.object as Stripe.SetupIntent);
         break;
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated':
-        await onSubscriptionChanged(event.data.object as Stripe.Subscription);
+      case 'payment_intent.succeeded':
+        await onPaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
         break;
-      case 'customer.subscription.deleted':
-        await onSubscriptionDeleted(event.data.object as Stripe.Subscription);
+      case 'payment_intent.payment_failed':
+        await onPaymentIntentFailed(event.data.object as Stripe.PaymentIntent);
         break;
-      case 'invoice.payment_failed':
-        await onInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+      case 'charge.refunded':
+        await onChargeRefunded(event.data.object as Stripe.Charge);
         break;
       default:
         logger.debug({ type: event.type }, 'Unhandled Stripe event');
     }
   } catch (err) {
-    // Handler failed — null out processed_at so a future retry from Stripe
-    // can re-execute the handler. (The audit-log row in stripe_webhook_events
-    // stays; only the marker that says "we finished" is cleared.)
-    await prisma.stripeWebhookEvent.update({
-      where: { eventId: event.id },
-      data: { processedAt: null },
-    }).catch(() => { /* swallow; primary error is more important */ });
+    await prisma.stripeWebhookEvent
+      .update({ where: { eventId: event.id }, data: { processedAt: null } })
+      .catch(() => { /* primary error matters more */ });
     throw err;
   }
 
-  // Mark done. (For retries that come in past this point, the row already
-  // exists with processedAt set — the ON CONFLICT DO NOTHING at the top
-  // will short-circuit them.)
   await prisma.stripeWebhookEvent.update({
     where: { eventId: event.id },
     data: { processedAt: new Date() },
   });
 }
 
-// Helper: extract billing period dates from a Stripe Subscription.
-// In Stripe SDK v22, current_period_start/end moved from Subscription to
-// SubscriptionItem (items.data[0]). Fall back to null if items are empty.
-function getSubPeriod(sub: Stripe.Subscription): {
-  currentPeriodStart: Date | null;
-  currentPeriodEnd: Date | null;
-} {
-  const item = sub.items.data[0];
-  if (!item) return { currentPeriodStart: null, currentPeriodEnd: null };
-  return {
-    currentPeriodStart: new Date(item.current_period_start * 1000),
-    currentPeriodEnd: new Date(item.current_period_end * 1000),
-  };
-}
-
-async function onCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
-  const orgId = session.client_reference_id;
-  const stripeCustomerId = session.customer as string;
-  const stripeSubscriptionId = session.subscription as string;
-  const planId = session.metadata?.planId;
-  if (!orgId || !planId) {
-    logger.warn({ sessionId: session.id }, 'Checkout session missing orgId or planId in metadata');
-    return;
-  }
-  // Fetch the subscription to get current period details
-  const stripeSub = await getStripe().subscriptions.retrieve(stripeSubscriptionId);
-  const { currentPeriodStart, currentPeriodEnd } = getSubPeriod(stripeSub);
-
-  await prisma.subscription.upsert({
-    where: { orgId },
-    update: {
-      planId,
-      stripeCustomerId,
-      stripeSubscriptionId,
-      status: stripeSub.status,
-      currentPeriodStart,
-      currentPeriodEnd,
-      cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
-      canceledAt: null,
-    },
-    create: {
-      orgId,
-      planId,
-      stripeCustomerId,
-      stripeSubscriptionId,
-      status: stripeSub.status,
-      currentPeriodStart,
-      currentPeriodEnd,
-      cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
-    },
-  });
-  logger.info({ orgId, planId }, '✓ Subscription activated via checkout');
-
-  // Audit trail (Phase 7): subscriptions are the highest-stakes financial
-  // state on the platform. Every state change is logged so we can chase
-  // back any billing dispute to the exact Stripe event that drove it.
-  writeAuditLog({
-    orgId,
-    action: 'subscription.activated',
-    entityType: 'subscription',
-    entityId: stripeSubscriptionId,
-    newValue: { planId, status: stripeSub.status, stripeCustomerId },
-  });
-
-  // Phase 3: notify owners + admins that the subscription is live.
-  await notify({
-    kind:     'billing_subscription_changed',
-    audience: { orgId, roles: ['ADMIN', 'OWNER'] },
-    title:    'Subscription Activated',
-    message:  `Your ${planId} plan is now active.`,
-    linkUrl:  '/settings?tab=billing',
-    metadata: { planId, status: stripeSub.status },
-  });
-}
-
-async function onSubscriptionChanged(sub: Stripe.Subscription): Promise<void> {
-  const existing = await prisma.subscription.findUnique({
-    where: { stripeSubscriptionId: sub.id },
-  });
-  if (!existing) {
-    logger.warn(
-      { subscriptionId: sub.id },
-      'Subscription updated but not found in DB; waiting for checkout.session.completed'
-    );
-    return;
-  }
-  // Determine the planId from the Stripe price — look up via stripePriceId
-  const priceId = sub.items.data[0]?.price.id;
-  const plan = priceId
-    ? await prisma.plan.findUnique({ where: { stripePriceId: priceId } })
-    : null;
-
-  const { currentPeriodStart, currentPeriodEnd } = getSubPeriod(sub);
-
+/** Backup for POST /billing/card — a confirmed SetupIntent saved a card. */
+async function onSetupIntentSucceeded(si: Stripe.SetupIntent): Promise<void> {
+  const customerId = typeof si.customer === 'string' ? si.customer : si.customer?.id;
+  const pmId = typeof si.payment_method === 'string' ? si.payment_method : si.payment_method?.id;
+  if (!customerId || !pmId) return;
+  const sub = await prisma.subscription.findFirst({ where: { stripeCustomerId: customerId } });
+  if (!sub) return;
+  if (sub.defaultPaymentMethodId === pmId) return; // already recorded by the direct endpoint
+  const card = await setDefaultCard(customerId, pmId);
   await prisma.subscription.update({
-    where: { stripeSubscriptionId: sub.id },
+    where: { orgId: sub.orgId },
     data: {
-      planId: plan?.id ?? existing.planId,
-      status: sub.status,
-      currentPeriodStart,
-      currentPeriodEnd,
-      cancelAtPeriodEnd: sub.cancel_at_period_end,
-      canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
+      defaultPaymentMethodId: card.paymentMethodId,
+      cardBrand: card.brand,
+      cardLast4: card.last4,
+      cardExpMonth: card.expMonth,
+      cardExpYear: card.expYear,
+      status: 'card_on_file',
     },
   });
+  await retryFailedCharges(sub.orgId);
+  logger.info({ orgId: sub.orgId }, '✓ Card saved (via setup_intent webhook)');
+}
 
-  writeAuditLog({
-    orgId: existing.orgId,
-    action: 'subscription.updated',
-    entityType: 'subscription',
-    entityId: sub.id,
-    oldValue: { planId: existing.planId, status: existing.status },
-    newValue: { planId: plan?.id ?? existing.planId, status: sub.status, cancelAtPeriodEnd: sub.cancel_at_period_end },
+/** Mark the matching ShipmentCharge paid (backup for the synchronous path). */
+async function onPaymentIntentSucceeded(pi: Stripe.PaymentIntent): Promise<void> {
+  const chargeId = pi.metadata?.chargeId;
+  const charge = chargeId
+    ? await prisma.shipmentCharge.findUnique({ where: { id: chargeId } })
+    : await prisma.shipmentCharge.findFirst({ where: { stripePaymentIntentId: pi.id } });
+  if (!charge || charge.status === 'paid') return;
+  await prisma.shipmentCharge.update({
+    where: { id: charge.id },
+    data: { status: 'paid', stripePaymentIntentId: pi.id },
   });
 }
 
-async function onSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
-  // There is no free tier in the per-filing model. On cancellation the org
-  // simply loses its active tier: we keep the last planId for the audit trail
-  // but flip status to 'canceled' (the capability check gates on an active
-  // status, so a canceled org has zero capabilities and cannot file until it
-  // re-subscribes).
-  const existing = await prisma.subscription.findUnique({
-    where: { stripeSubscriptionId: sub.id },
-  });
-  if (!existing) return;
-  // Preserve the original cancellation timestamp. Pre-fix every retry set
-  // `canceledAt: new Date()`, so the audit trail showed the LAST retry
-  // rather than when the user actually cancelled. Prefer Stripe's own
-  // canceled_at when present; fall back to NOW only on first cancel.
-  const canceledAt = existing.canceledAt
-    ? existing.canceledAt
-    : sub.canceled_at
-    ? new Date(sub.canceled_at * 1000)
-    : new Date();
-  await prisma.subscription.update({
-    where: { stripeSubscriptionId: sub.id },
-    data: {
-      status: 'canceled',
-      canceledAt,
-      stripeSubscriptionId: null, // allow the org to resubscribe
-    },
-  });
-  logger.info({ orgId: existing.orgId }, '✓ Subscription canceled — org has no active tier');
-
-  writeAuditLog({
-    orgId: existing.orgId,
-    action: 'subscription.canceled',
-    entityType: 'subscription',
-    entityId: sub.id,
-    oldValue: { planId: existing.planId, status: existing.status },
-    newValue: { planId: existing.planId, status: 'canceled', canceledAt },
-  });
-
-  // Phase 3: warn owners + admins. Severity is 'warning' (default for kind) —
-  // the org isn't blocked retroactively, but new filings will be gated until
-  // they re-subscribe.
-  await notify({
-    kind:     'billing_subscription_canceled',
-    audience: { orgId: existing.orgId, roles: ['ADMIN', 'OWNER'] },
-    title:    'Subscription Canceled',
-    message:  'Your plan has been canceled. Choose a plan to continue filing.',
-    linkUrl:  '/settings?tab=billing',
-    metadata: { previousPlanId: existing.planId },
-  });
-}
-
-async function onInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
-  // In Stripe SDK v22, the subscription reference moved to invoice.parent.subscription_details.subscription
-  const parentSub = invoice.parent?.subscription_details?.subscription;
-  const subId: string | null =
-    typeof parentSub === 'string' ? parentSub : (parentSub?.id ?? null);
-  if (!subId) return;
-  await prisma.subscription.updateMany({
-    where: { stripeSubscriptionId: subId },
-    data: { status: 'past_due' },
-  });
-  logger.warn({ subscriptionId: subId }, 'Payment failed — subscription marked past_due');
-
-  // Phase 3: critical alert to admin + owner. Service may be suspended if
-  // not resolved before grace period lapses, so this is the highest-urgency
-  // billing notification we send.
-  const sub = await prisma.subscription.findUnique({
-    where: { stripeSubscriptionId: subId },
-    select: { orgId: true },
-  });
-  if (sub) {
-    // Dedupe per-invoice so retries within a single dunning cycle don't
-    // spam users; a fresh payment_failed event for the same invoice is a
-    // no-op.
-    await notify({
-      kind:      'billing_payment_failed',
-      audience:  { orgId: sub.orgId, roles: ['ADMIN', 'OWNER'] },
-      title:     'Payment Failed',
-      message:   'A subscription invoice failed to charge. Update your payment method to keep service running.',
-      linkUrl:   '/settings?tab=billing',
-      metadata:  { invoiceId: invoice.id, subscriptionId: subId },
-      dedupeKey: `billing_failed_${invoice.id}`,
+/** A charge failed — mark it, flag the org delinquent, and alert owners/admins. */
+async function onPaymentIntentFailed(pi: Stripe.PaymentIntent): Promise<void> {
+  const chargeId = pi.metadata?.chargeId;
+  const metaOrgId = pi.metadata?.orgId;
+  const charge = chargeId
+    ? await prisma.shipmentCharge.findUnique({ where: { id: chargeId } })
+    : await prisma.shipmentCharge.findFirst({ where: { stripePaymentIntentId: pi.id } });
+  if (charge && charge.status !== 'paid') {
+    await prisma.shipmentCharge.update({
+      where: { id: charge.id },
+      data: { status: 'failed', stripePaymentIntentId: pi.id },
     });
   }
+  const targetOrg = charge?.orgId ?? metaOrgId;
+  if (!targetOrg) return;
+  await prisma.subscription
+    .updateMany({ where: { orgId: targetOrg }, data: { status: 'delinquent' } })
+    .catch(() => {});
+  await notify({
+    kind: 'billing_payment_failed',
+    audience: { orgId: targetOrg, roles: ['ADMIN', 'OWNER'] },
+    title: 'Payment Failed',
+    message: 'A per-shipment charge could not be completed. Update your card to keep filing.',
+    linkUrl: '/settings?tab=billing',
+    metadata: { paymentIntentId: pi.id },
+    dedupeKey: `billing_failed_${pi.id}`,
+  }).catch(() => {});
 }
 
-// ─── Authenticated endpoints ─────────────────────────────────
+/** A charge was refunded in Stripe — reflect it on the ShipmentCharge. */
+async function onChargeRefunded(charge: Stripe.Charge): Promise<void> {
+  const piId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+  if (!piId) return;
+  await prisma.shipmentCharge.updateMany({
+    where: { stripePaymentIntentId: piId },
+    data: { status: 'refunded' },
+  });
+}
+
+// ─── Authenticated endpoints ───────────────────────────────────────────────
 router.use(authMiddleware);
 
-// POST /api/v1/billing/checkout-session
-// Body: { planId: string, successUrl?: string, cancelUrl?: string }
-// Returns: { url: string, sessionId: string }
-router.post('/checkout-session', requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
+// GET /api/v1/billing/config → publishable key for Stripe Elements.
+router.get('/config', (_req: AuthRequest, res: Response): void => {
+  res.json({ publishableKey: env.STRIPE_PUBLISHABLE_KEY, configured: stripeConfigured() });
+});
+
+// POST /api/v1/billing/select-tier  { planId }
+// Choose / change the plan tier. No charge, no card re-entry — the new rate
+// applies to shipments accepted after the change. Self-serve tiers only.
+router.post('/select-tier', async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = z.object({ planId: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const plan = await prisma.plan.findUnique({ where: { id: parsed.data.planId } });
+  if (!plan || !plan.isActive) {
+    res.status(404).json({ error: 'Plan not found' });
+    return;
+  }
+  if (!plan.isPublic) {
+    res.status(400).json({ error: 'This plan is not self-serve. Contact sales.' });
+    return;
+  }
+  const orgId = req.user!.orgId;
+  const existing = await prisma.subscription.findUnique({ where: { orgId } });
+  const hasCard = !!existing?.defaultPaymentMethodId;
+  // Preserve a delinquency; otherwise card-on-file if a card exists, else incomplete.
+  const status = existing?.status === 'delinquent' ? 'delinquent' : hasCard ? 'card_on_file' : 'incomplete';
+  await prisma.subscription.upsert({
+    where: { orgId },
+    update: { planId: plan.id, status },
+    create: { orgId, planId: plan.id, status: 'incomplete' },
+  });
+  writeAuditLog({
+    orgId,
+    userId: req.user!.id,
+    action: 'billing.tier_selected',
+    entityType: 'subscription',
+    entityId: orgId,
+    oldValue: existing ? { planId: existing.planId } : undefined,
+    newValue: { planId: plan.id },
+  });
+  const ent = await getOrgEntitlements(orgId);
+  res.json({ planId: plan.id, canFile: ent.canFile, cardOnFile: ent.cardOnFile });
+});
+
+// POST /api/v1/billing/setup-intent → { clientSecret }
+// Starts saving a card. Requires a selected tier (so we have a billing row).
+router.post('/setup-intent', requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
   if (!stripeConfigured()) {
     res.status(503).json({ error: 'Billing not configured. Contact support.' });
     return;
   }
-  const schema = z.object({
-    planId: z.string().min(1),
-    successUrl: z.string().url().optional(),
-    cancelUrl: z.string().url().optional(),
-  });
-  const body = schema.safeParse(req.body);
-  if (!body.success) {
-    res.status(400).json({ error: body.error.flatten() });
-    return;
-  }
-  const plan = await prisma.plan.findUnique({ where: { id: body.data.planId } });
-  if (!plan) {
-    res.status(404).json({ error: 'Plan not found' });
-    return;
-  }
-  if (!plan.stripePriceId) {
-    res
-      .status(400)
-      .json({ error: 'This plan is not purchasable via self-service. Contact sales.' });
-    return;
-  }
-
   const orgId = req.user!.orgId;
   const sub = await prisma.subscription.findUnique({ where: { orgId } });
-  const baseUrl = env.FRONTEND_URL || 'https://mycargolens.com';
-
-  const session = await getStripe().checkout.sessions.create({
-    mode: 'subscription',
-    // Metered prices must NOT carry a quantity — usage is reported per filing
-    // via the Billing Meter, and Stripe rejects `quantity` on usage_type=metered.
-    line_items: [{ price: plan.stripePriceId }],
-    customer: sub?.stripeCustomerId || undefined,
-    customer_email: sub?.stripeCustomerId ? undefined : req.user!.email,
-    client_reference_id: orgId,
-    metadata: { orgId, planId: plan.id },
-    subscription_data: { metadata: { orgId, planId: plan.id } },
-    success_url:
-      body.data.successUrl ||
-      `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: body.data.cancelUrl || `${baseUrl}/checkout/cancel`,
-    allow_promotion_codes: true,
-    billing_address_collection: 'auto',
-    automatic_tax: { enabled: false }, // flip to true once you configure tax in Stripe Dashboard
-  });
-
-  res.json({ url: session.url, sessionId: session.id });
+  if (!sub) {
+    res.status(400).json({ error: 'Choose a plan before adding a card.', code: 'tier_required' });
+    return;
+  }
+  let customerId = sub.stripeCustomerId;
+  if (!customerId) {
+    customerId = await createStripeCustomer({ orgId, email: req.user!.email });
+    await prisma.subscription.update({ where: { orgId }, data: { stripeCustomerId: customerId } });
+  }
+  const { clientSecret } = await createSetupIntent(customerId);
+  res.json({ clientSecret });
 });
 
-// GET /api/v1/billing/subscription
-// Returns: { plan, capabilities, subscription, usage }
-// In the per-filing model there is no implicit free plan: an org with no active
-// subscription has `plan: null` and `capabilities: []`, and the UI prompts it
-// to choose a tier. `usage` reflects the current billing period's billed
-// shipments and the running (uninvoiced) total.
+// POST /api/v1/billing/card  { setupIntentId }
+// Confirm a saved card: set it as the default payment method, store the display
+// summary, and reattempt any unsettled charges (clearing delinquency on success).
+router.post('/card', requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!stripeConfigured()) {
+    res.status(503).json({ error: 'Billing not configured' });
+    return;
+  }
+  const parsed = z.object({ setupIntentId: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const orgId = req.user!.orgId;
+  const sub = await prisma.subscription.findUnique({ where: { orgId } });
+  if (!sub?.stripeCustomerId) {
+    res.status(400).json({ error: 'No billing account — choose a plan first.' });
+    return;
+  }
+  const si = await getStripe().setupIntents.retrieve(parsed.data.setupIntentId);
+  const pmId = typeof si.payment_method === 'string' ? si.payment_method : si.payment_method?.id;
+  const siCustomer = typeof si.customer === 'string' ? si.customer : si.customer?.id;
+  if (si.status !== 'succeeded' || !pmId || siCustomer !== sub.stripeCustomerId) {
+    res.status(400).json({ error: 'Card was not confirmed. Please try again.' });
+    return;
+  }
+  const card = await setDefaultCard(sub.stripeCustomerId, pmId);
+  await prisma.subscription.update({
+    where: { orgId },
+    data: {
+      defaultPaymentMethodId: card.paymentMethodId,
+      cardBrand: card.brand,
+      cardLast4: card.last4,
+      cardExpMonth: card.expMonth,
+      cardExpYear: card.expYear,
+      status: 'card_on_file',
+    },
+  });
+  writeAuditLog({
+    orgId,
+    userId: req.user!.id,
+    action: 'billing.card_saved',
+    entityType: 'subscription',
+    entityId: orgId,
+    newValue: { brand: card.brand, last4: card.last4 },
+  });
+  // Now that a card is on file, settle anything that previously failed.
+  await retryFailedCharges(orgId);
+  const ent = await getOrgEntitlements(orgId);
+  res.json({ card, canFile: ent.canFile });
+});
+
+// GET /api/v1/billing/subscription → { plan, capabilities, card, canFile, usage }
 router.get('/subscription', async (req: AuthRequest, res: Response): Promise<void> => {
   const orgId = req.user!.orgId;
-  const sub = await prisma.subscription.findUnique({
-    where: { orgId },
-    include: { plan: true },
-  });
+  const sub = await prisma.subscription.findUnique({ where: { orgId }, include: { plan: true } });
+  const ent = await getOrgEntitlements(orgId);
+  const plan = ent.hasActiveTier ? sub?.plan ?? null : null;
 
-  // A tier only confers capabilities while the subscription is usable.
-  const ACTIVE_STATUSES = ['active', 'trialing', 'past_due'];
-  const tierActive = !!sub && ACTIVE_STATUSES.includes(sub.status);
-  const plan = tierActive ? sub!.plan : null;
-
-  // Current billing period window — fall back to the calendar month when there
-  // is no Stripe period yet (e.g. brand-new or canceled subscription).
+  // Usage = shipments charged this calendar month + the running total.
   const now = new Date();
-  const periodStart = sub?.currentPeriodStart ?? new Date(now.getFullYear(), now.getMonth(), 1);
-  const periodEnd = sub?.currentPeriodEnd ?? new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const agg = await prisma.shipmentCharge.aggregate({
-    where: { orgId, billedAt: { gte: periodStart, lt: periodEnd } },
+    where: { orgId, status: 'paid', billedAt: { gte: periodStart, lt: periodEnd } },
     _count: { _all: true },
     _sum: { amountCents: true },
   });
@@ -419,14 +336,12 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
           features: plan.features,
         }
       : null,
-    capabilities: plan?.capabilities ?? [],
-    subscription: sub
-      ? {
-          status: sub.status,
-          currentPeriodStart: sub.currentPeriodStart,
-          currentPeriodEnd: sub.currentPeriodEnd,
-          cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
-        }
+    capabilities: ent.capabilities,
+    canFile: ent.canFile,
+    status: ent.status,
+    delinquent: ent.delinquent,
+    card: ent.cardOnFile
+      ? { brand: sub?.cardBrand, last4: sub?.cardLast4, expMonth: sub?.cardExpMonth, expYear: sub?.cardExpYear }
       : null,
     usage: {
       periodStart,
@@ -437,8 +352,7 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
   });
 });
 
-// POST /api/v1/billing/portal-session
-// Returns: { url: string }
+// POST /api/v1/billing/portal-session → { url }  (manage card / receipts in Stripe)
 router.post('/portal-session', async (req: AuthRequest, res: Response): Promise<void> => {
   if (!stripeConfigured()) {
     res.status(503).json({ error: 'Billing not configured' });
@@ -447,13 +361,13 @@ router.post('/portal-session', async (req: AuthRequest, res: Response): Promise<
   const orgId = req.user!.orgId;
   const sub = await prisma.subscription.findUnique({ where: { orgId } });
   if (!sub?.stripeCustomerId) {
-    res.status(404).json({ error: 'No active subscription found' });
+    res.status(404).json({ error: 'No billing account found' });
     return;
   }
   const baseUrl = env.FRONTEND_URL || 'https://mycargolens.com';
   const session = await getStripe().billingPortal.sessions.create({
     customer: sub.stripeCustomerId,
-    return_url: `${baseUrl}/app/settings/billing`,
+    return_url: `${baseUrl}/settings?tab=billing`,
   });
   res.json({ url: session.url });
 });

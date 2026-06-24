@@ -85,8 +85,8 @@ export async function billShipment(anchor: ShipmentAnchor, orgId: string): Promi
       idempotencyKey: chargeId,
       description: anchor.filingId ? `ISF shipment ${anchor.filingId}` : `ABI entry ${anchor.abiDocumentId}`,
       metadata: anchor.filingId
-        ? { orgId, planId: ent.planId, filingId: anchor.filingId }
-        : { orgId, planId: ent.planId, abiDocumentId: anchor.abiDocumentId! },
+        ? { orgId, planId: ent.planId, chargeId, filingId: anchor.filingId }
+        : { orgId, planId: ent.planId, chargeId, abiDocumentId: anchor.abiDocumentId! },
     });
 
     await prisma.shipmentCharge.update({
@@ -113,5 +113,58 @@ export async function billShipment(anchor: ShipmentAnchor, orgId: string): Promi
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ err: message, ...anchorLog, orgId }, '[Billing] Unexpected error while billing shipment');
+  }
+}
+
+/**
+ * Re-attempt an org's unsettled charges (status failed / requires_action).
+ * Called when the org adds or updates a card, and by the nightly sweep. Uses a
+ * FRESH idempotency key per attempt so Stripe actually retries (reusing the
+ * original would just replay the old failure). Only retries non-paid charges,
+ * so a settled shipment is never re-charged. Clears delinquency when nothing
+ * is left unsettled. Never throws.
+ */
+export async function retryFailedCharges(orgId: string): Promise<{ retried: number; settled: number }> {
+  try {
+    const ent = await getOrgEntitlements(orgId);
+    if (!ent.stripeCustomerId || !ent.defaultPaymentMethodId || !stripeConfigured()) {
+      return { retried: 0, settled: 0 };
+    }
+    const failed = await prisma.shipmentCharge.findMany({
+      where: { orgId, status: { in: ['failed', 'requires_action'] } },
+    });
+    let settled = 0;
+    for (const c of failed) {
+      const outcome = await chargeSavedCard({
+        customerId: ent.stripeCustomerId,
+        paymentMethodId: ent.defaultPaymentMethodId,
+        amountCents: c.amountCents,
+        idempotencyKey: randomUUID(), // fresh key → Stripe retries the charge
+        description: c.filingId ? `ISF shipment ${c.filingId} (retry)` : `ABI entry ${c.abiDocumentId} (retry)`,
+        metadata: { orgId, planId: c.planId, chargeId: c.id },
+      }).catch(() => ({ status: 'failed' as const, paymentIntentId: null }));
+      await prisma.shipmentCharge.update({
+        where: { id: c.id },
+        data: { status: outcome.status, stripePaymentIntentId: outcome.paymentIntentId ?? c.stripePaymentIntentId },
+      });
+      if (outcome.status === 'paid') settled++;
+    }
+    // Clear delinquency once nothing is left unsettled.
+    const remaining = await prisma.shipmentCharge.count({
+      where: { orgId, status: { in: ['failed', 'requires_action'] } },
+    });
+    if (remaining === 0) {
+      await prisma.subscription
+        .updateMany({ where: { orgId, status: 'delinquent' }, data: { status: 'card_on_file' } })
+        .catch(() => { /* best effort */ });
+    }
+    if (failed.length > 0) {
+      logger.info({ orgId, retried: failed.length, settled }, '[Billing] Retried unsettled charges');
+    }
+    return { retried: failed.length, settled };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error({ err: message, orgId }, '[Billing] retryFailedCharges error');
+    return { retried: 0, settled: 0 };
   }
 }
