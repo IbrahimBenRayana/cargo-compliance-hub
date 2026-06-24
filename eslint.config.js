@@ -5,7 +5,11 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  // tests/e2e holds Playwright specs + helper scripts. They use Playwright's
+  // `use` fixture argument, which the react-hooks rule misreads as a React
+  // Hook — and they aren't shipped app code, so they're linted by their own
+  // conventions, not the app's React config.
+  { ignores: ["dist", "tests/e2e/**", "**/.next/**", ".claude/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
