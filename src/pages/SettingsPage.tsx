@@ -13,17 +13,20 @@ import {
 import {
   User, Building2, Shield, Key, Activity, CheckCircle2, XCircle,
   Loader2, Clock, Users, FileText, Save, Eye, EyeOff, ChevronRight,
-  Mail, CalendarDays, BadgeCheck, Plus, Trash2, Copy, ShieldCheck, Bell,
+  Mail, CalendarDays, BadgeCheck, Plus, Trash2, Copy, ShieldCheck, Bell, CreditCard,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
+import { BillingSettings } from '@/components/billing/BillingSettings';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-type SettingsTab = 'profile' | 'organization' | 'api' | 'notifications' | 'activity';
+type SettingsTab = 'profile' | 'organization' | 'billing' | 'api' | 'notifications' | 'activity';
 
 const tabs: { id: SettingsTab; label: string; desc: string; icon: React.ElementType }[] = [
   { id: 'profile',       label: 'Profile',           desc: 'Personal info & security',  icon: User },
   { id: 'organization',  label: 'Organization',      desc: 'Company & IOR details',     icon: Building2 },
+  { id: 'billing',       label: 'Billing',           desc: 'Plan, card & charges',      icon: CreditCard },
   { id: 'api',           label: 'API & Integrations',desc: 'Filing gateway connection', icon: Key },
   { id: 'notifications', label: 'Notifications',     desc: 'Per-event delivery channels', icon: Bell },
   { id: 'activity',      label: 'Audit Log',         desc: 'Recent activity',           icon: Activity },
@@ -38,7 +41,11 @@ export default function SettingsPage() {
   const updateOrganization = useUpdateOrganization();
   const testConnection = useTestCCConnection();
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<SettingsTab>(
+    tabs.some((t) => t.id === requestedTab) ? (requestedTab as SettingsTab) : 'profile',
+  );
 
   // Profile form
   const [firstName, setFirstName] = useState('');
@@ -418,6 +425,8 @@ export default function SettingsPage() {
           )}
 
           {/* ── API ── */}
+          {activeTab === 'billing' && <BillingSettings />}
+
           {activeTab === 'api' && (
             <Card>
               <CardHeader className="border-b">

@@ -11,9 +11,10 @@ import { settingsApi, integrationsApi, organizationApi } from '@/api/client';
 import { useAuthStore } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { LogoMark } from '@/components/LogoMark';
+import { OnboardingPaymentStep } from '@/components/billing/OnboardingPaymentStep';
 import { cn } from '@/lib/utils';
 import {
-  Building2, Plug, FileText, PartyPopper, ArrowRight, ArrowLeft,
+  Building2, Plug, FileText, PartyPopper, ArrowRight, ArrowLeft, CreditCard,
   CheckCircle2, XCircle, Loader2, Ship, Globe, Zap, ChevronRight,
 } from 'lucide-react';
 
@@ -21,6 +22,7 @@ import {
 const STEPS = [
   { id: 'company', label: 'Company Profile', icon: Building2 },
   { id: 'api', label: 'API Connection', icon: Plug },
+  { id: 'payment', label: 'Payment', icon: CreditCard },
   { id: 'next', label: 'Get Started', icon: FileText },
   { id: 'done', label: 'All Set!', icon: PartyPopper },
 ] as const;
@@ -96,8 +98,8 @@ export default function OnboardingPage() {
       }
     }
 
-    if (step === 2) {
-      // Mark onboarding complete
+    if (step === 3) {
+      // Mark onboarding complete (Get Started step)
       try {
         await completeOnboarding.mutateAsync();
       } catch {
@@ -318,8 +320,28 @@ export default function OnboardingPage() {
           </Card>
         )}
 
-        {/* ─── Step 2: Get Started ────────────────────────── */}
+        {/* ─── Step 2: Payment (optional) ─────────────────── */}
         {step === 2 && (
+          <Card className="animate-fade-in-up border border-slate-200 dark:border-slate-800 shadow-sm dark:bg-slate-900/40">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_8px_20px_-10px_rgba(245,158,11,0.5)] flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-amber-950" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Add a payment method</CardTitle>
+                  <CardDescription>Pick a plan and add a card so you're ready to file — or skip and add it later.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <OnboardingPaymentStep onDone={() => setStep(3)} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ─── Step 3: Get Started ────────────────────────── */}
+        {step === 3 && (
           <Card className="animate-fade-in-up border border-slate-200 dark:border-slate-800 shadow-sm dark:bg-slate-900/40">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3 mb-1">
@@ -380,7 +402,7 @@ export default function OnboardingPage() {
         )}
 
         {/* ─── Step 3: Done ───────────────────────────────── */}
-        {step === 3 && (
+        {step === 4 && (
           <Card className="animate-fade-in-up border border-slate-200 dark:border-slate-800 shadow-sm dark:bg-slate-900/40 text-center">
             <CardContent className="py-14">
               <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_12px_36px_-12px_rgba(245,158,11,0.55)] mb-6">
