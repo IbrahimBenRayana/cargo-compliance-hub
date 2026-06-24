@@ -1,27 +1,32 @@
 /**
  * Entitlements — resolves what an organization is allowed to do under the
- * per-filing pricing model. The single read used by both the capability
- * middleware (route gating) and the filing-submit path (billing + gating).
+ * card-on-file, immediate per-shipment model. The single read used by both the
+ * capability middleware (route gating / feature visibility) and the
+ * filing-submit path (billing + gating).
  *
- * A tier only confers capabilities while the subscription is in a usable
- * state. A canceled / incomplete subscription — or no subscription at all —
- * yields zero capabilities, so the org must (re)subscribe before it can file
- * or reach a gated feature.
+ * Selecting a tier grants its capabilities (so the user can see + explore the
+ * features). Actually FILING — which charges the card on CBP acceptance —
+ * additionally requires a usable card on file and no unpaid (delinquent)
+ * charge, UNLESS the tier is $0 (enterprise/custom), which needs no card.
  */
 import { prisma } from '../config/database.js';
 import type { Capability } from '../config/plans.js';
 
-const ACTIVE_STATUSES = ['active', 'trialing', 'past_due'];
-
 export interface OrgEntitlements {
-  /** Active tier id, or null when there is no usable subscription. */
+  /** Selected tier id, or null when no tier is chosen. */
   planId: string | null;
   capabilities: Capability[];
-  /** Per-shipment rate (cents) of the active tier; 0 when none. */
+  /** Per-shipment rate (cents) of the selected tier; 0 when none / enterprise. */
   perFilingCents: number;
   stripeCustomerId: string | null;
+  defaultPaymentMethodId: string | null;
   status: string | null;
+  cardOnFile: boolean;
+  delinquent: boolean;
+  /** Has a selected tier that grants capabilities (feature/nav visibility). */
   hasActiveTier: boolean;
+  /** May submit/file (and be charged): $0 tier, or card on file & not delinquent. */
+  canFile: boolean;
 }
 
 export async function getOrgEntitlements(orgId: string): Promise<OrgEntitlements> {
@@ -29,15 +34,26 @@ export async function getOrgEntitlements(orgId: string): Promise<OrgEntitlements
     where: { orgId },
     include: { plan: true },
   });
-  const hasActiveTier = !!sub && ACTIVE_STATUSES.includes(sub.status);
-  const plan = hasActiveTier ? sub!.plan : null;
+  // A tier is "selected" (grants capabilities) when a row exists with a plan
+  // and the account isn't canceled. 'active' is the legacy metered status,
+  // treated the same as the new 'card_on_file'/'incomplete'/'delinquent'.
+  const selected = !!sub && sub.status !== 'canceled' && !!sub.plan;
+  const plan = selected ? sub!.plan : null;
+  const perFilingCents = plan?.perFilingCents ?? 0;
+  const cardOnFile = !!sub?.defaultPaymentMethodId;
+  const delinquent = sub?.status === 'delinquent';
+  const canFile = selected && (perFilingCents === 0 || (cardOnFile && !delinquent));
   return {
     planId: plan?.id ?? null,
     capabilities: (plan?.capabilities ?? []) as Capability[],
-    perFilingCents: plan?.perFilingCents ?? 0,
+    perFilingCents,
     stripeCustomerId: sub?.stripeCustomerId ?? null,
+    defaultPaymentMethodId: sub?.defaultPaymentMethodId ?? null,
     status: sub?.status ?? null,
-    hasActiveTier,
+    cardOnFile,
+    delinquent,
+    hasActiveTier: selected,
+    canFile,
   };
 }
 
