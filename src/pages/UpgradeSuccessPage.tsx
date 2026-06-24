@@ -47,9 +47,8 @@ export default function UpgradeSuccessPage() {
     if (activated || timedOut) return;
     if (!billing) return;
 
-    const isActive =
-      billing.subscription?.status === 'active' &&
-      billing.plan !== null;
+    // Card-on-file model: "active" means a tier is selected and the org can file.
+    const isActive = billing.canFile && billing.plan !== null;
 
     if (isActive) {
       if (toastId.current) toast.dismiss(toastId.current);
