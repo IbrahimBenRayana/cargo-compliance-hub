@@ -26,6 +26,7 @@ import {
 } from './notifications.js';
 import { drainEmailDeliveries } from './notificationDeliveryWorker.js';
 import { recordScoreSnapshot, triggerForStatus } from './compliance/scoreSnapshot.js';
+import { billShipmentForFiling } from './shipmentBilling.js';
 import { syncFromFederalRegister } from './compliance/addCvdSync.js';
 import { invalidateAddCvdCache } from './compliance/addCvd.js';
 import { CRON, ABI_SENDING_TIMEOUT_MS } from '../config/schedules.js';
@@ -216,6 +217,9 @@ async function pollSubmittedFilings(): Promise<void> {
             const bol = filing.houseBol || filing.masterBol || filing.id.slice(0, 8);
             if (newStatus === 'accepted') {
               await notifyFilingAccepted(filing.orgId, filing.id, bol);
+              // Charge the shipment now that CBP accepted it (idempotent on
+              // filingId; never throws — billing must not break the poller).
+              await billShipmentForFiling(filing.id, filing.orgId);
               logger.info({ bol }, '[Jobs:StatusPoll] Filing ACCEPTED by CBP');
             } else if (newStatus === 'rejected') {
               await notifyFilingRejected(filing.orgId, filing.id, bol, rejectionReason);

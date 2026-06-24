@@ -1,24 +1,24 @@
 /**
- * Shipment billing — charges a shipment exactly once under the per-filing
- * pricing model.
+ * Shipment billing — charges a shipment exactly once, immediately, under the
+ * card-on-file model.
  *
  * The billable unit is the shipment, anchored on EITHER an ISF Filing or a
- * standalone ABI Entry. The first successful CBP submission — the ISF submit
- * (routes/filings.ts) or an ABI Entry send (routes/abiDocuments.ts) — creates a
- * ShipmentCharge and reports one metered event to Stripe at the org's current
- * tier rate. An Entry that is linked to an ISF bills against that filingId, so
- * it shares the ISF's charge (never double-billed). Idempotency is enforced two
- * ways: the unique anchor index makes a repeat submit/send a no-op, and the
- * meter event uses the charge id as its Stripe idempotency key.
+ * standalone ABI Entry. Billing fires when CBP ACCEPTS the shipment (the
+ * polling subsystem) — not on transmission — so a rejected filing is never
+ * charged. We create a ShipmentCharge and immediately charge the org's saved
+ * card (off-session PaymentIntent) at its tier rate. An Entry linked to an ISF
+ * bills against that filingId, so a linked ISF+Entry is billed once. Idempotency
+ * is enforced two ways: the unique anchor index makes a repeat accept a no-op,
+ * and the PaymentIntent uses the charge id as its Stripe idempotency key.
  *
- * This NEVER throws. The customer's filing already succeeded at CBP before we
- * get here; a billing hiccup must not surface as a filing failure. Failed meter
- * events leave the charge row as 'failed' for a later retry sweep.
+ * This NEVER throws — by acceptance time the filing is already done at CBP. A
+ * failed charge marks the org `delinquent` (blocking further filing until the
+ * card is fixed) and leaves the charge for the retry sweep.
  */
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../config/database.js';
 import { getOrgEntitlements } from './entitlements.js';
-import { recordFilingMeterEvent, stripeConfigured } from './stripe.js';
+import { chargeSavedCard, stripeConfigured } from './stripe.js';
 import logger from '../config/logger.js';
 
 /** Anchor the charge on the ISF Filing when one exists, else the ABI Entry. */
@@ -37,8 +37,8 @@ export async function billShipment(anchor: ShipmentAnchor, orgId: string): Promi
   try {
     const ent = await getOrgEntitlements(orgId);
     if (!ent.hasActiveTier || !ent.planId) {
-      // Submission paths gate on an active tier, so this is a defensive guard.
-      logger.warn({ ...anchorLog, orgId }, '[Billing] No active tier at bill time; charge skipped');
+      // Submission paths gate on a selected tier, so this is a defensive guard.
+      logger.warn({ ...anchorLog, orgId }, '[Billing] No selected tier at bill time; charge skipped');
       return;
     }
 
@@ -68,33 +68,47 @@ export async function billShipment(anchor: ShipmentAnchor, orgId: string): Promi
       return;
     }
 
-    // Enterprise / custom orgs (or dev without Stripe) have no self-serve
-    // customer: record the charge for reporting but skip the meter event.
-    if (!ent.stripeCustomerId || !stripeConfigured()) {
+    // $0 tiers (enterprise/custom), or orgs without a card / Stripe, are not
+    // charged — record the row for reporting and move on.
+    if (ent.perFilingCents <= 0 || !ent.stripeCustomerId || !ent.defaultPaymentMethodId || !stripeConfigured()) {
       await prisma.shipmentCharge.update({ where: { id: chargeId }, data: { status: 'skipped' } });
-      logger.info({ ...anchorLog, orgId, planId: ent.planId }, '✓ Shipment charge recorded (metering skipped)');
+      logger.info({ ...anchorLog, orgId, planId: ent.planId }, '✓ Shipment charge recorded (no charge — $0 tier / no card)');
       return;
     }
 
-    try {
-      const meterEventId = await recordFilingMeterEvent({
-        stripeCustomerId: ent.stripeCustomerId,
-        identifier: chargeId, // Stripe-level idempotency key
-      });
-      await prisma.shipmentCharge.update({
-        where: { id: chargeId },
-        data: { status: 'reported', stripeMeterEventId: meterEventId },
-      });
+    // Charge the saved card immediately. chargeId is the idempotency key, so a
+    // retry of the same accepted shipment never double-charges.
+    const outcome = await chargeSavedCard({
+      customerId: ent.stripeCustomerId,
+      paymentMethodId: ent.defaultPaymentMethodId,
+      amountCents: ent.perFilingCents,
+      idempotencyKey: chargeId,
+      description: anchor.filingId ? `ISF shipment ${anchor.filingId}` : `ABI entry ${anchor.abiDocumentId}`,
+      metadata: anchor.filingId
+        ? { orgId, planId: ent.planId, filingId: anchor.filingId }
+        : { orgId, planId: ent.planId, abiDocumentId: anchor.abiDocumentId! },
+    });
+
+    await prisma.shipmentCharge.update({
+      where: { id: chargeId },
+      data: { status: outcome.status, stripePaymentIntentId: outcome.paymentIntentId },
+    });
+
+    if (outcome.status === 'paid') {
       logger.info(
         { ...anchorLog, orgId, planId: ent.planId, amountCents: ent.perFilingCents },
-        '✓ Shipment billed (meter event reported)',
+        '✓ Shipment charged',
       );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      await prisma.shipmentCharge
-        .update({ where: { id: chargeId }, data: { status: 'failed' } })
-        .catch(() => { /* charge stays 'pending'; retry sweep will pick it up */ });
-      logger.error({ err: message, ...anchorLog, orgId }, '[Billing] Meter event failed; charge left for retry');
+    } else {
+      // Decline or 3DS-required: flag the org delinquent so further filing is
+      // blocked until the card is fixed; the retry sweep re-attempts the charge.
+      await prisma.subscription
+        .update({ where: { orgId }, data: { status: 'delinquent' } })
+        .catch(() => { /* best effort */ });
+      logger.error(
+        { ...anchorLog, orgId, outcome: outcome.status, err: outcome.error },
+        '[Billing] Shipment charge not completed; org marked delinquent',
+      );
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

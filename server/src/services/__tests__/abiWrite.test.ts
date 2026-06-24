@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-const { prisma, abiGateway, mapper, schema, billing } = vi.hoisted(() => ({
+const { prisma, abiGateway, mapper, schema, billing, entitlements } = vi.hoisted(() => ({
   prisma: {
     abiDocument: {
       findFirst: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn(),
@@ -29,6 +29,7 @@ const { prisma, abiGateway, mapper, schema, billing } = vi.hoisted(() => ({
     createABIDocumentSchema: { safeParse: vi.fn() },
   },
   billing: { billShipment: vi.fn() },
+  entitlements: { getOrgEntitlements: vi.fn() },
 }));
 
 vi.mock('../../config/database.js', () => ({ prisma }));
@@ -36,6 +37,7 @@ vi.mock('../abi/gateway.js', () => ({ abiGateway }));
 vi.mock('../abiDocumentMapper.js', () => mapper);
 vi.mock('../../schemas/abiDocument.js', () => schema);
 vi.mock('../shipmentBilling.js', () => billing);
+vi.mock('../entitlements.js', () => entitlements);
 vi.mock('../errorTranslator.js', () => ({ sanitizeErrorMessage: (s: string) => s }));
 vi.mock('../auditLog.js', () => ({ writeAuditLog: vi.fn() }));
 vi.mock('../notifications.js', () => ({ notify: vi.fn(() => Promise.resolve()) }));
@@ -58,6 +60,7 @@ beforeEach(() => {
   mapper.extractDenormFromPayload.mockReturnValue({ mbolNumber: 'MBOL1', entryNumber: 'ENT1', entryType: '01', modeOfTransport: '40' });
   abiGateway.createABIDocument.mockResolvedValue({ status: 201, data: { _id: 'cc1' }, latencyMs: 1 });
   abiGateway.sendABIDocument.mockResolvedValue({ status: 200, data: {}, latencyMs: 1 });
+  entitlements.getOrgEntitlements.mockResolvedValue({ canFile: true, hasActiveTier: true, capabilities: ['ABI_ENTRY'], planId: 'entry', delinquent: false });
 });
 
 describe('sendAbiDocumentToCBP', () => {
@@ -94,19 +97,18 @@ describe('sendAbiDocumentToCBP', () => {
     expect(abiGateway.createABIDocument).not.toHaveBeenCalled();
   });
 
-  it('200 on a successful transmit — bills the shipment (abiDocument anchor)', async () => {
+  it('200 on a successful transmit — NOT billed on send (billed on acceptance)', async () => {
     const out = await sendAbiDocumentToCBP(ARGS);
     expect(out.httpStatus).toBe(200);
     expect(abiGateway.sendABIDocument).toHaveBeenCalled();
-    expect(billing.billShipment).toHaveBeenCalledWith({ abiDocumentId: 'd1' }, 'o1');
+    expect(billing.billShipment).not.toHaveBeenCalled();
   });
 
-  it('anchors billing on the linked ISF filing when present', async () => {
-    prisma.abiDocument.findUniqueOrThrow.mockResolvedValue({ ...DRAFT, filingId: 'f9' });
-    prisma.abiDocument.update.mockImplementation(({ data }: any) => Promise.resolve({ ...DRAFT, filingId: 'f9', ...data }));
+  it('402 when the org has no card on file', async () => {
+    entitlements.getOrgEntitlements.mockResolvedValue({ canFile: false, hasActiveTier: true, capabilities: ['ABI_ENTRY'], planId: 'entry', delinquent: false });
     const out = await sendAbiDocumentToCBP(ARGS);
-    expect(out.httpStatus).toBe(200);
-    expect(billing.billShipment).toHaveBeenCalledWith({ filingId: 'f9' }, 'o1');
+    expect(out.httpStatus).toBe(402);
+    expect(abiGateway.sendABIDocument).not.toHaveBeenCalled();
   });
 
   it('502 + rollback when CC create errors — not billed', async () => {

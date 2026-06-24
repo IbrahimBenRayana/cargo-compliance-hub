@@ -15,7 +15,6 @@ import { recordScoreSnapshot, triggerForStatus } from './compliance/scoreSnapsho
 import { translateValidationErrors } from './errorTranslator.js';
 import { writeAuditLog } from './auditLog.js';
 import { notifyFilingSubmitted, notifyFilingRejected, notifyApiError } from './notifications.js';
-import { billShipmentForFiling } from './shipmentBilling.js';
 import { getOrgEntitlements } from './entitlements.js';
 import { CAPABILITIES } from '../config/plans.js';
 import type { CreateFilingInput } from '../schemas/filing.js';
@@ -264,10 +263,9 @@ export async function submitFilingToCBP(params: {
     });
     await recordScoreSnapshot(filing.id, triggerForStatus(newStatus));
 
-    // Bill on successful submission (idempotent on filingId; never throws).
-    if (newStatus === 'submitted') {
-      await billShipmentForFiling(filing.id, orgId);
-    }
+    // NOTE: billing is NOT done here. The shipment is charged only when CBP
+    // ACCEPTS it (see the acceptance handler in services/backgroundJobs.ts),
+    // so a rejected filing is never charged.
 
     // Audit + notifications (fire-and-forget).
     writeAuditLog({

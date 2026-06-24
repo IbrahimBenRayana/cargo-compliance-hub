@@ -8,6 +8,7 @@ import { prisma } from '../config/database.js';
 import { abiGateway } from './abi/gateway.js';
 import { notify } from './notifications.js';
 import { emitWebhook } from './webhooks.js';
+import { billShipment } from './shipmentBilling.js';
 import logger from '../config/logger.js';
 import { CC_POLL_INTERVAL_MS } from '../config/schedules.js';
 
@@ -160,6 +161,14 @@ export async function runSinglePoll(args: {
       entryType,
       mbolNumber,
     });
+
+    // Charge on acceptance (idempotent; never throws). Anchor on the linked ISF
+    // filing if present so a linked ISF+Entry bills once; else the standalone
+    // entry. A rejected entry is never charged.
+    if (nextStatus === 'ACCEPTED') {
+      const linked = await prisma.abiDocument.findUnique({ where: { id: docId }, select: { filingId: true } });
+      await billShipment(linked?.filingId ? { filingId: linked.filingId } : { abiDocumentId: docId }, orgId);
+    }
   }
 
   return { terminal: !!nextStatus };

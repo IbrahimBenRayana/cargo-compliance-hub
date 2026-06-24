@@ -23,7 +23,7 @@ import { sanitizeErrorMessage } from './errorTranslator.js';
 import { createABIDocumentSchema, abiDocumentBodySchema } from '../schemas/abiDocument.js';
 import { writeAuditLog } from './auditLog.js';
 import { notify } from './notifications.js';
-import { billShipment } from './shipmentBilling.js';
+import { getOrgEntitlements } from './entitlements.js';
 import { pollABIDocumentStatus } from './abiPolling.js';
 import { emitWebhook } from './webhooks.js';
 import logger from '../config/logger.js';
@@ -127,6 +127,18 @@ export async function sendAbiDocumentToCBP(params: {
   const bodyResult = abiDocumentBodySchema.safeParse(doc.payload);
   if (!bodyResult.success) {
     return { httpStatus: 400, body: { error: 'ABI document is incomplete or invalid', details: bodyResult.error.flatten() } };
+  }
+
+  // Billing gate — a card must be on file before we transmit, since the entry
+  // is charged the moment CBP accepts it.
+  const ent = await getOrgEntitlements(orgId);
+  if (!ent.canFile) {
+    return {
+      httpStatus: 402,
+      body: ent.delinquent
+        ? { error: 'A previous charge failed — update your card to keep filing.', code: 'payment_required', upgradeUrl: '/settings?tab=billing' }
+        : { error: 'Add a payment method to submit entries.', code: 'card_required', upgradeUrl: '/settings?tab=billing' },
+    };
   }
 
   const denorm = extractDenormFromPayload(doc.payload);
@@ -268,12 +280,10 @@ export async function sendAbiDocumentToCBP(params: {
       mbolNumber: sentDoc.mbolNumber,
     });
 
-    // Bill the shipment — anchor on the linked ISF filing if present (so a
-    // linked ISF+Entry bills once); else the standalone Entry. Idempotent.
-    await billShipment(
-      sentDoc.filingId ? { filingId: sentDoc.filingId } : { abiDocumentId: sentDoc.id },
-      sentDoc.orgId,
-    );
+    // NOTE: billing is NOT done on send. The shipment is charged only when CBP
+    // ACCEPTS the entry (see the acceptance handler in services/abiPolling.ts),
+    // so a rejected entry is never charged. A linked ISF+Entry bills once
+    // because both anchor on the same filingId.
 
     // Fire-and-forget polling.
     pollABIDocumentStatus(
