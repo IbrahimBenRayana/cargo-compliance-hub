@@ -330,7 +330,7 @@ export default function OnboardingPage() {
                 </div>
                 <div>
                   <CardTitle className="text-xl">Add a payment method</CardTitle>
-                  <CardDescription>Pick a plan and add a card so you're ready to file — or skip and add it later.</CardDescription>
+                  <CardDescription>Add a card so you're ready to file — or skip and add it later.</CardDescription>
                 </div>
               </div>
             </CardHeader>

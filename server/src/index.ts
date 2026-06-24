@@ -53,11 +53,14 @@ app.use(helmet({
     useDefaults: false,
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'", "https://api-cert.customscity.com", "https://api.customscity.com"],
+      // Stripe Elements: js.stripe.com (script + iframe), api.stripe.com (XHR),
+      // hooks.stripe.com (3DS/redirect iframe). Without these the card form can't render.
+      connectSrc: ["'self'", "https://api-cert.customscity.com", "https://api.customscity.com", "https://api.stripe.com"],
+      frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
