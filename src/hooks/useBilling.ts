@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { billingApi } from '../api/client';
 import type { Capability } from '../lib/planMeta';
 
@@ -28,15 +28,37 @@ export function useCapabilities() {
     planId: data?.plan?.id ?? null,
     planName: data?.plan?.name ?? null,
     hasActivePlan: !!data?.plan,
+    /** A usable card is on file (or a $0 tier) and the org isn't delinquent. */
+    canFile: !!data?.canFile,
+    cardOnFile: !!data?.card,
+    delinquent: !!data?.delinquent,
+    card: data?.card ?? null,
     capabilities,
     /** True once entitlements are known and the capability is present. */
     can: (cap: Capability) => capabilities.includes(cap),
   };
 }
 
-export function useCreateCheckoutSession() {
+/** Choose / change the plan tier (no charge, reuses the saved card). */
+export function useSelectTier() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: billingApi.createCheckoutSession,
+    mutationFn: billingApi.selectTier,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['billing', 'subscription'] }),
+  });
+}
+
+/** Begin saving a card — returns a SetupIntent client secret for Elements. */
+export function useCreateSetupIntent() {
+  return useMutation({ mutationFn: billingApi.createSetupIntent });
+}
+
+/** Confirm a saved card after Elements confirms the SetupIntent. */
+export function useSaveCard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: billingApi.saveCard,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['billing', 'subscription'] }),
   });
 }
 

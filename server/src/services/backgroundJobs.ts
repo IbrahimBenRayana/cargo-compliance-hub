@@ -26,6 +26,7 @@ import {
 } from './notifications.js';
 import { drainEmailDeliveries } from './notificationDeliveryWorker.js';
 import { recordScoreSnapshot, triggerForStatus } from './compliance/scoreSnapshot.js';
+import { billShipmentForFiling, retryFailedCharges } from './shipmentBilling.js';
 import { syncFromFederalRegister } from './compliance/addCvdSync.js';
 import { invalidateAddCvdCache } from './compliance/addCvd.js';
 import { CRON, ABI_SENDING_TIMEOUT_MS } from '../config/schedules.js';
@@ -216,6 +217,9 @@ async function pollSubmittedFilings(): Promise<void> {
             const bol = filing.houseBol || filing.masterBol || filing.id.slice(0, 8);
             if (newStatus === 'accepted') {
               await notifyFilingAccepted(filing.orgId, filing.id, bol);
+              // Charge the shipment now that CBP accepted it (idempotent on
+              // filingId; never throws — billing must not break the poller).
+              await billShipmentForFiling(filing.id, filing.orgId);
               logger.info({ bol }, '[Jobs:StatusPoll] Filing ACCEPTED by CBP');
             } else if (newStatus === 'rejected') {
               await notifyFilingRejected(filing.orgId, filing.id, bol, rejectionReason);
@@ -464,6 +468,23 @@ let staleCheckTask: ScheduledTask | null = null;
 let deliveryDrainTask: ScheduledTask | null = null;
 let addCvdSyncTask: ScheduledTask | null = null;
 let abiReaperTask: ScheduledTask | null = null;
+let chargeRetryTask: ScheduledTask | null = null;
+
+/** Retry per-shipment charges that failed, for every delinquent org. */
+async function retryDelinquentCharges(): Promise<void> {
+  const delinquent = await prisma.subscription.findMany({
+    where: { status: 'delinquent' },
+    select: { orgId: true },
+  });
+  let settled = 0;
+  for (const s of delinquent) {
+    const r = await retryFailedCharges(s.orgId);
+    settled += r.settled;
+  }
+  if (delinquent.length > 0) {
+    logger.info({ orgs: delinquent.length, settled }, '[Jobs:ChargeRetry] Done');
+  }
+}
 
 export function startBackgroundJobs(): void {
   logger.info('[Jobs] Starting background job scheduler');
@@ -525,6 +546,12 @@ export function startBackgroundJobs(): void {
   }, cronOpts);
   logger.info('[Jobs] ABI document reaper scheduled — every 5 minutes (UTC)');
 
+  chargeRetryTask = cron.schedule(CRON.CHARGE_RETRY, () => {
+    withAdvisoryLock('jobs:charge-retry', retryDelinquentCharges)
+      .catch(err => logger.error({ err }, '[Jobs:ChargeRetry] Unhandled'));
+  }, cronOpts);
+  logger.info('[Jobs] Failed-charge retry scheduled — hourly at :15 (UTC)');
+
   setTimeout(() => {
     checkDeadlines().catch(err => logger.error({ err }, '[Jobs:Deadlines] Initial check error'));
   }, 5000);
@@ -540,12 +567,14 @@ export function stopBackgroundJobs(): void {
   deliveryDrainTask?.stop();
   addCvdSyncTask?.stop();
   abiReaperTask?.stop();
+  chargeRetryTask?.stop();
   statusPollTask = null;
   deadlineTask = null;
   staleCheckTask = null;
   deliveryDrainTask = null;
   addCvdSyncTask = null;
   abiReaperTask = null;
+  chargeRetryTask = null;
 }
 
 /**

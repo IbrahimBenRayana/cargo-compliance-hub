@@ -786,7 +786,9 @@ export const exportApi = {
   },
 };
 
-// ─── Billing API ──────────────────────────────────────────
+// ─── Billing API (card-on-file, immediate per-shipment charge) ─────────────
+export type BillingCard = { brand: string | null; last4: string | null; expMonth: number | null; expYear: number | null };
+
 export const billingApi = {
   subscription() {
     return apiFetch<{
@@ -798,15 +800,14 @@ export const billingApi = {
         capabilities: string[];
         features: string[];
       } | null;
-      // Capabilities unlocked by the active tier (empty when no active plan).
       capabilities: string[];
-      subscription: {
-        status: string;
-        currentPeriodStart: string | null;
-        currentPeriodEnd: string | null;
-        cancelAtPeriodEnd: boolean;
-      } | null;
-      // Current billing period usage: shipments billed + running uninvoiced total.
+      /** May submit/file: a card is on file (or a $0 tier) and no unpaid charge. */
+      canFile: boolean;
+      status: string | null;
+      delinquent: boolean;
+      /** Saved card summary, or null when none on file. */
+      card: BillingCard | null;
+      // This calendar month's charged shipments + running total.
       usage: {
         periodStart: string | null;
         periodEnd: string | null;
@@ -816,8 +817,27 @@ export const billingApi = {
     }>('/api/v1/billing/subscription');
   },
 
-  createCheckoutSession(body: { planId: string; successUrl?: string; cancelUrl?: string }) {
-    return apiFetch<{ url: string; sessionId: string }>('/api/v1/billing/checkout-session', {
+  /** Publishable key for mounting Stripe Elements. */
+  config() {
+    return apiFetch<{ publishableKey: string; configured: boolean }>('/api/v1/billing/config');
+  },
+
+  /** Choose or change the plan tier (no charge, no card re-entry). */
+  selectTier(body: { planId: string }) {
+    return apiFetch<{ planId: string; canFile: boolean; cardOnFile: boolean }>('/api/v1/billing/select-tier', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  /** Start saving a card — returns a SetupIntent client secret for Elements. */
+  createSetupIntent() {
+    return apiFetch<{ clientSecret: string }>('/api/v1/billing/setup-intent', { method: 'POST' });
+  },
+
+  /** Confirm the saved card after Elements confirms the SetupIntent. */
+  saveCard(body: { setupIntentId: string }) {
+    return apiFetch<{ card: BillingCard; canFile: boolean }>('/api/v1/billing/card', {
       method: 'POST',
       body: JSON.stringify(body),
     });

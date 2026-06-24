@@ -46,7 +46,7 @@ beforeEach(() => {
   prisma.filingStatusHistory.create.mockResolvedValue({});
   validation.isValidTransition.mockReturnValue(true);
   validation.validateFiling.mockReturnValue({ valid: true, errors: [], score: 100 });
-  entitlements.getOrgEntitlements.mockResolvedValue({ hasActiveTier: true, capabilities: ['ISF_FILING'], planId: 'isf' });
+  entitlements.getOrgEntitlements.mockResolvedValue({ hasActiveTier: true, canFile: true, capabilities: ['ISF_FILING'], planId: 'isf' });
   // No `send: 'add'` → ISF-10 takes the separate-send path by default.
   abiGateway.createDocument.mockResolvedValue({ persisted: true, status: 201, data: { _id: 'cc1' }, latencyMs: 1 });
   abiGateway.sendDocument.mockResolvedValue({ data: {}, status: 200, latencyMs: 1 });
@@ -72,8 +72,8 @@ describe('submitFilingToCBP', () => {
     expect(out.httpStatus).toBe(400);
   });
 
-  it('402 when the org has no active tier', async () => {
-    entitlements.getOrgEntitlements.mockResolvedValue({ hasActiveTier: false, capabilities: [], planId: null });
+  it('402 when the org cannot file (no tier / no card on file)', async () => {
+    entitlements.getOrgEntitlements.mockResolvedValue({ hasActiveTier: false, canFile: false, capabilities: [], planId: null });
     const out = await submitFilingToCBP(ARGS);
     expect(out.httpStatus).toBe(402);
     expect(billing.billShipmentForFiling).not.toHaveBeenCalled();
@@ -93,20 +93,21 @@ describe('submitFilingToCBP', () => {
     expect(billing.billShipmentForFiling).not.toHaveBeenCalled();
   });
 
-  it('200 on a successful ISF-5 submit (sent during create) — bills the shipment', async () => {
+  it('200 on a successful ISF-5 submit (sent during create) — NOT billed on submit', async () => {
     prisma.filing.findFirst.mockResolvedValue({ ...DRAFT, filingType: 'ISF-5' });
     abiGateway.createDocument.mockResolvedValue({ persisted: true, status: 201, data: {}, latencyMs: 1 });
     const out = await submitFilingToCBP(ARGS);
     expect(out.httpStatus).toBe(200);
     expect(abiGateway.sendDocument).not.toHaveBeenCalled(); // ISF-5 = one-step
-    expect(billing.billShipmentForFiling).toHaveBeenCalledWith('f1', 'o1');
+    // Billing now fires on CBP acceptance (the poller), not on submit.
+    expect(billing.billShipmentForFiling).not.toHaveBeenCalled();
   });
 
-  it('200 on a successful ISF-10 submit (separate send) — bills the shipment', async () => {
+  it('200 on a successful ISF-10 submit (separate send) — NOT billed on submit', async () => {
     const out = await submitFilingToCBP(ARGS);
     expect(out.httpStatus).toBe(200);
     expect(abiGateway.sendDocument).toHaveBeenCalled();
-    expect(billing.billShipmentForFiling).toHaveBeenCalledWith('f1', 'o1');
+    expect(billing.billShipmentForFiling).not.toHaveBeenCalled();
   });
 
   it('502 when the gateway throws — logs and does not bill', async () => {

@@ -15,7 +15,6 @@ import { recordScoreSnapshot, triggerForStatus } from './compliance/scoreSnapsho
 import { translateValidationErrors } from './errorTranslator.js';
 import { writeAuditLog } from './auditLog.js';
 import { notifyFilingSubmitted, notifyFilingRejected, notifyApiError } from './notifications.js';
-import { billShipmentForFiling } from './shipmentBilling.js';
 import { getOrgEntitlements } from './entitlements.js';
 import { CAPABILITIES } from '../config/plans.js';
 import type { CreateFilingInput } from '../schemas/filing.js';
@@ -127,12 +126,17 @@ export async function submitFilingToCBP(params: {
     };
   }
 
-  // Capability gate — ISF filing is in every tier, so just need an active tier.
+  // Billing gate — ISF filing is in every tier. A card must be on file before
+  // we transmit, since the shipment is charged the moment CBP accepts it.
   const ent = await getOrgEntitlements(orgId);
-  if (!ent.hasActiveTier || !ent.capabilities.includes(CAPABILITIES.ISF_FILING)) {
+  if (!ent.canFile || !ent.capabilities.includes(CAPABILITIES.ISF_FILING)) {
     return {
       httpStatus: 402,
-      body: { error: 'Choose a plan to submit filings.', code: 'subscription_required', upgradeUrl: '/settings?tab=billing' },
+      body: ent.delinquent
+        ? { error: 'A previous charge failed — update your card to keep filing.', code: 'payment_required', upgradeUrl: '/settings?tab=billing' }
+        : !ent.hasActiveTier
+          ? { error: 'Choose a plan to submit filings.', code: 'subscription_required', upgradeUrl: '/settings?tab=billing' }
+          : { error: 'Add a payment method to submit filings.', code: 'card_required', upgradeUrl: '/settings?tab=billing' },
     };
   }
 
@@ -259,10 +263,9 @@ export async function submitFilingToCBP(params: {
     });
     await recordScoreSnapshot(filing.id, triggerForStatus(newStatus));
 
-    // Bill on successful submission (idempotent on filingId; never throws).
-    if (newStatus === 'submitted') {
-      await billShipmentForFiling(filing.id, orgId);
-    }
+    // NOTE: billing is NOT done here. The shipment is charged only when CBP
+    // ACCEPTS it (see the acceptance handler in services/backgroundJobs.ts),
+    // so a rejected filing is never charged.
 
     // Audit + notifications (fire-and-forget).
     writeAuditLog({
