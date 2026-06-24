@@ -2,6 +2,10 @@
 import './instrument.js';
 import * as Sentry from '@sentry/node';
 import express from 'express';
+// Patches Express so async route handlers that throw/reject forward the error
+// to our errorHandler instead of hanging the request forever (Express 4 does
+// not auto-forward async rejections). Must load before any Router is created.
+import 'express-async-errors';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';

@@ -43,6 +43,13 @@ export interface ValidationIssue {
 // endpoint with credentials: 'include'.
 let accessToken: string | null = null;
 
+// Remembers the outcome of the most recent /auth/refresh so a late "second
+// wave" of 401s on the same page load reuses it instead of starting a SECOND
+// token rotation that races the cookie the first rotation just set. See
+// tryRefreshToken() below.
+let lastRefresh: { at: number; ok: boolean } | null = null;
+const REFRESH_REUSE_MS = 4000;
+
 // Drop any legacy localStorage entry from the pre-Phase-6 era so the same
 // browser session doesn't keep a now-orphaned token around. Safe to keep
 // indefinitely — by the time everyone has rotated, this is a no-op.
@@ -58,6 +65,7 @@ export function setAccessToken(access: string | null) {
 
 export function clearTokens() {
   accessToken = null;
+  lastRefresh = null;
 }
 
 export function getAccessToken() {
@@ -134,9 +142,18 @@ async function apiFetch<T = any>(
 let refreshInFlight: Promise<boolean> | null = null;
 
 async function tryRefreshToken(): Promise<boolean> {
+  // Concurrent 401s share the in-flight refresh.
   if (refreshInFlight) return refreshInFlight;
 
-  refreshInFlight = (async () => {
+  // A refresh just completed (within the reuse window): the access token it set
+  // is still valid, so reuse that outcome and let the caller retry with the new
+  // token. This stops a late second 401 from triggering another rotation that
+  // would race the freshly-set cookie and bounce the user to /login.
+  if (lastRefresh && Date.now() - lastRefresh.at < REFRESH_REUSE_MS) {
+    return lastRefresh.ok;
+  }
+
+  const inflight = (async () => {
     try {
       // credentials: 'include' is what tells the browser to send the
       // path-scoped mcl_refresh cookie. We send no JSON body — the
@@ -153,13 +170,18 @@ async function tryRefreshToken(): Promise<boolean> {
       return true;
     } catch {
       return false;
-    } finally {
-      // Release the lock so the next 401-cycle can refresh again.
-      refreshInFlight = null;
     }
   })();
 
-  return refreshInFlight;
+  refreshInFlight = inflight;
+  try {
+    const ok = await inflight;
+    lastRefresh = { at: Date.now(), ok };
+    return ok;
+  } finally {
+    // Release the lock so a later 401 (past the reuse window) can refresh again.
+    refreshInFlight = null;
+  }
 }
 
 // ─── Auth API ─────────────────────────────────────────────

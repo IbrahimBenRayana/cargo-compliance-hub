@@ -1,0 +1,6 @@
+# Playwright run artifacts — regenerated each run
+test-results/
+report/
+screenshots/
+.auth-state.json
+recon-report.json
