@@ -451,24 +451,24 @@ const COMPARE_GROUPS: CompareGroup[] = [
 
 const FAQ = [
   {
-    q: "How does per-filing pricing work?",
-    a: "There's no monthly subscription fee. You pick an account tier — ISF Filing, ISF + Entry, or Complete — which sets your per-shipment rate and unlocks the features for that tier. We meter the shipments you file and invoice you once a month. You only pay for what you actually file.",
+    q: "How does per-shipment pricing work?",
+    a: "No subscription, no monthly fee. You pick a tier — ISF Filing, ISF + Entry, or Complete — which sets your flat per-shipment rate and unlocks that tier's features. You keep a card on file, and you're charged that flat rate for each shipment you file. You only ever pay for what you actually file.",
   },
   {
     q: "What counts as a billable shipment?",
-    a: "One charge per shipment filed. A linked ISF and ABI Entry on the same shipment is billed once, not twice. Attempts that are rejected before transmission don't count, and manifest (MBOL) queries are always free.",
+    a: "One charge per shipment you file. A linked ISF and ABI Entry on the same shipment is billed once, not twice — and fixing and resubmitting the same filing never double-charges it. Browsing, drafting, and manifest (MBOL) queries are always free.",
   },
   {
     q: "Can I change tiers?",
-    a: "Yes — anytime, from your billing portal. The new per-shipment rate and feature set apply to shipments you file after the change. Your existing data stays exactly where it is.",
+    a: "Yes — anytime, from your billing settings. The new per-shipment rate and feature set apply to shipments you file after the change. Your existing data stays exactly where it is.",
   },
   {
-    q: "Is there a free tier?",
-    a: "There's no monthly fee on any tier. Signing up is free — you can browse and draft at no cost — but submitting a filing requires choosing a tier and adding a card. You pay from your first filing, nothing before it.",
+    q: "Do I pay anything to get started?",
+    a: "No. Signing up is free, and you can browse and draft at no cost. Filing requires picking a tier and adding a card — but you pay from your first filing, and only per shipment. No setup fees, no monthly minimums.",
   },
   {
     q: "What about high volume?",
-    a: "For high-volume importers and brokerages, our Enterprise / volume option offers custom per-shipment pricing plus SSO and SLAs. Talk to us about terms that fit your numbers.",
+    a: "For high-volume importers and brokerages, our Enterprise option offers custom per-shipment pricing plus SSO and SLAs. Talk to us about terms that fit your numbers.",
   },
 ];
 
@@ -569,7 +569,7 @@ function TierCard({ tier, index }: { tier: Tier; index: number }) {
           >
             {tier.priceNote}
           </span>
-          <span className="text-muted-foreground/70">Billed monthly</span>
+          <span className="text-muted-foreground/70">Pay as you file</span>
         </div>
       </div>
 
@@ -655,7 +655,7 @@ export function PricingPageClient() {
       <PageHero
         label="Pricing"
         title="Priced per shipment. Nothing sneaky."
-        description="No monthly subscription. Pick a tier, add a card, and pay only for the shipments you file — invoiced monthly. A linked ISF and Entry on the same shipment is billed once. Sign up free to browse and draft."
+        description="No subscription. No monthly fee. No minimums. Add a card once, pick a tier, and pay a flat rate per shipment — only when you file. A linked ISF and Entry on the same shipment is billed once, not twice. Signing up is free: browse and draft all you want, and pay nothing until your first filing."
         breadcrumbs={[{ label: "Pricing", href: "/pricing" }]}
         illustration={<PricingHeroIllustration />}
       />
@@ -820,7 +820,7 @@ export function PricingPageClient() {
               See it live. Pay per shipment.
             </h3>
             <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-              No monthly fee. Book a 20-minute demo and we will set you up on the right plan — you only pay when you file, billed monthly. Change tiers anytime.
+              No subscription, no monthly fee. Book a 20-minute demo and we will set you up on the right tier — add a card once and pay only per shipment, as you file. Change tiers anytime.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button variant="gold" size="lg" asChild>
