@@ -7,21 +7,20 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { settingsApi, integrationsApi, organizationApi } from '@/api/client';
+import { settingsApi, organizationApi } from '@/api/client';
 import { useAuthStore } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { LogoMark } from '@/components/LogoMark';
 import { OnboardingPaymentStep } from '@/components/billing/OnboardingPaymentStep';
 import { cn } from '@/lib/utils';
 import {
-  Building2, Plug, FileText, PartyPopper, ArrowRight, ArrowLeft, CreditCard,
-  CheckCircle2, XCircle, Loader2, Ship, Globe, Zap, ChevronRight,
+  Building2, FileText, PartyPopper, ArrowRight, ArrowLeft, CreditCard,
+  CheckCircle2, Loader2, Ship, Globe, ChevronRight,
 } from 'lucide-react';
 
 // ─── Step definitions ─────────────────────────────────────
 const STEPS = [
   { id: 'company', label: 'Company Profile', icon: Building2 },
-  { id: 'api', label: 'API Connection', icon: Plug },
   { id: 'payment', label: 'Payment', icon: CreditCard },
   { id: 'next', label: 'Get Started', icon: FileText },
   { id: 'done', label: 'All Set!', icon: PartyPopper },
@@ -42,29 +41,9 @@ export default function OnboardingPage() {
   const [phone, setPhone] = useState('');
   const [website, setWebsite] = useState('');
 
-  // ─── Step 2: API Connection ─────────────────────────────
-  const [connectionResult, setConnectionResult] = useState<{
-    connected: boolean; environment: string; baseUrl: string;
-  } | null>(null);
-
   // ─── Mutations ──────────────────────────────────────────
   const updateOrg = useMutation({
     mutationFn: (data: Record<string, any>) => settingsApi.updateOrganization(data),
-  });
-
-  const testConnection = useMutation({
-    mutationFn: () => integrationsApi.testConnection(),
-    onSuccess: (result) => {
-      setConnectionResult(result);
-      if (result.connected) {
-        toast.success('CBP Filing Gateway connected successfully!');
-      } else {
-        toast.error('Connection failed — check your API key in environment settings');
-      }
-    },
-    onError: () => {
-      toast.error('Connection test failed');
-    },
   });
 
   const completeOnboarding = useMutation({
@@ -98,7 +77,7 @@ export default function OnboardingPage() {
       }
     }
 
-    if (step === 3) {
+    if (step === 2) {
       // Mark onboarding complete (Get Started step)
       try {
         await completeOnboarding.mutateAsync();
@@ -243,85 +222,8 @@ export default function OnboardingPage() {
           </Card>
         )}
 
-        {/* ─── Step 1: API Connection ─────────────────────── */}
+        {/* ─── Step 1: Payment (optional) ─────────────────── */}
         {step === 1 && (
-          <Card className="animate-fade-in-up border border-slate-200 dark:border-slate-800 shadow-sm dark:bg-slate-900/40">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3 mb-1">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md">
-                  <Plug className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Connect to CBP Filing Gateway</CardTitle>
-                  <CardDescription>Test your API connection to start filing ISFs electronically</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="rounded-xl bg-amber-50/60 dark:bg-amber-500/[0.06] border border-amber-200/60 dark:border-amber-500/20 p-5">
-                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-amber-900 dark:text-amber-300">
-                  <Globe className="h-4 w-4" />
-                  How it works
-                </h4>
-                <p className="text-sm text-amber-900/80 dark:text-amber-200/80 leading-relaxed">
-                  MyCargoLens connects to the <strong>CBP Filing Gateway</strong> to electronically submit your ISF filings
-                  to U.S. Customs & Border Protection (CBP). Your API credentials are configured in the server
-                  environment — click below to verify the connection.
-                </p>
-              </div>
-
-              <div className="flex flex-col items-center gap-4 py-4">
-                <Button
-                  size="lg"
-                  onClick={() => testConnection.mutate()}
-                  disabled={testConnection.isPending}
-                  className="min-w-[200px]"
-                >
-                  {testConnection.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Zap className="h-4 w-4 mr-2" />
-                  )}
-                  Test Connection
-                </Button>
-
-                {connectionResult && (
-                  <div className={cn(
-                    'flex items-center gap-3 px-5 py-3 rounded-xl border',
-                    connectionResult.connected
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                      : 'bg-red-50 border-red-200 text-red-800',
-                  )}>
-                    {connectionResult.connected ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    )}
-                    <div>
-                      <p className="font-semibold text-sm">
-                        {connectionResult.connected ? 'Connected successfully!' : 'Connection failed'}
-                      </p>
-                      <p className="text-xs opacity-80">
-                        Environment: {connectionResult.environment} · {connectionResult.baseUrl}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
-                <p className="text-xs text-amber-800">
-                  <strong>Note:</strong> You can skip this step and configure the API connection later
-                  in <strong>Settings → API & Integrations</strong>. The sandbox environment is
-                  pre-configured for testing.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ─── Step 2: Payment (optional) ─────────────────── */}
-        {step === 2 && (
           <Card className="animate-fade-in-up border border-slate-200 dark:border-slate-800 shadow-sm dark:bg-slate-900/40">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3 mb-1">
@@ -335,13 +237,13 @@ export default function OnboardingPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <OnboardingPaymentStep onDone={() => setStep(3)} />
+              <OnboardingPaymentStep onDone={() => setStep(2)} />
             </CardContent>
           </Card>
         )}
 
-        {/* ─── Step 3: Get Started ────────────────────────── */}
-        {step === 3 && (
+        {/* ─── Step 2: Get Started ────────────────────────── */}
+        {step === 2 && (
           <Card className="animate-fade-in-up border border-slate-200 dark:border-slate-800 shadow-sm dark:bg-slate-900/40">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3 mb-1">
@@ -402,7 +304,7 @@ export default function OnboardingPage() {
         )}
 
         {/* ─── Step 3: Done ───────────────────────────────── */}
-        {step === 4 && (
+        {step === 3 && (
           <Card className="animate-fade-in-up border border-slate-200 dark:border-slate-800 shadow-sm dark:bg-slate-900/40 text-center">
             <CardContent className="py-14">
               <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_12px_36px_-12px_rgba(245,158,11,0.55)] mb-6">
@@ -428,7 +330,7 @@ export default function OnboardingPage() {
         )}
 
         {/* ─── Navigation buttons ─────────────────────────── */}
-        {step < 2 && (
+        {step < 1 && (
           <div className="flex items-center justify-between mt-8">
             <Button
               variant="ghost"
@@ -451,7 +353,7 @@ export default function OnboardingPage() {
         )}
 
         {/* Skip link */}
-        {step < 2 && (
+        {step < 1 && (
           <div className="text-center mt-4">
             <button
               onClick={async () => {
