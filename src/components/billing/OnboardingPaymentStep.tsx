@@ -18,10 +18,21 @@ export function OnboardingPaymentStep({ onDone }: { onDone: () => void }) {
   const selectTier = useSelectTier();
   const [chosen, setChosen] = React.useState<string | null>(billing?.plan?.id ?? null);
   const [phase, setPhase] = React.useState<'pick' | 'card'>('pick');
+  // Sales-led onboarding: the admin already chose this client's plan during the
+  // meeting. When a plan is already assigned, skip the tier picker and go straight
+  // to adding a card for that plan (don't ask them to choose again).
+  const planPreassigned = React.useRef(false);
+  const didInit = React.useRef(false);
 
   React.useEffect(() => {
-    if (billing?.plan?.id && !chosen) setChosen(billing.plan.id);
-  }, [billing?.plan?.id, chosen]);
+    if (didInit.current || isLoading || !billing) return;
+    didInit.current = true;
+    if (billing.plan?.id && !billing.canFile) {
+      setChosen(billing.plan.id);
+      planPreassigned.current = true;
+      setPhase('card');
+    }
+  }, [billing, isLoading]);
 
   // Already able to file (card on file or a $0 tier) — nothing to do here.
   if (!isLoading && billing?.canFile) {
@@ -73,9 +84,13 @@ export function OnboardingPaymentStep({ onDone }: { onDone: () => void }) {
           }}
         />
         <div className="mt-4 flex items-center justify-between text-xs">
-          <button type="button" onClick={() => setPhase('pick')} className="text-muted-foreground hover:text-foreground">
-            ← Change plan
-          </button>
+          {planPreassigned.current ? (
+            <span />
+          ) : (
+            <button type="button" onClick={() => setPhase('pick')} className="text-muted-foreground hover:text-foreground">
+              ← Change plan
+            </button>
+          )}
           <button type="button" onClick={onDone} className="text-muted-foreground hover:text-foreground">
             Skip for now
           </button>
