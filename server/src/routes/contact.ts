@@ -84,6 +84,10 @@ router.post('/', contactFormLimiter, async (req: Request, res: Response): Promis
   // Route by subject: "Request a demo" submissions go to the sales inbox;
   // everything else continues to support.
   const to = subject === 'demo' ? 'contact@mycargolens.com' : 'support@mycargolens.com';
+  // Demo requests also CC the sales leads so they see every inbound demo directly.
+  const cc = subject === 'demo'
+    ? ['irayana@sigmatechllc.com', 'isiddique@sigmatechllc.com']
+    : undefined;
 
   const safeName = escapeHtml(name);
   const safeEmail = escapeHtml(email);
@@ -111,6 +115,7 @@ router.post('/', contactFormLimiter, async (req: Request, res: Response): Promis
   // inquiries into "send failed" toast spam.
   const ok = await sendMail({
     to,
+    cc,
     subject: `[Contact] ${subjectLabel} — ${name}`,
     html,
     text,
