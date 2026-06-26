@@ -7,6 +7,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Next.js inlines NEXT_PUBLIC_* at build time. Without this the book-a-demo
+# contact form falls back to http://localhost:3001 and fails for every visitor.
+ARG NEXT_PUBLIC_API_URL=https://app.mycargolens.com
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
 FROM node:20-alpine AS runner
