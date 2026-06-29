@@ -14,50 +14,49 @@ export function Wordmark({ className }: WordmarkProps) {
       )}
       aria-label="MyCargoLens"
     >
-      {/* 6-blade camera aperture (iris diaphragm) with gold hex opening.
-          The lens metaphor: many things → the one item that matters now. */}
+      {/* "Focus Frame" mark — four corner brackets lock a single gold
+          subject square in the center. The frame color is driven by the
+          --logo-frame CSS variable (navy in light mode, light-grey in
+          dark), defined per-theme in globals.css — so it flips with the
+          theme without arbitrary Tailwind dark: variants (no FOUC). The
+          subject square is the only gold and stays fixed. */}
       <svg
         width="28"
         height="28"
-        viewBox="0 0 32 32"
+        viewBox="0 0 100 100"
         aria-hidden="true"
         xmlns="http://www.w3.org/2000/svg"
-        // text-primary inherits the --primary CSS variable, which is
-        // already defined per-theme in globals.css: dark-navy in light
-        // mode, gold in dark mode. No arbitrary Tailwind variants → no
-        // JIT/cache surprises and no FOUC.
-        className="text-primary"
+        style={{ color: "hsl(var(--logo-frame))" }}
       >
-        {/* Six blades, alternating tones for iris depth */}
-        <path d="M 30 16 L 23 3.88 L 16 10.5 L 20.76 13.25 Z" fill="currentColor" />
-        <path d="M 23 3.88 L 9 3.88 L 11.24 13.25 L 16 10.5 Z" fill="currentColor" fillOpacity="0.75" />
-        <path d="M 9 3.88 L 2 16 L 11.24 18.75 L 11.24 13.25 Z" fill="currentColor" />
-        <path d="M 2 16 L 9 28.12 L 16 21.5 L 11.24 18.75 Z" fill="currentColor" fillOpacity="0.75" />
-        <path d="M 9 28.12 L 23 28.12 L 20.76 18.75 L 16 21.5 Z" fill="currentColor" />
-        <path d="M 23 28.12 L 30 16 L 20.76 13.25 L 20.76 18.75 Z" fill="currentColor" fillOpacity="0.75" />
-        {/* Gold hex aperture at the center — the only gold accent */}
-        <path
-          d="M 20.76 13.25 L 16 10.5 L 11.24 13.25 L 11.24 18.75 L 16 21.5 L 20.76 18.75 Z"
-          fill="hsl(43 96% 56%)"
-        />
+        <g
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="6.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M 26 40 L 26 26 L 40 26" />
+          <path d="M 60 26 L 74 26 L 74 40" />
+          <path d="M 74 60 L 74 74 L 60 74" />
+          <path d="M 40 74 L 26 74 L 26 60" />
+        </g>
+        <rect x="42" y="42" width="16" height="16" rx="4.6" fill="hsl(43 96% 56%)" />
       </svg>
 
-      {/* Wordmark text uses the CSS-variable-driven `text-foreground`
-          token (driven by --foreground in globals.css). This auto-flips
-          with theme without relying on Tailwind generating arbitrary
-          dark: variants — and avoids any FOUC where the cached light
-          color would leak into a dark-mode first paint. */}
+      {/* Wordmark text. "MyCargo" uses the theme --foreground token; "Lens"
+          uses --logo-lens (dark-gold in light mode, bright gold in dark) —
+          both CSS-variable-driven so they auto-flip without FOUC. */}
       <span
         style={{
           fontFamily: "'Inter', ui-sans-serif, sans-serif",
           fontSize: "17px",
-          fontWeight: 600,
-          letterSpacing: "-0.01em",
+          fontWeight: 700,
+          letterSpacing: "-0.025em",
           lineHeight: 1,
         }}
-        className="text-foreground"
       >
-        MyCargoLens
+        <span className="text-foreground">MyCargo</span>
+        <span style={{ color: "hsl(var(--logo-lens))" }}>Lens</span>
       </span>
     </span>
   );
