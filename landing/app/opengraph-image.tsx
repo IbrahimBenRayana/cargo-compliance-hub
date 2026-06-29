@@ -29,26 +29,26 @@ export default async function Image() {
           justifyContent: "space-between",
         }}
       >
-        {/* Brand row */}
+        {/* Brand row — "Focus Frame" mark (reversed for the dark card) */}
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div
-            style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "10px",
-              backgroundColor: "#FBBF24",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#0F172A",
-              fontSize: "22px",
-              fontWeight: 800,
-            }}
-          >
-            ML
-          </div>
-          <div style={{ fontSize: "26px", fontWeight: 600, letterSpacing: "-0.01em" }}>
-            MyCargoLens
+          <svg width="44" height="44" viewBox="0 0 100 100">
+            <g
+              fill="none"
+              stroke="#8C99B8"
+              strokeWidth="6.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M 26 40 L 26 26 L 40 26" />
+              <path d="M 60 26 L 74 26 L 74 40" />
+              <path d="M 74 60 L 74 74 L 60 74" />
+              <path d="M 40 74 L 26 74 L 26 60" />
+            </g>
+            <rect x="42" y="42" width="16" height="16" rx="4.6" fill="#FBBE24" />
+          </svg>
+          <div style={{ fontSize: "26px", fontWeight: 700, letterSpacing: "-0.02em", display: "flex" }}>
+            <span style={{ color: "#F8FAFC" }}>MyCargo</span>
+            <span style={{ color: "#FBBE24" }}>Lens</span>
           </div>
         </div>
 

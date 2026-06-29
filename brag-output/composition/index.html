@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: hsl(222 47% 5%);
+      }
+      body {
+        font-family: "Inter", system-ui, sans-serif;
+        font-optical-sizing: auto;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: geometricPrecision;
+      }
+      .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+      .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+      /* ---- palette ---- */
+      :root {
+        --navy-bg:  hsl(222 47% 5%);
+        --warm:     hsl(220 25% 97%);
+        --ink:      hsl(222 47% 8%);
+        --light:    hsl(210 40% 94%);
+        --muted:    hsl(220 14% 44%);
+        --border:   hsl(220 20% 88%);
+        --gold:     #FBBE24;
+        --gold-deep:#D8920F;
+        --frame:    #1E2D4D;
+        --frame-rev:#8C99B8;
+        --rose:     hsl(0 72% 51%);
+        --amber:    hsl(38 92% 50%);
+        --emerald:  hsl(160 84% 39%);
+        --blue:     hsl(217 91% 60%);
+        --violet:   hsl(262 83% 58%);
+      }
+
+      .scene { position: absolute; inset: 0; overflow: hidden; }
+      .center { display: flex; align-items: center; justify-content: center; flex-direction: column; }
+
+      /* cinematic vignette — soft edge darkening for depth */
+      .vignette {
+        position: absolute; inset: 0; pointer-events: none;
+        box-shadow: inset 0 0 240px 60px hsl(222 60% 2% / 0.55);
+      }
+      .vignette-soft {
+        position: absolute; inset: 0; pointer-events: none;
+        box-shadow: inset 0 0 200px 40px hsl(222 30% 60% / 0.10);
+      }
+      .dotgrid {
+        position: absolute; inset: 0;
+        background-image: radial-gradient(hsl(210 40% 80% / 0.09) 1.2px, transparent 1.2px);
+        background-size: 36px 36px;
+      }
+
+      /* cards */
+      .card {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: 0 1px 3px hsl(222 47% 8% / 0.04),
+                    0 24px 60px -18px hsl(222 47% 8% / 0.18);
+      }
+      .pill {
+        display: inline-flex; align-items: center; gap: 9px;
+        padding: 7px 16px; border-radius: 9999px;
+        font-size: 19px; font-weight: 600; letter-spacing: -0.01em;
+      }
+      .dot { width: 9px; height: 9px; border-radius: 9999px; display: inline-block; }
+      .eyebrow {
+        font-size: 14px; font-weight: 700; letter-spacing: 0.2em;
+        text-transform: uppercase; color: var(--muted);
+      }
+
+      /* chaos fragments */
+      .frag { position: absolute; border-radius: 10px; font-size: 18px; will-change: transform, opacity, filter; }
+      .term {
+        background: hsl(222 47% 8%);
+        border: 1px solid hsl(160 60% 30% / 0.5);
+        color: hsl(150 70% 62%);
+        padding: 16px 18px; line-height: 1.55;
+      }
+      .blink { animation: blink 1s steps(2, start) infinite; }
+      @keyframes blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+
+      .willf { will-change: transform, opacity, filter; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="22.5"
+         data-width="1920" data-height="1080">
+
+      <!-- ===================== SCENE 1 — CHAOS ===================== -->
+      <div id="s1" class="scene clip" data-start="0" data-duration="4.2" data-track-index="1"
+           data-layout-allow-occlusion="true" data-layout-allow-overlap="true"
+           style="background: var(--navy-bg); opacity:0;">
+        <div id="s1-grid" class="dotgrid"></div>
+        <div class="vignette"></div>
+
+        <div id="s1-head" class="willf" style="position:absolute; left:210px; top:118px; width:1500px; text-align:center;">
+          <div class="eyebrow" style="color:hsl(210 30% 58%); margin-bottom:20px;">US customs software · 1995 → today</div>
+          <h1 style="color:var(--light); font-size:64px; font-weight:600; letter-spacing:-0.03em; line-height:1.08;">
+            US customs software hasn't<br/>changed since 1995.
+          </h1>
+        </div>
+
+        <div class="frag term mono willf" id="f1" style="left:250px; top:560px; width:520px;">
+          ABI&gt; ENTRY 7501 ________<br/>
+          &gt; STATUS: PENDING TRANSMIT<br/>
+          &gt; RETRY 03 ____ TIMEOUT<span class="blink">_</span>
+        </div>
+        <div class="frag willf" id="f2" style="left:840px; top:600px; width:560px; background:#fff; border:1px solid var(--border); padding:0; overflow:hidden;">
+          <div style="display:flex; gap:2px; background:hsl(220 20% 90%); padding:8px 8px 0 8px;">
+            <span style="background:#fff; border-radius:7px 7px 0 0; padding:6px 12px; font-size:13px; color:var(--muted);">Tab 1</span>
+            <span style="background:hsl(220 20% 96%); border-radius:7px 7px 0 0; padding:6px 12px; font-size:13px; color:var(--muted);">Tab 2</span>
+            <span style="background:hsl(220 20% 96%); border-radius:7px 7px 0 0; padding:6px 12px; font-size:13px; color:var(--muted);">…</span>
+            <span style="background:hsl(220 20% 96%); border-radius:7px 7px 0 0; padding:6px 12px; font-size:13px; color:var(--muted);">Tab 12</span>
+          </div>
+          <div style="padding:16px 18px; color:var(--ink); font-size:17px;">12 browser tabs to file one shipment</div>
+        </div>
+        <div class="frag willf" id="f3" style="left:560px; top:762px; width:330px; background:hsl(40 30% 97%); border:1px solid hsl(40 20% 80%); padding:16px 18px; color:hsl(30 25% 30%); transform:rotate(-5deg); box-shadow:0 12px 24px -10px hsl(0 0% 0% / 0.3);">
+          <div style="font-weight:700; font-size:13px; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:6px;">Fax confirmation</div>
+          <div class="mono" style="font-size:15px; color:hsl(30 15% 45%);">recv 04:12 · 3 pages · re-key by hand</div>
+        </div>
+        <div class="frag mono willf" id="f4" style="left:1230px; top:540px; background:hsl(0 72% 51% / 0.12); border:1px solid hsl(0 72% 51% / 0.45); color:var(--rose); padding:12px 18px; font-weight:600; font-size:20px;">
+          ✕ 10MSCM &nbsp;REJECTED
+        </div>
+        <div class="frag willf" id="f5" style="left:1240px; top:740px; background:hsl(38 92% 50% / 0.12); border:1px solid hsl(38 92% 50% / 0.45); color:hsl(36 90% 38%); padding:12px 18px; font-weight:600; font-size:18px; border-radius:9999px;">
+          ISF deadline missed
+        </div>
+      </div>
+
+      <!-- ===================== SCENE 2 — FOCUS FRAME LOCK / REVEAL ===================== -->
+      <div id="s2" class="scene center clip" data-start="3.8" data-duration="4.6" data-track-index="2"
+           style="background: var(--navy-bg); opacity:0;">
+        <div id="s2-orb" style="position:absolute; left:560px; top:60px; width:800px; height:800px;
+             background:radial-gradient(circle, hsl(43 96% 56% / 0.14) 0%, transparent 62%); opacity:0;"></div>
+        <div id="s2-vig" class="vignette"></div>
+
+        <div id="frame-wrap" class="willf" style="position:relative; width:300px; height:300px;">
+          <!-- glow bloom behind the subject -->
+          <div id="subj-glow" style="position:absolute; left:90px; top:90px; width:120px; height:120px; border-radius:30px;
+               background:radial-gradient(circle, hsl(43 96% 56% / 0.85) 0%, transparent 70%); opacity:0; filter:blur(6px);"></div>
+          <!-- focus ring that contracts onto the subject as it locks -->
+          <div id="focus-ring" style="position:absolute; left:50%; top:50%; width:300px; height:300px; margin:-150px 0 0 -150px;
+               border:2px solid hsl(43 96% 56% / 0.55); border-radius:50%; opacity:0;"></div>
+
+          <svg id="frame-svg" viewBox="0 0 100 100" width="300" height="300" style="position:relative; display:block; color:var(--frame-rev);">
+            <g fill="none" stroke="currentColor" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round">
+              <path id="br-tl" d="M 26 40 L 26 26 L 40 26" />
+              <path id="br-tr" d="M 60 26 L 74 26 L 74 40" />
+              <path id="br-br" d="M 74 60 L 74 74 L 60 74" />
+              <path id="br-bl" d="M 40 74 L 26 74 L 26 60" />
+            </g>
+            <rect id="subject" x="42" y="42" width="16" height="16" rx="4.6" fill="var(--gold)" />
+          </svg>
+        </div>
+
+        <div id="s2-word" class="willf" style="margin-top:30px; font-size:60px; font-weight:700; letter-spacing:-0.035em; color:var(--ink);">
+          MyCargo<span style="color:var(--gold-deep);">Lens</span>
+        </div>
+        <div id="s2-tag" class="willf" style="margin-top:14px; font-size:30px; font-weight:400; color:var(--muted); letter-spacing:-0.01em;">
+          An inbox for US customs. <span style="color:var(--ink); font-weight:600;">Not another dashboard.</span>
+        </div>
+      </div>
+
+      <!-- ===================== SCENE 3 — ACTION QUEUE ===================== -->
+      <div id="s3" class="scene center clip" data-start="8.1" data-duration="4.7" data-track-index="3"
+           style="background: var(--warm); opacity:0;">
+        <div id="s3-aurora" data-layout-allow-overflow="true" style="position:absolute; left:50%; top:-220px; width:1500px; height:700px; margin-left:-750px;
+             background:radial-gradient(ellipse 50% 60% at 50% 0%, hsl(43 96% 56% / 0.10) 0%, transparent 70%);"></div>
+        <div class="vignette-soft"></div>
+        <div id="s3-card" class="card willf" style="width:1080px; padding:40px 44px;">
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+            <span class="dot" style="background:var(--emerald); box-shadow:0 0 0 4px hsl(160 84% 39% / 0.18);"></span>
+            <span class="eyebrow">Action queue</span>
+          </div>
+          <div style="overflow:hidden; height:46px; margin:6px 0 30px 0;">
+            <div id="s3-brief-mask" data-layout-allow-overflow="true" style="overflow:hidden; white-space:nowrap; width:0;">
+              <span id="s3-brief" style="display:inline-block; white-space:nowrap; font-size:31px; font-weight:500; color:var(--ink); letter-spacing:-0.01em;">3 ISFs need attention. ISF-10 <span class="mono" style="color:var(--ink);">#X42191</span> — deadline in 4h.</span>
+            </div>
+          </div>
+          <div id="s3-row1" class="willf" style="display:flex; align-items:center; justify-content:space-between; border-top:1px solid var(--border); padding:22px 4px;">
+            <div style="display:flex; align-items:baseline; gap:16px;">
+              <span style="font-size:25px; font-weight:600; color:var(--ink);">ISF-10</span>
+              <span class="mono tnum" style="font-size:22px; color:var(--muted);">#X42191</span>
+            </div>
+            <span id="s3-pill1" class="pill" style="background:hsl(38 92% 50% / 0.14); color:hsl(36 90% 36%);">
+              <span class="dot" style="background:var(--amber);"></span> Deadline 4h
+            </span>
+          </div>
+          <div id="s3-row2" class="willf" style="display:flex; align-items:center; justify-content:space-between; border-top:1px solid var(--border); padding:22px 4px;">
+            <div style="display:flex; align-items:baseline; gap:16px;">
+              <span style="font-size:25px; font-weight:600; color:var(--ink);">ISF-10</span>
+              <span class="mono tnum" style="font-size:22px; color:var(--muted);">#X42088</span>
+            </div>
+            <span class="pill" style="background:hsl(0 72% 51% / 0.12); color:var(--rose);">
+              <span class="dot" style="background:var(--rose);"></span> Rejected
+            </span>
+          </div>
+          <div id="s3-row3" class="willf" style="display:flex; align-items:center; justify-content:space-between; border-top:1px solid var(--border); border-bottom:1px solid var(--border); padding:22px 4px;">
+            <div style="display:flex; align-items:baseline; gap:16px;">
+              <span style="font-size:25px; font-weight:600; color:var(--ink);">Entry</span>
+              <span class="mono tnum" style="font-size:22px; color:var(--muted);">#X41955</span>
+            </div>
+            <span class="pill" style="background:hsl(160 84% 39% / 0.12); color:var(--emerald);">
+              <span class="dot" style="background:var(--emerald);"></span> Accepted
+            </span>
+          </div>
+        </div>
+        <div id="s3-cap" class="willf" style="margin-top:24px; font-size:22px; color:var(--muted);">Every filing, ranked by urgency.</div>
+      </div>
+
+      <!-- ===================== SCENE 4 — REJECTION COACH ===================== -->
+      <div id="s4" class="scene center clip" data-start="12.5" data-duration="4.0" data-track-index="4"
+           data-layout-allow-overlap="true"
+           style="background: var(--warm); opacity:0;">
+        <div class="vignette-soft"></div>
+        <div style="width:1000px;">
+          <div id="s4-cap" class="willf" style="text-align:center; margin-bottom:26px;">
+            <div class="eyebrow" style="margin-bottom:12px;">Rejection coach</div>
+            <h2 style="font-size:40px; font-weight:600; color:var(--ink); letter-spacing:-0.02em;">Plain English explains every CBP rejection.</h2>
+          </div>
+          <div id="s4-card" class="card willf" style="padding:34px 36px;">
+            <div id="s4-rej" class="willf" style="display:flex; gap:14px; align-items:center; margin-bottom:24px;">
+              <span class="pill" style="background:hsl(0 72% 51% / 0.12); color:var(--rose); font-size:18px;">
+                <span class="dot" style="background:var(--rose);"></span> CBP rejection
+              </span>
+              <span class="mono" style="font-size:25px; color:var(--ink);">Invalid manufacturer ID (10MSCM)</span>
+            </div>
+            <div id="s4-step1" class="willf" style="display:flex; gap:16px; align-items:center; padding:13px 0; font-size:26px; color:var(--ink);">
+              <span style="flex:none; width:34px; height:34px; border-radius:9999px; background:hsl(43 96% 56% / 0.18); color:var(--gold-deep); font-weight:700; font-size:18px; display:flex; align-items:center; justify-content:center;">1</span>
+              Read the CBP code.
+            </div>
+            <div id="s4-step2" class="willf" style="display:flex; gap:16px; align-items:center; padding:13px 0; font-size:26px; color:var(--ink);">
+              <span style="flex:none; width:34px; height:34px; border-radius:9999px; background:hsl(43 96% 56% / 0.18); color:var(--gold-deep); font-weight:700; font-size:18px; display:flex; align-items:center; justify-content:center;">2</span>
+              Fix the manufacturer ID.
+            </div>
+            <div id="s4-step3" class="willf" style="display:flex; gap:16px; align-items:center; padding:13px 0; font-size:26px; color:var(--ink);">
+              <span style="flex:none; width:34px; height:34px; border-radius:9999px; background:hsl(43 96% 56% / 0.18); color:var(--gold-deep); font-weight:700; font-size:18px; display:flex; align-items:center; justify-content:center;">3</span>
+              Resubmit — we revalidate first.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== SCENE 5 — PIPELINE + PROOF ===================== -->
+      <div id="s5" class="scene center clip" data-start="16.2" data-duration="3.9" data-track-index="5"
+           data-layout-allow-overlap="true"
+           style="background: var(--warm); opacity:0;">
+        <div class="vignette-soft"></div>
+        <div style="width:1200px;">
+          <div class="eyebrow" id="s5-eye" style="text-align:center; margin-bottom:34px;">One filing, start to release</div>
+          <div style="position:relative; display:flex; align-items:flex-start; justify-content:space-between; padding:0 30px; margin-bottom:64px;">
+            <div style="position:absolute; left:60px; right:60px; top:17px; height:3px; background:var(--border);"></div>
+            <div id="s5-fill" style="position:absolute; left:60px; top:17px; height:3px; width:0; background:linear-gradient(90deg, var(--blue), var(--emerald)); border-radius:2px;"></div>
+            <div style="position:relative; text-align:center; width:120px;">
+              <span id="s5-d1" class="dot willf" style="width:36px; height:36px; background:var(--blue); display:block; margin:0 auto;"></span>
+              <div style="margin-top:16px; font-size:22px; font-weight:600; color:var(--ink);">ISF</div>
+            </div>
+            <div style="position:relative; text-align:center; width:120px;">
+              <span id="s5-d2" class="dot willf" style="width:36px; height:36px; background:var(--amber); display:block; margin:0 auto;"></span>
+              <div style="margin-top:16px; font-size:22px; font-weight:600; color:var(--ink);">Manifest</div>
+            </div>
+            <div style="position:relative; text-align:center; width:120px;">
+              <span id="s5-d3" class="dot willf" style="width:36px; height:36px; background:var(--violet); display:block; margin:0 auto;"></span>
+              <div style="margin-top:16px; font-size:22px; font-weight:600; color:var(--ink);">Entry</div>
+            </div>
+            <div style="position:relative; text-align:center; width:120px;">
+              <span id="s5-d4" class="dot willf" style="width:36px; height:36px; background:var(--emerald); display:block; margin:0 auto;"></span>
+              <div style="margin-top:16px; font-size:22px; font-weight:600; color:var(--ink);">Cleared</div>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:center; gap:80px;">
+            <div class="willf" id="s5-stat1" style="text-align:center;">
+              <div class="tnum" style="font-size:60px; font-weight:700; color:var(--ink); letter-spacing:-0.02em;"><span id="s5-num1">0.0</span>%</div>
+              <div style="font-size:21px; color:var(--muted); margin-top:6px;">CBP acceptance</div>
+            </div>
+            <div class="willf" id="s5-stat2" style="text-align:center;">
+              <div class="tnum" style="font-size:60px; font-weight:700; color:var(--ink); letter-spacing:-0.02em;">&lt;90s</div>
+              <div style="font-size:21px; color:var(--muted); margin-top:6px;">avg filing time</div>
+            </div>
+            <div class="willf" id="s5-stat3" style="text-align:center;">
+              <div class="tnum" style="font-size:60px; font-weight:700; color:var(--ink); letter-spacing:-0.02em;"><span id="s5-num3">0</span>%</div>
+              <div style="font-size:21px; color:var(--muted); margin-top:6px;">audit-ready</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== SCENE 6 — OUTRO / CTA ===================== -->
+      <div id="s6" class="scene center clip" data-start="19.8" data-duration="2.7" data-track-index="6"
+           style="background: var(--warm); opacity:0;">
+        <div id="s6-glow" style="position:absolute; left:580px; top:160px; width:760px; height:760px;
+             background:radial-gradient(circle, hsl(43 96% 56% / 0.13) 0%, transparent 64%);"></div>
+        <div id="s6-inner" class="center willf" style="position:relative;">
+          <svg viewBox="0 0 100 100" width="92" height="92" style="display:block; color:var(--frame);">
+            <g fill="none" stroke="currentColor" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 26 40 L 26 26 L 40 26" />
+              <path d="M 60 26 L 74 26 L 74 40" />
+              <path d="M 74 60 L 74 74 L 60 74" />
+              <path d="M 40 74 L 26 74 L 26 60" />
+            </g>
+            <rect x="42" y="42" width="16" height="16" rx="4.6" fill="var(--gold)" />
+          </svg>
+          <div style="margin-top:24px; font-size:34px; font-weight:700; letter-spacing:-0.03em;">
+            <span style="color:var(--ink);">MyCargo</span><span style="color:var(--gold-deep);">Lens</span>
+          </div>
+          <div style="margin-top:16px; font-size:24px; font-weight:500; color:var(--muted); letter-spacing:-0.01em;">File ISF, Entry, and In-Bond with confidence.</div>
+          <div id="s6-url" style="margin-top:22px; font-size:26px; font-weight:700; color:var(--ink); letter-spacing:-0.01em;">
+            mycargolens<span style="color:var(--gold-deep);">.com</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== AUDIO ===================== -->
+    <audio id="aud-music" data-start="0" data-duration="22.5" data-track-index="10" data-volume="0.26" src="assets/music/happy-beats-business-moves-vol-12-by-ende-dot-app.mp3"></audio>
+
+    <!-- SCENE 1 -->
+    <audio id="aud-key1" data-start="0.35" data-duration="0.25" data-track-index="11" data-volume="0.40" src="assets/sfx/keyboard/keypress-001.wav"></audio>
+    <audio id="aud-key2" data-start="0.78" data-duration="0.25" data-track-index="11" data-volume="0.38" src="assets/sfx/keyboard/keypress-005.wav"></audio>
+    <audio id="aud-key3" data-start="1.20" data-duration="0.25" data-track-index="11" data-volume="0.42" src="assets/sfx/keyboard/keypress-009.wav"></audio>
+    <audio id="aud-key4" data-start="1.62" data-duration="0.25" data-track-index="11" data-volume="0.36" src="assets/sfx/keyboard/keypress-013.wav"></audio>
+    <audio id="aud-glitch" data-start="2.7" data-duration="0.8" data-track-index="13" data-volume="0.32" src="assets/sfx/interface/glitch_002.ogg"></audio>
+
+    <!-- SCENE 2: focus lock -->
+    <audio id="aud-lock" data-start="5.42" data-duration="1.4" data-track-index="13" data-volume="0.55" src="assets/sfx/impact/impactSoft_medium_001.ogg"></audio>
+
+    <!-- SCENE 3 -->
+    <audio id="aud-brief1" data-start="8.65" data-duration="0.22" data-track-index="11" data-volume="0.24" src="assets/sfx/keyboard/keypress-003.wav"></audio>
+    <audio id="aud-brief2" data-start="9.00" data-duration="0.22" data-track-index="11" data-volume="0.24" src="assets/sfx/keyboard/keypress-007.wav"></audio>
+    <audio id="aud-brief3" data-start="9.35" data-duration="0.22" data-track-index="11" data-volume="0.24" src="assets/sfx/keyboard/keypress-011.wav"></audio>
+    <audio id="aud-row1" data-start="10.05" data-duration="0.5" data-track-index="12" data-volume="0.44" src="assets/sfx/interface/drop_001.ogg"></audio>
+    <audio id="aud-row2" data-start="10.42" data-duration="0.5" data-track-index="14" data-volume="0.44" src="assets/sfx/interface/drop_002.ogg"></audio>
+    <audio id="aud-row3" data-start="10.79" data-duration="0.5" data-track-index="12" data-volume="0.44" src="assets/sfx/interface/drop_001.ogg"></audio>
+    <audio id="aud-accept" data-start="11.45" data-duration="1.2" data-track-index="14" data-volume="0.50" src="assets/sfx/impact/impactSoft_medium_003.ogg"></audio>
+
+    <!-- SCENE 4 -->
+    <audio id="aud-step1" data-start="13.55" data-duration="0.5" data-track-index="11" data-volume="0.38" src="assets/sfx/interface/drop_002.ogg"></audio>
+    <audio id="aud-step2" data-start="14.05" data-duration="0.5" data-track-index="11" data-volume="0.38" src="assets/sfx/interface/drop_002.ogg"></audio>
+    <audio id="aud-step3" data-start="14.55" data-duration="0.5" data-track-index="11" data-volume="0.38" src="assets/sfx/interface/drop_002.ogg"></audio>
+
+    <!-- SCENE 5: pipeline dots (beat-grid) + stats -->
+    <audio id="aud-dot1" data-start="16.50" data-duration="0.3" data-track-index="11" data-volume="0.42" src="assets/sfx/ui/click1.ogg"></audio>
+    <audio id="aud-dot2" data-start="17.00" data-duration="0.3" data-track-index="11" data-volume="0.42" src="assets/sfx/ui/click3.ogg"></audio>
+    <audio id="aud-dot3" data-start="17.47" data-duration="0.3" data-track-index="11" data-volume="0.42" src="assets/sfx/ui/click1.ogg"></audio>
+    <audio id="aud-dot4" data-start="18.00" data-duration="0.3" data-track-index="11" data-volume="0.48" src="assets/sfx/interface/select_008.ogg"></audio>
+    <audio id="aud-stats" data-start="18.56" data-duration="0.5" data-track-index="12" data-volume="0.40" src="assets/sfx/interface/drop_001.ogg"></audio>
+
+    <!-- SCENE 6 -->
+    <audio id="aud-outro" data-start="20.05" data-duration="1.6" data-track-index="13" data-volume="0.30" src="assets/sfx/interface/bong_001.ogg"></audio>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const OUT = "expo.out";       // big, fluid deceleration
+      const SOFT = "power3.out";
+
+      // ---------- initial states ----------
+      tl.set(["#s1", "#s2", "#s3", "#s4", "#s5", "#s6"], { opacity: 0 }, 0);
+
+      // Scene 1
+      gsap.set("#s1-head", { opacity: 0, y: 18, filter: "blur(10px)" });
+      gsap.set("#s1-grid", { opacity: 0 });
+      gsap.set(["#f1", "#f2", "#f3", "#f4", "#f5"], { opacity: 0, scale: 0.9, filter: "blur(8px)" });
+
+      // Scene 2 — Focus Frame
+      gsap.set("#frame-wrap", { opacity: 0 });
+      gsap.set("#br-tl", { x: -34, y: -34, opacity: 0, transformOrigin: "50% 50%" });
+      gsap.set("#br-tr", { x: 34,  y: -34, opacity: 0, transformOrigin: "50% 50%" });
+      gsap.set("#br-br", { x: 34,  y: 34,  opacity: 0, transformOrigin: "50% 50%" });
+      gsap.set("#br-bl", { x: -34, y: 34,  opacity: 0, transformOrigin: "50% 50%" });
+      gsap.set("#subject", { scale: 0.2, opacity: 0, transformOrigin: "50% 50%" });
+      gsap.set("#subj-glow", { opacity: 0, scale: 0.6, transformOrigin: "50% 50%" });
+      gsap.set("#focus-ring", { opacity: 0, scale: 1.8, transformOrigin: "50% 50%" });
+      gsap.set("#s2-orb", { opacity: 0 });
+      gsap.set(["#s2-word", "#s2-tag"], { opacity: 0, y: 20, filter: "blur(8px)" });
+
+      // Scene 3
+      gsap.set("#s3-card", { opacity: 0, y: 30, scale: 0.97, filter: "blur(8px)", transformOrigin: "50% 60%" });
+      gsap.set("#s3-brief-mask", { width: 0 });
+      gsap.set(["#s3-row1", "#s3-row2", "#s3-row3"], { opacity: 0, y: 18, filter: "blur(4px)" });
+      gsap.set("#s3-cap", { opacity: 0, y: 10 });
+
+      // Scene 4
+      gsap.set("#s4-cap", { opacity: 0, y: 18, filter: "blur(8px)" });
+      gsap.set("#s4-card", { opacity: 0, y: 26, scale: 0.97, filter: "blur(8px)", transformOrigin: "50% 50%" });
+      gsap.set("#s4-rej", { opacity: 0, x: -20 });
+      gsap.set(["#s4-step1", "#s4-step2", "#s4-step3"], { opacity: 0, x: 24, filter: "blur(4px)" });
+
+      // Scene 5
+      gsap.set("#s5-eye", { opacity: 0, y: 12, filter: "blur(6px)" });
+      gsap.set(["#s5-d1", "#s5-d2", "#s5-d3", "#s5-d4"], { opacity: 0, scale: 0.2, transformOrigin: "50% 50%" });
+      gsap.set("#s5-fill", { width: 0 });
+      gsap.set(["#s5-stat1", "#s5-stat2", "#s5-stat3"], { opacity: 0, y: 20, filter: "blur(8px)" });
+
+      // Scene 6
+      gsap.set("#s6-inner", { opacity: 0, y: 18, filter: "blur(8px)" });
+      gsap.set("#s6-glow", { opacity: 0, scale: 0.9, transformOrigin: "50% 50%" });
+
+      // ===================== SCENE 1 — CHAOS (0 - 3.8) =====================
+      tl.to("#s1", { opacity: 1, duration: 0.4, ease: "power1.out" }, 0);
+      tl.to("#s1-grid", { opacity: 0.55, duration: 0.9, ease: SOFT }, 0.1);
+      tl.to("#s1-head", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: OUT }, 0.2);
+      tl.to("#f1", { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.45, ease: "back.out(1.6)" }, 0.35);
+      tl.to("#f2", { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.45, ease: "back.out(1.6)" }, 0.78);
+      tl.to("#f4", { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.4, ease: "back.out(2)" }, 1.20);
+      tl.to("#f3", { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.45, ease: "back.out(1.6)" }, 1.55);
+      tl.to("#f5", { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.4, ease: "back.out(2)" }, 1.90);
+      tl.to("#f4", { x: "+=6", duration: 0.06, repeat: 5, yoyo: true, ease: "none" }, 2.7);
+      // collapse the chaos inward — converging to where the frame will lock
+      tl.to(["#f1","#f2","#f3","#f4","#f5"], {
+        opacity: 0, scale: 0.12, left: "50%", top: "50%", xPercent: -50, yPercent: -50,
+        filter: "blur(14px)", duration: 0.58, ease: "power3.inOut", stagger: 0.02
+      }, 3.12);
+      tl.to(["#s1-head", "#s1-grid"], { opacity: 0, filter: "blur(12px)", duration: 0.5, ease: "power2.in" }, 3.2);
+      tl.set(["#f1","#f2","#f3","#f4","#f5"], { opacity: 0 }, 3.8); // hard kill
+      tl.set(["#s1-head", "#s1-grid"], { opacity: 0 }, 3.8); // hard kill
+      tl.to("#s1", { opacity: 0, duration: 0.4 }, 3.8);
+      tl.set("#s1", { opacity: 0 }, 4.2);
+
+      // ===================== SCENE 2 — FOCUS FRAME LOCK (3.8 - 8.4) =====================
+      tl.to("#s2", { opacity: 1, duration: 0.4 }, 3.85);
+      tl.to("#frame-wrap", { opacity: 1, duration: 0.3 }, 4.0);
+      // brackets fly in from their corners and lock — staggered, big ease
+      tl.to("#br-tl", { x: 0, y: 0, opacity: 1, duration: 1.0, ease: OUT }, 4.35);
+      tl.to("#br-tr", { x: 0, y: 0, opacity: 1, duration: 1.0, ease: OUT }, 4.45);
+      tl.to("#br-br", { x: 0, y: 0, opacity: 1, duration: 1.0, ease: OUT }, 4.55);
+      tl.to("#br-bl", { x: 0, y: 0, opacity: 1, duration: 1.0, ease: OUT }, 4.65);
+      // focus ring contracts onto the subject
+      tl.to("#focus-ring", { opacity: 1, duration: 0.3, ease: "power1.out" }, 4.9);
+      tl.to("#focus-ring", { scale: 0.55, opacity: 0, duration: 0.7, ease: "power2.in", overwrite: "auto" }, 5.05);
+      // SUBJECT LOCKS — spring in with a glow bloom (the reticle catches its subject)
+      tl.to("#subject", { scale: 1, opacity: 1, duration: 0.55, ease: "back.out(2.4)" }, 5.35);
+      tl.to("#subj-glow", { opacity: 1, scale: 1.5, duration: 0.34, ease: "power2.out", overwrite: "auto" }, 5.42);
+      tl.to("#subj-glow", { opacity: 0.5, scale: 1.0, duration: 0.7, ease: "power2.out", overwrite: "auto" }, 5.78);
+      // background resolves dark -> warm; frame recolors light-grey -> navy as it develops
+      tl.to("#s2", { backgroundColor: "hsl(220 25% 97%)", duration: 0.8, ease: "power2.out" }, 5.5);
+      tl.to("#s2-vig", { opacity: 0, duration: 0.6, ease: "power2.out" }, 5.5);
+      tl.to("#frame-svg", { color: "#1E2D4D", duration: 0.7, ease: "power2.out" }, 5.55);
+      tl.to("#s2-orb", { opacity: 1, duration: 0.7 }, 5.5);
+      // mark lifts; wordmark + tagline rack-focus in
+      tl.to("#frame-wrap", { y: -36, scale: 0.82, duration: 0.8, ease: OUT }, 5.95);
+      tl.to("#s2-word", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: OUT }, 6.2);
+      tl.to("#s2-tag", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: OUT }, 6.5);
+      // subtle gold breathing on the subject (life)
+      tl.to("#subj-glow", { opacity: 0.62, scale: 1.12, duration: 1.1, yoyo: true, repeat: 1, ease: "sine.inOut", overwrite: "auto" }, 6.9);
+      tl.to("#s2", { opacity: 0, duration: 0.4 }, 8.0);
+      tl.set("#s2", { opacity: 0 }, 8.4);
+
+      // ===================== SCENE 3 — ACTION QUEUE (8.1 - 12.8) =====================
+      tl.to("#s3", { opacity: 1, duration: 0.4 }, 8.05);
+      tl.to("#s3-card", { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", duration: 0.7, ease: OUT }, 8.15);
+      tl.to("#s3-brief-mask", {
+        width: function () { return document.getElementById("s3-brief").offsetWidth + 4 + "px"; },
+        duration: 1.2, ease: "steps(34)"
+      }, 8.55);
+      tl.to("#s3-row1", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.5, ease: OUT }, 10.05);
+      tl.to("#s3-row2", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.5, ease: OUT }, 10.42);
+      tl.to("#s3-row3", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.5, ease: OUT }, 10.79);
+      // RESULT: urgent row resolves — amber pill flips to emerald "Accepted"
+      tl.to("#s3-pill1", { opacity: 0, scale: 0.9, duration: 0.2, ease: "power1.in" }, 11.4);
+      tl.add(function () {
+        const p = document.getElementById("s3-pill1");
+        if (!p) return;
+        p.style.background = "hsl(160 84% 39% / 0.12)";
+        p.style.color = "hsl(160 84% 39%)";
+        p.innerHTML = '<span class="dot" style="background:hsl(160 84% 39%);"></span> Accepted';
+      }, 11.6);
+      tl.fromTo("#s3-pill1", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2.4)" }, 11.62);
+      tl.to("#s3-cap", { opacity: 1, y: 0, duration: 0.5, ease: OUT }, 11.0);
+      tl.to("#s3", { opacity: 0, duration: 0.4 }, 12.4);
+      tl.set("#s3", { opacity: 0 }, 12.8);
+
+      // ===================== SCENE 4 — REJECTION COACH (12.5 - 16.5) =====================
+      tl.to("#s4", { opacity: 1, duration: 0.4 }, 12.45);
+      tl.to("#s4-cap", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: OUT }, 12.6);
+      tl.to("#s4-card", { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", duration: 0.6, ease: OUT }, 12.85);
+      tl.to("#s4-rej", { opacity: 1, x: 0, duration: 0.5, ease: OUT }, 13.15);
+      tl.to("#s4-step1", { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.5, ease: OUT }, 13.55);
+      tl.to("#s4-step2", { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.5, ease: OUT }, 14.05);
+      tl.to("#s4-step3", { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.5, ease: OUT }, 14.55);
+      tl.to("#s4", { opacity: 0, duration: 0.35 }, 16.1);
+      tl.set("#s4", { opacity: 0 }, 16.5);
+
+      // ===================== SCENE 5 — PIPELINE + PROOF (16.2 - 20.1) =====================
+      tl.to("#s5", { opacity: 1, duration: 0.4 }, 16.15);
+      tl.to("#s5-eye", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.5, ease: OUT }, 16.2);
+      // stage dots light L->R, snapped to the vol-12 beat grid // beat-grid: 16.50 / 17.00 / 17.47 / 18.00
+      tl.to("#s5-d1", { opacity: 1, scale: 1, duration: 0.36, ease: "back.out(2.2)" }, 16.50);
+      tl.to("#s5-d2", { opacity: 1, scale: 1, duration: 0.36, ease: "back.out(2.2)" }, 17.00);
+      tl.to("#s5-d3", { opacity: 1, scale: 1, duration: 0.36, ease: "back.out(2.2)" }, 17.47); // beat-locked: strong cue 17.47s
+      tl.to("#s5-d4", { opacity: 1, scale: 1, duration: 0.38, ease: "back.out(2.4)" }, 18.00);
+      tl.to("#s5-fill", { width: "1020px", duration: 1.85, ease: "power1.inOut" }, 16.55);
+      // stats payoff — count-ups land on the strong cue // beat-locked: strong cue 18.56s
+      tl.to("#s5-stat1", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.5, ease: OUT }, 18.56);
+      tl.to("#s5-stat3", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.5, ease: OUT }, 18.56);
+      tl.to("#s5-stat2", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.5, ease: OUT }, 18.74);
+      tl.to({ v: 0 }, { v: 99.8, duration: 1.0, ease: "power2.out", overwrite: "auto",
+        onUpdate: function () { document.getElementById("s5-num1").textContent = this.targets()[0].v.toFixed(1); } }, 18.56);
+      tl.to({ v: 0 }, { v: 100, duration: 1.0, ease: "power2.out", overwrite: "auto",
+        onUpdate: function () { document.getElementById("s5-num3").textContent = Math.round(this.targets()[0].v); } }, 18.56);
+      tl.to("#s5", { opacity: 0, duration: 0.3 }, 19.8);
+      tl.set("#s5", { opacity: 0 }, 20.1);
+
+      // ===================== SCENE 6 — OUTRO / CTA (19.8 - 22.5) =====================
+      tl.to("#s6", { opacity: 1, duration: 0.4 }, 19.8);
+      tl.to("#s6-glow", { opacity: 1, scale: 1, duration: 0.7, ease: OUT }, 19.85);
+      tl.to("#s6-inner", { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.75, ease: OUT }, 19.95);
+      tl.to("#s6-glow", { opacity: 0.6, scale: 1.12, duration: 1.1, yoyo: true, repeat: 1, ease: "sine.inOut", overwrite: "auto" }, 20.6);
+      tl.to("#s6-inner", { opacity: 1, duration: 0.4 }, 21.9);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

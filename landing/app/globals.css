@@ -25,6 +25,9 @@
     --input: 220 20% 91%;
     --ring: 222 47% 22%;
     --radius: 0.75rem;
+    /* Logo (Focus Frame) — frame is navy on light; "Lens" word is dark-gold. */
+    --logo-frame: 222 47% 22%;
+    --logo-lens: 38 92% 44%;
   }
   .dark {
     /* Dark — Obsidian + Amber Gold */
@@ -47,6 +50,9 @@
     --border: 217 35% 12%;
     --input: 217 35% 12%;
     --ring: 43 96% 56%;
+    /* Logo (Focus Frame) — frame is light-grey on dark; "Lens" word is bright gold. */
+    --logo-frame: 222 30% 64%;
+    --logo-lens: 43 96% 56%;
   }
 }
 
