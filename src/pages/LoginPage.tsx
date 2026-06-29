@@ -14,7 +14,7 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 
 // Brand mark for the mobile header — uses the shared Focus Frame LogoMark.
 function GoldMark() {
-  return <LogoMark size={28} className="text-[hsl(222_47%_22%)] dark:text-[hsl(222_30%_64%)]" />;
+  return <LogoMark size={34} className="text-[hsl(222_47%_22%)] dark:text-[hsl(222_30%_64%)]" />;
 }
 
 export default function LoginPage() {

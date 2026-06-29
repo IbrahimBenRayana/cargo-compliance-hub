@@ -155,7 +155,7 @@ export function AppSidebar() {
         >
           {/* Logo mark — Focus Frame, sized for collapsed vs expanded rail */}
           <LogoMark
-            size={collapsed ? 28 : 32}
+            size={collapsed ? 32 : 38}
             className="text-[hsl(222_30%_64%)]"
           />
           {/* Sidebar bg is dark-navy in both modes, so the frame uses the
