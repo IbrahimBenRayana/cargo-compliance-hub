@@ -99,8 +99,8 @@ export function AuthBrandPanel({ variant = 'login' }: AuthBrandPanelProps) {
 
         {/* ── Wordmark — top left ── */}
         <div className="absolute top-8 left-8 flex items-center gap-2.5 z-10">
-          {/* Brand mark — aperture, tinted light for contrast on dark panel */}
-          <LogoMark size={24} className="text-white/90" />
+          {/* Brand mark — Focus Frame, reversed tint for contrast on dark panel */}
+          <LogoMark size={24} className="text-[hsl(222_30%_64%)]" />
           <span
             className="text-base font-semibold tracking-tight"
             style={{ color: 'rgba(255,255,255,0.92)' }}

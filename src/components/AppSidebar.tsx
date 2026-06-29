@@ -153,13 +153,13 @@ export function AppSidebar() {
             collapsed ? 'justify-center' : 'gap-3',
           )}
         >
-          {/* Logo mark — 6-blade aperture, sized for collapsed vs expanded rail */}
+          {/* Logo mark — Focus Frame, sized for collapsed vs expanded rail */}
           <LogoMark
             size={collapsed ? 28 : 32}
-            className="text-[hsl(43_96%_70%)]"
+            className="text-[hsl(222_30%_64%)]"
           />
-          {/* Old gold-tile + Ship icon retired in favor of the aperture mark.
-              The sidebar bg is dark-navy in both modes, so we tint the mark gold. */}
+          {/* Sidebar bg is dark-navy in both modes, so the frame uses the
+              reversed light-grey tint; the subject square stays gold. */}
 
           {!collapsed && (
             <div className="flex flex-col min-w-0">
