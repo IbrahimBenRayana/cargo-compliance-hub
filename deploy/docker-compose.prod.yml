@@ -107,6 +107,18 @@ services:
       AI_RATE_LIMIT_PER_USER:   ${AI_RATE_LIMIT_PER_USER:-50}
       AI_DISABLE_TRAINING_DATA: ${AI_DISABLE_TRAINING_DATA:-true}
 
+      # AI chat assistant + live human handoff (app + marketing widgets).
+      # Reuses the AI_* provider config above. CHAT_SESSION_SECRET (HMAC for
+      # anonymous visitor tokens) is required in prod — synced from the
+      # CHAT_SESSION_SECRET GitHub Environment secret into .env on deploy.
+      # The app's env.ts enforces the requirement, so pass-through ( :- ) here.
+      CHAT_ENABLED:        ${CHAT_ENABLED:-true}
+      CHAT_SESSION_SECRET: ${CHAT_SESSION_SECRET:-}
+      CHAT_MAX_TOKENS:     ${CHAT_MAX_TOKENS:-1024}
+      CHAT_MAX_HISTORY:    ${CHAT_MAX_HISTORY:-12}
+      CHAT_ANON_DAILY_CAP: ${CHAT_ANON_DAILY_CAP:-30}
+      CHAT_SUPPORT_EMAIL:  ${CHAT_SUPPORT_EMAIL:-support@mycargolens.com}
+
       # Terminal 49 — container tracking; feature self-disables when key is blank
       TERMINAL49_API_BASE_URL: ${TERMINAL49_API_BASE_URL:-https://api.terminal49.com/v2}
       TERMINAL49_API_KEY:      ${TERMINAL49_API_KEY:-}
