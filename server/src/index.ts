@@ -38,8 +38,11 @@ import abiDocumentsRoutes from './routes/abiDocuments.js';
 import dutyCalculationRoutes from './routes/dutyCalculation.js';
 import trackingRoutes from './routes/tracking.js';
 import contactRoutes from './routes/contact.js';
+import chatRoutes from './routes/chat.js';
+import chatAdminRoutes from './routes/chatAdmin.js';
 import { startBackgroundJobs, stopBackgroundJobs, getJobStatus, pollSubmittedFilings, checkDeadlines } from './services/backgroundJobs.js';
 import { startNotificationStream, stopNotificationStream } from './services/notificationStream.js';
+import { startChatStream, stopChatStream, getChatStreamStats } from './services/chat/chatStream.js';
 import { verifyEmailConnection } from './services/email.js';
 
 const app = express();
@@ -108,6 +111,7 @@ app.get('/api/health', async (_req, res) => {
       timestamp: new Date().toISOString(),
       environment: env.NODE_ENV,
       jobs: getJobStatus(),
+      chatStream: getChatStreamStats(),
     });
   } catch (err: any) {
     res.status(503).json({
@@ -145,6 +149,10 @@ app.use('/api/v1/tracking', trackingRoutes);
 // inside the route module. Mount here so it sits under the same /api/v1
 // prefix as everything else.
 app.use('/api/v1/contact', contactRoutes);
+// AI Assistant + live human handoff. Admin (staff console) is mounted BEFORE the
+// user/public router so /chat/admin/* matches the platform-admin-gated routes.
+app.use('/api/v1/chat/admin', chatAdminRoutes);
+app.use('/api/v1/chat', chatRoutes);
 
 // ─── Background Jobs Endpoints ────────────────────────────
 // GET job status + POST manual trigger. Pre-fix these were mounted with
@@ -223,6 +231,10 @@ async function main() {
     // streaming. Failures are non-fatal — clients fall back to 30s polling.
     startNotificationStream().catch(() => {});
 
+    // Open the second LISTEN socket for real-time chat (assistant + live agent
+    // handoff). Non-fatal — chat falls back to refetch-on-poll if it fails.
+    startChatStream().catch(() => {});
+
     // Verify email connection (non-blocking)
     verifyEmailConnection();
 
@@ -231,6 +243,7 @@ async function main() {
       console.log(`\n[Server] ${signal} received — shutting down gracefully...`);
       stopBackgroundJobs();
       await stopNotificationStream().catch(() => {});
+      await stopChatStream().catch(() => {});
       server.close(() => {
         prisma.$disconnect().then(() => {
           console.log('[Server] Disconnected from database. Goodbye.');

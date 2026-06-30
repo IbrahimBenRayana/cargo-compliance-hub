@@ -98,13 +98,13 @@ function callsToday(userId: string): number {
   return usage.get(`${userId}:${todayKeyUTC()}`) ?? 0;
 }
 
-function ensureWithinLimit(userId: string): void {
-  const current = callsToday(userId);
-  if (current >= env.AI_RATE_LIMIT_PER_USER) {
+function ensureWithinLimit(key: string, limit: number = env.AI_RATE_LIMIT_PER_USER): void {
+  const current = callsToday(key);
+  if (current >= limit) {
     throw new AiRateLimitedError(
-      `Daily AI request limit reached (${env.AI_RATE_LIMIT_PER_USER}). Resets at UTC midnight.`,
+      `Daily AI request limit reached (${limit}). Resets at UTC midnight.`,
       current,
-      env.AI_RATE_LIMIT_PER_USER,
+      limit,
     );
   }
 }
@@ -270,6 +270,107 @@ export async function vision(opts: VisionOptions): Promise<string> {
     return text;
   } catch (err: any) {
     logger.error({ err: err?.message, userId: opts.userId }, '[AI] vision failed');
+    throw err;
+  }
+}
+
+// ─── Multi-turn chat with tool-calling (for the assistant widget) ────
+// Unlike complete()/stream() (single system+user prompt), these accept a full
+// `messages` array and an optional `tools` array, and the rate limit is keyed
+// by an arbitrary `rateKey` — `userId` for signed-in users or `anon:<visitorId>`
+// for marketing visitors — with a per-key daily cap. Same privacy guard
+// (store:false) and content-free logging as the rest of the service.
+
+export interface ChatTurnOptions {
+  /** Rate-limit + log identity. `userId` or `anon:<visitorId>`. */
+  rateKey: string;
+  /** Daily cap for this key (defaults to AI_RATE_LIMIT_PER_USER). */
+  dailyLimit?: number;
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+  tools?: OpenAI.Chat.Completions.ChatCompletionTool[];
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+/**
+ * One non-streaming turn that MAY return tool calls. The caller (chatAssistant)
+ * inspects `choices[0].message.tool_calls`, runs the tools, appends the results,
+ * and calls again — looping until the model produces a final text answer.
+ */
+export async function chatTurn(opts: ChatTurnOptions): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  ensureWithinLimit(opts.rateKey, opts.dailyLimit);
+  const client = getClient();
+  const started = Date.now();
+  try {
+    const res = await client.chat.completions.create({
+      model:       opts.model       ?? env.AI_MODEL,
+      temperature: opts.temperature ?? env.AI_TEMPERATURE,
+      max_tokens:  opts.maxTokens   ?? env.CHAT_MAX_TOKENS,
+      messages:    opts.messages,
+      ...(opts.tools && opts.tools.length > 0
+        ? { tools: opts.tools, tool_choice: 'auto' as const }
+        : {}),
+      store: env.AI_DISABLE_TRAINING_DATA ? false : undefined,
+    });
+    recordCall(opts.rateKey);
+    logger.info({
+      rateKey: opts.rateKey,
+      provider: env.AI_PROVIDER,
+      model: opts.model ?? env.AI_MODEL,
+      promptTokens: res.usage?.prompt_tokens,
+      completionTokens: res.usage?.completion_tokens,
+      toolCalls: res.choices[0]?.message?.tool_calls?.length ?? 0,
+      latencyMs: Date.now() - started,
+    }, '[AI] chatTurn');
+    return res;
+  } catch (err: any) {
+    logger.error({ err: err?.message, rateKey: opts.rateKey }, '[AI] chatTurn failed');
+    throw err;
+  }
+}
+
+/**
+ * Stream the final answer for a prepared `messages` array (no tools). Used after
+ * any tool rounds resolve, to stream the synthesis to the client over SSE.
+ * Yields content deltas, like stream().
+ */
+export async function* streamMessages(opts: ChatTurnOptions): AsyncIterable<string> {
+  // The tool rounds already recorded calls; the final stream does not double-charge
+  // the daily cap, but we still guard so a stream can't run past the limit.
+  ensureWithinLimit(opts.rateKey, opts.dailyLimit);
+  const client = getClient();
+  const started = Date.now();
+  let promptTokens: number | undefined;
+  let completionTokens: number | undefined;
+  try {
+    const sse = await client.chat.completions.create({
+      model:       opts.model       ?? env.AI_MODEL,
+      temperature: opts.temperature ?? env.AI_TEMPERATURE,
+      max_tokens:  opts.maxTokens   ?? env.CHAT_MAX_TOKENS,
+      messages:    opts.messages,
+      stream: true,
+      stream_options: { include_usage: true },
+      store: env.AI_DISABLE_TRAINING_DATA ? false : undefined,
+    });
+    for await (const chunk of sse) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) yield delta;
+      if (chunk.usage) {
+        promptTokens = chunk.usage.prompt_tokens;
+        completionTokens = chunk.usage.completion_tokens;
+      }
+    }
+    logger.info({
+      rateKey: opts.rateKey,
+      provider: env.AI_PROVIDER,
+      model: opts.model ?? env.AI_MODEL,
+      promptTokens,
+      completionTokens,
+      latencyMs: Date.now() - started,
+    }, '[AI] streamMessages');
+  } catch (err: any) {
+    logger.error({ err: err?.message, rateKey: opts.rateKey }, '[AI] streamMessages failed');
     throw err;
   }
 }
