@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { NotificationBell } from '@/components/NotificationBell';
+import { ChatWidget } from '@/components/chat/ChatWidget';
 import { useAuthStore, useLogout } from '@/hooks/useAuth';
 import { useNotificationStream } from '@/hooks/useNotificationStream';
 import { cn } from '@/lib/utils';
@@ -116,6 +117,9 @@ export function AppLayout() {
           </main>
 
         </div>
+
+        {/* Floating AI assistant + live human handoff — authenticated only */}
+        {user && <ChatWidget />}
       </div>
     </SidebarProvider>
   );

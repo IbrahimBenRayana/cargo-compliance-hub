@@ -1,4 +1,4 @@
-import { LayoutDashboard, Ship, Shield, ShieldCheck, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator, Container } from 'lucide-react';
+import { LayoutDashboard, Ship, Shield, ShieldCheck, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator, Container, MessagesSquare } from 'lucide-react';
 import { LogoMark } from '@/components/LogoMark';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -95,7 +95,8 @@ const navSections: NavSection[] = [
   {
     label: 'Platform',
     items: [
-      { title: 'Clients', url: '/admin', icon: ShieldCheck, platformAdminOnly: true },
+      { title: 'Clients',   url: '/admin',      icon: ShieldCheck,    platformAdminOnly: true, end: true },
+      { title: 'Live Chat', url: '/admin/chat', icon: MessagesSquare, platformAdminOnly: true },
     ],
   },
 ];
@@ -117,8 +118,8 @@ export function AppSidebar() {
   const { isLoading: capsLoading, can } = useCapabilities();
   const isPlatformAdmin = useAuthStore((s) => s.user?.isPlatformAdmin ?? false);
 
-  const isActive = (path: string) => {
-    if (path === '/') return location.pathname === '/';
+  const isActive = (path: string, end?: boolean) => {
+    if (path === '/' || end) return location.pathname === path;
     return location.pathname.startsWith(path);
   };
 
@@ -197,7 +198,7 @@ export function AppSidebar() {
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
-                      isActive={isActive(item.url)}
+                      isActive={isActive(item.url, item.end)}
                       tooltip={item.title}
                       className={navItemClass}
                     >
@@ -206,7 +207,7 @@ export function AppSidebar() {
                         {!collapsed && (
                           <>
                             <span className="font-medium text-[13px]">{item.title}</span>
-                            {isActive(item.url) && (
+                            {isActive(item.url, item.end) && (
                               <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-60" />
                             )}
                           </>

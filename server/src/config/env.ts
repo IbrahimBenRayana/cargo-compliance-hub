@@ -68,6 +68,21 @@ const envSchema = z.object({
   // When true, sets OpenAI's `store: false` flag so prompts can't enter
   // their training corpus (zero-retention policy for trade data).
   AI_DISABLE_TRAINING_DATA: z.coerce.boolean().default(true),
+  // AI Assistant / live chat widget (both app + marketing surfaces). Reuses the
+  // AI_* provider config above for the OpenAI calls; these tune chat behaviour
+  // and the anonymous-visitor security model. CHAT_SESSION_SECRET signs the
+  // opaque conversationToken handed to anonymous marketing visitors — it has a
+  // dev default so the server boots locally, but is REQUIRED in production
+  // (enforced below) since a guessable secret would let one visitor read
+  // another's conversation.
+  CHAT_ENABLED:          z.coerce.boolean().default(true),
+  CHAT_SESSION_SECRET:   z.string().min(16).default('dev-chat-session-secret-change-me'),
+  CHAT_MAX_TOKENS:       z.coerce.number().int().positive().default(1024),
+  CHAT_MAX_HISTORY:      z.coerce.number().int().positive().default(12),
+  // Per-anonymous-visitor daily AI call cap (authed users use AI_RATE_LIMIT_PER_USER).
+  CHAT_ANON_DAILY_CAP:   z.coerce.number().int().positive().default(30),
+  // Where marketing-surface escalations are emailed (reuses the ACS sender).
+  CHAT_SUPPORT_EMAIL:    z.string().default('support@mycargolens.com'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -86,6 +101,11 @@ if (env.NODE_ENV === 'production') {
   if (!env.CC_API_TOKEN) missing.push('CC_API_TOKEN');
   if (!env.EMAIL_USER)   missing.push('EMAIL_USER');
   if (!env.EMAIL_PASS)   missing.push('EMAIL_PASS');
+  // A guessable chat secret lets one anonymous visitor forge another's
+  // conversationToken — must be a real secret in prod.
+  if (env.CHAT_ENABLED && env.CHAT_SESSION_SECRET === 'dev-chat-session-secret-change-me') {
+    missing.push('CHAT_SESSION_SECRET');
+  }
   if (missing.length > 0) {
     console.error(`❌ Missing required production environment variables: ${missing.join(', ')}`);
     process.exit(1);

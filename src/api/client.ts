@@ -1919,3 +1919,247 @@ async function* streamCoach(path: string, filingId: string): AsyncGenerator<stri
       }
     }
 }
+
+// ─── In-app Chat (AI assistant + live human handoff) ──────────
+//
+// Two surfaces share one backend at /api/v1/chat:
+//   • The signed-in widget (this `chatApi`) — surface 'app'.
+//   • The platform-admin live agent console (`chatAdminApi`).
+//
+// Sends are a streaming POST (NOT EventSource) modelled on streamCoach;
+// the persistent EventSource (live agent / system messages, mode changes,
+// typing) is opened separately by useChatEventStream.
+
+/** Conversation lifecycle mode. Drives the composer + mode badge. */
+export type ChatMode = 'ai' | 'pending_human' | 'human' | 'resolved';
+
+/** Author of a message. 'agent' is a live MyCargoLens specialist. */
+export type ChatRole = 'user' | 'assistant' | 'system' | 'agent';
+
+/** Clickable deep-link the AI may attach to an assistant message. */
+export interface ChatDeeplink {
+  url: string;
+  label: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: ChatRole;
+  content: string;
+  metadata?: { deeplinks?: ChatDeeplink[] } | null;
+  agentId?: string | null;
+  createdAt: string;
+}
+
+export interface ChatConversation {
+  id: string;
+  surface: 'app' | 'marketing';
+  mode: ChatMode;
+  status: string;
+  visitorName?: string | null;
+  visitorEmail?: string | null;
+  assignedAgentId?: string | null;
+  escalationReason?: string | null;
+  createdAt: string;
+}
+
+export interface ChatConversationResponse {
+  conversation: ChatConversation;
+  messages: ChatMessage[];
+}
+
+export interface ChatConfig {
+  enabled: boolean;
+  aiEnabled: boolean;
+}
+
+/** A single typed event yielded while streaming an assistant turn. */
+export type ChatStreamEvent =
+  | { type: 'delta'; text: string }
+  | { type: 'deeplink'; url: string; label: string }
+  | { type: 'escalated' }
+  | { type: 'error'; code?: string; message: string };
+
+/** A row in the live agent console queue. */
+export interface ChatQueueItem {
+  id: string;
+  surface: 'app' | 'marketing';
+  mode: ChatMode;
+  visitorName?: string | null;
+  visitorEmail?: string | null;
+  escalationReason?: string | null;
+  lastMessageAt?: string | null;
+  escalatedAt?: string | null;
+  assignedAgentId?: string | null;
+  user: { firstName: string; lastName: string; email: string } | null;
+  assignedAgent: { firstName: string; lastName: string } | null;
+}
+
+const CHAT_BASE = '/api/v1/chat';
+
+export const chatApi = {
+  /** Graceful-degradation flags — call once when the widget opens. */
+  getConfig() {
+    return apiFetch<ChatConfig>(`${CHAT_BASE}/config`);
+  },
+  /** Lazily create the signed-in conversation (surface is always 'app'). */
+  createConversation() {
+    return apiFetch<{ conversationId: string; mode: ChatMode; surface: 'app' }>(
+      `${CHAT_BASE}/conversations`,
+      { method: 'POST', body: JSON.stringify({ surface: 'app' }) },
+    );
+  },
+  /** Restore a transcript (e.g. a conversation id kept in localStorage). */
+  getConversation(id: string) {
+    return apiFetch<ChatConversationResponse>(
+      `${CHAT_BASE}/conversations/${encodeURIComponent(id)}`,
+    );
+  },
+  /** Ask to hand off to a human; flips mode to pending_human server-side. */
+  escalate(id: string, reason?: string) {
+    return apiFetch<{ mode: ChatMode }>(
+      `${CHAT_BASE}/conversations/${encodeURIComponent(id)}/escalate`,
+      { method: 'POST', body: JSON.stringify(reason ? { reason } : {}) },
+    );
+  },
+  /**
+   * Send a user message and stream the assistant turn. Modelled on
+   * streamCoach but yields typed ChatStreamEvents. When the conversation
+   * is in a human/pending_human mode the backend returns 204 (the message
+   * was handed to the live agent) — we detect that and return with no
+   * events; the agent's reply arrives over the EventSource instead.
+   */
+  sendMessage(conversationId: string, content: string): AsyncGenerator<ChatStreamEvent, void, void> {
+    return streamChatMessage(conversationId, content);
+  },
+};
+
+async function* streamChatMessage(
+  conversationId: string,
+  content: string,
+): AsyncGenerator<ChatStreamEvent, void, void> {
+  const res = await fetch(
+    `${API_BASE}${CHAT_BASE}/conversations/${encodeURIComponent(conversationId)}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ content }),
+    },
+  );
+
+  // Human / pending_human mode: 204 No Content — the message went to the
+  // live agent and there is no stream to consume. Also bail if the server
+  // (e.g. a proxy) didn't hand back an event-stream for any reason.
+  const contentType = res.headers.get('content-type') ?? '';
+  if (res.status === 204 || !contentType.includes('text/event-stream')) {
+    if (!res.ok && res.status !== 204) {
+      const errBody = await res.json().catch(() => ({ error: 'Chat request failed' }));
+      yield { type: 'error', code: errBody.code, message: errBody.error || `HTTP ${res.status}` };
+    }
+    return;
+  }
+  if (!res.body) return;
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split('\n\n');
+    buffer = events.pop() ?? '';
+    for (const ev of events) {
+      const lines = ev.split('\n');
+      let eventName = 'message';
+      let dataLine = '';
+      for (const l of lines) {
+        if (l.startsWith('event: ')) eventName = l.slice(7).trim();
+        else if (l.startsWith('data: ')) dataLine += l.slice(6);
+      }
+      if (eventName === 'done') return;
+      if (eventName === 'escalated') {
+        yield { type: 'escalated' };
+        continue;
+      }
+      if (eventName === 'deeplink') {
+        try {
+          const parsed = JSON.parse(dataLine) as { url?: string; label?: string };
+          if (parsed.url) {
+            yield { type: 'deeplink', url: parsed.url, label: parsed.label || parsed.url };
+          }
+        } catch {
+          /* ignore malformed deeplink */
+        }
+        continue;
+      }
+      if (eventName === 'error') {
+        let parsed: { error?: string; code?: string } = {};
+        try { parsed = JSON.parse(dataLine); } catch { /* ignore */ }
+        yield { type: 'error', code: parsed.code, message: parsed.error || 'Chat error' };
+        return;
+      }
+      if (dataLine) {
+        try {
+          const parsed = JSON.parse(dataLine);
+          if (typeof parsed.delta === 'string') yield { type: 'delta', text: parsed.delta };
+        } catch {
+          // ignore malformed line
+        }
+      }
+    }
+  }
+}
+
+// ─── Live agent console (platform admins) ─────────────────────
+const CHAT_ADMIN_BASE = '/api/v1/chat/admin';
+
+export const chatAdminApi = {
+  /** pending = waiting for a human; active = pending + human (in progress). */
+  queue(status: 'pending' | 'active') {
+    return apiFetch<{ data: ChatQueueItem[] }>(
+      `${CHAT_ADMIN_BASE}/queue?status=${status}`,
+    );
+  },
+  getConversation(id: string) {
+    return apiFetch<ChatConversationResponse>(
+      `${CHAT_ADMIN_BASE}/conversations/${encodeURIComponent(id)}`,
+    );
+  },
+  /** Claim a conversation. Throws with status 409 / code 'already_claimed'. */
+  assign(id: string) {
+    return apiFetch<{ assigned: boolean }>(
+      `${CHAT_ADMIN_BASE}/conversations/${encodeURIComponent(id)}/assign`,
+      { method: 'POST' },
+    );
+  },
+  reply(id: string, content: string) {
+    return apiFetch<{ id: string }>(
+      `${CHAT_ADMIN_BASE}/conversations/${encodeURIComponent(id)}/messages`,
+      { method: 'POST', body: JSON.stringify({ content }) },
+    );
+  },
+  /** Fire-and-forget typing ping (204). Call on a debounce while typing. */
+  typing(id: string) {
+    return apiFetch<void>(
+      `${CHAT_ADMIN_BASE}/conversations/${encodeURIComponent(id)}/typing`,
+      { method: 'POST' },
+    );
+  },
+  resolve(id: string) {
+    return apiFetch<{ mode: ChatMode }>(
+      `${CHAT_ADMIN_BASE}/conversations/${encodeURIComponent(id)}/resolve`,
+      { method: 'POST' },
+    );
+  },
+  /** Hand the conversation back to the AI assistant. */
+  handback(id: string) {
+    return apiFetch<{ mode: ChatMode }>(
+      `${CHAT_ADMIN_BASE}/conversations/${encodeURIComponent(id)}/handback`,
+      { method: 'POST' },
+    );
+  },
+};

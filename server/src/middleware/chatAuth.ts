@@ -1,0 +1,107 @@
+/**
+ * Hybrid auth for the chat widget — works for BOTH signed-in app users and
+ * anonymous marketing visitors.
+ *
+ *   • Authorization: Bearer <jwt>  → resolve a real user (id, orgId, role,
+ *                                     isPlatformAdmin) exactly like authMiddleware.
+ *   • X-Chat-Token / ?token=<tok>  → verify the HMAC conversationToken and
+ *                                     resolve an anonymous visitor (visitorId).
+ *   • neither                      → no actor; only conversation-create is
+ *                                     allowed to proceed (it mints an identity).
+ *
+ * This NEVER rejects on its own (so create works for first-time anon visitors).
+ * Routes that operate on an existing conversation must call assertOwnership()
+ * to confirm the resolved actor actually owns that conversation.
+ */
+import type { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { env } from '../config/env.js';
+import { prisma } from '../config/database.js';
+import { verifyConversationToken } from '../services/chat/conversationToken.js';
+
+export type ChatActor =
+  | { kind: 'user'; userId: string; email: string; orgId: string; role: string; isPlatformAdmin: boolean }
+  | { kind: 'anon'; visitorId: string }
+  | { kind: 'none' };
+
+export interface ChatRequest extends Request {
+  chatActor?: ChatActor;
+}
+
+/** Read the chat/stream token from the header (JSON requests) or query (EventSource). */
+export function readChatToken(req: Request): string | undefined {
+  const header = req.headers['x-chat-token'];
+  if (typeof header === 'string' && header.trim()) return header.trim();
+  const q = req.query.token;
+  if (typeof q === 'string' && q.trim()) return q.trim();
+  return undefined;
+}
+
+export async function chatAuth(req: ChatRequest, _res: Response, next: NextFunction): Promise<void> {
+  // 1) Bearer JWT → signed-in user.
+  const authz = req.headers.authorization;
+  if (authz?.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.verify(authz.slice(7), env.JWT_ACCESS_SECRET) as { sub: string };
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.sub },
+        select: { id: true, email: true, orgId: true, role: true, isActive: true, isPlatformAdmin: true },
+      });
+      if (user && user.isActive) {
+        req.chatActor = {
+          kind: 'user',
+          userId: user.id,
+          email: user.email,
+          orgId: user.orgId,
+          role: user.role,
+          isPlatformAdmin: user.isPlatformAdmin,
+        };
+        next();
+        return;
+      }
+    } catch {
+      // Fall through — a bad/expired JWT on the chat surface degrades to anon,
+      // it doesn't hard-fail (the widget may still want to chat as a guest).
+    }
+  }
+
+  // 2) conversationToken → anonymous visitor.
+  const visitorId = verifyConversationToken(readChatToken(req));
+  if (visitorId) {
+    req.chatActor = { kind: 'anon', visitorId };
+    next();
+    return;
+  }
+
+  // 3) No identity. Allowed only for conversation-create.
+  req.chatActor = { kind: 'none' };
+  next();
+}
+
+/**
+ * Confirm the resolved actor owns this conversation. Returns the conversation
+ * row (selected fields) or null. Routes should 404/403 on null. This is the
+ * load-bearing check that one anon token can't read another visitor's chat and
+ * one user can't read another org's chat.
+ */
+export async function loadOwnedConversation(actor: ChatActor, conversationId: string) {
+  const conv = await prisma.chatConversation.findUnique({
+    where: { id: conversationId },
+    select: {
+      id: true, orgId: true, userId: true, visitorId: true, surface: true,
+      mode: true, status: true, assignedAgentId: true,
+    },
+  });
+  if (!conv) return null;
+
+  if (actor.kind === 'user') {
+    // The user must own it; platform admins go through the admin routes, not here.
+    if (conv.userId && conv.userId === actor.userId) return conv;
+    return null;
+  }
+  if (actor.kind === 'anon') {
+    if (conv.visitorId && conv.visitorId === actor.visitorId) return conv;
+    return null;
+  }
+  return null;
+}
