@@ -6,6 +6,7 @@ import { Footer } from "@/components/footer";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BfcacheFix } from "@/components/bfcache-fix";
 import { MotionRoot } from "@/components/motion-root";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -63,6 +64,7 @@ export default function RootLayout({
             <Nav />
             <main className="flex-1">{children}</main>
             <Footer />
+            <ChatWidget />
           </MotionRoot>
         </ThemeProvider>
       </body>

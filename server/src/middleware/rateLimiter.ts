@@ -61,6 +61,36 @@ export const contactFormLimiter = rateLimit({
   },
 });
 
+// AI chat — per-IP cap on message/stream traffic. The assistant is also bounded
+// by the per-key daily AI cap inside services/ai.ts (userId for signed-in users,
+// anon:<visitorId> for marketing visitors); this protects the endpoint itself
+// (and the OpenAI budget) from a burst. 20/min comfortably covers an active
+// back-and-forth.
+export const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'You are sending messages too quickly. Please wait a moment.',
+    code: 'RATE_LIMIT_CHAT',
+  },
+});
+
+// New-conversation creation — anti-abuse on the unauthenticated marketing path,
+// where each create can mint a visitor token. 30/hr/IP deters churn/spam while
+// leaving plenty of headroom for legitimate visitors who reopen the widget.
+export const chatCreateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many new chats from this network. Please try again later.',
+    code: 'RATE_LIMIT_CHAT_CREATE',
+  },
+});
+
 // CBP filing API calls — protect against accidental hammering of external API
 export const ccApiLimiter = rateLimit({
   windowMs: 60 * 1000,

@@ -25,61 +25,64 @@ model Organization {
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  users           User[]
-  filings         Filing[]
-  submissionLogs  SubmissionLog[]
-  notifications   Notification[]
-  auditLogs       AuditLog[]
-  filingTemplates FilingTemplate[]
-  invitations     OrgInvitation[]
-  subscription    Subscription?
-  shipmentCharges ShipmentCharge[]
-  manifestQueries ManifestQuery[]
-  abiDocuments    AbiDocument[]
-  trackedShipments TrackedShipment[]
-  apiKeys         ApiKey[]
-  webhookEndpoints WebhookEndpoint[]
+  users             User[]
+  filings           Filing[]
+  submissionLogs    SubmissionLog[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  filingTemplates   FilingTemplate[]
+  invitations       OrgInvitation[]
+  subscription      Subscription?
+  shipmentCharges   ShipmentCharge[]
+  manifestQueries   ManifestQuery[]
+  abiDocuments      AbiDocument[]
+  trackedShipments  TrackedShipment[]
+  apiKeys           ApiKey[]
+  webhookEndpoints  WebhookEndpoint[]
+  chatConversations ChatConversation[]
 
   @@map("organizations")
 }
 
 // ─── Users ─────────────────────────────────────────────────
 model User {
-  id             String    @id @default(uuid()) @db.Uuid
-  orgId          String    @map("org_id") @db.Uuid
-  email          String    @unique @db.VarChar(255)
-  passwordHash   String    @map("password_hash") @db.VarChar(255)
-  firstName      String?   @map("first_name") @db.VarChar(100)
-  lastName       String?   @map("last_name") @db.VarChar(100)
-  role           String    @default("operator") @db.VarChar(20)
+  id              String    @id @default(uuid()) @db.Uuid
+  orgId           String    @map("org_id") @db.Uuid
+  email           String    @unique @db.VarChar(255)
+  passwordHash    String    @map("password_hash") @db.VarChar(255)
+  firstName       String?   @map("first_name") @db.VarChar(100)
+  lastName        String?   @map("last_name") @db.VarChar(100)
+  role            String    @default("operator") @db.VarChar(20)
   // Platform-level staff (MyCargoLens), distinct from the org-scoped role.
   // Grants access to the /admin area that provisions client organizations.
-  isPlatformAdmin Boolean  @default(false) @map("is_platform_admin")
-  isActive       Boolean   @default(true) @map("is_active")
-  emailVerified  Boolean   @default(false) @map("email_verified")
-  lastLoginAt    DateTime? @map("last_login_at") @db.Timestamptz()
-  failedAttempts Int       @default(0) @map("failed_attempts")
-  lockedUntil    DateTime? @map("locked_until") @db.Timestamptz()
-  refreshToken   String?   @map("refresh_token")
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  isPlatformAdmin Boolean   @default(false) @map("is_platform_admin")
+  isActive        Boolean   @default(true) @map("is_active")
+  emailVerified   Boolean   @default(false) @map("email_verified")
+  lastLoginAt     DateTime? @map("last_login_at") @db.Timestamptz()
+  failedAttempts  Int       @default(0) @map("failed_attempts")
+  lockedUntil     DateTime? @map("locked_until") @db.Timestamptz()
+  refreshToken    String?   @map("refresh_token")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  organization           Organization             @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  filings                Filing[]                 @relation("FilingCreator")
-  statusChanges          FilingStatusHistory[]    @relation("StatusChanger")
-  submissionLogs         SubmissionLog[]
-  notifications          Notification[]
+  organization            Organization             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  filings                 Filing[]                 @relation("FilingCreator")
+  statusChanges           FilingStatusHistory[]    @relation("StatusChanger")
+  submissionLogs          SubmissionLog[]
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
-  auditLogs              AuditLog[]
-  filingTemplates        FilingTemplate[]
-  invitations            OrgInvitation[]          @relation("InvitationCreator")
-  uploadedDocs           FilingDocument[]         @relation("DocumentUploader")
-  manifestQueries        ManifestQuery[]
-  abiDocuments           AbiDocument[]
+  auditLogs               AuditLog[]
+  filingTemplates         FilingTemplate[]
+  invitations             OrgInvitation[]          @relation("InvitationCreator")
+  uploadedDocs            FilingDocument[]         @relation("DocumentUploader")
+  manifestQueries         ManifestQuery[]
+  abiDocuments            AbiDocument[]
   emailVerificationTokens EmailVerificationToken[]
-  passwordSetupTokens    PasswordSetupToken[]
-  trackedShipments       TrackedShipment[]
-  apiKeys                ApiKey[]                 @relation("ApiKeyCreator")
+  passwordSetupTokens     PasswordSetupToken[]
+  trackedShipments        TrackedShipment[]
+  apiKeys                 ApiKey[]                 @relation("ApiKeyCreator")
+  chatConversations       ChatConversation[]       @relation("ChatUser")
+  assignedChats           ChatConversation[]       @relation("ChatAgent")
 
   @@index([orgId])
   @@index([email])
@@ -126,7 +129,7 @@ model WebhookEndpoint {
   url            String    @db.VarChar(2048)
   secret         String    @db.VarChar(255) // HMAC signing secret (whsec_…)
   secretPrefix   String    @map("secret_prefix") @db.VarChar(24) // non-secret hint, e.g. "whsec_a1b2"
-  events         String[]  // subscribed event types; empty array = all events
+  events         String[] // subscribed event types; empty array = all events
   active         Boolean   @default(true)
   description    String?   @db.VarChar(200)
   createdById    String?   @map("created_by") @db.Uuid
@@ -136,7 +139,7 @@ model WebhookEndpoint {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
 
-  organization   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([orgId])
   @@map("webhook_endpoints")
@@ -262,17 +265,17 @@ model Filing {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  organization    Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  createdBy       User                  @relation("FilingCreator", fields: [createdById], references: [id])
-  statusHistory   FilingStatusHistory[]
-  scoreSnapshots  FilingScoreSnapshot[]
-  submissionLogs  SubmissionLog[]
-  notifications   Notification[]
-  documents       FilingDocument[]
-  manifestQueries ManifestQuery[]
-  abiDocuments    AbiDocument[]
+  organization     Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy        User                  @relation("FilingCreator", fields: [createdById], references: [id])
+  statusHistory    FilingStatusHistory[]
+  scoreSnapshots   FilingScoreSnapshot[]
+  submissionLogs   SubmissionLog[]
+  notifications    Notification[]
+  documents        FilingDocument[]
+  manifestQueries  ManifestQuery[]
+  abiDocuments     AbiDocument[]
   trackedShipments TrackedShipment[]
-  shipmentCharge  ShipmentCharge?
+  shipmentCharge   ShipmentCharge?
 
   @@index([orgId])
   @@index([status])
@@ -306,15 +309,15 @@ model FilingStatusHistory {
 // the per-filing score-history endpoint can show validation-driven
 // trajectories instead of flat status-band approximations.
 model FilingScoreSnapshot {
-  id             String   @id @default(uuid()) @db.Uuid
-  filingId       String   @map("filing_id") @db.Uuid
-  score          Int
-  status         String   @db.VarChar(30)
-  criticalCount  Int      @default(0) @map("critical_count")
-  warningCount   Int      @default(0) @map("warning_count")
-  infoCount      Int      @default(0) @map("info_count")
-  triggerEvent   String   @map("trigger_event") @db.VarChar(40)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  id            String   @id @default(uuid()) @db.Uuid
+  filingId      String   @map("filing_id") @db.Uuid
+  score         Int
+  status        String   @db.VarChar(30)
+  criticalCount Int      @default(0) @map("critical_count")
+  warningCount  Int      @default(0) @map("warning_count")
+  infoCount     Int      @default(0) @map("info_count")
+  triggerEvent  String   @map("trigger_event") @db.VarChar(40)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   filing Filing @relation(fields: [filingId], references: [id], onDelete: Cascade)
 
@@ -330,19 +333,19 @@ model FilingScoreSnapshot {
 // 'pending' = discovered by sync, awaiting admin review; 'dismissed'
 // = manually rejected.
 model AddCvdOrder {
-  id           String    @id @default(uuid()) @db.Uuid
-  case         String    @db.VarChar(50)
-  type         String    @db.VarChar(10) // AD | CVD | ADCVD
-  country      String    @db.VarChar(10) // ISO-2
-  product      String    @db.Text
-  htsPrefixes  String[]  @map("hts_prefixes") @db.Text
-  note         String?   @db.Text
-  status       String    @default("active") @db.VarChar(20)
-  source       String    @default("manual") @db.VarChar(40)
-  sourceUrl    String?   @map("source_url") @db.Text
-  sourceDate   DateTime? @map("source_date") @db.Timestamptz()
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  id          String    @id @default(uuid()) @db.Uuid
+  case        String    @db.VarChar(50)
+  type        String    @db.VarChar(10) // AD | CVD | ADCVD
+  country     String    @db.VarChar(10) // ISO-2
+  product     String    @db.Text
+  htsPrefixes String[]  @map("hts_prefixes") @db.Text
+  note        String?   @db.Text
+  status      String    @default("active") @db.VarChar(20)
+  source      String    @default("manual") @db.VarChar(40)
+  sourceUrl   String?   @map("source_url") @db.Text
+  sourceDate  DateTime? @map("source_date") @db.Timestamptz()
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@index([status])
   @@index([country])
@@ -438,7 +441,7 @@ model Notification {
 model NotificationDelivery {
   id             String    @id @default(uuid()) @db.Uuid
   notificationId String    @map("notification_id") @db.Uuid
-  channel        String    @db.VarChar(20)         // 'email' (and 'push' later)
+  channel        String    @db.VarChar(20) // 'email' (and 'push' later)
   recipient      String    @db.VarChar(255)
   status         String    @default("queued") @db.VarChar(20)
   attempts       Int       @default(0)
@@ -449,15 +452,15 @@ model NotificationDelivery {
 
   notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
-  // Worker drain index. Prefix order matches the WHERE clause.
-  @@index([status, nextAttemptAt])
-  @@index([notificationId])
   // Defense-in-depth: a single (notification, recipient, channel) tuple must
   // never appear twice. The dispatcher dedupes via Notification.dedupeKey,
   // but if that ever fails (or a caller forgets to pass one), this constraint
   // stops a duplicate email at the DB layer. Paired with `skipDuplicates`
   // in enqueueEmailDeliveries.
   @@unique([notificationId, recipient, channel])
+  // Worker drain index. Prefix order matches the WHERE clause.
+  @@index([status, nextAttemptAt])
+  @@index([notificationId])
   @@map("notification_deliveries")
 }
 
@@ -583,7 +586,7 @@ model Plan {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  subscriptions  Subscription[]
+  subscriptions   Subscription[]
   shipmentCharges ShipmentCharge[]
 
   @@map("plans")
@@ -591,11 +594,11 @@ model Plan {
 
 // Subscription: one per organization, tracks current Stripe subscription + plan.
 model Subscription {
-  id                   String    @id @default(uuid()) @db.Uuid
-  orgId                String    @unique @map("org_id") @db.Uuid
-  planId               String    @map("plan_id")
-  stripeCustomerId     String?   @unique @map("stripe_customer_id")
-  stripeSubscriptionId String?   @unique @map("stripe_subscription_id")
+  id                     String    @id @default(uuid()) @db.Uuid
+  orgId                  String    @unique @map("org_id") @db.Uuid
+  planId                 String    @map("plan_id")
+  stripeCustomerId       String?   @unique @map("stripe_customer_id")
+  stripeSubscriptionId   String?   @unique @map("stripe_subscription_id")
   // Card-on-file billing (no Stripe subscription). The org keeps a default
   // payment method; each accepted shipment is charged immediately via a
   // PaymentIntent. status values:
@@ -603,20 +606,20 @@ model Subscription {
   //   "incomplete"   — tier selected but no card yet (cannot file paid tiers)
   //   "delinquent"   — a per-shipment charge failed; filing blocked until settled
   //   "active"       — legacy (pre-migration metered subscription); treated as card_on_file
-  status               String    @default("incomplete") @db.VarChar(30)
+  status                 String    @default("incomplete") @db.VarChar(30)
   // Default payment method on file (Stripe pm_… id) + display summary.
-  defaultPaymentMethodId String? @map("default_payment_method_id")
-  cardBrand            String?   @map("card_brand") @db.VarChar(20)
-  cardLast4            String?   @map("card_last4") @db.VarChar(4)
-  cardExpMonth         Int?      @map("card_exp_month")
-  cardExpYear          Int?      @map("card_exp_year")
-  currentPeriodStart   DateTime? @map("current_period_start") @db.Timestamptz()
-  currentPeriodEnd     DateTime? @map("current_period_end") @db.Timestamptz()
-  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
-  canceledAt           DateTime? @map("canceled_at") @db.Timestamptz()
-  trialEnd             DateTime? @map("trial_end") @db.Timestamptz()
-  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  defaultPaymentMethodId String?   @map("default_payment_method_id")
+  cardBrand              String?   @map("card_brand") @db.VarChar(20)
+  cardLast4              String?   @map("card_last4") @db.VarChar(4)
+  cardExpMonth           Int?      @map("card_exp_month")
+  cardExpYear            Int?      @map("card_exp_year")
+  currentPeriodStart     DateTime? @map("current_period_start") @db.Timestamptz()
+  currentPeriodEnd       DateTime? @map("current_period_end") @db.Timestamptz()
+  cancelAtPeriodEnd      Boolean   @default(false) @map("cancel_at_period_end")
+  canceledAt             DateTime? @map("canceled_at") @db.Timestamptz()
+  trialEnd               DateTime? @map("trial_end") @db.Timestamptz()
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   plan         Plan         @relation(fields: [planId], references: [id])
@@ -635,22 +638,22 @@ model Subscription {
 // doesn't retro-price the shipment. Each row maps to one Stripe metered event;
 // `status` tracks whether that event was reported.
 model ShipmentCharge {
-  id                 String   @id @default(uuid()) @db.Uuid
-  orgId              String   @map("org_id") @db.Uuid
-  filingId           String?  @unique @map("filing_id") @db.Uuid
-  abiDocumentId      String?  @unique @map("abi_document_id") @db.Uuid
-  planId             String   @map("plan_id") // tier at bill time
-  amountCents        Int      @map("amount_cents") // locked per-filing rate
-  stripeCustomerId   String?  @map("stripe_customer_id")
-  stripeMeterEventId String?  @map("stripe_meter_event_id") // legacy (metered model)
-  stripePaymentIntentId String? @map("stripe_payment_intent_id") // immediate-charge model
+  id                    String   @id @default(uuid()) @db.Uuid
+  orgId                 String   @map("org_id") @db.Uuid
+  filingId              String?  @unique @map("filing_id") @db.Uuid
+  abiDocumentId         String?  @unique @map("abi_document_id") @db.Uuid
+  planId                String   @map("plan_id") // tier at bill time
+  amountCents           Int      @map("amount_cents") // locked per-filing rate
+  stripeCustomerId      String?  @map("stripe_customer_id")
+  stripeMeterEventId    String?  @map("stripe_meter_event_id") // legacy (metered model)
+  stripePaymentIntentId String?  @map("stripe_payment_intent_id") // immediate-charge model
   // Immediate-charge model: pending → paid (PaymentIntent succeeded) | failed
   //   (declined/error, retry later) | requires_action (3DS — needs the customer) |
   //   skipped (no charge, e.g. $0 enterprise tier).
-  status             String   @default("pending") @db.VarChar(20)
-  billedAt           DateTime @default(now()) @map("billed_at") @db.Timestamptz()
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  status                String   @default("pending") @db.VarChar(20)
+  billedAt              DateTime @default(now()) @map("billed_at") @db.Timestamptz()
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   filing       Filing?      @relation(fields: [filingId], references: [id], onDelete: Cascade)
@@ -769,19 +772,19 @@ model AbiDocument {
 //     failed            → tracking_request.failed (see failedReason)
 //     stopped           → line_tracking_stopped_at populated by T49
 model TrackedShipment {
-  id                   String  @id @default(uuid()) @db.Uuid
-  orgId                String  @map("org_id") @db.Uuid
-  createdById          String  @map("created_by") @db.Uuid
-  filingId             String? @map("filing_id") @db.Uuid
+  id          String  @id @default(uuid()) @db.Uuid
+  orgId       String  @map("org_id") @db.Uuid
+  createdById String  @map("created_by") @db.Uuid
+  filingId    String? @map("filing_id") @db.Uuid
 
   // Terminal 49 identifiers
   t49TrackingRequestId String? @map("t49_tracking_request_id") @db.VarChar(100)
   t49ShipmentId        String? @map("t49_shipment_id") @db.VarChar(100)
 
   // Request inputs
-  requestType   String  @map("request_type") @db.VarChar(20)
-  requestNumber String  @map("request_number") @db.VarChar(100)
-  scac          String  @db.VarChar(10)
+  requestType   String @map("request_type") @db.VarChar(20)
+  requestNumber String @map("request_number") @db.VarChar(100)
+  scac          String @db.VarChar(10)
 
   // Lifecycle
   status       String  @default("pending") @db.VarChar(20)
@@ -816,11 +819,11 @@ model TrackedShipment {
   createdBy    User         @relation(fields: [createdById], references: [id])
   filing       Filing?      @relation(fields: [filingId], references: [id], onDelete: SetNull)
 
+  @@unique([orgId, t49ShipmentId])
   @@index([orgId])
   @@index([orgId, status])
   @@index([orgId, createdAt])
   @@index([filingId])
-  @@unique([orgId, t49ShipmentId])
   @@map("tracked_shipments")
 }
 
@@ -840,4 +843,74 @@ model StripeWebhookEvent {
 
   @@index([receivedAt(sort: Desc)])
   @@map("stripe_webhook_events")
+}
+
+// ─── AI Assistant / Live Chat ──────────────────────────────
+// Conversations from the floating chat widget on BOTH surfaces:
+//   • surface='app'        — signed-in users (orgId+userId set). The assistant
+//                            can read THAT org's own filings (hard-scoped).
+//   • surface='marketing'  — anonymous visitors (orgId+userId null). Identified
+//                            by an opaque, HMAC-signed visitorId (see
+//                            services/chat/conversationToken.ts); no data access.
+// `mode` drives who is answering:
+//   ai            — the OpenAI assistant replies (default)
+//   pending_human — user asked for a human; sits in the staff console queue
+//   human         — a platform-admin agent has claimed it and is replying live
+//   resolved      — closed by the agent (AI composer re-enabled client-side)
+// Realtime fan-out (new messages, mode changes, typing) rides Postgres
+// LISTEN/NOTIFY via services/chat/chatStream.ts — there is intentionally no
+// ChatEvent table: those signals are ephemeral, the durable record is the
+// ChatMessage rows + these columns.
+model ChatConversation {
+  id               String    @id @default(uuid()) @db.Uuid
+  // Both null ⇒ anonymous marketing visitor.
+  orgId            String?   @map("org_id") @db.Uuid
+  userId           String?   @map("user_id") @db.Uuid
+  surface          String    @db.VarChar(12) // 'app' | 'marketing'
+  mode             String    @default("ai") @db.VarChar(16) // 'ai' | 'pending_human' | 'human' | 'resolved'
+  status           String    @default("open") @db.VarChar(16) // 'open' | 'closed'
+  // Anonymous identity — random 192-bit id, HMAC-verified on every request.
+  visitorId        String?   @map("visitor_id") @db.VarChar(64)
+  visitorName      String?   @map("visitor_name") @db.VarChar(120)
+  visitorEmail     String?   @map("visitor_email") @db.VarChar(255)
+  assignedAgentId  String?   @map("assigned_agent_id") @db.Uuid
+  escalationReason String?   @map("escalation_reason") @db.VarChar(500)
+  lastMessageAt    DateTime  @default(now()) @map("last_message_at") @db.Timestamptz()
+  escalatedAt      DateTime? @map("escalated_at") @db.Timestamptz()
+  resolvedAt       DateTime? @map("resolved_at") @db.Timestamptz()
+  // sha256(ip + CHAT_SESSION_SECRET) — abuse forensics without retaining raw IPs.
+  ipHash           String?   @map("ip_hash") @db.VarChar(64)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user          User?         @relation("ChatUser", fields: [userId], references: [id], onDelete: SetNull)
+  assignedAgent User?         @relation("ChatAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  messages      ChatMessage[]
+
+  // Powers the staff console queue (pending first, then active, newest first).
+  @@index([mode, status, lastMessageAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([visitorId])
+  @@index([assignedAgentId, status])
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  role           String   @db.VarChar(12) // 'user' | 'assistant' | 'system' | 'agent'
+  content        String   @db.Text
+  // Audit of an agentic turn: the tool name invoked (never raw org data args).
+  toolName       String?  @map("tool_name") @db.VarChar(64)
+  // Rendered deep-links, agentUserId, and other structured UI hints.
+  metadata       Json?
+  // Set when role='agent' — which platform-admin sent it.
+  agentId        String?  @map("agent_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("chat_messages")
 }

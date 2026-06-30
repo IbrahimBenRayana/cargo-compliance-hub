@@ -13,6 +13,7 @@ import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import { SetPasswordPage } from "@/pages/SetPasswordPage";
 import { AdminClientsPage } from "@/pages/AdminClientsPage";
+import { AdminChatConsolePage } from "@/pages/AdminChatConsolePage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import UpgradePage from "@/pages/UpgradePage";
@@ -100,6 +101,7 @@ const App = () => (
                 {/* Platform-admin only — client provisioning console */}
                 <Route element={<PlatformAdminRoute />}>
                   <Route path="/admin" element={<ErrorBoundary><AdminClientsPage /></ErrorBoundary>} />
+                  <Route path="/admin/chat" element={<ErrorBoundary><AdminChatConsolePage /></ErrorBoundary>} />
                 </Route>
               </Route>
             </Route>
