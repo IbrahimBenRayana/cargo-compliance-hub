@@ -82,8 +82,14 @@ export function AdminChatConsolePage() {
     void queryClient.invalidateQueries({ queryKey: ['chatAdminQueue'] });
   }, [queryClient]);
 
-  // ── Admin live stream ──
+  // ── Admin live stream (auto-reconnecting; onOpen catches up) ──
   useChatEventStream('/api/v1/chat/admin/stream', {
+    onOpen: () => {
+      // Reconnected — refresh the queue and the open transcript so nothing
+      // missed while offline is lost.
+      refetchQueue();
+      if (selectedId) void loadConversation(selectedId);
+    },
     onQueueUpdate: () => refetchQueue(),
     onMessage: (msg) => {
       // Append only if it belongs to the conversation that's currently open.
@@ -92,6 +98,16 @@ export function AdminChatConsolePage() {
         return;
       }
       setMessages((prev) => {
+        // Reconcile our own optimistic reply by clientId — race-proof whether
+        // this echo or the POST response lands first (fixes the double message).
+        if (msg.clientId) {
+          const idx = prev.findIndex((m) => m.clientId === msg.clientId);
+          if (idx !== -1) {
+            const next = prev.slice();
+            next[idx] = { ...next[idx], id: msg.messageId, status: 'sent' };
+            return next;
+          }
+        }
         if (prev.some((m) => m.id === msg.messageId)) return prev; // dedupe
         return [
           ...prev,
@@ -129,23 +145,31 @@ export function AdminChatConsolePage() {
   const handleSend = useCallback(
     (text: string) => {
       if (!selectedId) return;
-      const localId = `agent-${Date.now()}-${agentUid++}`;
+      // Client nonce ties the optimistic bubble to its echoed copy so the two
+      // collapse into one regardless of which arrives first.
+      const clientId = `c-${Date.now()}-${agentUid++}`;
       setMessages((prev) => [
         ...prev,
-        { id: localId, role: 'agent', content: text, createdAt: new Date().toISOString() },
+        {
+          id: `agent-${clientId}`,
+          clientId,
+          role: 'agent',
+          content: text,
+          createdAt: new Date().toISOString(),
+          status: 'sending',
+        },
       ]);
       chatAdminApi
-        .reply(selectedId, text)
+        .reply(selectedId, text, clientId)
         .then((res) => {
-          // Reconcile the optimistic id with the server id (keeps dedupe sane
-          // if the events stream later echoes it).
+          // Reconcile by clientId (the stream echo may have arrived first).
           setMessages((prev) =>
-            prev.map((m) => (m.id === localId ? { ...m, id: res.id } : m)),
+            prev.map((m) => (m.clientId === clientId ? { ...m, id: res.id, status: 'sent' } : m)),
           );
         })
         .catch(() => {
           toast.error('Failed to send reply.');
-          setMessages((prev) => prev.filter((m) => m.id !== localId));
+          setMessages((prev) => prev.filter((m) => m.clientId !== clientId));
         });
     },
     [selectedId],

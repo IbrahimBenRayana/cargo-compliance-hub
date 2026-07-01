@@ -116,6 +116,8 @@ function rateKeyFor(actor: ChatActor): { rateKey: string; dailyLimit?: number; o
 // ─── POST /conversations/:id/messages ─────────────────────────────────
 const messageSchema = z.object({
   content: z.string().trim().min(1).max(4000),
+  /** Optional client nonce for optimistic-message reconciliation. */
+  clientId: z.string().max(64).optional(),
 });
 
 router.post('/conversations/:id/messages', chatLimiter, async (req: ChatRequest, res: Response): Promise<void> => {
@@ -134,15 +136,18 @@ router.post('/conversations/:id/messages', chatLimiter, async (req: ChatRequest,
   const content = parsed.data.content;
   const humanMode = conv.mode === 'human' || conv.mode === 'pending_human';
 
-  // Persist the user message. When a human owns the chat, this also pings the
-  // console so the agent sees it live; the agent's reply comes back over the
-  // /events stream — so we just acknowledge with 204 and don't call the AI.
+  // Persist the user message. When a human owns the chat, ping the console so
+  // the agent sees it live (participantEcho:false so it is NOT echoed back to
+  // the sender's own widget — that would duplicate the optimistic bubble). The
+  // agent's reply comes back over the /events stream; we ack 204 and skip AI.
   await appendMessage({
     conversationId: conv.id,
     role: 'user',
     content,
-    broadcast: true,
+    broadcast: humanMode,
     notifyAdmins: humanMode,
+    participantEcho: false,
+    clientId: parsed.data.clientId,
   });
 
   if (humanMode) {

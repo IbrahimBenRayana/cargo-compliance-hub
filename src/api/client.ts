@@ -2136,10 +2136,10 @@ export const chatAdminApi = {
       { method: 'POST' },
     );
   },
-  reply(id: string, content: string) {
+  reply(id: string, content: string, clientId?: string) {
     return apiFetch<{ id: string }>(
       `${CHAT_ADMIN_BASE}/conversations/${encodeURIComponent(id)}/messages`,
-      { method: 'POST', body: JSON.stringify({ content }) },
+      { method: 'POST', body: JSON.stringify({ content, clientId }) },
     );
   },
   /** Fire-and-forget typing ping (204). Call on a debounce while typing. */
