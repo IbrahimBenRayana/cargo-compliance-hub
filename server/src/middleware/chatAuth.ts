@@ -38,11 +38,22 @@ export function readChatToken(req: Request): string | undefined {
 }
 
 export async function chatAuth(req: ChatRequest, _res: Response, next: NextFunction): Promise<void> {
-  // 1) Bearer JWT → signed-in user.
+  // A signed-in user's JWT can arrive two ways:
+  //   • Authorization: Bearer <jwt>  — normal fetch/XHR (POST message, transcript)
+  //   • ?token=<jwt> / X-Chat-Token  — the EventSource /events stream, which
+  //     CANNOT set request headers, so it passes the access token in the query.
+  // We must try BOTH as a JWT before treating a query token as an anonymous
+  // HMAC conversationToken — otherwise the signed-in widget's live stream can
+  // never authenticate and silently 404s (looks like "messages only appear
+  // after a refresh").
   const authz = req.headers.authorization;
-  if (authz?.startsWith('Bearer ')) {
+  const bearer = authz?.startsWith('Bearer ') ? authz.slice(7) : undefined;
+  const rawToken = readChatToken(req);
+  const jwtCandidate = bearer ?? rawToken;
+
+  if (jwtCandidate) {
     try {
-      const decoded = jwt.verify(authz.slice(7), env.JWT_ACCESS_SECRET) as { sub: string };
+      const decoded = jwt.verify(jwtCandidate, env.JWT_ACCESS_SECRET) as { sub: string };
       const user = await prisma.user.findUnique({
         where: { id: decoded.sub },
         select: { id: true, email: true, orgId: true, role: true, isActive: true, isPlatformAdmin: true },
@@ -60,13 +71,12 @@ export async function chatAuth(req: ChatRequest, _res: Response, next: NextFunct
         return;
       }
     } catch {
-      // Fall through — a bad/expired JWT on the chat surface degrades to anon,
-      // it doesn't hard-fail (the widget may still want to chat as a guest).
+      // Not a valid JWT — fall through and try it as an anonymous token.
     }
   }
 
-  // 2) conversationToken → anonymous visitor.
-  const visitorId = verifyConversationToken(readChatToken(req));
+  // 2) conversationToken → anonymous visitor (marketing surface).
+  const visitorId = verifyConversationToken(rawToken);
   if (visitorId) {
     req.chatActor = { kind: 'anon', visitorId };
     next();
