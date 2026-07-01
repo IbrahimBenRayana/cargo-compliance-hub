@@ -116,7 +116,10 @@ router.post('/conversations/:id/assign', async (req: AuthRequest, res: Response)
 });
 
 // ─── POST /conversations/:id/messages (agent reply) ───────────────────
-const replySchema = z.object({ content: z.string().trim().min(1).max(4000) });
+const replySchema = z.object({
+  content: z.string().trim().min(1).max(4000),
+  clientId: z.string().max(64).optional(),
+});
 
 router.post('/conversations/:id/messages', async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = replySchema.safeParse(req.body ?? {});
@@ -137,7 +140,7 @@ router.post('/conversations/:id/messages', async (req: AuthRequest, res: Respons
     res.status(409).json({ error: 'Assigned to another agent.', code: 'not_assignee' });
     return;
   }
-  const msg = await agentReply({ conversationId: pid(req), agentId: req.user!.id, content: parsed.data.content });
+  const msg = await agentReply({ conversationId: pid(req), agentId: req.user!.id, content: parsed.data.content, clientId: parsed.data.clientId });
   res.status(201).json({ id: msg.id });
 });
 

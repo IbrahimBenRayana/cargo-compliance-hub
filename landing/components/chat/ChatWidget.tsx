@@ -12,6 +12,8 @@ import { HumanHandoffForm } from "./HumanHandoffForm";
 import {
   getConfig,
   createOrRestoreConversation,
+  getConversation,
+  hasSession,
   sendMessage,
   eventsUrl,
   type ChatConfig,
@@ -57,6 +59,9 @@ export function ChatWidget() {
   const [showHandoff, setShowHandoff] = React.useState(false);
 
   const seenIds = React.useRef<Set<string>>(new Set());
+  // Mirror of `streaming` for use inside stable stream callbacks.
+  const streamingRef = React.useRef(false);
+  streamingRef.current = streaming;
   const panelRef = React.useRef<HTMLDivElement>(null);
   const agentTypingTimer = React.useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -98,13 +103,30 @@ export function ChatWidget() {
       });
   }, [open, initialised, initialising]);
 
-  // ── Live events stream while the panel is open and a session exists ────────
+  // ── Live events stream (auto-reconnecting) while the panel is open ─────────
   React.useEffect(() => {
     if (!open || !initialised) return;
-    const url = eventsUrl();
-    if (!url) return;
 
-    const es = new EventSource(url);
+    let stopped = false;
+    let es: EventSource | null = null;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    // Catch up on anything missed while disconnected. Skipped while an AI reply
+    // is streaming so it can't clobber the in-flight bubble. The transcript is
+    // authoritative — this is what makes live updates work without a refresh.
+    const resync = async () => {
+      if (streamingRef.current || !hasSession()) return;
+      try {
+        const detail = await getConversation();
+        const mapped = detail.messages.map(mapMessage);
+        mapped.forEach((m) => seenIds.current.add(m.id));
+        setMessages(mapped.length > 0 ? mapped : [WELCOME]);
+        setMode(detail.conversation.mode);
+      } catch {
+        // transient — the next reconnect retries
+      }
+    };
 
     const onMessage = (e: MessageEvent) => {
       try {
@@ -114,18 +136,12 @@ export function ChatWidget() {
         setAgentTyping(false);
         setMessages((prev) => [
           ...prev,
-          {
-            id: data.messageId,
-            role: data.role,
-            content: data.content,
-            agentName: data.agentName,
-          },
+          { id: data.messageId, role: data.role, content: data.content, agentName: data.agentName },
         ]);
       } catch {
         // ignore malformed frame
       }
     };
-
     const onModeChange = (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data) as ModeChangeEvent;
@@ -135,22 +151,65 @@ export function ChatWidget() {
         // ignore
       }
     };
-
     const onAgentTyping = () => {
       setAgentTyping(true);
       if (agentTypingTimer.current) clearTimeout(agentTypingTimer.current);
       agentTypingTimer.current = setTimeout(() => setAgentTyping(false), 6000);
     };
 
-    es.addEventListener("message", onMessage);
-    es.addEventListener("mode_change", onModeChange);
-    es.addEventListener("agent_typing", onAgentTyping);
+    const scheduleReconnect = () => {
+      if (stopped || timer) return;
+      const delay = Math.min(1000 * 2 ** attempt, 15000);
+      attempt += 1;
+      timer = setTimeout(() => { timer = null; connect(); }, delay);
+    };
+
+    const connect = () => {
+      if (stopped) return;
+      const url = eventsUrl();
+      if (!url) return;
+      try {
+        es = new EventSource(url);
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+      es.onopen = () => {
+        if (stopped) return;
+        attempt = 0;
+        void resync();
+      };
+      es.addEventListener("message", onMessage);
+      es.addEventListener("mode_change", onModeChange);
+      es.addEventListener("agent_typing", onAgentTyping);
+      es.onerror = () => {
+        if (stopped) return;
+        // Recreate ourselves (a bare EventSource gives up on CLOSED errors).
+        try { es?.close(); } catch { /* noop */ }
+        es = null;
+        scheduleReconnect();
+      };
+    };
+
+    connect();
+
+    const onWake = () => {
+      if (stopped) return;
+      if (!es || es.readyState === 2) {
+        attempt = 0;
+        if (timer) { clearTimeout(timer); timer = null; }
+        connect();
+      }
+    };
+    window.addEventListener("online", onWake);
+    document.addEventListener("visibilitychange", onWake);
 
     return () => {
-      es.removeEventListener("message", onMessage);
-      es.removeEventListener("mode_change", onModeChange);
-      es.removeEventListener("agent_typing", onAgentTyping);
-      es.close();
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("online", onWake);
+      document.removeEventListener("visibilitychange", onWake);
+      try { es?.close(); } catch { /* noop */ }
       if (agentTypingTimer.current) clearTimeout(agentTypingTimer.current);
     };
   }, [open, initialised]);

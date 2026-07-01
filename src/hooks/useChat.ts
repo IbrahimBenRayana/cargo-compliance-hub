@@ -24,6 +24,10 @@ export interface UiMessage {
   createdAt: string;
   pending?: boolean;
   streaming?: boolean;
+  /** Client nonce for optimistic-message reconciliation (admin replies). */
+  clientId?: string;
+  /** Delivery state of an optimistic message. */
+  status?: 'sending' | 'sent' | 'failed';
 }
 
 interface ChatState {
@@ -44,6 +48,7 @@ interface ChatState {
 
 type Action =
   | { type: 'init'; conversationId: string; mode: ChatMode; messages: UiMessage[] }
+  | { type: 'resync'; mode: ChatMode; messages: UiMessage[] }
   | { type: 'config'; config: ChatConfig }
   | { type: 'loading'; loading: boolean }
   | { type: 'addMessage'; message: UiMessage }
@@ -80,6 +85,13 @@ function reducer(state: ChatState, action: Action): ChatState {
         loading: false,
         error: null,
       };
+    case 'resync': {
+      // Server transcript is the source of truth; preserve only an in-flight
+      // streaming assistant bubble (not yet persisted). This heals any message
+      // missed while the stream was disconnected — no manual refresh needed.
+      const streaming = state.messages.filter((m) => m.streaming);
+      return { ...state, mode: action.mode, messages: [...action.messages, ...streaming] };
+    }
     case 'config':
       return { ...state, config: action.config };
     case 'loading':
@@ -238,10 +250,29 @@ export function useChat(active: boolean) {
       ? `/api/v1/chat/conversations/${state.conversationId}/events`
       : null;
 
-  useChatEventStream(eventUrl, {
+  // Refs so the resync closure isn't stale and doesn't clobber an in-flight send.
+  const busyRef = useRef(state.busy);
+  busyRef.current = state.busy;
+  const convIdRef = useRef(state.conversationId);
+  convIdRef.current = state.conversationId;
+
+  // Catch up on anything missed while the stream was disconnected. Runs on every
+  // (re)connect and on tab focus. Skipped mid-send so it can't reorder a live
+  // AI stream.
+  const resync = useCallback(async () => {
+    const cid = convIdRef.current;
+    if (!cid || busyRef.current) return;
+    try {
+      const res = await chatApi.getConversation(cid);
+      dispatch({ type: 'resync', mode: res.conversation.mode, messages: res.messages.map(toUiMessage) });
+    } catch { /* transient — the next reconnect will retry */ }
+  }, []);
+
+  const { connected } = useChatEventStream(eventUrl, {
+    onOpen: resync,
     onMessage: (msg) => {
-      // Our own streamed assistant + user bubbles aren't re-sent; agent /
-      // system messages are. Dedupe by id to be safe.
+      // User messages aren't echoed back to their own stream; only agent /
+      // system messages arrive here. Dedupe by id to be safe.
       dispatch({
         type: 'upsertMessage',
         message: {
@@ -356,5 +387,5 @@ export function useChat(active: boolean) {
     [state.conversationId],
   );
 
-  return { state, send, escalate };
+  return { state, send, escalate, connected };
 }
