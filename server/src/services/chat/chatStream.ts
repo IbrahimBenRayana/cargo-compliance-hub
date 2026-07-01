@@ -47,8 +47,17 @@ export interface ChatStreamPayload {
   type: ChatEventType;
   /** True for events the admin queue cares about (also fanned to adminRegistry). */
   notifyAdmins?: boolean;
+  /**
+   * When false, the event is NOT written to the conversation participant's own
+   * stream — only to admins. Used so a user's own message isn't echoed back to
+   * their widget (they already rendered it optimistically), which would
+   * otherwise duplicate it. Defaults to true.
+   */
+  participantEcho?: boolean;
   // message fields
   messageId?: string;
+  /** Client-generated nonce, echoed so the sender can reconcile its optimistic copy. */
+  clientId?: string;
   role?: string;
   content?: string;
   agentName?: string;
@@ -132,8 +141,9 @@ export function registerAdminClient(res: Response): () => void {
 }
 
 function writeEvent(res: Response, payload: ChatStreamPayload): void {
-  // The SSE `event:` name is the type; data carries the rest.
-  const { type, ...rest } = payload;
+  // The SSE `event:` name is the type; data carries the rest. Internal routing
+  // flags (notifyAdmins / participantEcho) are stripped — they're server-only.
+  const { type, notifyAdmins: _n, participantEcho: _p, ...rest } = payload;
   const chunk = `event: ${type}\ndata: ${JSON.stringify(rest)}\n\n`;
   try {
     res.write(chunk);
@@ -143,8 +153,11 @@ function writeEvent(res: Response, payload: ChatStreamPayload): void {
 }
 
 function broadcast(payload: ChatStreamPayload): void {
-  const set = convRegistry.get(payload.conversationId);
-  if (set) for (const res of set) writeEvent(res, payload);
+  // Write to the conversation participant unless explicitly suppressed.
+  if (payload.participantEcho !== false) {
+    const set = convRegistry.get(payload.conversationId);
+    if (set) for (const res of set) writeEvent(res, payload);
+  }
 
   if (payload.notifyAdmins) {
     for (const res of adminRegistry) writeEvent(res, payload);

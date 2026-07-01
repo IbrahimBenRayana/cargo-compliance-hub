@@ -78,6 +78,10 @@ export async function appendMessage(input: {
   /** Broadcast over SSE to the participant (and admins, for queue freshness). */
   broadcast?: boolean;
   notifyAdmins?: boolean;
+  /** When false, don't echo to the participant's own stream (admins only). */
+  participantEcho?: boolean;
+  /** Client nonce, echoed so the sender reconciles its optimistic bubble. */
+  clientId?: string | null;
 }) {
   const msg = await prisma.chatMessage.create({
     data: {
@@ -100,11 +104,13 @@ export async function appendMessage(input: {
       conversationId: input.conversationId,
       type: 'message',
       messageId: msg.id,
+      clientId: input.clientId ?? undefined,
       role: msg.role,
       content: msg.content,
       agentName: input.agentName ?? undefined,
       createdAt: msg.createdAt.toISOString(),
       notifyAdmins: input.notifyAdmins,
+      participantEcho: input.participantEcho,
       lastMessageAt: msg.createdAt.toISOString(),
     });
   }
@@ -248,7 +254,7 @@ export async function assignConversation(conversationId: string, agentId: string
   return { ok: true as const, agentName };
 }
 
-export async function agentReply(input: { conversationId: string; agentId: string; content: string }) {
+export async function agentReply(input: { conversationId: string; agentId: string; content: string; clientId?: string }) {
   const agent = await prisma.user.findUnique({
     where: { id: input.agentId },
     select: { firstName: true, lastName: true },
@@ -259,8 +265,11 @@ export async function agentReply(input: { conversationId: string; agentId: strin
     content: input.content,
     agentId: input.agentId,
     agentName: agentName_(agent),
+    // Reaches the customer's stream; also echoes to admins (incl. the sender,
+    // who reconciles their optimistic bubble by clientId).
     broadcast: true,
     notifyAdmins: true,
+    clientId: input.clientId,
   });
 }
 
