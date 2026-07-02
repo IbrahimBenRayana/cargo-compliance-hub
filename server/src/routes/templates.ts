@@ -106,9 +106,12 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   if (name && typeof name === 'string') updateData.name = name.trim();
   if (templateData) updateData.templateData = templateData;
 
-  const updated = await prisma.filingTemplate.update({
-    where: { id: template.id },
+  await prisma.filingTemplate.updateMany({
+    where: { id: template.id, orgId: req.user!.orgId },
     data: updateData,
+  });
+  const updated = await prisma.filingTemplate.findFirst({
+    where: { id: template.id, orgId: req.user!.orgId },
   });
 
   res.json(updated);
@@ -125,7 +128,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     return;
   }
 
-  await prisma.filingTemplate.delete({ where: { id: template.id } });
+  await prisma.filingTemplate.deleteMany({ where: { id: template.id, orgId: req.user!.orgId } });
 
   const meta = getRequestMeta(req);
   writeAuditLog({

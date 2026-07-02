@@ -263,8 +263,9 @@ router.delete('/:filingId/:docId', async (req: AuthRequest, res: Response): Prom
       fs.unlinkSync(filePath);
     }
 
-    // Delete from DB
-    await prisma.filingDocument.delete({ where: { id: docId } });
+    // Delete from DB — scoped to the (org-verified) filing so the write itself
+    // is bounded, not just the preceding lookup.
+    await prisma.filingDocument.deleteMany({ where: { id: docId, filingId } });
 
     res.json({ message: 'Document deleted' });
 

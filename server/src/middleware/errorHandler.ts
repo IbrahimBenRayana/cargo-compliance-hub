@@ -9,13 +9,17 @@ export function errorHandler(
 ): void {
   logger.error({ err }, 'Unhandled error');
 
+  const isProd = process.env.NODE_ENV === 'production';
+
   // Prisma known errors
   if (err.constructor.name === 'PrismaClientKnownRequestError') {
     const prismaErr = err as any;
     if (prismaErr.code === 'P2002') {
       res.status(409).json({
         error: 'A record with that unique value already exists',
-        field: prismaErr.meta?.target,
+        // The raw constraint target exposes internal column names — only
+        // surface it outside production to aid local debugging.
+        ...(isProd ? {} : { field: prismaErr.meta?.target }),
       });
       return;
     }
@@ -36,10 +40,7 @@ export function errorHandler(
 
   // Default error
   const statusCode = (err as any).statusCode ?? 500;
-  const message =
-    process.env.NODE_ENV === 'production'
-      ? 'Internal server error'
-      : err.message;
+  const message = isProd ? 'Internal server error' : err.message;
 
   res.status(statusCode).json({ error: message });
 }

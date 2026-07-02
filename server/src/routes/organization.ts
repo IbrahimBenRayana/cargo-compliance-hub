@@ -88,9 +88,12 @@ router.patch('/members/:id/role', requireRole('owner', 'admin'), async (req: Aut
       return;
     }
 
-    const updated = await prisma.user.update({
-      where: { id },
+    await prisma.user.updateMany({
+      where: { id, orgId: req.user!.orgId },
       data: { role },
+    });
+    const updated = await prisma.user.findFirst({
+      where: { id, orgId: req.user!.orgId },
       select: { id: true, email: true, firstName: true, lastName: true, role: true },
     });
 

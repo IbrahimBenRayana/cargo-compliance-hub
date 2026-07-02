@@ -99,7 +99,23 @@ All four release-blocking items are fixed, typechecked, and tested (server suite
 - **M1 marketing headers** — `landing/next.config.ts` now sets CSP (with API origin + Sentry in `connect-src`, dev relaxations for HMR), HSTS, X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy, and `poweredByHeader:false`. **Smoke-test on staging** — CSP tightening to script nonces is a follow-up.
 - **M3 entitlement gate** — `routes/integrations.ts` `/hts-classify` now `requireCapability(HTS_CLASSIFICATION)`, `/mid-list` now `requireCapability(ABI_ENTRY)`.
 
-Remaining Phase B/C items below are not yet done.
+## 3b. Phase B — COMPLETED (2026-07-02)
+
+Hardening pass; typecheck clean, server suite 115/115 green.
+
+- **M4 per-API-key rate limit** — `middleware/rateLimiter.ts` new `apiKeyLimiter` (300/min keyed on `apiContext.keyId`), applied in `routes/publicApi.ts` after `apiKeyAuth`. Bounds each key independently of the per-IP `generalLimiter`.
+- **M5 tighten app CSP** — `index.ts` drops `'unsafe-inline'` from `script-src` (built SPA has only external hashed module scripts — verified). `style-src` keeps it (injected component styles). **Smoke-test on staging.**
+- **L1 atomic org-scoped mutations** — updates → `updateMany({id,orgId})` + refetch; deletes → `deleteMany({id,orgId})`. Applied in `filings.ts`, `templates.ts`, `organization.ts`, `documents.ts`.
+- **L5 chat secret** — `config/env.ts` now fails prod boot on the dev-default `CHAT_SESSION_SECRET` unconditionally (no longer gated on `CHAT_ENABLED`).
+- **L4 error genericization** — `middleware/errorHandler.ts` no longer returns Prisma constraint target field names in production.
+
+## 3c. Phase C (dependencies) — COMPLETED (2026-07-02)
+
+GitHub Dependabot flagged highs on `main` that local `npm audit` did not — because a prior remediation bumped the deps in the working tree but never committed the lockfiles. This phase commits them.
+
+- **Resolved highs:** `multer ^2.1.1→^2.2.0` (upload DoS), `nodemailer ^8.0.5→^9.0.1` (raw-option file read/SSRF), `form-data`→4.0.6 (via `jsdom`, test-only; lockfile), `postcss ^8.5.6→^8.5.16` (CSS-stringify XSS). Server vite (8.1.0) already > patched 8.0.16.
+- **Deferred (documented):** root **vite 5.4.21 → 6.4.3 is a MAJOR bump** and the advisories (`server.fs.deny` bypass, optimized-deps path traversal) affect only the **Vite dev server on Windows** — never the production static build. Not a prod exposure; not worth a breaking build-tool upgrade at cutover. Revisit post-launch.
+- Prod-runtime dependency exposure after this phase: none outstanding.
 
 ## 4. Remediation plan (code)
 

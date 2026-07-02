@@ -14,7 +14,7 @@ import express, { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { apiKeyAuth, requireScope, ApiRequest } from '../middleware/apiKeyAuth.js';
-import { generalLimiter } from '../middleware/rateLimiter.js';
+import { generalLimiter, apiKeyLimiter } from '../middleware/rateLimiter.js';
 import { xmlContentNegotiation } from '../middleware/xmlContent.js';
 import { CAPABILITIES } from '../config/plans.js';
 import { createFilingSchema } from '../schemas/filing.js';
@@ -30,6 +30,8 @@ router.use(express.text({ type: ['application/xml', 'text/xml', 'application/*+x
 router.use(xmlContentNegotiation);
 router.use(generalLimiter);
 router.use(apiKeyAuth);
+// Per-key ceiling — runs after apiKeyAuth so req.apiContext.keyId is populated.
+router.use(apiKeyLimiter);
 
 function clampLimit(raw: unknown): number {
   const n = Number(raw);

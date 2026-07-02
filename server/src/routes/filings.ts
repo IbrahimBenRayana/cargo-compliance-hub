@@ -358,14 +358,19 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       filingDeadline.setHours(filingDeadline.getHours() - 24);
     }
 
-    const filing = await prisma.filing.update({
-      where: { id: paramId(req) },
+    // Atomic org-scoped write (updateMany accepts the orgId in its where; the
+    // by-id `update` cannot), then re-read the row to return it.
+    await prisma.filing.updateMany({
+      where: { id: paramId(req), orgId: req.user!.orgId },
       data: {
         ...data,
         estimatedDeparture: data.estimatedDeparture ? new Date(data.estimatedDeparture) : undefined,
         estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
         filingDeadline: filingDeadline ?? undefined,
       },
+    });
+    const filing = await prisma.filing.findFirst({
+      where: { id: paramId(req), orgId: req.user!.orgId },
     });
 
     res.json(filing);
@@ -394,7 +399,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     return;
   }
 
-  await prisma.filing.delete({ where: { id: paramId(req) } });
+  await prisma.filing.deleteMany({ where: { id: paramId(req), orgId: req.user!.orgId } });
   res.json({ message: 'Filing deleted' });
 });
 
