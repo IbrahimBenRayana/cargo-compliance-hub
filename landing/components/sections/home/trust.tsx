@@ -3,10 +3,18 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, useInView } from "framer-motion";
-import { ArrowRight, BellRing } from "lucide-react";
+import {
+  ArrowRight,
+  BellRing,
+  BookOpen,
+  Boxes,
+  CreditCard,
+  Landmark,
+  Shield,
+  type LucideIcon,
+} from "lucide-react";
 import { SectionShell } from "@/components/sections/section-shell";
 import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
-import { cn } from "@/lib/utils";
 
 const EASE_OUT_QUART = [0.25, 1, 0.5, 1] as const;
 
@@ -25,25 +33,100 @@ const AUDIT_LINES = [
   { time: "14:24", actor: "alice@", action: "submitted to CBP" },
 ] as const;
 
-export function ActTeamTrust() {
+type Rail = {
+  Icon: LucideIcon;
+  name: string;
+  descriptor: string;
+};
+
+const RAILS: Rail[] = [
+  { Icon: Boxes, name: "CustomsCity", descriptor: "ABI gateway" },
+  { Icon: Shield, name: "CBP ABI", descriptor: "Direct connection" },
+  { Icon: BookOpen, name: "Federal Register", descriptor: "Daily ADD/CVD sync" },
+  { Icon: CreditCard, name: "Stripe", descriptor: "Billing" },
+  {
+    Icon: Landmark,
+    name: "FDA · USDA-APHIS · EPA · FCC",
+    descriptor: "PGA partner agencies",
+  },
+];
+
+/**
+ * Teams + rails in one trust beat: who can use it, what gets logged, and
+ * the CBP infrastructure it actually runs on.
+ */
+export function Trust() {
+  const marqueeRef = React.useRef<HTMLDivElement | null>(null);
+  const marqueeInView = useInView(marqueeRef, { once: true, amount: 0.2 });
+
   return (
     <SectionShell
-      id="team-trust"
-      tone="muted"
+      id="trust"
+      tone="default"
       headingAlign="center"
-      eyebrow="Built for teams"
-      title="Multi-user from day one. Audit-ready from week one."
-      intro="Invite your team. Set roles. Get notified the right way. Every action logged. Your data stays yours."
+      eyebrow="Trust"
+      title={
+        <span className="block [text-wrap:balance]">
+          Built for teams. Built on the rails CBP actually uses.
+        </span>
+      }
+      intro="Invite your team, set roles, log every action — on a direct line to CBP's own infrastructure."
     >
       <TrustGrid />
 
+      {/* Rails marquee */}
+      <div
+        ref={marqueeRef}
+        className="mt-12 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]"
+        aria-label="Integration partners"
+      >
+        <motion.div
+          className="flex w-max gap-4"
+          animate={marqueeInView ? { x: ["0%", "-50%"] } : undefined}
+          transition={{
+            duration: 38,
+            ease: "linear",
+            repeat: Infinity,
+            repeatType: "loop",
+          }}
+        >
+          {[...RAILS, ...RAILS].map((rail, i) => (
+            <div
+              key={`${rail.name}-${i}`}
+              aria-hidden={i >= RAILS.length}
+              className="flex w-[220px] shrink-0 rounded-2xl border border-border/60 bg-card px-5 py-4"
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-[hsl(43_96%_44%)] ring-1 ring-amber-500/20 dark:text-[hsl(43_96%_62%)]"
+                  aria-hidden
+                >
+                  <rail.Icon className="size-4" />
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] font-semibold text-foreground">
+                    {rail.name}
+                  </div>
+                  <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    {rail.descriptor}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </motion.div>
+      </div>
+
       <div className="mt-10 flex justify-center">
         <Link
-          href="/platform/automation#team"
+          href="/pricing"
           className="group inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           No surprise upgrades. No usage-based gotchas. See pricing
-          <ArrowRight className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
+          <ArrowRight
+            className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
+            aria-hidden
+          />
         </Link>
       </div>
     </SectionShell>
@@ -67,7 +150,7 @@ function TrustGrid() {
         delay={0.15}
         inView={inView}
         heading="Per-user, per-kind opt-in."
-        body="In-app bell, email when it matters. Deep-link from notification right into the action card with an amber halo pulse."
+        body="In-app bell, email when it matters. Deep-link from notification right into the action card."
         visual={<NotificationsVisual />}
       />
       <Column
@@ -99,9 +182,7 @@ function Column({
       initial={{ opacity: 0, y: 16 }}
       animate={inView ? { opacity: 1, y: 0 } : undefined}
       transition={{ duration: 0.55, ease: EASE_OUT_QUART, delay }}
-      className={cn(
-        "flex flex-col gap-5 rounded-2xl border border-border/60 bg-card p-6 transition-shadow duration-200 hover:shadow-card-hover",
-      )}
+      className="flex flex-col gap-5 rounded-2xl border border-border/60 bg-card p-6 transition-shadow duration-200 hover:shadow-card-hover"
     >
       <div className="flex h-24 items-center">{visual}</div>
       <div>
@@ -148,7 +229,7 @@ function AuditVisual() {
       className="w-full overflow-hidden rounded-lg border border-border/60 bg-background/60 p-3"
       aria-hidden
     >
-      <ul className="flex flex-col gap-1 font-mono text-[11px] leading-relaxed text-muted-foreground tabular-nums">
+      <ul className="flex flex-col gap-1 font-mono text-[11px] leading-relaxed tabular-nums text-muted-foreground">
         {AUDIT_LINES.map((line) => (
           <li key={line.time} className="flex gap-2 truncate">
             <span className="text-foreground/70">{line.time}</span>
