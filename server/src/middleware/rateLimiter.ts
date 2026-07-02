@@ -102,3 +102,20 @@ export const ccApiLimiter = rateLimit({
     code: 'RATE_LIMIT_FILING_API',
   },
 });
+
+// Public API — per-API-KEY ceiling (not per-IP). The generalLimiter only bounds
+// per IP, so a single key hammering from many IPs, or a leaked key, could still
+// burst. This caps each key independently. Mounted AFTER apiKeyAuth so
+// req.apiContext.keyId is set; keying on the key id (never the IP) also avoids
+// the IPv6 key-generator pitfall.
+export const apiKeyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req as { apiContext?: { keyId?: string } }).apiContext?.keyId ?? 'unauthenticated',
+  message: {
+    error: 'API rate limit exceeded for this key. Please slow down.',
+    code: 'RATE_LIMIT_API_KEY',
+  },
+});

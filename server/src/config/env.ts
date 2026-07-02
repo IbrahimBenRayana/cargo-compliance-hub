@@ -102,8 +102,10 @@ if (env.NODE_ENV === 'production') {
   if (!env.EMAIL_USER)   missing.push('EMAIL_USER');
   if (!env.EMAIL_PASS)   missing.push('EMAIL_PASS');
   // A guessable chat secret lets one anonymous visitor forge another's
-  // conversationToken — must be a real secret in prod.
-  if (env.CHAT_ENABLED && env.CHAT_SESSION_SECRET === 'dev-chat-session-secret-change-me') {
+  // conversationToken — must be a real secret in prod. Enforced unconditionally
+  // (not gated on CHAT_ENABLED) so chat can't later be toggled on at runtime
+  // while still signing tokens with the publicly-known dev default.
+  if (env.CHAT_SESSION_SECRET === 'dev-chat-session-secret-change-me') {
     missing.push('CHAT_SESSION_SECRET');
   }
   if (missing.length > 0) {

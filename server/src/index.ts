@@ -56,7 +56,11 @@ app.use(helmet({
     useDefaults: false,
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+      // No 'unsafe-inline' for scripts: the Vite build emits only external,
+      // hashed module scripts (verified — no inline <script> in the built
+      // index.html), so the SPA runs under a strict script-src. styleSrc keeps
+      // 'unsafe-inline' because Radix/injected component styles need it.
+      scriptSrc: ["'self'", "https://js.stripe.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:"],
