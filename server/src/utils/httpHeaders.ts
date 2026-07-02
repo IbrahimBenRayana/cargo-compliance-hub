@@ -9,13 +9,18 @@
 
 /** Build a `Content-Disposition: attachment` value safe for any filename. */
 export function contentDispositionAttachment(filename: string): string {
-  // ASCII fallback: drop control chars (incl. CR/LF), quotes and backslashes.
+  // ASCII fallback built via char-code checks (avoids a control-char regex):
+  // drop control chars incl. CR/LF, neutralize quotes/backslashes that would
+  // break the directive, and replace non-ASCII with a placeholder (the real
+  // value is carried by filename* below).
   const asciiFallback =
-    filename
-      .replace(/[\x00-\x1F\x7F]/g, '') // control chars incl. \r \n
-      .replace(/["\\]/g, '_')          // quote/backslash break the directive
-      .replace(/[^\x20-\x7E]/g, '_')   // non-ASCII → placeholder (filename* carries the real value)
-      .trim() || 'download';
+    Array.from(filename, (ch) => {
+      const c = ch.charCodeAt(0);
+      if (c < 0x20 || c === 0x7f) return ''; // control chars, incl. \r \n
+      if (c > 0x7e) return '_';              // non-ASCII → placeholder
+      if (ch === '"' || ch === '\\') return '_';
+      return ch;
+    }).join('').trim() || 'download';
 
   // RFC 5987 extended value: percent-encode, then also encode the chars
   // encodeURIComponent leaves that are not valid in a token.
