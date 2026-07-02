@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
 import { WEBHOOK_EVENTS, generateWebhookSecret } from '../services/webhooks.js';
+import { assertPublicWebhookUrl, SsrfError } from '../services/ssrfGuard.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -53,6 +54,15 @@ router.post('/', requireRole('owner', 'admin'), async (req: AuthRequest, res: Re
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
+  try {
+    await assertPublicWebhookUrl(parsed.data.url);
+  } catch (err) {
+    if (err instanceof SsrfError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
   const { secret, prefix } = generateWebhookSecret();
   const created = await prisma.webhookEndpoint.create({
     data: {
@@ -76,6 +86,17 @@ router.patch('/:id', requireRole('owner', 'admin'), async (req: AuthRequest, res
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
+  }
+  if (parsed.data.url !== undefined) {
+    try {
+      await assertPublicWebhookUrl(parsed.data.url);
+    } catch (err) {
+      if (err instanceof SsrfError) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
+      throw err;
+    }
   }
   const id = String(req.params.id);
   const existing = await prisma.webhookEndpoint.findFirst({ where: { id, orgId: req.user!.orgId } });

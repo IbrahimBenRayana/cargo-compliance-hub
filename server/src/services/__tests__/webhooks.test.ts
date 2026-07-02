@@ -7,11 +7,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
 
-const { prisma } = vi.hoisted(() => ({
+const { prisma, dnsLookup } = vi.hoisted(() => ({
   prisma: { webhookEndpoint: { findMany: vi.fn(), update: vi.fn() } },
+  dnsLookup: vi.fn(),
 }));
 vi.mock('../../config/database.js', () => ({ prisma }));
 vi.mock('../../config/logger.js', () => ({ default: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
+// The delivery path now runs an SSRF check that resolves the target host.
+// Default the resolver to a public address so existing delivery tests pass.
+vi.mock('node:dns/promises', () => ({ lookup: dnsLookup }));
 
 import { dispatchWebhook, signPayload, generateWebhookSecret } from '../webhooks.js';
 
@@ -21,6 +25,7 @@ const ACTIVE_FILING = { id: 'w2', url: 'https://hook.test/filing', secret: 's2',
 beforeEach(() => {
   vi.clearAllMocks();
   prisma.webhookEndpoint.update.mockResolvedValue({});
+  dnsLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]); // public
   // @ts-expect-error — install a fetch stub for the test
   global.fetch = vi.fn(async () => ({ ok: true, status: 200 }));
 });
@@ -72,6 +77,24 @@ describe('dispatchWebhook', () => {
   it('no-ops when the org has no endpoints', async () => {
     prisma.webhookEndpoint.findMany.mockResolvedValue([]);
     await dispatchWebhook('o1', 'filing.submitted', {});
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('blocks delivery (no fetch) when the target resolves to a private address', async () => {
+    dnsLookup.mockResolvedValue([{ address: '169.254.169.254', family: 4 }]); // cloud metadata
+    prisma.webhookEndpoint.findMany.mockResolvedValue([ACTIVE_ALL]);
+    await dispatchWebhook('o1', 'filing.accepted', { filingId: 'f1' });
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(prisma.webhookEndpoint.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ lastError: expect.stringContaining('blocked') }) }),
+    );
+  });
+
+  it('blocks delivery to a literal private IP without needing DNS', async () => {
+    prisma.webhookEndpoint.findMany.mockResolvedValue([
+      { id: 'w3', url: 'http://127.0.0.1:8080/hook', secret: 's3', events: [], active: true },
+    ]);
+    await dispatchWebhook('o1', 'filing.accepted', { filingId: 'f1' });
     expect(global.fetch).not.toHaveBeenCalled();
   });
 });

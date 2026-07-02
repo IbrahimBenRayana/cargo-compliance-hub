@@ -10,6 +10,7 @@ import { Router, Response } from 'express';
 import PDFDocument from 'pdfkit';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { contentDispositionAttachment } from '../utils/httpHeaders.js';
 import logger from '../config/logger.js';
 
 const router = Router();
@@ -103,7 +104,7 @@ router.get('/csv', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const filename = `mycargolens-filings-${new Date().toISOString().slice(0, 10)}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', contentDispositionAttachment(filename));
     res.send('\uFEFF' + csv); // BOM for Excel compatibility
   } catch (err: any) {
     logger.error({ err: err.message }, '[Export] CSV error:');
@@ -133,7 +134,7 @@ router.get('/pdf/:id', async (req: AuthRequest, res: Response): Promise<void> =>
 
     const filename = `ISF-${filing.houseBol || filing.masterBol || filing.id.slice(0, 8)}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', contentDispositionAttachment(filename));
     doc.pipe(res);
 
     // ─── Header ───
@@ -265,7 +266,7 @@ router.get('/pdf-summary', async (req: AuthRequest, res: Response): Promise<void
     const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 40, bufferPages: true });
     const filename = `mycargolens-summary-${new Date().toISOString().slice(0, 10)}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', contentDispositionAttachment(filename));
     doc.pipe(res);
 
     // Header

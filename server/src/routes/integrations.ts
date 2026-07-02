@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { ccClient } from '../services/customscity.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { requireCapability } from '../middleware/requireCapability.js';
+import { CAPABILITIES } from '../config/plans.js';
 import { sendTestEmail, verifyEmailConnection } from '../services/email.js';
 import { env } from '../config/env.js';
 
@@ -25,7 +27,7 @@ router.post('/test', async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // ─── POST /api/v1/integrations/hts-classify — AI HTS ──────
-router.post('/hts-classify', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/hts-classify', requireCapability(CAPABILITIES.HTS_CLASSIFICATION), async (req: AuthRequest, res: Response): Promise<void> => {
   const { description } = req.body;
   if (!description || !description.trim()) {
     res.status(400).json({ error: 'Description is required' });
@@ -104,7 +106,7 @@ router.post('/hts-classify', async (req: AuthRequest, res: Response): Promise<vo
 });
 
 // ─── GET /api/v1/integrations/mid-list — MID lookup ───────
-router.get('/mid-list', async (req: AuthRequest, res: Response): Promise<void> => {
+router.get('/mid-list', requireCapability(CAPABILITIES.ABI_ENTRY), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const result = await ccClient.getMIDList();
     res.json(result.data);

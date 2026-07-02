@@ -15,6 +15,7 @@ import { fileTypeFromFile } from 'file-type';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
+import { contentDispositionAttachment } from '../utils/httpHeaders.js';
 import logger from '../config/logger.js';
 
 const router = Router();
@@ -223,7 +224,7 @@ router.get('/:filingId/:docId/download', async (req: AuthRequest, res: Response)
     // safest combo — the browser saves to disk and the user opens it
     // explicitly in whatever app handles that extension.
     // X-Content-Type-Options: nosniff blocks IE/Edge MIME sniffing too.
-    res.setHeader('Content-Disposition', `attachment; filename="${doc.fileName}"`);
+    res.setHeader('Content-Disposition', contentDispositionAttachment(doc.fileName));
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Length', doc.fileSizeBytes.toString());

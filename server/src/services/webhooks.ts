@@ -13,6 +13,7 @@
 import { randomBytes, createHmac } from 'node:crypto';
 import { prisma } from '../config/database.js';
 import logger from '../config/logger.js';
+import { assertPublicWebhookUrl, SsrfError } from './ssrfGuard.js';
 
 export const WEBHOOK_EVENTS = [
   'filing.submitted',
@@ -73,6 +74,21 @@ async function deliverOne(
   const signature = signPayload(ep.secret, payload);
   let lastStatus = 0;
   let lastError: string | null = null;
+
+  // SSRF guard: re-validate the target at send time (a URL that passed at
+  // registration could have since rebound to a private/reserved address).
+  try {
+    await assertPublicWebhookUrl(ep.url);
+  } catch (err) {
+    if (err instanceof SsrfError) {
+      await prisma.webhookEndpoint
+        .update({ where: { id: ep.id }, data: { lastStatus: 0, lastError: `blocked: ${err.message}`, lastDeliveryAt: new Date() } })
+        .catch(() => {});
+      logger.warn({ endpointId: ep.id, reason: err.message }, 'Webhook delivery blocked by SSRF guard');
+      return;
+    }
+    throw err;
+  }
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const controller = new AbortController();
