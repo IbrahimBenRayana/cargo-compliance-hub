@@ -154,6 +154,23 @@ These verify the *deployed* state, which the code can't prove. Run against `app.
 
 ---
 
+## 5a. Live check RESULTS (2026-07-02, non-invasive external probes)
+
+Ran against `mycargolens.com`, `app.mycargolens.com`, `staging.mycargolens.com`.
+
+**TLS / transport — PASS.** All three: HTTP→HTTPS 301; certs verify (`ssl_verify_result=0`); **TLS 1.1 refused**, TLS 1.2 accepted (1.3 not testable from local LibreSSL but expected on). Edge is nginx/1.24.0 (Ubuntu). Note: HTTP/2 not negotiated (served over HTTP/1.1) — perf, not security.
+
+**Headers — findings:**
+- **Marketing (`mycargolens.com`)**: nginx emits HSTS + `X-Frame-Options: SAMEORIGIN` + `X-Content-Type-Options: nosniff`, but **NO CSP, NO Referrer-Policy, NO Permissions-Policy**, and leaks `X-Powered-By: Next.js`. → Confirms M1; fixed by this PR (adds CSP/Referrer-Policy/Permissions-Policy + `poweredByHeader:false`).
+- **Header-source conflict (acted on):** because the edge already sets HSTS/XFO/nosniff, the initial `next.config.ts` would have produced a **conflicting duplicate** `X-Frame-Options` (nginx SAMEORIGIN + app DENY). Config revised to add only the missing headers; clickjacking now covered by CSP `frame-ancestors 'none'`.
+- **App (`app.mycargolens.com`)**: helmet CSP present; but helmet **and** nginx BOTH set HSTS/XFO/nosniff → these appear **duplicated** (helmet XFO DENY + nginx SAMEORIGIN). Pre-existing, low impact, but header ownership should be consolidated to one layer. `Referrer-Policy: no-referrer` (fine).
+
+**Still needs SSH / infra access (not doable externally):**
+- Open-port/firewall check (only 80/443 public; app 3001/3000 + Postgres 5432 not exposed).
+- Env-var sanity on each VM (`NODE_ENV=production`, real & distinct JWT/CHAT secrets, `STRIPE_WEBHOOK_SECRET` set, staging→test Stripe).
+- `.env` perms (600, app-user), backup restore test, OS/Docker patch level.
+- **Config drift:** repo `deploy/nginx.conf` is a bare template — the live nginx (HSTS/XFO/nosniff, TLS policy) is hand-configured on the VMs and not tracked in the repo. Recommend capturing the real nginx config into the repo so header ownership and TLS policy are reviewable/reproducible.
+
 ## 6. Verification (definition of done)
 
 - Phase A fixes merged with passing tests + both typechecks green.

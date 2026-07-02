@@ -25,11 +25,16 @@ const csp = [
   `form-action 'self'`,
 ].join("; ");
 
+// NOTE: the live nginx edge already emits Strict-Transport-Security,
+// X-Frame-Options, and X-Content-Type-Options. We deliberately DON'T set those
+// here to avoid duplicate/conflicting headers (nginx sends X-Frame-Options:
+// SAMEORIGIN; a second DENY from the app would be an undefined-behavior
+// duplicate). Clickjacking is covered by CSP `frame-ancestors 'none'` above,
+// which supersedes X-Frame-Options in modern browsers. We add only what the
+// edge is missing: CSP, Referrer-Policy, Permissions-Policy (poweredByHeader:
+// false below strips the X-Powered-By disclosure).
 const securityHeaders = [
   { key: "Content-Security-Policy", value: csp },
-  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-  { key: "X-Frame-Options", value: "DENY" },
-  { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
