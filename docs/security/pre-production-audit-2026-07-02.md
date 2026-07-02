@@ -171,6 +171,25 @@ Ran against `mycargolens.com`, `app.mycargolens.com`, `staging.mycargolens.com`.
 - `.env` perms (600, app-user), backup restore test, OS/Docker patch level.
 - **Config drift:** repo `deploy/nginx.conf` is a bare template — the live nginx (HSTS/XFO/nosniff, TLS policy) is hand-configured on the VMs and not tracked in the repo. Recommend capturing the real nginx config into the repo so header ownership and TLS policy are reviewable/reproducible.
 
+## 5b. On-VM infra checks — RESULTS (prod 62.146.225.94, 2026-07-02)
+
+Ran as root over verified key-only SSH.
+
+**PASS:**
+- **Firewall (UFW):** active, default-deny inbound, only 22/80/443 allowed.
+- **Postgres:** NOT published to host (container-network only) — not internet-reachable.
+- **Secrets/.env:** `/opt/mycargolens/.env` is `600`, `deploy`-owned. JWT access/refresh + `CHAT_SESSION_SECRET` all 64 chars; chat secret is NOT the dev default; `STRIPE_SECRET_KEY` is `sk_live` (correct for prod); `CC_ENVIRONMENT=production`; `NODE_ENV=production` (set via compose, confirmed by `/api/health`).
+- **TLS renewal:** certbot cron present.
+- **Auto-patching:** `unattended-upgrades` active.
+
+**FINDINGS:**
+- **[HIGH] API port 3001 publicly exposed over plaintext HTTP.** `docker-compose.prod.yml` published `3001:3001` on `0.0.0.0`, and Docker's iptables rules bypass UFW — so `http://62.146.225.94:3001/api/health` returned 200 directly from the internet, bypassing nginx/TLS. **Fixed in repo** by binding `127.0.0.1:3001:3001` (and `127.0.0.1:3000:3000` for landing); nginx proxies via `127.0.0.1:3001` so the site is unaffected. **Live box still exposed until redeploy / container recreate** (see remediation).
+- **[HIGH] No database backups.** No pg_dump cron, systemd timer, backup script, or dump files found on prod. The repo's `deploy/scripts/backup-db.sh` + `install-backup.sh` were never installed. Going to production with zero DB backups is a major risk — install + test a restore before/at launch.
+- **[MED] 4 pending security updates + reboot required.** `apt` has 4 security updates queued and `/var/run/reboot-required` is set (kernel/lib). Apply and schedule a maintenance-window reboot.
+- **[INFO] Root login was password-enabled.** `PermitRootLogin yes` + `PasswordAuthentication yes`. **Fixed (2026-07-02):** key-only hardening drop-in `/etc/ssh/sshd_config.d/00-hardening.conf` (`PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin prohibit-password`). Verified: key login works, password refused. Admin key `~/.ssh/mycargolens_prod` on the mac (`ssh mycargolens-prod`).
+
+**Not yet applied (need decision / window):** close live 3001 (redeploy or recreate), install DB backups, apply security updates + reboot. **Staging (5.180.151.204) still has password SSH auth enabled** — apply the same hardening there.
+
 ## 6. Verification (definition of done)
 
 - Phase A fixes merged with passing tests + both typechecks green.

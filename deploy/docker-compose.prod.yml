@@ -61,7 +61,11 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "3001:3001"
+      # Bind to loopback only — nginx proxies via http://127.0.0.1:3001. Without
+      # the 127.0.0.1 prefix Docker publishes on 0.0.0.0 and, because Docker's
+      # iptables rules bypass UFW, the API is reachable directly over plaintext
+      # HTTP from the internet (bypassing TLS + the nginx edge).
+      - "127.0.0.1:3001:3001"
     environment:
       # Runtime + DB
       NODE_ENV: production
@@ -165,7 +169,8 @@ services:
     container_name: mycargolens-landing
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # Loopback only — nginx fronts the landing site. See the server note above.
+      - "127.0.0.1:3000:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
