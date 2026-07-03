@@ -34,7 +34,7 @@ export function Watchtower() {
       title="It watches the rules while you work."
       intro="From the HTS code to the agency that owns it — checked continuously, surfaced only when something changes."
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:auto-rows-fr">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <TileWrapper className="md:row-span-2" delay={0}>
           <TileHtsClassifier />
         </TileWrapper>
@@ -44,7 +44,7 @@ export function Watchtower() {
         <TileWrapper delay={0.16}>
           <TileUflpa />
         </TileWrapper>
-        <TileWrapper delay={0.24}>
+        <TileWrapper className="md:col-span-2" delay={0.24}>
           <TilePga />
         </TileWrapper>
       </div>
@@ -415,26 +415,31 @@ const DOT_CLASS: Record<Agency["dot"], string> = {
 
 function TilePga() {
   return (
-    <div className="flex h-full flex-col">
-      <h3 className="text-lg font-semibold text-foreground">PGA flags by HTS</h3>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        FDA. USDA-APHIS. EPA. FCC. Know which agencies own your code before
-        you file.
-      </p>
+    <div className="flex h-full flex-col gap-5 md:flex-row md:items-center md:gap-10">
+      <div className="md:max-w-xs md:shrink-0">
+        <h3 className="text-lg font-semibold text-foreground">PGA flags by HTS</h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          FDA. USDA-APHIS. EPA. FCC. Know which agencies own your code before
+          you file.
+        </p>
+      </div>
 
-      <div className="mt-5 grid flex-1 grid-cols-2 gap-2.5">
+      <div className="grid flex-1 grid-cols-2 gap-2.5 sm:grid-cols-4">
         {AGENCIES.map((a) => (
           <div
             key={a.name}
-            className="flex flex-col justify-between rounded-lg border border-border/50 bg-background/60 p-3"
+            className="flex flex-col justify-between gap-4 rounded-lg border border-border/50 bg-background/60 p-3"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold tracking-tight text-foreground">
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-sm font-semibold tracking-tight text-foreground">
                 {a.name}
               </span>
-              <span className={cn("size-1.5 rounded-full", DOT_CLASS[a.dot])} aria-hidden />
+              <span
+                className={cn("size-1.5 shrink-0 rounded-full", DOT_CLASS[a.dot])}
+                aria-hidden
+              />
             </div>
-            <div className="mt-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               {a.status}
             </div>
           </div>

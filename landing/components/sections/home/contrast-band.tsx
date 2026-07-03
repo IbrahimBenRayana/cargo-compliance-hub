@@ -44,7 +44,7 @@ export function ContrastBand() {
           className="mx-auto mb-12 max-w-3xl text-center md:mb-16"
         >
           <h2 className="mb-4 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl md:text-5xl">
-            Customs software stuck in 1998.
+            You know these screens.
           </h2>
           <p className="text-base leading-relaxed opacity-75 sm:text-lg">
             ABI terminals. CSV exports. Faxed PDF confirmations. Twelve browser

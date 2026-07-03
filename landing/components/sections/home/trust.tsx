@@ -3,16 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, useInView } from "framer-motion";
-import {
-  ArrowRight,
-  BellRing,
-  BookOpen,
-  Boxes,
-  CreditCard,
-  Landmark,
-  Shield,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowRight, BellRing } from "lucide-react";
 import { SectionShell } from "@/components/sections/section-shell";
 import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
 
@@ -34,21 +25,25 @@ const AUDIT_LINES = [
 ] as const;
 
 type Rail = {
-  Icon: LucideIcon;
   name: string;
   descriptor: string;
 };
 
+/**
+ * Typographic wordmarks only — federal agency seals and logos are
+ * usage-restricted for private companies (implied endorsement), so the
+ * names carry the weight instead. One item per agency, auto width, so
+ * nothing ever truncates.
+ */
 const RAILS: Rail[] = [
-  { Icon: Boxes, name: "CustomsCity", descriptor: "ABI gateway" },
-  { Icon: Shield, name: "CBP ABI", descriptor: "Direct connection" },
-  { Icon: BookOpen, name: "Federal Register", descriptor: "Daily ADD/CVD sync" },
-  { Icon: CreditCard, name: "Stripe", descriptor: "Billing" },
-  {
-    Icon: Landmark,
-    name: "FDA · USDA-APHIS · EPA · FCC",
-    descriptor: "PGA partner agencies",
-  },
+  { name: "CBP ABI", descriptor: "Direct connection" },
+  { name: "CustomsCity", descriptor: "ABI gateway" },
+  { name: "Federal Register", descriptor: "Daily ADD/CVD sync" },
+  { name: "FDA", descriptor: "PGA partner agency" },
+  { name: "USDA-APHIS", descriptor: "PGA partner agency" },
+  { name: "EPA", descriptor: "PGA partner agency" },
+  { name: "FCC", descriptor: "PGA partner agency" },
+  { name: "Stripe", descriptor: "Billing" },
 ];
 
 /**
@@ -94,23 +89,13 @@ export function Trust() {
             <div
               key={`${rail.name}-${i}`}
               aria-hidden={i >= RAILS.length}
-              className="flex w-[220px] shrink-0 rounded-2xl border border-border/60 bg-card px-5 py-4"
+              className="flex shrink-0 flex-col justify-center whitespace-nowrap rounded-2xl border border-border/60 bg-card px-6 py-3.5"
             >
-              <div className="flex items-start gap-3">
-                <span
-                  className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-[hsl(43_96%_44%)] ring-1 ring-amber-500/20 dark:text-[hsl(43_96%_62%)]"
-                  aria-hidden
-                >
-                  <rail.Icon className="size-4" />
-                </span>
-                <div className="min-w-0">
-                  <div className="truncate text-[13px] font-semibold text-foreground">
-                    {rail.name}
-                  </div>
-                  <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                    {rail.descriptor}
-                  </div>
-                </div>
+              <div className="text-[15px] font-semibold tracking-tight text-foreground">
+                {rail.name}
+              </div>
+              <div className="mt-0.5 text-[11px] text-muted-foreground">
+                {rail.descriptor}
               </div>
             </div>
           ))}
@@ -138,7 +123,7 @@ function TrustGrid() {
   const inView = useInView(ref, { once: true, amount: 0.2 });
 
   return (
-    <div ref={ref} className="grid gap-6 md:grid-cols-3 md:gap-8">
+    <div ref={ref} className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
       <Column
         delay={0.05}
         inView={inView}

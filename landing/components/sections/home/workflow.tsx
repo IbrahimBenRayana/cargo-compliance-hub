@@ -119,7 +119,7 @@ export function Workflow() {
       title="Three moves. One surface."
       intro="File, triage, fix — a whole customs day without leaving the window."
     >
-      <div ref={ref} className="grid items-start gap-8 lg:grid-cols-12 lg:gap-12">
+      <div ref={ref} className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:gap-12">
         {/* Step rail — desktop */}
         <div className="hidden lg:col-span-4 lg:block">
           <ol className="flex flex-col gap-2">
@@ -132,10 +132,10 @@ export function Workflow() {
                     onClick={() => select(s.key)}
                     aria-current={isActive ? "step" : undefined}
                     className={cn(
-                      "group relative w-full overflow-hidden rounded-2xl border p-5 text-left transition-colors duration-200",
+                      "group relative w-full cursor-pointer overflow-hidden rounded-2xl border p-5 text-left transition-all duration-200",
                       isActive
-                        ? "border-border bg-card shadow-card"
-                        : "border-transparent hover:border-border/60 hover:bg-card/50",
+                        ? "border-border bg-card shadow-card-hover"
+                        : "border-border/60 bg-secondary/50 hover:-translate-y-px hover:border-border hover:bg-secondary/70",
                     )}
                   >
                     <div className="flex items-start gap-4">
