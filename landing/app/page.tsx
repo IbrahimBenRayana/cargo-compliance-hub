@@ -12,12 +12,12 @@ import HomeClient from "./home-client";
 export const metadata: Metadata = {
   title: "MyCargoLens — CBP Compliance Platform",
   description:
-    "An inbox for US customs. File ISF, Entry, and In-Bond in one calm workspace — with an AI Coach for every CBP rejection.",
+    "Know which CBP filing needs you now. File ISF, Entry, and In-Bond in one calm workspace — with an AI Coach for every rejection.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "MyCargoLens — CBP Compliance Platform",
     description:
-      "An inbox for US customs. File ISF, Entry, and In-Bond in one calm workspace — with an AI Coach for every CBP rejection.",
+      "Know which CBP filing needs you now. File ISF, Entry, and In-Bond in one calm workspace — with an AI Coach for every rejection.",
     url: "https://mycargolens.com",
     type: "website",
     siteName: "MyCargoLens",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "MyCargoLens — CBP Compliance Platform",
     description:
-      "An inbox for US customs. File ISF, Entry, and In-Bond in one calm workspace.",
+      "Know which CBP filing needs you now. File ISF, Entry, and In-Bond in one calm workspace.",
   },
 };
 

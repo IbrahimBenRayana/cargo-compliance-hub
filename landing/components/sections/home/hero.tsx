@@ -16,8 +16,7 @@ import { cn } from "@/lib/utils";
 const EASE_OUT_QUART = [0.25, 1, 0.5, 1] as const;
 const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const;
 
-const HEADLINE_BEFORE = "An inbox for US customs.";
-const HEADLINE_HIGHLIGHT = "Not another dashboard.";
+const HEADLINE = "Know which filing needs you now.";
 
 const STATS: { value: string; label: string }[] = [
   { value: "99.8%", label: "CBP acceptance" },
@@ -87,7 +86,7 @@ export function Hero() {
     <section className="relative overflow-hidden py-16 md:py-20 lg:py-24">
       <HeroBackground />
       <Container className="relative z-10">
-        <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-8">
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
           {/* Copy column */}
           <motion.div
             initial="hidden"
@@ -122,12 +121,7 @@ export function Hero() {
             </motion.span>
 
             <h1 className="mb-6 w-full break-words text-[2rem] font-semibold leading-[1.08] tracking-tight text-foreground sm:text-4xl md:text-5xl xl:text-[3.4rem]">
-              <HeadlineWords text={HEADLINE_BEFORE} delayChildren={0.1} />
-              <HeadlineWords
-                text={HEADLINE_HIGHLIGHT}
-                delayChildren={0.35}
-                highlightLast
-              />
+              <HeadlineWords text={HEADLINE} delayChildren={0.1} highlightLast />
             </h1>
 
             <motion.p
@@ -141,9 +135,10 @@ export function Hero() {
               }}
               className="mb-8 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg"
             >
-              MyCargoLens ranks every filing by urgency, explains every CBP
+              MyCargoLens ranks every CBP filing by urgency, explains every
               rejection in plain English, and tracks ADD/CVD, UFLPA, and
-              liquidation deadlines — in one calm surface for ops teams.
+              liquidation deadlines. An inbox for US customs — not another
+              dashboard.
             </motion.p>
 
             <motion.div
