@@ -31,7 +31,12 @@ import { Wordmark } from "@/components/wordmark";
 import { Container } from "@/components/ui/container";
 import { Magnetic } from "@/components/ui/magnetic";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Donut } from "@/components/ui/donut";
+import { SeverityPill } from "@/components/ui/severity-pill";
+import {
+  CHANGELOG_ENTRIES,
+  KIND_LABEL,
+  KIND_TONE,
+} from "@/lib/changelog";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -636,47 +641,57 @@ function PlatformPanel({ close }: { close: () => void }) {
         </Link>
       </motion.div>
 
-      {/* Featured rail — a living sliver of the product */}
+      {/* "What's new" rail — real release notes, straight from the
+          changelog. The GitHub/Linear nav pattern: evergreen product
+          proof instead of mocked data. */}
       <motion.div
-        initial={{ opacity: 0, x: 8 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.3, delay: 0.08, ease: EASE }}
-        className="border-l border-border/50 bg-secondary/30 px-4 py-5"
+        initial="hidden"
+        animate="visible"
+        variants={listVariants}
+        className="flex flex-col border-l border-border/50 bg-secondary/30 px-4 py-5"
       >
-        <p className="mb-3 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          <span className="relative flex size-1.5" aria-hidden>
-            <span className="absolute inline-flex size-full rounded-full bg-emerald-500/60 motion-safe:animate-ping" />
-            <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-          </span>
-          Live in the app
-        </p>
-        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-card">
-          <div className="flex items-center gap-2.5">
-            <Donut value={86} tone="gold" size={38} strokeWidth={3.5} showLabel delay={0.25} />
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                Today&apos;s brief
-              </p>
-              <p className="mt-0.5 truncate text-[11.5px] font-medium leading-snug text-foreground">
-                3 drafts waiting on you.
-              </p>
-            </div>
-          </div>
-          <p className="mt-2.5 border-t border-border/50 pt-2 font-mono text-[10px] tabular-nums text-muted-foreground">
-            Polling CBP every 5 minutes
-          </p>
-        </div>
-        <Link
-          href="/book-a-demo"
-          onClick={close}
-          className="group mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-foreground transition-colors hover:text-gold-dark dark:hover:text-gold"
+        <motion.p
+          variants={itemVariants}
+          className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground"
         >
-          See it on your data
-          <ArrowRight
-            size={12}
-            className="transition-transform duration-200 group-hover:translate-x-0.5"
-          />
-        </Link>
+          What&apos;s new
+        </motion.p>
+        <ul className="flex flex-1 flex-col gap-0.5">
+          {CHANGELOG_ENTRIES.slice(0, 3).map((entry) => (
+            <motion.li key={`${entry.date}-${entry.title}`} variants={itemVariants}>
+              <Link
+                href="/changelog"
+                onClick={close}
+                className="group -mx-2 block rounded-lg px-2 py-2 transition-colors hover:bg-background/70"
+              >
+                <div className="flex items-center gap-2">
+                  <SeverityPill tone={KIND_TONE[entry.kind]}>
+                    {KIND_LABEL[entry.kind]}
+                  </SeverityPill>
+                  <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                    {entry.date.slice(5).replace("-", "/")}
+                  </span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-snug text-foreground/90 transition-colors group-hover:text-foreground">
+                  {entry.title}
+                </p>
+              </Link>
+            </motion.li>
+          ))}
+        </ul>
+        <motion.div variants={itemVariants}>
+          <Link
+            href="/changelog"
+            onClick={close}
+            className="group mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-foreground transition-colors hover:text-gold-dark dark:hover:text-gold"
+          >
+            View changelog
+            <ArrowRight
+              size={12}
+              className="transition-transform duration-200 group-hover:translate-x-0.5"
+            />
+          </Link>
+        </motion.div>
       </motion.div>
     </div>
   );
