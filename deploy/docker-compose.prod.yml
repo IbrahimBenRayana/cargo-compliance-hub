@@ -118,6 +118,11 @@ services:
       # The app's env.ts enforces the requirement, so pass-through ( :- ) here.
       CHAT_ENABLED:        ${CHAT_ENABLED:-true}
       CHAT_SESSION_SECRET: ${CHAT_SESSION_SECRET:-}
+
+      # MFA — AES-256-GCM key (64 hex chars) encrypting TOTP secrets at rest.
+      # Required in prod (env.ts enforces); synced from the MFA_ENC_KEY
+      # GitHub Environment secret into .env on deploy, so pass-through here.
+      MFA_ENC_KEY:         ${MFA_ENC_KEY:-}
       CHAT_MAX_TOKENS:     ${CHAT_MAX_TOKENS:-1024}
       CHAT_MAX_HISTORY:    ${CHAT_MAX_HISTORY:-12}
       CHAT_ANON_DAILY_CAP: ${CHAT_ANON_DAILY_CAP:-30}

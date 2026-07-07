@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { NotificationBell } from '@/components/NotificationBell';
+import { MfaNagBanner } from '@/components/MfaNagBanner';
 import { ChatWidget } from '@/components/chat/ChatWidget';
 import { useAuthStore, useLogout } from '@/hooks/useAuth';
 import { useNotificationStream } from '@/hooks/useNotificationStream';
@@ -110,6 +111,9 @@ export function AppLayout() {
               </DropdownMenu>
             </div>
           </header>
+
+          {/* Existing-user prompt to enable 2FA (dismissible, 7-day snooze) */}
+          <MfaNagBanner />
 
           {/* ── Page Content ── */}
           <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto p-6">

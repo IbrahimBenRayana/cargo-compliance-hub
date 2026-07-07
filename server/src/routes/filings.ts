@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
+import { requireMfaEnrolled } from '../middleware/requireMfaEnrolled.js';
 import { ccClient, mapFilingToCC, mapFilingToISF5CC, mapFilingToCCPayload } from '../services/customscity.js';
 import { validateFiling, isValidTransition, getAllowedTransitions, ValidationResult } from '../services/validation.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
@@ -404,7 +405,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 });
 
 // ─── POST /api/v1/filings/:id/submit — Submit to CBP ──────
-router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const outcome = await submitFilingToCBP({
     filingId: paramId(req),
     orgId: req.user!.orgId,
@@ -415,7 +416,7 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, async (req: AuthR
 });
 
 // ─── POST /api/v1/filings/:id/amend — Submit amendment ─────
-router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const filing = await prisma.filing.findFirst({
     where: { id: paramId(req), orgId: req.user!.orgId },
   });
@@ -559,7 +560,7 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, async (req: AuthRe
 });
 
 // ─── POST /api/v1/filings/:id/cancel — Cancel a filing ────
-router.post('/:id/cancel', filingMutationLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/cancel', filingMutationLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const filing = await prisma.filing.findFirst({
     where: { id: paramId(req), orgId: req.user!.orgId },
   });
@@ -1206,7 +1207,7 @@ router.post('/:id/save-template', filingMutationLimiter, async (req: AuthRequest
 });
 
 // ─── POST /api/v1/filings/bulk-submit — Submit multiple draft filings ──
-router.post('/bulk-submit', filingMutationLimiter, ccApiLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/bulk-submit', filingMutationLimiter, ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { filingIds } = req.body;
     if (!Array.isArray(filingIds) || filingIds.length === 0) {

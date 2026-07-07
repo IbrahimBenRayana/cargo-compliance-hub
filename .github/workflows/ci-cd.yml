@@ -285,11 +285,15 @@ jobs:
           # Required in production (server env.ts rejects the dev default when
           # CHAT_ENABLED). Set as an Environment secret per env (staging/production).
           CHAT_SESSION_SECRET:      ${{ secrets.CHAT_SESSION_SECRET }}
+          # MFA — AES-256-GCM key (64 hex chars) encrypting TOTP secrets at
+          # rest. Required in production (server env.ts rejects a missing key).
+          # Set as an Environment secret per env (staging/production).
+          MFA_ENC_KEY:              ${{ secrets.MFA_ENC_KEY }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: NEW_TAG,AI_ASSESSMENT_ENABLED,AI_PROVIDER,AI_MODEL,AI_API_KEY,AI_MAX_TOKENS,AI_TEMPERATURE,AI_RATE_LIMIT_PER_USER,AI_DISABLE_TRAINING_DATA,TERMINAL49_API_BASE_URL,TERMINAL49_API_KEY,CC_API_TOKEN,CC_ENVIRONMENT,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,STRIPE_PUBLISHABLE_KEY,JWT_ACCESS_SECRET,JWT_REFRESH_SECRET,EMAIL_USER,EMAIL_PASS,SENTRY_DSN,SENTRY_ENVIRONMENT,CHAT_SESSION_SECRET
+          envs: NEW_TAG,AI_ASSESSMENT_ENABLED,AI_PROVIDER,AI_MODEL,AI_API_KEY,AI_MAX_TOKENS,AI_TEMPERATURE,AI_RATE_LIMIT_PER_USER,AI_DISABLE_TRAINING_DATA,TERMINAL49_API_BASE_URL,TERMINAL49_API_KEY,CC_API_TOKEN,CC_ENVIRONMENT,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,STRIPE_PUBLISHABLE_KEY,JWT_ACCESS_SECRET,JWT_REFRESH_SECRET,EMAIL_USER,EMAIL_PASS,SENTRY_DSN,SENTRY_ENVIRONMENT,CHAT_SESSION_SECRET,MFA_ENC_KEY
           script: |
             set -euo pipefail
             cd /opt/mycargolens
@@ -332,7 +336,7 @@ jobs:
                        AI_MAX_TOKENS AI_TEMPERATURE AI_RATE_LIMIT_PER_USER \
                        AI_DISABLE_TRAINING_DATA \
                        TERMINAL49_API_BASE_URL TERMINAL49_API_KEY \
-                       CHAT_SESSION_SECRET; do
+                       CHAT_SESSION_SECRET MFA_ENC_KEY; do
               # The :- handles the case where the var is unset entirely (set -u
               # would otherwise blow up here). If empty, unset it; printf the
               # outcome so deploy logs make the decision auditable.
@@ -387,6 +391,7 @@ jobs:
             upsert_env SENTRY_DSN "${SENTRY_DSN:-}"
             upsert_env SENTRY_ENVIRONMENT "${SENTRY_ENVIRONMENT:-}"
             upsert_env CHAT_SESSION_SECRET "${CHAT_SESSION_SECRET:-}"
+            upsert_env MFA_ENC_KEY "${MFA_ENC_KEY:-}"
             echo "▶ AI_* + TERMINAL49_* + rotatable secrets synced from GitHub Secrets"
 
             # The compose file is now sourced verbatim from

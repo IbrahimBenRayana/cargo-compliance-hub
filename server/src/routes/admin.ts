@@ -131,6 +131,8 @@ router.post('/organizations', async (req: AuthRequest, res: Response): Promise<v
         lastName: data.ownerLastName,
         role: 'owner',
         emailVerified: false, // flipped true when they set their password
+        // Provisioned client owners must enroll in MFA at first login.
+        mfaEnforced: true,
       },
     });
     await tx.subscription.create({

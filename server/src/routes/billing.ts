@@ -5,6 +5,7 @@ import Stripe from 'stripe';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
+import { requireMfaEnrolled } from '../middleware/requireMfaEnrolled.js';
 import {
   getStripe,
   stripeConfigured,
@@ -236,7 +237,7 @@ router.post('/select-tier', async (req: AuthRequest, res: Response): Promise<voi
 
 // POST /api/v1/billing/setup-intent → { clientSecret }
 // Starts saving a card. Requires a selected tier (so we have a billing row).
-router.post('/setup-intent', requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/setup-intent', requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   if (!stripeConfigured()) {
     res.status(503).json({ error: 'Billing not configured. Contact support.' });
     return;
@@ -259,7 +260,7 @@ router.post('/setup-intent', requireVerifiedEmail, async (req: AuthRequest, res:
 // POST /api/v1/billing/card  { setupIntentId }
 // Confirm a saved card: set it as the default payment method, store the display
 // summary, and reattempt any unsettled charges (clearing delinquency on success).
-router.post('/card', requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/card', requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   if (!stripeConfigured()) {
     res.status(503).json({ error: 'Billing not configured' });
     return;

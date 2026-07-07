@@ -23,6 +23,7 @@ import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
+import { requireMfaEnrolled } from '../middleware/requireMfaEnrolled.js';
 import { requireCapability } from '../middleware/requireCapability.js';
 import { CAPABILITIES } from '../config/plans.js';
 import * as t49 from '../services/terminal49.js';
@@ -149,7 +150,7 @@ const createSchema = z.object({
   refNumbers:    z.array(z.string().trim().min(1)).max(20).optional(),
 });
 
-router.post('/', requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/', requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid body', details: parsed.error.flatten() });

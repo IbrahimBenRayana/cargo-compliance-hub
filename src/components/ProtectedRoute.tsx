@@ -53,6 +53,18 @@ export function ProtectedRoute() {
     return <Navigate to={verifyUrl} replace />;
   }
 
+  // MFA-enrollment gate — sits AFTER the email-verify gate. When the org
+  // enforces MFA and the user hasn't enrolled (mfaSetupRequired), force them
+  // to /mfa-setup, which we whitelist so they can actually reach it. The
+  // server-side requireMfaEnrolled middleware is the load-bearing gate; this
+  // is UX so the user doesn't hit raw 403s mid-flow.
+  if (
+    user && user.mfaSetupRequired === true &&
+    location.pathname !== '/mfa-setup'
+  ) {
+    return <Navigate to="/mfa-setup" replace />;
+  }
+
   // If onboarding not completed and not already on onboarding page, redirect.
   // Also let /verify-email through so unverified-with-incomplete-onboarding
   // users hit the verify gate first (handled above) and aren't bounced here.

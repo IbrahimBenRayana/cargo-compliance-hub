@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authApi, setAccessToken, clearTokens } from '../api/client';
 import { create } from 'zustand';
-import type { User } from '../types/auth';
+import type { MfaMethod, User } from '../types/auth';
+import { isMfaChallenge } from '../types/auth';
 
 // ─── Auth Store (Zustand) ─────────────────────────────────
 interface AuthState {
@@ -29,6 +30,27 @@ export function useLogin() {
   return useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) =>
       authApi.login(email, password),
+    onSuccess: (data) => {
+      // When the account has MFA, login returns an MfaChallenge with no
+      // session — do NOT establish an authenticated session here. The
+      // LoginPage inspects the result and drives the challenge step; the
+      // real session lands via useMfaVerify().
+      if (isMfaChallenge(data)) return;
+      setAccessToken(data.accessToken);
+      setUser(data.user);
+    },
+  });
+}
+
+/**
+ * Second step of MFA login: exchange the challenge mfaToken + a code for a
+ * real session. On success it establishes the session exactly like login.
+ */
+export function useMfaVerify() {
+  const setUser = useAuthStore((s) => s.setUser);
+  return useMutation({
+    mutationFn: ({ mfaToken, method, code }: { mfaToken: string; method: MfaMethod; code: string }) =>
+      authApi.mfaVerify(mfaToken, method, code),
     onSuccess: (data) => {
       setAccessToken(data.accessToken);
       setUser(data.user);

@@ -16,6 +16,7 @@ import {
   CreditCard,
   XOctagon,
   UserPlus,
+  ShieldAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -57,6 +58,8 @@ const typeConfig: Record<string, { icon: React.ElementType; color: string; bg: s
   billing_payment_failed:        { icon: XOctagon,   color: 'text-red-500',   bg: 'bg-red-500/10'   },
   // Team
   team_member_joined: { icon: UserPlus,    color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+  // Security
+  security_mfa_prompt: { icon: ShieldAlert, color: 'text-amber-500',   bg: 'bg-amber-500/10'   },
   // System
   api_error:        { icon: AlertCircle,   color: 'text-red-500',     bg: 'bg-red-500/10'     },
 };

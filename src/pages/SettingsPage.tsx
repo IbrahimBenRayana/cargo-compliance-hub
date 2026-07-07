@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
+import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
 import { BillingSettings } from '@/components/billing/BillingSettings';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -347,6 +348,8 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              <TwoFactorSettings />
             </>
           )}
 

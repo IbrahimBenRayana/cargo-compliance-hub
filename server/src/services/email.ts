@@ -489,6 +489,160 @@ export async function sendVerificationCodeEmail(params: {
   });
 }
 
+/**
+ * MFA sign-in code (email OTP fallback). Same 6-digit code block styling as the
+ * email-verification template — different heading + purpose.
+ */
+export async function sendMfaCodeEmail(params: {
+  to: string;
+  firstName?: string | null;
+  code: string;
+  expiresInMin: number;
+}): Promise<boolean> {
+  const codeFormatted = `${params.code.slice(0, 3)}&nbsp;&nbsp;${params.code.slice(3)}`;
+  const greeting = params.firstName ? `Hi ${params.firstName},` : 'Hi there,';
+
+  const body = `
+    <h2 style="margin:0 0 12px; font-size:20px; font-weight:600; color:#0f172a;">Your sign-in code</h2>
+    <p style="margin:0 0 20px; font-size:15px; line-height:1.6; color:#475569;">
+      ${greeting} use the code below to finish signing in to MyCargoLens.
+    </p>
+
+    <!-- Code block -->
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 24px; border-collapse:separate;">
+      <tr>
+        <td style="
+          padding:20px 32px;
+          background:#f8fafc;
+          border:1px solid #e2e8f0;
+          border-radius:10px;
+          text-align:center;
+        ">
+          <div style="font-size:11px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#64748b; margin-bottom:8px;">
+            Sign-in code
+          </div>
+          <div style="font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size:32px; font-weight:600; letter-spacing:0.18em; color:#0f172a; line-height:1;">
+            ${codeFormatted}
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:0 0 20px; font-size:14px; line-height:1.6; color:#475569; text-align:center;">
+      This code expires in <strong>${params.expiresInMin} minutes</strong>.
+    </p>
+
+    <hr style="margin:28px 0 16px; border:none; border-top:1px solid #e2e8f0;" />
+    <p style="margin:0; font-size:12px; line-height:1.6; color:#94a3b8;">
+      If you didn't try to sign in, someone may have your password — change it and contact support@mycargolens.com.
+    </p>
+  `;
+
+  return sendMail({
+    to: params.to,
+    subject: `Your MyCargoLens sign-in code: ${params.code}`,
+    html: wrapTemplate(body),
+  });
+}
+
+/**
+ * Security notice: two-factor authentication was enabled on the account.
+ */
+export async function sendMfaEnabledEmail(params: {
+  to: string;
+  firstName?: string | null;
+}): Promise<boolean> {
+  const greeting = params.firstName ? `Hi ${params.firstName},` : 'Hi there,';
+  const body = `
+    <h2 style="margin:0 0 12px; font-size:20px; font-weight:600; color:#0f172a;">Two-factor authentication enabled</h2>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      ${greeting} two-factor authentication (2FA) was just turned on for your MyCargoLens account.
+      From now on you'll enter a code from your authenticator app when you sign in.
+    </p>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      Keep your recovery codes somewhere safe — they're the way back in if you lose your device.
+    </p>
+    <hr style="margin:24px 0 16px; border:none; border-top:1px solid #e2e8f0;" />
+    <p style="margin:0; font-size:13px; line-height:1.6; color:#64748b;">
+      If this wasn't you, your account may be compromised — contact support@mycargolens.com right away.
+    </p>
+  `;
+
+  return sendMail({
+    to: params.to,
+    subject: 'Two-factor authentication was enabled on your account',
+    html: wrapTemplate(body),
+  });
+}
+
+/**
+ * Security notice: two-factor authentication was disabled on the account.
+ */
+export async function sendMfaDisabledEmail(params: {
+  to: string;
+  firstName?: string | null;
+}): Promise<boolean> {
+  const greeting = params.firstName ? `Hi ${params.firstName},` : 'Hi there,';
+  const body = `
+    <h2 style="margin:0 0 12px; font-size:20px; font-weight:600; color:#0f172a;">Two-factor authentication disabled</h2>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      ${greeting} two-factor authentication (2FA) was just turned off for your MyCargoLens account.
+      Your account is now protected by your password alone.
+    </p>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      We recommend keeping 2FA on. You can re-enable it any time from Settings → Password &amp; Security.
+    </p>
+    <hr style="margin:24px 0 16px; border:none; border-top:1px solid #e2e8f0;" />
+    <p style="margin:0; font-size:13px; line-height:1.6; color:#64748b;">
+      If this wasn't you, your account may be compromised — contact support@mycargolens.com right away.
+    </p>
+  `;
+
+  return sendMail({
+    to: params.to,
+    subject: 'Two-factor authentication was disabled on your account',
+    html: wrapTemplate(body),
+  });
+}
+
+/**
+ * Security notice: a recovery code was used to sign in / recover the account.
+ */
+export async function sendMfaRecoveryCodeUsedEmail(params: {
+  to: string;
+  firstName?: string | null;
+  remainingCodes: number;
+}): Promise<boolean> {
+  const greeting = params.firstName ? `Hi ${params.firstName},` : 'Hi there,';
+  const lowWarning =
+    params.remainingCodes <= 2
+      ? `<p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#b45309;">
+           You're running low on recovery codes. Generate a fresh set from
+           Settings → Password &amp; Security so you don't get locked out.
+         </p>`
+      : '';
+  const body = `
+    <h2 style="margin:0 0 12px; font-size:20px; font-weight:600; color:#0f172a;">A recovery code was used</h2>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      ${greeting} one of your MyCargoLens recovery codes was just used to sign in.
+      You have <strong>${params.remainingCodes}</strong> recovery ${
+        params.remainingCodes === 1 ? 'code' : 'codes'
+      } left.
+    </p>
+    ${lowWarning}
+    <hr style="margin:24px 0 16px; border:none; border-top:1px solid #e2e8f0;" />
+    <p style="margin:0; font-size:13px; line-height:1.6; color:#64748b;">
+      If this wasn't you, your account may be compromised — contact support@mycargolens.com right away.
+    </p>
+  `;
+
+  return sendMail({
+    to: params.to,
+    subject: 'A recovery code was used on your account',
+    html: wrapTemplate(body),
+  });
+}
+
 // ─── Phase 6: Generic notification renderer ──────────────────────────
 // Used by the delivery worker to render any notification into a sendable
 // email. Delegates to the existing specialized templates for the four
