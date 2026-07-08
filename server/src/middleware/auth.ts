@@ -31,7 +31,18 @@ export async function authMiddleware(
       email: string;
       orgId: string;
       role: string;
+      typ?: string;
     };
+
+    // Type-confusion guard: a normal access token carries NO `typ` claim.
+    // Partial-auth MFA tokens (typ: 'mfa') are signed with the same
+    // JWT_ACCESS_SECRET, so without this check an mfaToken would sail through
+    // here and grant a full session before the second factor is proven.
+    // Reject anything carrying a `typ` claim outright.
+    if (decoded.typ !== undefined) {
+      res.status(401).json({ error: 'Invalid token' });
+      return;
+    }
 
     // Verify user still exists and is active
     const user = await prisma.user.findUnique({

@@ -18,6 +18,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { authMiddleware, requireRole } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
+import mfaRoutes from './routes/mfa.js';
 import adminRoutes from './routes/admin.js';
 import apiKeyRoutes from './routes/apiKeys.js';
 import webhookRoutes from './routes/webhooks.js';
@@ -128,6 +129,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 // ─── API Routes (v1) ─────────────────────────────────────
+app.use('/api/v1/auth/mfa', mfaRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/api-keys', apiKeyRoutes);

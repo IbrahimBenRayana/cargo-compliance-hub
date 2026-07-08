@@ -2,6 +2,7 @@ import { Router, type Response } from 'express';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
+import { requireMfaEnrolled } from '../middleware/requireMfaEnrolled.js';
 import { requireCapability } from '../middleware/requireCapability.js';
 import { CAPABILITIES } from '../config/plans.js';
 import { billShipment } from '../services/shipmentBilling.js';
@@ -192,7 +193,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
 // ── POST /:id/send — Transmit to CC ────────────────────
 
-router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const outcome = await sendAbiDocumentToCBP({
     docId: id,
@@ -205,7 +206,7 @@ router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, async (req: AuthReq
 
 // ── POST /:id/poll — Manual re-poll ────────────────────
 
-router.post('/:id/poll', ccApiLimiter, requireVerifiedEmail, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/poll', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
   const doc = await prisma.abiDocument.findFirst({

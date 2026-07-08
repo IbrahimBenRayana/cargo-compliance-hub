@@ -2,7 +2,7 @@
  * API Client — Typed fetch wrapper with auto-refresh JWT tokens
  */
 
-import type { AuthSession, User } from '@/types/auth';
+import type { AuthSession, LoginResult, MfaMethod, User } from '@/types/auth';
 import type { Filing } from '@/types/shipment';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -122,6 +122,18 @@ async function apiFetch<T = any>(
       window.location.href = `/verify-email?redirect=${encodeURIComponent(intent)}`;
       throw new Error('Email verification required');
     }
+    // MFA-enrollment gate: server returned 403 with code='mfa_enrollment_required'
+    // (org enforces MFA, user hasn't enrolled). Mirror the email-verify bounce —
+    // send a stale tab to /mfa-setup rather than surfacing a raw 403.
+    if (
+      response.status === 403 &&
+      errorBody?.code === 'mfa_enrollment_required' &&
+      typeof window !== 'undefined' &&
+      !window.location.pathname.startsWith('/mfa-setup')
+    ) {
+      window.location.href = '/mfa-setup';
+      throw new Error('MFA enrollment required');
+    }
     const error = new Error(errorBody.error || `HTTP ${response.status}`);
     (error as any).status = response.status;
     (error as any).body = errorBody;
@@ -198,11 +210,35 @@ export const authApi = {
   },
 
   login(email: string, password: string) {
-    return apiFetch<AuthSession>('/api/v1/auth/login', {
+    // May resolve to a full AuthSession OR an MfaChallenge ({ mfaRequired,
+    // mfaToken, methods }) when the account has MFA enabled — the caller
+    // discriminates via isMfaChallenge().
+    return apiFetch<LoginResult>('/api/v1/auth/login', {
       method: 'POST',
       credentials: 'include',
       body: JSON.stringify({ email, password }),
     });
+  },
+
+  /**
+   * Exchange the login mfaToken + a second-factor code for a real session.
+   * No Authorization header — the mfaToken travels in the body. Sends the
+   * refresh cookie back (credentials:'include'), identical to login success.
+   */
+  mfaVerify(mfaToken: string, method: MfaMethod, code: string) {
+    return apiFetch<AuthSession>('/api/v1/auth/mfa/verify', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ mfaToken, method, code }),
+    });
+  },
+
+  /** Trigger the email-OTP fallback for the current login challenge. */
+  mfaEmailSend(mfaToken: string) {
+    return apiFetch<{ ok: boolean; expiresInMin: number; cooldownSec: number }>(
+      '/api/v1/auth/mfa/email/send',
+      { method: 'POST', body: JSON.stringify({ mfaToken }) },
+    );
   },
 
   logout() {
@@ -633,6 +669,39 @@ export const settingsApi = {
     }
     const qs = query.toString();
     return apiFetch<PaginatedResponse<AuditLogEntry>>(`/api/v1/settings/audit-log${qs ? `?${qs}` : ''}`);
+  },
+
+  // ── Two-factor authentication (authed; re-auth via password) ──
+  /** Begin enrollment: re-auth with password, get a pending TOTP secret + QR URI. */
+  mfaSetup(password: string) {
+    return apiFetch<{ otpauthUri: string; secretBase32: string }>('/api/v1/auth/mfa/setup', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+  },
+
+  /** Activate MFA by confirming a live code against the pending secret; returns recovery codes. */
+  mfaEnable(code: string) {
+    return apiFetch<{ recoveryCodes: string[] }>('/api/v1/auth/mfa/enable', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  },
+
+  /** Turn MFA off — requires password + a current TOTP or recovery code. */
+  mfaDisable(password: string, code: string) {
+    return apiFetch<{ ok: true }>('/api/v1/auth/mfa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ password, code }),
+    });
+  },
+
+  /** Regenerate the recovery-code set (invalidates the old one). */
+  mfaRecoveryCodes(password: string) {
+    return apiFetch<{ recoveryCodes: string[] }>('/api/v1/auth/mfa/recovery-codes', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
   },
 };
 

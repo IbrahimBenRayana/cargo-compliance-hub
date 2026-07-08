@@ -62,6 +62,19 @@ model User {
   failedAttempts  Int       @default(0) @map("failed_attempts")
   lockedUntil     DateTime? @map("locked_until") @db.Timestamptz()
   refreshToken    String?   @map("refresh_token")
+  // ── Multi-factor auth (TOTP + email OTP fallback + recovery codes) ──
+  // Secrets are AES-256-GCM encrypted at rest (services/mfaCrypto.ts); the
+  // pending secret is the verify-before-activate staging slot (15-min TTL).
+  // mfaLastUsedStep is the RFC 6238 replay guard (reject any matched step ≤
+  // the last one accepted). mfaEnforced hard-gates enrollment at first login.
+  mfaEnabled          Boolean   @default(false) @map("mfa_enabled")
+  mfaSecretEnc        String?   @map("mfa_secret_enc")
+  mfaPendingSecretEnc String?   @map("mfa_pending_secret_enc")
+  mfaPendingCreatedAt DateTime? @map("mfa_pending_created_at") @db.Timestamptz()
+  mfaLastUsedStep     Int?      @map("mfa_last_used_step")
+  mfaEnrolledAt       DateTime? @map("mfa_enrolled_at") @db.Timestamptz()
+  mfaEnforced         Boolean   @default(false) @map("mfa_enforced")
+  mfaFailedAttempts   Int       @default(0) @map("mfa_failed_attempts")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
@@ -79,6 +92,8 @@ model User {
   abiDocuments            AbiDocument[]
   emailVerificationTokens EmailVerificationToken[]
   passwordSetupTokens     PasswordSetupToken[]
+  mfaRecoveryCodes        MfaRecoveryCode[]
+  mfaEmailCodes           MfaEmailCode[]
   trackedShipments        TrackedShipment[]
   apiKeys                 ApiKey[]                 @relation("ApiKeyCreator")
   chatConversations       ChatConversation[]       @relation("ChatUser")
@@ -198,6 +213,42 @@ model EmailVerificationToken {
   // for this user" which is (userId, consumedAt, createdAt DESC).
   @@index([userId, consumedAt, createdAt])
   @@map("email_verification_tokens")
+}
+
+// ─── MFA Recovery Codes ────────────────────────────────────
+// Single-use break-glass codes (format XXXXX-XXXXX) shown exactly once at
+// enrollment / regeneration. Stored as bcrypt hashes; usedAt stamps a code
+// spent so it can't be replayed. Regenerating deletes the prior set.
+model MfaRecoveryCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @map("code_hash") @db.VarChar(255)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
+}
+
+// ─── MFA Email Codes ───────────────────────────────────────
+// 6-digit email OTP fallback (for users who can't use an authenticator).
+// bcrypt-hashed, 5-min TTL, 5 attempts/code, one active code at a time.
+// Mirrors the email_verification_tokens lifecycle.
+model MfaEmailCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  codeHash   String    @map("code_hash") @db.VarChar(255)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz()
+  attempts   Int       @default(0)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz()
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_email_codes")
 }
 
 // ─── ISF Filings ───────────────────────────────────────────

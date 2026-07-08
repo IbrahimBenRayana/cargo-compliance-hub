@@ -15,6 +15,7 @@ import { SetPasswordPage } from "@/pages/SetPasswordPage";
 import { AdminClientsPage } from "@/pages/AdminClientsPage";
 import { AdminChatConsolePage } from "@/pages/AdminChatConsolePage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
+import MfaSetupPage from "@/pages/MfaSetupPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import UpgradePage from "@/pages/UpgradePage";
 import UpgradeSuccessPage from "@/pages/UpgradeSuccessPage";
@@ -68,6 +69,11 @@ const App = () => (
                   ProtectedRoute (auth required) but ProtectedRoute itself
                   whitelists this path so an unverified user can reach it. */}
               <Route path="/verify-email" element={<ErrorBoundary><VerifyEmailPage /></ErrorBoundary>} />
+
+              {/* Forced two-factor enrollment — full-page, no sidebar. Like
+                  /verify-email, ProtectedRoute whitelists this path so a
+                  must-enroll user can reach it. */}
+              <Route path="/mfa-setup" element={<ErrorBoundary><MfaSetupPage /></ErrorBoundary>} />
 
               {/* Onboarding — full-page, no sidebar */}
               <Route path="/onboarding" element={<ErrorBoundary><OnboardingPage /></ErrorBoundary>} />

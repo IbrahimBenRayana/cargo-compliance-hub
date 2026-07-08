@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
@@ -35,7 +36,7 @@ const REFRESH_COOKIE = 'mcl_refresh';
 const REFRESH_COOKIE_PATH = '/api/v1/auth/refresh';
 const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-function setRefreshCookie(res: Response, token: string): void {
+export function setRefreshCookie(res: Response, token: string): void {
   res.cookie(REFRESH_COOKIE, token, {
     httpOnly: true,
     // Secure attribute requires HTTPS — required in prod, would break
@@ -75,7 +76,7 @@ const loginSchema = z.object({
 });
 
 // ─── Token Helpers ────────────────────────────────────────
-function generateAccessToken(user: { id: string; email: string; orgId: string; role: string }) {
+export function generateAccessToken(user: { id: string; email: string; orgId: string; role: string }) {
   return jwt.sign(
     { sub: user.id, email: user.email, orgId: user.orgId, role: user.role },
     env.JWT_ACCESS_SECRET,
@@ -83,11 +84,25 @@ function generateAccessToken(user: { id: string; email: string; orgId: string; r
   );
 }
 
-function generateRefreshToken(userId: string) {
+export function generateRefreshToken(userId: string) {
   return jwt.sign(
     { sub: userId, type: 'refresh' },
     env.JWT_REFRESH_SECRET,
     { expiresIn: env.JWT_REFRESH_EXPIRES_IN as any }
+  );
+}
+
+// Partial-auth token issued after a correct password when the account has MFA.
+// It ONLY authorizes the /auth/mfa/* challenge endpoints — the `typ: 'mfa'`
+// claim is explicitly rejected by authMiddleware (type-confusion guard), so it
+// can never be replayed as a full access token. Short-lived (5 min) with a jti
+// for traceability. Signed with JWT_ACCESS_SECRET so mfa.ts can verify it with
+// the same secret while asserting typ === 'mfa'.
+export function generateMfaToken(userId: string) {
+  return jwt.sign(
+    { sub: userId, typ: 'mfa', jti: randomUUID() },
+    env.JWT_ACCESS_SECRET,
+    { expiresIn: '5m' }
   );
 }
 
@@ -172,6 +187,9 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
           // middleware. Existing accounts pre-dating this rollout are not
           // affected (they're already true in the DB).
           emailVerified: false,
+          // New accounts must enroll in MFA at first login — the
+          // requireMfaEnrolled gate 403s sensitive writes until they do.
+          mfaEnforced: true,
         },
       });
 
@@ -318,6 +336,26 @@ router.post('/login', authLimiter, async (req: Request, res: Response): Promise<
       return;
     }
 
+    // Password is correct. If the account has MFA enabled, STOP here: issue no
+    // session tokens, set no cookie, and don't reset failedAttempts / lastLoginAt
+    // yet — the login only completes once the second factor is proven at
+    // POST /auth/mfa/verify (which exchanges the mfaToken below for real tokens).
+    if (user.mfaEnabled) {
+      const meta = getRequestMeta(req);
+      writeAuditLog({
+        orgId: user.orgId, userId: user.id,
+        action: 'user.login_mfa_pending', entityType: 'user', entityId: user.id,
+        ...meta,
+      });
+
+      res.json({
+        mfaRequired: true,
+        mfaToken: generateMfaToken(user.id),
+        methods: ['totp', 'recovery', 'email'],
+      });
+      return;
+    }
+
     // Reset failed attempts on success
     const accessToken = generateAccessToken({
       id: user.id,
@@ -349,6 +387,8 @@ router.post('/login', authLimiter, async (req: Request, res: Response): Promise<
         lastName: user.lastName,
         role: user.role,
         isPlatformAdmin: user.isPlatformAdmin,
+        mfaEnabled: user.mfaEnabled,
+        mfaSetupRequired: user.mfaEnforced && !user.mfaEnabled,
         organization: {
           id: user.organization.id,
           name: user.organization.name,
@@ -365,6 +405,22 @@ router.post('/login', authLimiter, async (req: Request, res: Response): Promise<
       action: 'user.login', entityType: 'user', entityId: user.id,
       ...meta,
     });
+
+    // Existing-user MFA nudge: on a full (non-MFA) login, drop a one-time
+    // in-app notification prompting the user to turn on 2FA. dedupeKey makes
+    // notify() idempotent — a given user is prompted at most once, ever.
+    // Fire-and-forget and defensively wrapped so it can never break login.
+    if (!user.mfaEnabled) {
+      notify({
+        kind: 'security_mfa_prompt',
+        audience: { orgId: user.orgId, userIds: [user.id] },
+        title: 'Protect your account with two-factor authentication',
+        message:
+          'Add an extra layer of security to your MyCargoLens account. Turn on 2FA to require a code from your authenticator app when you sign in.',
+        linkUrl: '/settings?tab=profile',
+        dedupeKey: `security_mfa_prompt_${user.id}`,
+      }).catch(() => { /* never throw into the login path */ });
+    }
   } catch (err) {
     if (err instanceof z.ZodError) {
       res.status(400).json({ error: 'Validation failed', details: err.flatten() });
@@ -490,6 +546,8 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promi
     role: user.role,
     isPlatformAdmin: user.isPlatformAdmin,
     emailVerified: user.emailVerified,
+    mfaEnabled: user.mfaEnabled,
+    mfaSetupRequired: user.mfaEnforced && !user.mfaEnabled,
     organization: {
       id: user.organization.id,
       name: user.organization.name,

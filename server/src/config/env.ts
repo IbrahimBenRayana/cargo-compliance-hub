@@ -83,6 +83,16 @@ const envSchema = z.object({
   CHAT_ANON_DAILY_CAP:   z.coerce.number().int().positive().default(30),
   // Where marketing-surface escalations are emailed (reuses the ACS sender).
   CHAT_SUPPORT_EMAIL:    z.string().default('support@mycargolens.com'),
+  // Multi-factor auth — AES-256-GCM key that encrypts TOTP secrets at rest
+  // (services/mfaCrypto.ts). 32 bytes as 64 hex chars. Optional in dev (a
+  // JWT-derived key is used as a fallback), REQUIRED in production (enforced
+  // below) — losing/rotating it makes every enrolled TOTP secret undecryptable.
+  MFA_ENC_KEY: z
+    .string()
+    .refine((v) => v === '' || /^[0-9a-fA-F]{64}$/.test(v), {
+      message: 'MFA_ENC_KEY must be 64 hex characters (32 bytes)',
+    })
+    .optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -108,6 +118,10 @@ if (env.NODE_ENV === 'production') {
   if (env.CHAT_SESSION_SECRET === 'dev-chat-session-secret-change-me') {
     missing.push('CHAT_SESSION_SECRET');
   }
+  // In dev, mfaCrypto derives a key from JWT_ACCESS_SECRET; prod must supply a
+  // dedicated key so MFA secrets survive a JWT-secret rotation and can't be
+  // decrypted by anyone who only has the (shorter-lived) JWT secret.
+  if (!env.MFA_ENC_KEY) missing.push('MFA_ENC_KEY');
   if (missing.length > 0) {
     console.error(`❌ Missing required production environment variables: ${missing.join(', ')}`);
     process.exit(1);

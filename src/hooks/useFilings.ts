@@ -444,6 +444,46 @@ export function useChangePassword() {
   });
 }
 
+// ─── Two-factor authentication ────────────────────────────
+/** Begin enrollment (re-auth with password → pending secret + QR URI). */
+export function useMfaSetup() {
+  return useMutation({
+    mutationFn: ({ password }: { password: string }) => settingsApi.mfaSetup(password),
+  });
+}
+
+/** Confirm a live code → activate MFA. Refreshes the cached user's mfaEnabled. */
+export function useMfaEnable() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ code }: { code: string }) => settingsApi.mfaEnable(code),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      queryClient.invalidateQueries({ queryKey: ['settings', 'profile'] });
+    },
+  });
+}
+
+/** Disable MFA (password + TOTP/recovery code). */
+export function useMfaDisable() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ password, code }: { password: string; code: string }) =>
+      settingsApi.mfaDisable(password, code),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      queryClient.invalidateQueries({ queryKey: ['settings', 'profile'] });
+    },
+  });
+}
+
+/** Regenerate recovery codes (password re-auth). */
+export function useMfaRecoveryCodes() {
+  return useMutation({
+    mutationFn: ({ password }: { password: string }) => settingsApi.mfaRecoveryCodes(password),
+  });
+}
+
 export function useOrganization() {
   return useQuery({
     queryKey: ['settings', 'organization'],
