@@ -34,6 +34,10 @@ server/uploads/
 # Claude Code project data (skills, worktrees, local memory)
 .claude/
 
+# Agent skills installed via `npx skills add` (universal skill dir + lockfile)
+.agents/
+skills-lock.json
+
 # Landing page (Next.js)
 landing/node_modules/
 landing/.next/

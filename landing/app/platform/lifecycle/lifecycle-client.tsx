@@ -420,16 +420,16 @@ const TIMELINE = [
   { label: "CBP response", date: "Apr 12 · 09:23", status: "done" as const, badge: "rejected" as const },
   { label: "Amended", date: "Apr 12 · 11:48", status: "done" as const },
   { label: "Re-submitted", date: "Apr 12 · 11:51", status: "done" as const, badge: "accepted" as const },
-  { label: "Liquidated", date: "—", status: "pending" as const },
+  { label: "Liquidated", date: "Pending", status: "pending" as const },
 ];
 
 const SCORE_HISTORY = [
   { day: "Apr 12 · 09:14", score: 62, event: "Created · 1 critical, 2 warnings" },
   { day: "Apr 12 · 09:21", score: 62, event: "Submitted to CBP" },
-  { day: "Apr 12 · 09:23", score: 38, event: "CBP rejected — manufacturer party missing tax ID" },
-  { day: "Apr 12 · 11:48", score: 84, event: "Amended — tax ID added, pre-flight clean" },
+  { day: "Apr 12 · 09:23", score: 38, event: "CBP rejected: manufacturer party missing tax ID" },
+  { day: "Apr 12 · 11:48", score: 84, event: "Amended: tax ID added, pre-flight clean" },
   { day: "Apr 12 · 11:51", score: 84, event: "Re-submitted to CBP" },
-  { day: "Apr 12 · 11:54", score: 92, event: "Accepted by CBP — score finalised" },
+  { day: "Apr 12 · 11:54", score: 92, event: "Accepted by CBP: score finalised" },
 ];
 
 const VALIDATION_TICKER = [
@@ -488,7 +488,7 @@ export function LifecycleClient() {
       </SectionShell>
 
       {/* Score history sparkline + ticker */}
-      <SectionShell tone="muted" eyebrow="Score history" title="See your compliance score move with every event." intro="Snapshotted at every scoring event. Each row in the ticker explains the delta.">
+      <SectionShell tone="default" className="bg-muted/30" title="See your compliance score move with every event." intro="Snapshotted at every scoring event. Each row in the ticker explains the delta.">
         <div className="grid gap-6 lg:grid-cols-5">
           <div className="rounded-2xl border border-border/60 bg-card p-5 lg:col-span-2">
             <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-3">Score over time</div>
@@ -560,7 +560,7 @@ export function LifecycleClient() {
       </SectionShell>
 
       {/* Rejection card translated */}
-      <SectionShell tone="default" eyebrow="Rejections" title="CBP error codes, translated.">
+      <SectionShell tone="default" title="CBP error codes, translated.">
         <div className="grid gap-6 md:grid-cols-2">
           <div className="rounded-2xl border border-rose-500/30 bg-rose-500/5 p-5">
             <div className="flex items-center gap-2 mb-3">
@@ -588,14 +588,14 @@ Filed at: 2026-04-12T09:21:00Z`}
             <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
               <li>Open INV-4421 → Parties → Manufacturer</li>
               <li>Add the tax ID (DUNS, MID, or foreign ID accepted)</li>
-              <li>Re-submit — the bond and other parties carry over</li>
+              <li>Re-submit. The bond and other parties carry over.</li>
             </ol>
           </div>
         </div>
       </SectionShell>
 
       {/* ISF → ABI → Manifest chain */}
-      <SectionShell tone="muted" eyebrow="Lifecycle widget" title="Follow the shipment from ISF to manifest.">
+      <SectionShell tone="default" className="bg-muted/30" title="Follow the shipment from ISF to manifest.">
         <div className="rounded-2xl border border-border/60 bg-card p-6">
           <div className="grid gap-3 sm:grid-cols-3">
             {PIPELINE.map((p, i) => (
@@ -607,9 +607,9 @@ Filed at: 2026-04-12T09:21:00Z`}
                   </SeverityPill>
                 </div>
                 <div className="text-[11px] text-muted-foreground">
-                  {i === 0 && "ISF-10 accepted by CBP — manufacturer party verified"}
-                  {i === 1 && "Entry summary filed and accepted — bond posted"}
-                  {i === 2 && "Manifest live — vessel ETA Long Beach 18:30"}
+                  {i === 0 && "ISF-10 accepted by CBP. Manufacturer party verified."}
+                  {i === 1 && "Entry summary filed and accepted. Bond posted."}
+                  {i === 2 && "Manifest live. Vessel ETA Long Beach 18:30."}
                 </div>
               </div>
             ))}
@@ -618,13 +618,13 @@ Filed at: 2026-04-12T09:21:00Z`}
       </SectionShell>
 
       {/* PDF export */}
-      <SectionShell tone="default" eyebrow="PDF export" title="Every filing, exportable.">
+      <SectionShell tone="default" title="Every filing, exportable.">
         <div className="mx-auto max-w-2xl rounded-2xl border border-border/60 bg-card p-6 flex items-center gap-4">
           <IconTile icon={FileDown} hover="lift" size="lg" reveal />
           <div className="flex-1">
             <h3 className="text-base font-semibold text-foreground">One-click PDF of any filing, at any stage.</h3>
             <p className="text-sm text-muted-foreground leading-relaxed mt-1">
-              Wizard fields, CBP responses, score history, AI Coach explanations — all in one self-contained document. Use it for audits, customer hand-offs, or your records system.
+              Wizard fields, CBP responses, score history, AI Coach explanations, all in one self-contained document. Use it for audits, customer hand-offs, or your records system.
             </p>
           </div>
           <Clock size={18} className="text-muted-foreground hidden sm:block" />
