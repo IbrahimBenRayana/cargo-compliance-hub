@@ -15,6 +15,7 @@
  */
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import { emailField } from '../schemas/common.js';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '../config/database.js';
@@ -83,7 +84,7 @@ router.get('/organizations', async (_req: AuthRequest, res: Response): Promise<v
 const provisionSchema = z.object({
   companyName: z.string().min(1).max(255),
   iorNumber: z.string().max(100).optional(),
-  ownerEmail: z.string().email(),
+  ownerEmail: emailField,
   ownerFirstName: z.string().min(1).max(100),
   ownerLastName: z.string().min(1).max(100),
   planId: z.string().min(1),
