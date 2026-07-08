@@ -16,32 +16,32 @@ is missing a tax ID.
 Three fixes:
   1. Open INV-4421 → Parties → Manufacturer
   2. Add the tax ID (DUNS, MID, or foreign ID)
-  3. Re-submit — the bond carries over`;
+  3. Re-submit. The bond carries over.`;
 
 const PREFLIGHT_TEXT = `Pre-flight on INV-4502: 1 warning.
 
 HTS 6204.62.40 (women's trousers) has
 ADD/CVD watch for Chinese-origin goods.
-Confirm origin before submitting — could
+Confirm origin before submitting. It could
 trigger an additional duty deposit.`;
 
 const HTS_SUGGESTIONS = [
-  { code: "6115.96.6010", desc: "Stockings, socks — Knit — Of cotton", best: true, reason: "Best match — polyester is a synthetic fiber and athletic socks are typically knit." },
-  { code: "6115.95.6020", desc: "Stockings, socks — Synthetic fibers", best: false, reason: "Alternative — but 'cotton' subheading often used for blended athletic socks." },
-  { code: "6115.99.1410", desc: "Stockings, socks — Other textile materials", best: false, reason: "Fallback for blends with no dominant material." },
+  { code: "6115.96.6010", desc: "Stockings, socks: knit, of cotton", best: true, reason: "Best match. Polyester is a synthetic fiber and athletic socks are typically knit." },
+  { code: "6115.95.6020", desc: "Stockings, socks: synthetic fibers", best: false, reason: "Alternative. The 'cotton' subheading is often used for blended athletic socks." },
+  { code: "6115.99.1410", desc: "Stockings, socks: other textile materials", best: false, reason: "Fallback for blends with no dominant material." },
 ];
 
 const HOW_IT_WORKS = [
   { title: "The model", body: "gpt-4o via OpenAI. We send only the filing data plus the CBP response. We do not send your AR data, banking, billing, or other unrelated tenant data." },
-  { title: "The gate", body: "Gated by your team's enable flag — admin can toggle AI off per-team or per-feature. Rule-based fallback is always available." },
+  { title: "The gate", body: "Gated by your team's enable flag. An admin can toggle AI off per-team or per-feature. Rule-based fallback is always available." },
   { title: "Your data", body: "Your data is not used for model training. OpenAI's API tier we use has zero-retention by contract." },
 ];
 
 const FAQ = [
   { q: "Is the AI required to use MyCargoLens?", a: "No. AI is opt-in per team. The rule-based gate runs on every filing regardless." },
-  { q: "How long does AI Coach take to respond?", a: "First token typically 1.5–3 seconds. Full numbered fix steps in 6–12 seconds. Streams as it generates." },
+  { q: "How long does AI Coach take to respond?", a: "First token typically 1.5 to 3 seconds. Full numbered fix steps in 6 to 12 seconds. Streams as it generates." },
   { q: "What if the AI gets it wrong?", a: "You're the final reviewer. Every fix step is suggested, not auto-applied. You always click submit." },
-  { q: "Does the AI know my templates?", a: "Yes — pre-flight reads your saved templates to suggest field reuse and flag inconsistencies." },
+  { q: "Does the AI know my templates?", a: "Yes. Pre-flight reads your saved templates to suggest field reuse and flag inconsistencies." },
   { q: "Can I disable AI for sensitive filings?", a: "Yes. Mark any draft as 'AI off' and it bypasses Coach + pre-flight regardless of team setting." },
 ];
 
@@ -315,7 +315,7 @@ export function AiClient() {
       <PageHero
         label="Platform"
         title="Plain English explains every CBP rejection."
-        description="Built on gpt-4o. Reads your filing, your party data, and the CBP response. Streams numbered fix steps. Gated behind your team's enable flag — toggle off anytime."
+        description="Built on gpt-4o. Reads your filing, your party data, and the CBP response. Streams numbered fix steps. Gated behind your team's enable flag, so you can toggle it off anytime."
         breadcrumbs={[
           { label: "Platform", href: "/features" },
           { label: "AI", href: "/platform/ai" },
@@ -348,7 +348,7 @@ export function AiClient() {
                 With AI enabled
               </div>
               <div className="rounded-lg border border-gold/30 bg-gold/5 p-3 text-[12.5px] text-foreground font-medium leading-snug">
-                "Three drafts waiting on you. Run an AI pre-flight before submitting — one rejection blocking re-file."
+                "Three drafts waiting on you. Run an AI pre-flight before submitting. One rejection is blocking re-file."
               </div>
             </div>
 
@@ -371,16 +371,16 @@ export function AiClient() {
             {/* Pulse — the AI Coach feels alive. Only one of the three AI
                 cards gets the continuous breath so it doesn't compete. */}
             <IconTile icon={Bot} hover="pulse" reveal revealDelay={0.08} className="size-9 mb-4" />
-            <h3 className="text-base font-semibold text-foreground mb-2">AI Coach — rejection mode</h3>
+            <h3 className="text-base font-semibold text-foreground mb-2">AI Coach: rejection mode</h3>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-1">
-              When CBP rejects, the Coach reads the error code, your filing, and party data — then streams numbered fix steps.
+              When CBP rejects, the Coach reads the error code, your filing, and party data, then streams numbered fix steps.
             </p>
             <CodeStream variant="chat" replayOnView speed={18} text={REJECTION_TEXT} ariaLabel="AI rejection example" className="h-[260px] overflow-hidden" />
           </li>
 
           <li className="rounded-2xl border border-border/60 bg-card p-5 flex flex-col min-h-[520px]">
             <IconTile icon={Sparkles} hover="wiggle" reveal revealDelay={0.16} className="size-9 mb-4" />
-            <h3 className="text-base font-semibold text-foreground mb-2">AI Coach — pre-flight mode</h3>
+            <h3 className="text-base font-semibold text-foreground mb-2">AI Coach: pre-flight mode</h3>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-1">
               Reviews the entire draft for UFLPA risks, PGA flags, HTS issues, and rule-based gates before you submit.
             </p>
@@ -389,7 +389,7 @@ export function AiClient() {
         </ul>
       </SectionShell>
 
-      <SectionShell tone="muted" eyebrow="HTS Classifier" title="Describe goods, get the right HTS code.">
+      <SectionShell tone="default" title="Describe goods, get the right HTS code.">
         <div className="mx-auto max-w-3xl">
           <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 mb-5">
             <Search size={16} className="text-muted-foreground" />
@@ -414,7 +414,7 @@ export function AiClient() {
         </div>
       </SectionShell>
 
-      <SectionShell tone="default" eyebrow="Under the hood" title="How the AI actually works." headingAlign="center">
+      <SectionShell tone="default" title="How the AI actually works." headingAlign="center">
         <ul className="grid gap-4 md:grid-cols-3 max-w-5xl mx-auto">
           {HOW_IT_WORKS.map((c) => (
             <li key={c.title} className="rounded-2xl border border-border/60 bg-card p-5">
@@ -425,7 +425,7 @@ export function AiClient() {
         </ul>
       </SectionShell>
 
-      <SectionShell tone="muted" eyebrow="FAQ" title="Common questions.">
+      <SectionShell tone="default" title="Common questions.">
         <div className="mx-auto max-w-3xl">
           <ul className="divide-y divide-border/40">
             {FAQ.map((item) => (
@@ -438,7 +438,7 @@ export function AiClient() {
         </div>
       </SectionShell>
 
-      <SectionShell tone="default" headingAlign="center" title="Want AI on your next filing?">
+      <SectionShell tone="muted" headingAlign="center" title="Want AI on your next filing?">
         <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button variant="gold" size="lg" asChild>
             <Link href="/book-a-demo">Request a demo</Link>

@@ -42,12 +42,12 @@ const FILE_TYPES = [
   {
     code: "7501",
     title: "Entry Summary",
-    body: "Prefilled from your accepted ISF — importer, consignee, MBOL, carrier, bond all carry over. Edit, sign, submit.",
+    body: "Prefilled from your accepted ISF: importer, consignee, MBOL, carrier, and bond all carry over. Edit, sign, submit.",
   },
   {
     code: "3461",
     title: "Entry / Immediate Delivery",
-    body: "ABI Documents API. Manifest queries by Master BOL. Release approval, hold notices, exam intent — all in one timeline.",
+    body: "ABI Documents API. Manifest queries by Master BOL. Release approval, hold notices, and exam intent, all in one timeline.",
   },
   {
     code: "In-bond",
@@ -70,7 +70,7 @@ const MOVE_FASTER = [
   {
     icon: LayoutTemplate,
     title: "Templates",
-    body: "Save any filing's parties, ports, bond, and commodity defaults as a reusable template. New filings prefill from your most-used template — no retyping.",
+    body: "Save any filing's parties, ports, bond, and commodity defaults as a reusable template. New filings prefill from your most-used template, with no retyping.",
   },
   {
     icon: Copy,
@@ -111,7 +111,7 @@ const FAQ = [
   },
   {
     q: "Can I export the filing as PDF for my files?",
-    a: "Yes — every filing has a PDF export at any stage of its lifecycle.",
+    a: "Yes. Every filing has a PDF export at any stage of its lifecycle.",
   },
 ];
 
@@ -124,7 +124,7 @@ export function FilingsClient() {
       <PageHero
         label="Platform"
         title="One wizard. Every shipment type."
-        description="ISF-10, ISF-5, Entry Summary, Entry, In-bond — all in the same flow. Save reusable templates. Duplicate any filing as a new draft. Bulk-submit dozens at once. Every draft gets a rule-based validation gate plus an optional AI pre-flight review."
+        description="ISF-10, ISF-5, Entry Summary, Entry, and In-bond, all in the same flow. Save reusable templates. Duplicate any filing as a new draft. Bulk-submit dozens at once. Every draft gets a rule-based validation gate plus an optional AI pre-flight review."
         breadcrumbs={[
           { label: "Platform", href: "/features" },
           { label: "Filings", href: "/platform/filings" },
@@ -157,8 +157,7 @@ export function FilingsClient() {
 
       {/* (c) Wizard step-tracker */}
       <SectionShell
-        tone="muted"
-        eyebrow="The wizard"
+        tone="default"
         title="Same 7 steps for every filing type."
         intro="Importer → Parties → Shipment → Commodities → Containers → Bond → Review. Skip what doesn't apply; everything carries forward."
       >
@@ -210,7 +209,7 @@ export function FilingsClient() {
           <div className="grid gap-6 md:grid-cols-2">
             <div className="rounded-2xl border border-border/60 bg-card p-5">
               <h4 className="text-sm font-semibold text-foreground mb-2">
-                Commodities <span className="ml-1.5 text-muted-foreground font-normal">— active step</span>
+                Commodities <span className="ml-1.5 text-muted-foreground font-normal">(active step)</span>
               </h4>
               <p className="text-[13px] text-muted-foreground leading-relaxed mb-4">
                 Add line items by HTS code or by description (AI suggests the code). Each line
@@ -234,18 +233,18 @@ export function FilingsClient() {
             </div>
             <div className="rounded-2xl border border-border/60 bg-card p-5">
               <h4 className="text-sm font-semibold text-foreground mb-2">
-                Bond <span className="ml-1.5 text-muted-foreground font-normal">— up next</span>
+                Bond <span className="ml-1.5 text-muted-foreground font-normal">(up next)</span>
               </h4>
               <p className="text-[13px] text-muted-foreground leading-relaxed mb-4">
                 For ISF, choose bond type and enter the bond holder ID (IOR tax ID). For ABI
-                Entry, enter the surety code and bond number. Active bonds prefill — no retyping.
+                Entry, enter the surety code and bond number. Active bonds prefill, so there is no retyping.
               </p>
               <div className="grid grid-cols-2 gap-2.5 text-[12px]">
                 <div className="rounded-lg border border-border/50 bg-background/60 p-2.5">
                   <div className="text-muted-foreground text-[10px] uppercase tracking-wider font-semibold mb-1">
                     Bond type
                   </div>
-                  <div className="font-mono tabular-nums text-foreground">8 — Continuous</div>
+                  <div className="font-mono tabular-nums text-foreground">8 · Continuous</div>
                 </div>
                 <div className="rounded-lg border border-border/50 bg-background/60 p-2.5">
                   <div className="text-muted-foreground text-[10px] uppercase tracking-wider font-semibold mb-1">
@@ -262,16 +261,12 @@ export function FilingsClient() {
       {/* (d) Move faster */}
       <SectionShell
         tone="default"
-        eyebrow="Move faster"
         title="Templates, duplicate, bulk submit."
         intro="The three accelerators every ops team asks for after the first filing."
       >
-        <ul className="grid gap-5 sm:grid-cols-3">
+        <ul className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border/60 rounded-2xl border border-border/60 bg-card">
           {MOVE_FASTER.map(({ icon: Icon, title, body }, idx) => (
-            <li
-              key={title}
-              className="rounded-2xl border border-border/60 bg-card p-5"
-            >
+            <li key={title} className="p-6">
               <IconTile icon={Icon} hover="lift" reveal revealDelay={idx * 0.06} className="size-9 mb-4" />
               <h3 className="text-base font-semibold text-foreground mb-2">{title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
@@ -282,8 +277,8 @@ export function FilingsClient() {
 
       {/* (e) Validation gate + AI pre-flight */}
       <SectionShell
-        tone="muted"
-        eyebrow="Catch issues before CBP does"
+        tone="default"
+        className="bg-muted/30"
         title="Two gates between a draft and CBP."
         intro="A deterministic rule-based check runs on every filing. An AI pre-flight is one click away."
       >
@@ -319,8 +314,8 @@ export function FilingsClient() {
 
 HTS 6204.62.40 (women's trousers) has
 ADD/CVD watch for Chinese-origin goods.
-Confirm origin before submitting — could
-trigger an additional duty deposit.`}
+Confirm origin before submitting. This
+could trigger an additional duty deposit.`}
               ariaLabel="AI pre-flight example"
               className="min-h-[180px]"
             />
@@ -331,7 +326,6 @@ trigger an additional duty deposit.`}
       {/* (f) FAQ */}
       <SectionShell
         tone="default"
-        eyebrow="FAQ"
         title="Common questions."
       >
         <div className="mx-auto max-w-3xl">

@@ -222,7 +222,7 @@ const FEATURES: Feature[] = [
   // Filings
   { name: "ISF-10 filing", surface: "filings", status: "live", blurb: "10 + 2 elements for ocean cargo importers.", icon: Ship },
   { name: "ISF-5 filing", surface: "filings", status: "live", blurb: "5-element ISF for foreign exporters / FROB.", icon: Ship },
-  { name: "ABI 7501 Entry Summary", surface: "filings", status: "live", blurb: "Prefilled from accepted ISF — bond carries over.", icon: ClipboardList },
+  { name: "ABI 7501 Entry Summary", surface: "filings", status: "live", blurb: "Prefilled from accepted ISF. The bond carries over.", icon: ClipboardList },
   { name: "ABI 3461 Entry", surface: "filings", status: "live", blurb: "Manifest queries by Master BOL + hold notices.", icon: ClipboardList },
   { name: "In-Bond filing", surface: "filings", status: "live", blurb: "Cross-port moves with hand-off tracking.", icon: Layers },
   { name: "Templates", surface: "filings", status: "live", blurb: "Save parties, ports, HTS, bond as reusable templates.", icon: Boxes },
@@ -250,8 +250,8 @@ const FEATURES: Feature[] = [
   { name: "CBP exam tracking", surface: "compliance", status: "q4-2026", blurb: "Exam intent notices + status from CBP.", icon: ShieldCheck },
 
   // AI
-  { name: "AI Coach — rejection mode", surface: "ai", status: "live", blurb: "Plain-English explanation + numbered fix steps.", icon: Bot },
-  { name: "AI Coach — pre-flight mode", surface: "ai", status: "live", blurb: "Review before submit. Catches UFLPA / PGA / HTS issues.", icon: Sparkles },
+  { name: "AI Coach: rejection mode", surface: "ai", status: "live", blurb: "Plain-English explanation + numbered fix steps.", icon: Bot },
+  { name: "AI Coach: pre-flight mode", surface: "ai", status: "live", blurb: "Review before submit. Catches UFLPA / PGA / HTS issues.", icon: Sparkles },
   { name: "Today's brief generation", surface: "ai", status: "live", blurb: "≤140 char auto-generated summary at top of day.", icon: Sparkles },
   { name: "HTS Classifier (AI)", surface: "ai", status: "live", blurb: "Best match + alternatives + reasoning.", icon: Sparkles },
 
@@ -308,53 +308,40 @@ export function FeaturesClient() {
       <PageHero
         label="All features"
         title="Every shipped capability, on one page."
-        description={`${liveCount} features live in production today, plus what's on the roadmap. Five platform surfaces — Filings, Compliance Center, AI, Lifecycle, Automation — each with its own deep-dive page.`}
+        description={`${liveCount} features live in production today, plus what's on the roadmap. Five platform surfaces, each with its own deep-dive page: Filings, Compliance Center, AI, Lifecycle, and Automation.`}
         breadcrumbs={[{ label: "All features", href: "/features" }]}
         illustration={<FeaturesHeroIllustration />}
       />
 
-      {/* 5 surfaces */}
-      <SectionShell tone="default" eyebrow="Platform surfaces" title="Five places you'll spend your time.">
-        <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {SURFACES.map(({ id, label, title, blurb, href, count, icon: Icon }, i) => (
-            <motion.li
-              key={id}
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              transition={{ duration: 0.5, ease: EASE, delay: i * 0.06 }}
-            >
-              <Link
-                href={href}
-                className="group block h-full rounded-2xl border border-border/60 bg-card p-6 transition-all hover:-translate-y-0.5 hover:border-gold/40 hover:shadow-card-hover"
+      {/* 5 surfaces — asymmetric bento: two featured, three compact */}
+      <SectionShell tone="default" title="Five places you'll spend your time.">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-6">
+          {SURFACES.map((surf, i) => {
+            const featured = i < 2;
+            return (
+              <motion.div
+                key={surf.id}
+                initial={{ opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.5, ease: EASE, delay: i * 0.06 }}
+                className={featured ? "lg:col-span-3" : "lg:col-span-2"}
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="grid size-11 place-items-center rounded-xl bg-gold/15 text-gold-dark dark:text-gold">
-                    <Icon size={18} />
-                  </div>
-                  <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{count} features</span>
-                </div>
-                <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1">{label}</h3>
-                <h4 className="text-lg font-semibold tracking-tight text-foreground mb-2 leading-tight">{title}</h4>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4">{blurb}</p>
-                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground/85 group-hover:text-gold-dark dark:group-hover:text-gold">
-                  Explore
-                  <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
-                </span>
-              </Link>
-            </motion.li>
-          ))}
-        </ul>
+                <SurfaceCard surf={surf} featured={featured} />
+              </motion.div>
+            );
+          })}
+        </div>
       </SectionShell>
 
-      {/* Filterable grid */}
+      {/* Full inventory — grouped by surface, filterable by status */}
       <SectionShell
-        tone="muted"
-        eyebrow="Every feature"
+        tone="default"
+        className="bg-muted/30"
         title="The full inventory."
-        intro="One row per shipped capability. Filter by status to see what's live, what's coming this quarter, and what's on the longer roadmap."
+        intro="Every shipped capability, grouped by surface. Filter by status to see what's live, what's coming this quarter, and what's on the longer roadmap."
       >
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-10 flex flex-wrap gap-2">
           {FILTERS.map((f) => {
             const active = filter === f.id;
             const count = f.id === "all" ? FEATURES.length : FEATURES.filter((x) => x.status === f.id).length;
@@ -365,8 +352,8 @@ export function FeaturesClient() {
                 onClick={() => setFilter(f.id)}
                 className={
                   active
-                    ? "inline-flex items-center gap-1.5 rounded-full border border-gold bg-gold/20 px-4 py-1.5 text-xs font-semibold"
-                    : "inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card px-4 py-1.5 text-xs font-semibold transition-colors hover:bg-gold/10"
+                    ? "inline-flex items-center gap-1.5 rounded-full border border-gold bg-gold/20 px-4 py-1.5 text-xs font-semibold text-foreground"
+                    : "inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card px-4 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-gold/10 hover:text-foreground"
                 }
               >
                 {f.label}
@@ -376,36 +363,63 @@ export function FeaturesClient() {
           })}
         </div>
 
-        <ul className="grid gap-3 md:grid-cols-2">
-          {visible.map(({ name, surface, status, blurb, icon: Icon }) => {
-            const surf = SURFACES.find((s) => s.id === surface)!;
+        <div className="space-y-14">
+          {SURFACES.map((surf) => {
+            const items = visible.filter((f) => f.surface === surf.id);
+            if (items.length === 0) return null;
+            const Icon = surf.icon;
             return (
-              <li key={`${surface}-${name}`} className="rounded-xl border border-border/60 bg-card p-4 transition-shadow hover:shadow-card-hover">
-                <div className="flex items-start gap-3">
-                  <div className="grid size-9 place-items-center rounded-lg bg-gold/15 text-gold-dark dark:text-gold shrink-0">
-                    <Icon size={15} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="text-[13.5px] font-semibold truncate">{name}</h4>
-                      <SeverityPill tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</SeverityPill>
-                    </div>
-                    <p className="text-[12px] opacity-75 leading-relaxed mb-2">{blurb}</p>
-                    <Link
-                      href={surf.href}
-                      className="text-[11px] font-semibold uppercase tracking-[0.1em] opacity-60 hover:opacity-100"
+              <section key={surf.id} aria-labelledby={`inventory-${surf.id}`}>
+                <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-border/60 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <Icon size={16} className="text-gold-dark dark:text-gold" />
+                    <h3
+                      id={`inventory-${surf.id}`}
+                      className="text-base font-semibold tracking-tight text-foreground"
                     >
-                      → {surf.label}
-                    </Link>
+                      {surf.label}
+                    </h3>
+                    <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                      {items.length}
+                    </span>
                   </div>
+                  <Link
+                    href={surf.href}
+                    className="group inline-flex items-center gap-1 text-[12.5px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Deep dive
+                    <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+                  </Link>
                 </div>
-              </li>
+                <ul className="grid grid-cols-1 gap-x-12 gap-y-1 md:grid-cols-2">
+                  {items.map(({ name, status, blurb }) => (
+                    <li
+                      key={`${surf.id}-${name}`}
+                      className="-mx-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-card"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <h4 className="min-w-0 truncate text-[13.5px] font-semibold text-foreground">
+                          {name}
+                        </h4>
+                        <SeverityPill tone={STATUS_TONE[status]}>
+                          {STATUS_LABEL[status]}
+                        </SeverityPill>
+                      </div>
+                      <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                        {blurb}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             );
           })}
-        </ul>
+        </div>
 
         {visible.length === 0 && (
-          <p className="text-center text-sm opacity-60 mt-8">No features match this filter.</p>
+          <p className="mt-8 text-center text-sm text-muted-foreground">
+            No features match this filter.
+          </p>
         )}
       </SectionShell>
 
@@ -420,5 +434,56 @@ export function FeaturesClient() {
         </div>
       </SectionShell>
     </>
+  );
+}
+
+function SurfaceCard({ surf, featured }: { surf: Surface; featured: boolean }) {
+  const Icon = surf.icon;
+  return (
+    <Link
+      href={surf.href}
+      className={
+        featured
+          ? "group flex h-full flex-col rounded-2xl border border-gold/25 bg-gold/[0.05] p-7 transition-all hover:-translate-y-0.5 hover:border-gold/40 hover:shadow-card-hover"
+          : "group flex h-full flex-col rounded-2xl border border-border/60 bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-gold/40 hover:shadow-card-hover"
+      }
+    >
+      <div className="mb-4 flex items-start justify-between">
+        <div
+          className={
+            featured
+              ? "grid size-11 place-items-center rounded-xl bg-gold/20 text-gold-dark dark:text-gold"
+              : "grid size-9 place-items-center rounded-lg bg-gold/15 text-gold-dark dark:text-gold"
+          }
+        >
+          <Icon size={featured ? 18 : 15} />
+        </div>
+        <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+          {surf.count} features
+        </span>
+      </div>
+      <h3
+        className={
+          featured
+            ? "mb-2 text-xl font-semibold leading-tight tracking-tight text-foreground"
+            : "mb-2 text-[15px] font-semibold leading-tight tracking-tight text-foreground"
+        }
+      >
+        {surf.title}
+      </h3>
+      <p
+        className={
+          featured
+            ? "mb-5 text-sm leading-relaxed text-muted-foreground"
+            : "mb-5 text-[12.5px] leading-relaxed text-muted-foreground"
+        }
+      >
+        {surf.blurb}
+      </p>
+      <span className="mt-auto inline-flex items-center gap-1.5 text-sm font-semibold text-foreground/85 transition-colors group-hover:text-gold-dark dark:group-hover:text-gold">
+        {surf.label}
+        <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+      </span>
+    </Link>
   );
 }
