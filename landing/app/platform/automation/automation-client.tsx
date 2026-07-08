@@ -334,7 +334,7 @@ const SCHEDULES: Array<{
 
 const NOTIF_KINDS = [
   { kind: "filing.rejected", channels: "in-app · email", body: "AI Coach card pre-loaded with the rejection explanation." },
-  { kind: "filing.accepted", channels: "in-app", body: "Quiet confirmation — no email noise for good news." },
+  { kind: "filing.accepted", channels: "in-app", body: "Quiet confirmation. No email noise for good news." },
   { kind: "filing.on_hold", channels: "in-app · email", body: "Includes the CBP detail code and the suggested next step." },
   { kind: "deadline.warning", channels: "in-app · email", body: "Fires at 72h, 48h, and 24h before the deadline, plus an overdue alert once it lapses." },
   { kind: "entry.psc_closing", channels: "in-app · email", body: "Once the PSC window enters its final 14 days." },
@@ -354,7 +354,7 @@ export function AutomationClient() {
       <PageHero
         label="Platform"
         title="Background work, happening 24/7."
-        description="Polling, syncs, alerts, sweeps — the plumbing that keeps your queue honest. Plus the notifications, roles, and audit trail your team needs to share the workload."
+        description="Polling, syncs, alerts, sweeps: the plumbing that keeps your queue honest. Plus the notifications, roles, and audit trail your team needs to share the workload."
         breadcrumbs={[
           { label: "Platform", href: "/features" },
           { label: "Automation", href: "/platform/automation" },
@@ -386,8 +386,7 @@ export function AutomationClient() {
 
       {/* Notifications */}
       <SectionShell
-        tone="muted"
-        eyebrow="Notifications"
+        tone="default"
         title="In-app bell. Email when it matters."
         intro="Every notification kind is opt-in per user. Deep-links from email land you on the right action card with an amber halo pulse so you can spot it instantly."
       >
@@ -401,7 +400,7 @@ export function AutomationClient() {
             {NOTIF_KINDS.map((n) => (
               <li key={n.kind} className="grid md:grid-cols-12 gap-4 px-5 py-3 border-b border-border/40 last:border-b-0">
                 <div className="md:col-span-4">
-                  <span className="font-mono text-[12px] text-foreground">{n.kind}</span>
+                  <span className="font-mono tabular-nums text-[12px] text-foreground">{n.kind}</span>
                 </div>
                 <div className="md:col-span-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   {n.channels.split(" · ").map((c) => (
@@ -422,7 +421,6 @@ export function AutomationClient() {
       <SectionShell
         id="team"
         tone="default"
-        eyebrow="Team & roles"
         title="Four roles. Same data, different permissions."
         intro="Email-verified invites with a 6-digit code. Suspend access in one click. Every action logged."
       >

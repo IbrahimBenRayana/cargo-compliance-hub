@@ -27,10 +27,10 @@ const QUEUE: {
   tone: Extract<Severity, "rose" | "amber" | "emerald">;
   pill: string;
 }[] = [
-  { title: "CBP rejected — INV-4421", meta: "Manufacturer party missing tax ID · Open AI coach to fix", score: 42, tone: "rose", pill: "Rejected" },
-  { title: "ISF-10 deadline in 4h — INV-4502", meta: "MBOL MAEU9381-2 · Vessel arriving Long Beach 18:30", score: 78, tone: "amber", pill: "4h" },
-  { title: "UFLPA high-risk — INV-4198", meta: "Apparel from Xinjiang-adjacent supplier · Review evidence", score: 24, tone: "rose", pill: "High" },
-  { title: "PSC window closing — Entry 230-1148293-5", meta: "11 days to PSC · 53 days to liquidation", score: 88, tone: "amber", pill: "PSC" },
+  { title: "CBP rejected: INV-4421", meta: "Manufacturer party missing tax ID · Open AI coach to fix", score: 42, tone: "rose", pill: "Rejected" },
+  { title: "ISF-10 deadline in 4h: INV-4502", meta: "MBOL MAEU9381-2 · Vessel arriving Long Beach 18:30", score: 78, tone: "amber", pill: "4h" },
+  { title: "UFLPA high-risk: INV-4198", meta: "Apparel from Xinjiang-adjacent supplier · Review evidence", score: 24, tone: "rose", pill: "High" },
+  { title: "PSC window closing: Entry 230-1148293-5", meta: "11 days to PSC · 53 days to liquidation", score: 88, tone: "amber", pill: "PSC" },
   { title: "3 drafts ready for review", meta: "Templates · AI pre-flight available · Bulk submit", score: 96, tone: "emerald", pill: "Ready" },
 ];
 
@@ -50,16 +50,16 @@ const UFLPA_ROWS: { id: string; score: number; tone: Extract<Severity, "rose" | 
 ];
 
 const PGA = [
-  { name: "FDA", required: "Permit required", tone: "rose" as const, body: "0207.13.00 — fresh chicken" },
+  { name: "FDA", required: "Permit required", tone: "rose" as const, body: "0207.13.00, fresh chicken" },
   { name: "USDA-APHIS", required: "Conditional", tone: "amber" as const, body: "Plant/animal origin" },
   { name: "EPA", required: "Not required", tone: "neutral" as const, body: "Non-chemical" },
   { name: "FCC", required: "Not required", tone: "neutral" as const, body: "No radio device" },
 ];
 
 const HTS_SUGGESTIONS = [
-  { code: "6115.96.6010", desc: "Stockings, socks — Knit — Of cotton", best: true, reason: "Best match — polyester is synthetic and athletic socks are typically knit" },
-  { code: "6115.95.6020", desc: "Stockings, socks — Synthetic fibers", best: false, reason: "Alternative — used for non-cotton blends" },
-  { code: "6115.99.1410", desc: "Stockings, socks — Other textile materials", best: false, reason: "Fallback for blends with no dominant material" },
+  { code: "6115.96.6010", desc: "Stockings, socks · Knit · Of cotton", best: true, reason: "Best match. Polyester is synthetic and athletic socks are typically knit." },
+  { code: "6115.95.6020", desc: "Stockings, socks · Synthetic fibers", best: false, reason: "Alternative. Used for non-cotton blends." },
+  { code: "6115.99.1410", desc: "Stockings, socks · Other textile materials", best: false, reason: "Fallback for blends with no dominant material." },
 ];
 
 const ADD_CVD = [
@@ -430,7 +430,7 @@ export function ComplianceClient() {
       <PageHero
         label="Platform"
         title="The Compliance Center."
-        description="Four tabs. Every shipped capability in one calm surface — action queue, risk inbox, classification, and the 314-day liquidation pipeline."
+        description="Four tabs. Every shipped capability in one calm surface: action queue, risk inbox, classification, and the 314-day liquidation pipeline."
         breadcrumbs={[
           { label: "Platform", href: "/features" },
           { label: "Compliance Center", href: "/platform/compliance" },
@@ -438,7 +438,7 @@ export function ComplianceClient() {
         illustration={<ComplianceHeroIllustration />}
       />
 
-      {/* Tab nav — pill-style with stronger visual distinction */}
+      {/* Tab nav, pill-style with stronger visual distinction */}
       <nav className="sticky top-16 z-30 border-y border-border/60 bg-background/95 backdrop-blur-md shadow-card">
         <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto px-4 py-3 lg:px-6">
           <span className="hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mr-2 sm:inline">
@@ -461,9 +461,8 @@ export function ComplianceClient() {
       <SectionShell
         id="overview"
         tone="default"
-        eyebrow="Overview tab"
         title="An inbox, not a dashboard."
-        intro="Today's AI brief at the top. Then every filing that needs your attention — ranked by urgency, not chronology."
+        intro="Today's AI brief at the top. Then every filing that needs your attention, ranked by urgency, not chronology."
       >
         <div className="rounded-2xl border border-border/60 bg-card shadow-card-hover overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/60 bg-card/60">
@@ -484,7 +483,7 @@ export function ComplianceClient() {
                   <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Today's brief</span>
                 </div>
                 <p className="text-foreground font-medium leading-snug">
-                  3 drafts waiting on you. Run an AI pre-flight before submitting — one rejection blocking re-file.
+                  3 drafts waiting on you. Run an AI pre-flight before submitting. One rejection is blocking re-file.
                 </p>
               </div>
             </div>
@@ -536,8 +535,8 @@ export function ComplianceClient() {
       {/* RISK & WATCH */}
       <SectionShell
         id="risk"
-        tone="muted"
-        eyebrow="Risk & Watch tab"
+        tone="default"
+        className="bg-muted/30"
         title="Spot risk before CBP does."
         intro="A unified risk inbox plus the partner-agency and 5106 verifications most teams do in spreadsheets."
       >
@@ -579,7 +578,7 @@ export function ComplianceClient() {
             <input
               readOnly
               className="mb-4 w-full rounded-lg border border-border/60 bg-background/60 px-3 py-2 font-mono text-xs"
-              value="0207.13.00 — Chicken, fresh"
+              value="0207.13.00 · Chicken, fresh"
             />
             <ul className="grid grid-cols-2 gap-2.5">
               {PGA.map((p) => (
@@ -595,7 +594,7 @@ export function ComplianceClient() {
             <h3 className="text-sm font-semibold text-foreground mb-3">5106 EIN Self-Check</h3>
             <p className="text-xs text-muted-foreground mb-3">
               Catch malformed EINs and missing CBP 5106 registrations before
-              CBP rejects your filing — plus a one-click jump to Form 5106.
+              CBP rejects your filing, plus a one-click jump to Form 5106.
             </p>
             <input
               readOnly
@@ -614,8 +613,7 @@ export function ComplianceClient() {
       <SectionShell
         id="classification"
         tone="default"
-        eyebrow="Classification tab"
-        title="HTS, ADD/CVD, FTA — every classification answer in one place."
+        title="HTS, ADD/CVD, FTA: every classification answer in one place."
       >
         <div className="rounded-2xl border border-border/60 bg-card p-5 mb-6">
           <h3 className="text-sm font-semibold text-foreground mb-3">HTS Classifier</h3>
@@ -640,7 +638,7 @@ export function ComplianceClient() {
 
         <div className="rounded-2xl border border-border/60 bg-card overflow-hidden mb-6">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-            <h3 className="text-sm font-semibold text-foreground">ADD/CVD — recent updates</h3>
+            <h3 className="text-sm font-semibold text-foreground">ADD/CVD: recent updates</h3>
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
               <span className="relative flex size-2">
                 <span aria-hidden className="absolute inline-flex size-full rounded-full bg-emerald-500/60 motion-safe:animate-ping" />
@@ -678,8 +676,8 @@ export function ComplianceClient() {
       {/* RECORDS */}
       <SectionShell
         id="records"
-        tone="muted"
-        eyebrow="Records tab"
+        tone="default"
+        className="bg-muted/30"
         title="Every entry has a 314-day clock."
         intro="From CBP acceptance to liquidation. PSC closes at 270. Urgent rises to the top."
       >
@@ -745,7 +743,7 @@ export function ComplianceClient() {
         </div>
       </SectionShell>
 
-      <SectionShell tone="default" headingAlign="center" title="Want to see this for your shipments?">
+      <SectionShell tone="muted" headingAlign="center" title="Want to see this for your shipments?">
         <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button variant="gold" size="lg" asChild>
             <Link href="/book-a-demo">Request a demo</Link>
