@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
+import { emailField } from '../schemas/common.js';
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
@@ -61,7 +62,7 @@ function clearRefreshCookie(res: Response): void {
 
 // ─── Zod Schemas ──────────────────────────────────────────
 const registerSchema = z.object({
-  email: z.string().email(),
+  email: emailField,
   password: z.string().min(8, 'Password must be at least 8 characters'),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
@@ -71,7 +72,7 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: emailField,
   password: z.string().min(1),
 });
 

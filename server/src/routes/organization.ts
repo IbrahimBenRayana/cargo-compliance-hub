@@ -7,6 +7,7 @@
 
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import { emailField } from '../schemas/common.js';
 import { randomBytes } from 'crypto';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
@@ -163,7 +164,7 @@ router.delete('/members/:id', requireRole('owner', 'admin'), async (req: AuthReq
 router.post('/invitations', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const schema = z.object({
-      email: z.string().email(),
+      email: emailField,
       role: z.enum(['viewer', 'operator', 'admin']),
     });
 
