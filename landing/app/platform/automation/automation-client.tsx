@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   motion,
+  useMotionValueEvent,
   useReducedMotion,
   useScroll,
   useTime,
@@ -162,12 +163,14 @@ function AutomationHeroIllustration() {
  * idle sweep) summed with a scroll-derived boost so faster-cadence
  * clocks visibly outrun slower ones when the user scrolls past.
  *
- * Hand pivot: `transformOrigin` in CSS pixels on the motion.line. This
- * is the framer-motion equivalent of SMIL's `rotate(deg cx cy)` and
- * the reason the previous comment in this file warned against
- * framer-motion's default bounding-box pivot. With explicit
- * `transformOrigin` the pivot lands on the dial centre, which is what
- * the eye reads as a real clock.
+ * Hand pivot: we use the SVG-native `transform` attribute on a wrapper
+ * `<g>` — `translate(cx cy) rotate(θ)` — so the pivot lands on the dial
+ * centre regardless of how the parent SVG is scaled by its container.
+ * CSS `transformOrigin` in pixel units breaks under viewBox scaling
+ * (the origin lands off-center when the SVG is rendered at any width
+ * other than the viewBox width), which is what the previous
+ * implementation was hitting — hands rotated around a phantom point
+ * off to the side and read as random arrows instead of clock hands.
  */
 function ClockGroup({
   c,
@@ -189,6 +192,21 @@ function ClockGroup({
     if (reduce) return 0;
     const [t, s] = latest as [number, number];
     return t * degPerMs + s;
+  });
+
+  // Drive the SVG `transform` attribute imperatively on a plain <g>.
+  // framer-motion's motion.g doesn't route the `transform` prop to the
+  // native SVG attribute reliably (it composes into CSS transform, which
+  // in turn needs transformBox + transform-origin gymnastics under
+  // viewBox scaling). Setting the attribute directly on every frame
+  // sidesteps all of that — the pivot is exactly (cx, cy) at any render
+  // size.
+  const handRef = React.useRef<SVGGElement | null>(null);
+  useMotionValueEvent(rotation, "change", (deg) => {
+    handRef.current?.setAttribute(
+      "transform",
+      `translate(${c.cx} ${c.cy}) rotate(${deg})`,
+    );
   });
 
   return (
@@ -242,19 +260,16 @@ function ClockGroup({
         const y2 = c.cy + Math.sin(rad) * 26;
         return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} strokeOpacity="0.6" />;
       })}
-      {/* Rotating hand. CSS transformOrigin pins the pivot to (cx, cy). */}
-      <motion.line
-        x1={c.cx}
-        y1={c.cy}
-        x2={c.cx}
-        y2={c.cy - 22}
-        stroke={GOLD}
-        strokeWidth="2.5"
-        style={{
-          transformOrigin: `${c.cx}px ${c.cy}px`,
-          rotate: rotation,
-        }}
-      />
+      {/* Rotating hand. The wrapper <g> gets its `transform` attribute
+          updated per-frame from `rotation` (see useMotionValueEvent
+          above). Initial attribute puts the hand at 12 o'clock so SSR
+          + first paint aren't off by a full frame. */}
+      <g
+        ref={handRef}
+        transform={`translate(${c.cx} ${c.cy}) rotate(0)`}
+      >
+        <line x1={0} y1={0} x2={0} y2={-22} stroke={GOLD} strokeWidth="2.5" />
+      </g>
       {/* Center hub */}
       <circle cx={c.cx} cy={c.cy} r="3.5" fill={GOLD} stroke="none" />
       {/* Cadence label */}
