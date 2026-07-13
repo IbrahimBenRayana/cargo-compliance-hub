@@ -12,7 +12,6 @@ import {
   Bot,
   ChevronDown,
   ArrowRight,
-  Command,
   Compass,
   ShieldCheck,
   History,
@@ -276,7 +275,7 @@ export function Nav() {
             {/* Desktop links. One shared hover pill glides between items
                 (layoutId), and one shared panel morphs between dropdowns. */}
             <ul
-              className="hidden items-center gap-0.5 md:flex"
+              className="hidden items-center gap-0.5 lg:flex"
               onMouseLeave={() => setHovered(null)}
             >
               <NavTrigger
@@ -321,18 +320,7 @@ export function Nav() {
             </ul>
 
             {/* Desktop CTAs */}
-            <div className="hidden items-center gap-2 md:flex">
-              <button
-                type="button"
-                disabled
-                aria-label="Search (coming soon)"
-                className="hidden h-9 cursor-not-allowed items-center gap-2 rounded-full border border-border/60 bg-secondary/40 pl-3 pr-2 text-xs text-muted-foreground/70 transition-colors hover:bg-secondary/70 hover:text-muted-foreground lg:inline-flex"
-              >
-                <span className="opacity-60">Search…</span>
-                <kbd className="inline-flex h-5 items-center gap-0.5 rounded border border-border/60 bg-background/80 px-1.5 font-mono text-[10px]">
-                  <Command size={9} />K
-                </kbd>
-              </button>
+            <div className="hidden items-center gap-2 lg:flex">
               <ThemeToggle />
               <div className="h-5 w-px bg-border/60" aria-hidden="true" />
               <Button variant="outline" size="sm" asChild>
@@ -362,7 +350,7 @@ export function Nav() {
 
             {/* Mobile hamburger */}
             <button
-              className="-mr-2 rounded-md p-2 text-foreground/80 transition-colors hover:bg-secondary/70 hover:text-foreground md:hidden"
+              className="-mr-2 rounded-md p-2 text-foreground/80 transition-colors hover:bg-secondary/70 hover:text-foreground lg:hidden"
               onClick={() => setMobileOpen((v) => !v)}
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileOpen}
@@ -498,7 +486,7 @@ function MorphPanel({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 8, scale: 0.98 }}
           transition={{ duration: 0.24, ease: EASE }}
-          className="absolute left-0 right-0 top-full z-50 hidden pt-3 md:block"
+          className="absolute left-0 right-0 top-full z-50 hidden pt-3 lg:block"
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
         >
@@ -730,7 +718,7 @@ function MobileSheet({ open, close }: { open: boolean; close: () => void }) {
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.28, ease: EASE }}
-          className="overflow-hidden border-t border-border/60 md:hidden"
+          className="overflow-hidden border-t border-border/60 lg:hidden"
         >
           <motion.div
             className="flex max-h-[calc(100dvh-4rem)] flex-col gap-0.5 overflow-y-auto pb-4 pt-3"
