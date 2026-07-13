@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "About",
   description:
     "MyCargoLens was built because customs compliance shouldn't require a broker, a spreadsheet, and three phone calls.",
+  alternates: { canonical: "/about" },
 };
 
 export default function AboutPage() {
