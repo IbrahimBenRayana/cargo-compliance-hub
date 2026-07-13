@@ -38,6 +38,7 @@ let isStatusPollRunning = false;
 let isDeadlineCheckRunning = false;
 let lastStatusPoll: Date | null = null;
 let lastDeadlineCheck: Date | null = null;
+let lastAddCvdSync: Date | null = null;
 let statusPollStats = { checked: 0, updated: 0, errors: 0 };
 
 // Stale-filing dedup is delegated to the dispatcher's persistent dedupeKey
@@ -532,6 +533,7 @@ export function startBackgroundJobs(): void {
     withAdvisoryLock('jobs:add-cvd-sync', async () => {
       const result = await syncFromFederalRegister();
       if (result.inserted > 0) invalidateAddCvdCache();
+      lastAddCvdSync = new Date();
       logger.info({ result }, '[Jobs:AddCvdSync] Done');
     }).catch(err => logger.error({ err }, '[Jobs:AddCvdSync] Unhandled'));
   }, cronOpts);
@@ -617,6 +619,9 @@ export function getJobStatus() {
     deadlineCheck: {
       running: isDeadlineCheckRunning,
       lastRun: lastDeadlineCheck?.toISOString() ?? null,
+    },
+    addCvdSync: {
+      lastRun: lastAddCvdSync?.toISOString() ?? null,
     },
   };
 }
