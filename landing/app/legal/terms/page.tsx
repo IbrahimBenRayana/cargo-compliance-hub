@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Terms of Service",
   description:
     "Terms and conditions governing your use of the MyCargoLens CBP compliance platform.",
+  alternates: { canonical: "/legal/terms" },
 };
 
 export default function TermsOfServicePage() {
