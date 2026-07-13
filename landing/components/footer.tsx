@@ -5,8 +5,13 @@ import Link from "next/link";
 import { ChevronDown, Globe, Sun } from "lucide-react";
 import { Wordmark } from "@/components/wordmark";
 import { Container } from "@/components/ui/container";
-import { SeverityPill } from "@/components/ui/severity-pill";
+import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
 import { cn } from "@/lib/utils";
+import {
+  useSystemStatus,
+  formatSecondsAgo,
+  formatUtcTime,
+} from "@/lib/systemStatus";
 
 
 const platformLinks = [
@@ -122,27 +127,89 @@ function MobileAccordion({
 // ──────────────────────────────────────────────────────────────────────────
 
 function StatusTicker() {
+  const status = useSystemStatus();
+
+  // Fallback strings while the initial fetch is in flight or if the endpoint
+  // is unreachable. These are neutral wording that doesn't imply a specific
+  // freshness — the live values overwrite once the fetch resolves.
+  const cbpText = status
+    ? `Last CBP ping: ${formatSecondsAgo(status.cbp.lastPingSecondsAgo) ?? "—"}`
+    : "Last CBP ping: —";
+  const addCvdText = status
+    ? `ADD/CVD: synced ${formatUtcTime(status.addCvd.lastSyncedIso) ?? "—"}`
+    : "ADD/CVD: syncing…";
+  const incidentText = status
+    ? `Open incidents: ${status.openIncidents}`
+    : "Open incidents: —";
+
+  // Dot color mirrors CBP-poll health. Amber if the poll is stale (missed
+  // one cycle), emerald otherwise. Falls back to emerald pre-fetch so the
+  // strip doesn't render "degraded" before we know.
+  const cbpDotClass = status && !status.cbp.healthy
+    ? "bg-amber-500"
+    : "bg-emerald-500";
+  const cbpPingClass = status && !status.cbp.healthy
+    ? "bg-amber-500/60"
+    : "bg-emerald-500/60";
+
   return (
-    <div className="flex flex-col items-start gap-2 font-mono text-[11px] tracking-wide text-muted-foreground sm:flex-row sm:items-center sm:gap-4">
+    <div
+      className="flex flex-col items-start gap-2 font-mono text-[11px] tracking-wide text-muted-foreground sm:flex-row sm:items-center sm:gap-4"
+      aria-live="polite"
+    >
       <span className="inline-flex items-center gap-2">
         <span className="relative flex size-2">
           <span
             aria-hidden
-            className="absolute inline-flex size-full rounded-full bg-emerald-500/60 motion-safe:animate-ping"
+            className={cn(
+              "absolute inline-flex size-full rounded-full motion-safe:animate-ping",
+              cbpPingClass,
+            )}
           />
-          <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+          <span className={cn("relative inline-flex size-2 rounded-full", cbpDotClass)} />
         </span>
-        <span className="tabular-nums">Last CBP ping: 14s ago</span>
+        <span className="tabular-nums">{cbpText}</span>
       </span>
       <span aria-hidden className="hidden text-muted-foreground/40 sm:inline">
         ·
       </span>
-      <span className="tabular-nums">ADD/CVD: synced 04:02 UTC</span>
+      <span className="tabular-nums">{addCvdText}</span>
       <span aria-hidden className="hidden text-muted-foreground/40 sm:inline">
         ·
       </span>
-      <span className="tabular-nums">Open incidents: 0</span>
+      <span className="tabular-nums">{incidentText}</span>
     </div>
+  );
+}
+
+/**
+ * Emerald pill when everything's healthy, amber when at least one signal
+ * is stale or incidents are open. Renders the same shape as the previous
+ * hard-coded pill so accordion / spacing layouts don't shift.
+ */
+function SystemStatusBadge() {
+  const status = useSystemStatus();
+
+  const operational = status?.allSystemsOperational ?? true;
+  const tone: Severity = operational ? "emerald" : "amber";
+  const dotBg = operational ? "bg-emerald-500" : "bg-amber-500";
+  const dotPing = operational ? "bg-emerald-500/60" : "bg-amber-500/60";
+  const label = operational ? "All systems operational" : "Degraded — see status";
+
+  return (
+    <SeverityPill tone={tone}>
+      <span className="relative mr-1.5 flex size-1.5">
+        <span
+          aria-hidden
+          className={cn(
+            "absolute inline-flex size-full rounded-full motion-safe:animate-ping",
+            dotPing,
+          )}
+        />
+        <span className={cn("relative inline-flex size-1.5 rounded-full", dotBg)} />
+      </span>
+      {label}
+    </SeverityPill>
   );
 }
 
@@ -177,18 +244,9 @@ export function Footer() {
               <Link
                 href="/security"
                 className="mb-6 inline-flex"
-                aria-label="System status — all systems operational"
+                aria-label="System status"
               >
-                <SeverityPill tone="emerald">
-                  <span className="relative mr-1.5 flex size-1.5">
-                    <span
-                      aria-hidden
-                      className="absolute inline-flex size-full rounded-full bg-emerald-500/60 motion-safe:animate-ping"
-                    />
-                    <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-                  </span>
-                  All systems operational
-                </SeverityPill>
+                <SystemStatusBadge />
               </Link>
             </div>
 
@@ -228,18 +286,9 @@ export function Footer() {
             <Link
               href="/security"
               className="mb-5 inline-flex"
-              aria-label="System status — all systems operational"
+              aria-label="System status"
             >
-              <SeverityPill tone="emerald">
-                <span className="relative mr-1.5 flex size-1.5">
-                  <span
-                    aria-hidden
-                    className="absolute inline-flex size-full rounded-full bg-emerald-500/60 motion-safe:animate-ping"
-                  />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-                </span>
-                All systems operational
-              </SeverityPill>
+              <SystemStatusBadge />
             </Link>
             <div className="mt-8 border-t border-border/60">
               <MobileAccordion title="Platform" links={platformLinks} />

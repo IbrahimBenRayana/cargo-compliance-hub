@@ -40,6 +40,7 @@ import dutyCalculationRoutes from './routes/dutyCalculation.js';
 import trackingRoutes from './routes/tracking.js';
 import contactRoutes from './routes/contact.js';
 import chatRoutes from './routes/chat.js';
+import statusRoutes from './routes/status.js';
 import chatAdminRoutes from './routes/chatAdmin.js';
 import { startBackgroundJobs, stopBackgroundJobs, getJobStatus, pollSubmittedFilings, checkDeadlines } from './services/backgroundJobs.js';
 import { startNotificationStream, stopNotificationStream } from './services/notificationStream.js';
@@ -155,6 +156,9 @@ app.use('/api/v1/tracking', trackingRoutes);
 // inside the route module. Mount here so it sits under the same /api/v1
 // prefix as everything else.
 app.use('/api/v1/contact', contactRoutes);
+// Public, unauthenticated — marketing-site footer status strip. Reads
+// last-run timestamps from the in-memory job scheduler; safe to expose.
+app.use('/api/v1/status', statusRoutes);
 // AI Assistant + live human handoff. Admin (staff console) is mounted BEFORE the
 // user/public router so /chat/admin/* matches the platform-admin-gated routes.
 app.use('/api/v1/chat/admin', chatAdminRoutes);
