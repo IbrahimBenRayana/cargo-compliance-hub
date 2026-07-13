@@ -316,7 +316,7 @@ export function SecurityClient() {
       <SectionShell
         tone="default"
         eyebrow="Audit trail"
-        title="Every action, logged forever."
+        title="Every action, logged for the life of your account."
         intro="Read-only audit log accessible to Owners and Admins. Filterable by user, filing, action, or time. Exportable as CSV for your compliance team."
       >
         <div className="rounded-2xl border border-border/60 bg-card p-6">

@@ -471,8 +471,8 @@ export function SolutionsClient() {
 
       <SectionShell tone="muted" headingAlign="center" title="Not sure which one fits?">
         <p className="mx-auto max-w-2xl text-center text-base leading-relaxed mb-8 opacity-80">
-          Start free — the same product works for all three. Pick the persona that
-          matches your day-to-day, but the rest is one click away.
+          Same product, three angles. Pick the persona that matches your day-to-day —
+          the rest is one click away. Book a walkthrough and we&apos;ll set you up for yours.
         </p>
         <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button variant="gold" size="lg" asChild>
