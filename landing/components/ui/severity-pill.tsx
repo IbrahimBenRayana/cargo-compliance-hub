@@ -4,13 +4,20 @@ import { cn } from "@/lib/utils";
 
 export type Severity = "rose" | "amber" | "emerald" | "blue" | "neutral";
 
+// Light-mode uses SOLID tint backgrounds (bg-*-100) rather than the
+// alpha variant, because axe can't reliably compute contrast through
+// alpha channels and reports false-positive fails on our tinted pills
+// even at 4.5:1+. Dark-mode keeps the alpha backdrop — dark pages don't
+// hit the alpha-contrast heuristic. Text bumped one step darker too.
 const TONE: Record<Severity, string> = {
-  rose: "bg-rose-500/15 text-rose-600 dark:text-rose-300 ring-rose-500/20",
+  rose:
+    "bg-rose-100 text-rose-900 ring-rose-500/20 dark:bg-rose-500/15 dark:text-rose-300",
   amber:
-    "bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-amber-500/20",
+    "bg-amber-100 text-amber-900 ring-amber-500/20 dark:bg-amber-500/15 dark:text-amber-300",
   emerald:
-    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20",
-  blue: "bg-blue-500/15 text-blue-700 dark:text-blue-300 ring-blue-500/20",
+    "bg-emerald-100 text-emerald-900 ring-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300",
+  blue:
+    "bg-blue-100 text-blue-900 ring-blue-500/20 dark:bg-blue-500/15 dark:text-blue-300",
   neutral:
     "bg-secondary text-secondary-foreground ring-border/60",
 };

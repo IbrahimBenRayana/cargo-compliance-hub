@@ -331,11 +331,11 @@ export function SecurityClient() {
           </ul>
           <div className="mt-5 rounded-lg border border-border/40 bg-background/60 p-3 font-mono text-[11px] tabular-nums leading-relaxed text-muted-foreground">
             <div>2026-05-23T14:21:08Z · alice@atlasapparel.com · operator · 192.0.2.14</div>
-            <div className="opacity-60">→ filing.submit · INV-4421 · ISF-10 · success</div>
+            <div className="opacity-85">→ filing.submit · INV-4421 · ISF-10 · success</div>
             <div>2026-05-23T14:22:31Z · carlos@atlasapparel.com · operator · 198.51.100.7</div>
-            <div className="opacity-60">→ ai.preflight.run · INV-4421 · 0 critical, 1 warning</div>
+            <div className="opacity-85">→ ai.preflight.run · INV-4421 · 0 critical, 1 warning</div>
             <div>2026-05-23T14:24:55Z · alice@atlasapparel.com · operator · 192.0.2.14</div>
-            <div className="opacity-60">→ filing.resubmit · INV-4421 · ISF-10 · accepted</div>
+            <div className="opacity-85">→ filing.resubmit · INV-4421 · ISF-10 · accepted</div>
           </div>
         </div>
       </SectionShell>
