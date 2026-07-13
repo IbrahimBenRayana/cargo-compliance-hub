@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { Bot, Search, Sparkles, Sun } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
@@ -46,9 +47,156 @@ const FAQ = [
 ];
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-import { GOLD } from "@/lib/colors";
+import { AMBER, EMERALD, GOLD } from "@/lib/colors";
+
+/* ------------------------------------------------------------------------
+ * Hero: "streaming intelligence" — a live AI Coach chat exchange that plays
+ * out on loop. Two scenarios alternate: a CBP rejection explained with fix
+ * steps, then an HTS lookup. Reduced motion renders scenario 1 fully
+ * resolved with no timers or loops.
+ * ---------------------------------------------------------------------- */
+
+type HeroScenario = {
+  question: string;
+  questionWidth: number;
+  reply: string[];
+  steps: string[];
+  pillFrom: { label: string; width: number };
+  pillTo: { label: string; width: number };
+};
+
+const HERO_SCENARIOS: HeroScenario[] = [
+  {
+    question: "Why did CBP reject INV-4421?",
+    questionWidth: 154,
+    reply: ["ISF-10 missing the seller's full", "address (S02 field)."],
+    steps: ["Open Parties → Seller", "Add street + city", "Resubmit"],
+    pillFrom: { label: "Draft", width: 56 },
+    pillTo: { label: "Resubmitted · Accepted", width: 132 },
+  },
+  {
+    question: "HTS for wool overcoats?",
+    questionWidth: 130,
+    reply: ["6202.11.00 · 41¢/kg + 16.3%", "Women's overcoats, wool, not knit — Ch. 62."],
+    steps: [],
+    pillFrom: { label: "Looking up", width: 76 },
+    pillTo: { label: "Classified · Ch. 62", width: 118 },
+  },
+];
+
+type HeroPhase = "user-in" | "thinking" | "streaming" | "list" | "status" | "hold" | "fade";
+
+const HERO_PHASE_ORDER: HeroPhase[] = [
+  "user-in",
+  "thinking",
+  "streaming",
+  "list",
+  "status",
+  "hold",
+  "fade",
+];
+
+/** Approx. advance width of ui-monospace at fontSize 8.5 — drives caret x. */
+const HERO_CHAR_W = 5.1;
+const REPLY_X = 96;
+const REPLY_Y = 138; // baseline of first reply line
+const REPLY_LINE_H = 15;
+const STEP_Y = 180; // baseline of first fix step
+const STEP_H = 22;
 
 function HeroAIIllustration() {
+  const rawReduce = useReducedMotion();
+  // SSR-safe gate (same pattern as CodeStream): server HTML always renders
+  // the animated branch's initial state; we flip after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const reduce = mounted && rawReduce === true;
+
+  const [phaseState, setPhaseState] = useState<HeroPhase>("user-in");
+  const [scenarioIdx, setScenarioIdx] = useState(0);
+  const [chars, setChars] = useState(0);
+  const [stepCount, setStepCount] = useState(0);
+  const [cycle, setCycle] = useState(0);
+
+  // Loop state machine. Every transition is a timeout; the streaming phase
+  // chains one timeout per character (~30ms). All timers clean up on unmount.
+  useEffect(() => {
+    if (reduce) return;
+    const sc = HERO_SCENARIOS[scenarioIdx];
+    const total = sc.reply.join("").length;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    switch (phaseState) {
+      case "user-in":
+        t = setTimeout(() => setPhaseState("thinking"), 700);
+        break;
+      case "thinking":
+        t = setTimeout(() => setPhaseState("streaming"), 1300);
+        break;
+      case "streaming":
+        t =
+          chars < total
+            ? setTimeout(() => setChars((c) => c + 1), 30)
+            : setTimeout(() => setPhaseState(sc.steps.length > 0 ? "list" : "status"), 450);
+        break;
+      case "list":
+        t =
+          stepCount < sc.steps.length
+            ? setTimeout(() => setStepCount((n) => n + 1), 480)
+            : setTimeout(() => setPhaseState("status"), 300);
+        break;
+      case "status":
+        t = setTimeout(() => setPhaseState("hold"), 900);
+        break;
+      case "hold":
+        t = setTimeout(() => setPhaseState("fade"), 2500);
+        break;
+      case "fade":
+        t = setTimeout(() => {
+          setChars(0);
+          setStepCount(0);
+          setScenarioIdx((i) => (i + 1) % HERO_SCENARIOS.length);
+          setCycle((c) => c + 1);
+          setPhaseState("user-in");
+        }, 300);
+        break;
+    }
+    return () => {
+      if (t !== undefined) clearTimeout(t);
+    };
+  }, [reduce, phaseState, chars, stepCount, scenarioIdx]);
+
+  // Reduced motion: scenario 1, fully resolved, frozen.
+  const s = HERO_SCENARIOS[reduce ? 0 : scenarioIdx];
+  const totalChars = s.reply.join("").length;
+  const phase: HeroPhase = reduce ? "hold" : phaseState;
+  const shownChars = reduce ? totalChars : Math.min(chars, totalChars);
+  const shownSteps = reduce ? s.steps.length : stepCount;
+
+  const at = (p: HeroPhase) => HERO_PHASE_ORDER.indexOf(phase) >= HERO_PHASE_ORDER.indexOf(p);
+  const statusDone = at("status");
+
+  // Caret position + per-line reveal offsets for the typewriter.
+  const lineStarts: number[] = [];
+  let caretLine = s.reply.length - 1;
+  let caretCol = s.reply[caretLine].length;
+  {
+    let consumed = 0;
+    for (const line of s.reply) {
+      lineStarts.push(consumed);
+      consumed += line.length;
+    }
+    let rem = shownChars;
+    for (let i = 0; i < s.reply.length; i++) {
+      const len = s.reply[i].length;
+      if (rem <= len) {
+        caretLine = i;
+        caretCol = rem;
+        break;
+      }
+      rem -= len;
+    }
+  }
+
   return (
     <motion.svg
       viewBox="0 0 480 360"
@@ -59,252 +207,351 @@ function HeroAIIllustration() {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      initial="hidden"
-      animate="visible"
-      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}
     >
-      {/* === Backdrop dot grid ============================================ */}
       <defs>
         <pattern id="ai-dots" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
           <circle cx="2" cy="2" r="1" fill="currentColor" fillOpacity="0.08" stroke="none" />
         </pattern>
-        <radialGradient id="ai-glow" cx="50%" cy="40%" r="60%">
-          <stop offset="0%" stopColor={GOLD} stopOpacity="0.18" />
+        <radialGradient id="ai-glow" cx="50%" cy="45%" r="60%">
+          <stop offset="0%" stopColor={GOLD} stopOpacity="0.16" />
           <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
         </radialGradient>
       </defs>
-      <ellipse cx="260" cy="180" rx="180" ry="140" fill="url(#ai-glow)" stroke="none" />
 
-      {/* === User message bubble (top right) ============================= */}
-      <motion.g
-        variants={{
-          hidden: { opacity: 0, y: 12, x: 12 },
-          visible: { opacity: 1, y: 0, x: 0, transition: { duration: 0.6, ease: EASE } },
-        }}
-      >
-        <rect
-          x="240"
-          y="32"
-          width="210"
-          height="44"
-          rx="14"
-          fill={GOLD}
-          fillOpacity="0.14"
-          stroke={GOLD}
-          strokeOpacity="0.35"
-        />
-        <line x1="258" y1="56" x2="412" y2="56" strokeOpacity="0.55" />
-        <circle cx="432" cy="54" r="4" fill={GOLD} stroke="none" />
-      </motion.g>
-
-      {/* === Connector line user → bot =================================== */}
-      <motion.path
-        d="M340 80 Q 270 110 200 130"
-        stroke="currentColor"
-        strokeOpacity="0.18"
-        strokeDasharray="4 4"
-        variants={{
-          hidden: { pathLength: 0 },
-          visible: { pathLength: 1, transition: { duration: 0.9, ease: EASE, delay: 0.2 } },
-        }}
+      {/* === Ambience: dot grid + slowly drifting gold glow =============== */}
+      <rect x="16" y="6" width="448" height="348" fill="url(#ai-dots)" stroke="none" />
+      <motion.ellipse
+        cx="240"
+        cy="180"
+        rx="196"
+        ry="152"
+        fill="url(#ai-glow)"
+        stroke="none"
+        animate={reduce ? undefined : { scale: [1, 1.06, 1] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        style={{ transformOrigin: "240px 180px" }}
       />
 
-      {/* === Bot avatar (left middle) ==================================== */}
+      {/* === Chat panel frame (persistent) ================================ */}
       <motion.g
-        variants={{
-          hidden: { opacity: 0, scale: 0.7 },
-          visible: { opacity: 1, scale: 1, transition: { duration: 0.55, ease: EASE, delay: 0.3 } },
-        }}
-      >
-        <circle cx="78" cy="156" r="22" fill="currentColor" fillOpacity="0.04" strokeOpacity="0.55" />
-        {/* Bot face — antenna + eyes + smile */}
-        <line x1="78" y1="128" x2="78" y2="134" strokeOpacity="0.6" />
-        <circle cx="78" cy="125" r="2" fill={GOLD} stroke="none" />
-        <circle cx="72" cy="154" r="1.6" fill="currentColor" stroke="none" />
-        <circle cx="84" cy="154" r="1.6" fill="currentColor" stroke="none" />
-        <path d="M70 162 Q 78 167 86 162" strokeOpacity="0.7" />
-        {/* Pulse ring */}
-        <motion.circle
-          cx="78"
-          cy="156"
-          r="22"
-          stroke={GOLD}
-          strokeOpacity="0.4"
-          fill="none"
-          animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
-          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-          style={{ transformOrigin: "78px 156px" }}
-        />
-      </motion.g>
-
-      {/* === Main AI response bubble ===================================== */}
-      <motion.g
-        variants={{
-          hidden: { opacity: 0, y: 12 },
-          visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE, delay: 0.4 } },
-        }}
+        initial={reduce ? false : { opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: EASE }}
       >
         <rect
-          x="116"
-          y="118"
-          width="320"
-          height="180"
+          x="78"
+          y="28"
+          width="324"
+          height="304"
           rx="16"
           fill="currentColor"
           fillOpacity="0.03"
-          strokeOpacity="0.55"
+          strokeOpacity="0.5"
         />
-        {/* Header pill: "AI Coach · streaming" */}
-        <rect x="132" y="132" width="92" height="16" rx="4" fill="currentColor" fillOpacity="0.06" stroke="none" />
+        <line x1="79" y1="60" x2="401" y2="60" strokeOpacity="0.16" />
+        <circle cx="96" cy="44" r="3" fill="currentColor" fillOpacity="0.18" stroke="none" />
+        <circle cx="108" cy="44" r="3" fill="currentColor" fillOpacity="0.18" stroke="none" />
+        <circle cx="120" cy="44" r="3" fill="currentColor" fillOpacity="0.18" stroke="none" />
         <text
-          x="142"
-          y="143"
+          x="138"
+          y="47.5"
           fontSize="8"
+          fontFamily="ui-sans-serif, sans-serif"
+          fontWeight="600"
+          fill="currentColor"
+          fillOpacity="0.7"
+          stroke="none"
+        >
+          AI Coach
+        </text>
+        <text
+          x="386"
+          y="47.5"
+          textAnchor="end"
+          fontSize="7"
           fontFamily="ui-monospace, monospace"
-          fontWeight="700"
-          letterSpacing="0.8"
+          letterSpacing="0.5"
           fill="currentColor"
           fillOpacity="0.65"
           stroke="none"
         >
-          AI COACH · STREAMING
+          gpt-4o · SSE
         </text>
-
-        {/* First "sentence" line */}
-        <motion.line
-          x1="132"
-          y1="172"
-          x2="424"
-          y2="172"
-          strokeOpacity="0.55"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 1.2, delay: 1.0, ease: EASE }}
-        />
-        <motion.line
-          x1="132"
-          y1="186"
-          x2="356"
-          y2="186"
-          strokeOpacity="0.4"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 1.0, delay: 1.3, ease: EASE }}
-        />
-
-        {/* Numbered fix steps */}
-        {[218, 240, 262].map((y, i) => (
-          <motion.g
-            key={i}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 1.7 + i * 0.25, ease: EASE }}
-          >
-            <circle
-              cx="142"
-              cy={y}
-              r="7"
-              fill={GOLD}
-              fillOpacity="0.16"
-              stroke={GOLD}
-              strokeWidth="1.5"
-            />
-            <text
-              x="142"
-              y={y + 2.6}
-              fontSize="8"
-              textAnchor="middle"
-              fontFamily="ui-sans-serif, sans-serif"
-              fontWeight="700"
-              fill={GOLD}
-              stroke="none"
-            >
-              {i + 1}
-            </text>
-            <line x1="158" y1={y} x2={i === 0 ? 392 : i === 1 ? 376 : 410} y2={y} strokeOpacity="0.5" />
-          </motion.g>
-        ))}
-
-        {/* Streaming caret */}
-        <motion.rect
-          x="424"
-          y="276"
-          width="2"
-          height="12"
-          fill={GOLD}
-          stroke="none"
-          animate={{ opacity: [1, 0.1, 1] }}
-          transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
-        />
       </motion.g>
 
-      {/* === Floating accent chips (HTS · UFLPA · ADD/CVD) =============== */}
-      {[
-        { x: 32, y: 60, label: "HTS", delay: 1.4 },
-        { x: 20, y: 220, label: "UFLPA", delay: 1.6 },
-        { x: 30, y: 296, label: "ADD/CVD", delay: 1.8 },
-      ].map((chip) => (
+      {/* === Conversation (remounts each cycle so entrances replay) ======= */}
+      <motion.g
+        key={reduce ? "static" : cycle}
+        animate={{ opacity: phase === "fade" ? 0 : 1 }}
+        transition={{ duration: 0.25, ease: EASE }}
+      >
+        {/* User message — slides in from the right */}
         <motion.g
-          key={chip.label}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: chip.delay, ease: EASE }}
+          initial={reduce ? false : { opacity: 0, x: 16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, ease: EASE }}
         >
-          <motion.g
-            animate={{ y: [0, -3, 0] }}
-            transition={{
-              duration: 5 + chip.delay,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: chip.delay,
-            }}
+          <rect
+            x={386 - s.questionWidth}
+            y="74"
+            width={s.questionWidth}
+            height="26"
+            rx="13"
+            fill={GOLD}
+            fillOpacity="0.13"
+            stroke={GOLD}
+            strokeOpacity="0.35"
+          />
+          <text
+            x="374"
+            y="90.5"
+            textAnchor="end"
+            fontSize="9"
+            fontFamily="ui-sans-serif, sans-serif"
+            fill="currentColor"
+            fillOpacity="0.8"
+            stroke="none"
           >
-            <rect
-              x={chip.x}
-              y={chip.y}
-              width="68"
-              height="22"
-              rx="6"
-              fill="currentColor"
-              fillOpacity="0.04"
-              strokeOpacity="0.55"
-            />
-            <circle cx={chip.x + 9} cy={chip.y + 11} r="2.5" fill={GOLD} stroke="none" />
+            {s.question}
+          </text>
+        </motion.g>
+
+        {/* Bot row label */}
+        {at("thinking") && (
+          <motion.g
+            initial={reduce ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, ease: EASE }}
+          >
+            <circle cx="100" cy="115" r="3" fill={GOLD} stroke="none" />
             <text
-              x={chip.x + 17}
-              y={chip.y + 14}
-              fontSize="9"
-              fontFamily="ui-sans-serif, sans-serif"
-              fontWeight="600"
+              x="108"
+              y="118"
+              fontSize="7"
+              fontFamily="ui-monospace, monospace"
+              fontWeight="700"
+              letterSpacing="1"
               fill="currentColor"
-              fillOpacity="0.78"
+              fillOpacity="0.65"
               stroke="none"
             >
-              {chip.label}
+              AI COACH
             </text>
           </motion.g>
-        </motion.g>
-      ))}
+        )}
 
-      {/* === Sparkles ==================================================== */}
-      <g stroke={GOLD} strokeOpacity="0.85" strokeWidth="1.6">
-        <motion.path
-          d="M438 64 v10 M443 69 h-10"
-          animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.18, 1] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-          style={{ transformOrigin: "438px 69px" }}
-        />
-        <motion.path
-          d="M126 56 v6 M129 59 h-6"
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
-        />
-        <motion.path
-          d="M448 330 v6 M451 333 h-6"
-          animate={{ opacity: [0.3, 0.9, 0.3] }}
-          transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut", delay: 1.4 }}
-        />
-      </g>
+        {/* Thinking dots — pulse in stagger, dissolve into the reply */}
+        <AnimatePresence>
+          {phase === "thinking" && (
+            <motion.g
+              key="thinking"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3, ease: EASE }}
+            >
+              <rect
+                x="96"
+                y="126"
+                width="58"
+                height="26"
+                rx="13"
+                fill="currentColor"
+                fillOpacity="0.05"
+                strokeOpacity="0.35"
+              />
+              {[0, 1, 2].map((i) => (
+                <motion.circle
+                  key={i}
+                  cx={112 + i * 13}
+                  cy="139"
+                  r="2.5"
+                  fill="currentColor"
+                  stroke="none"
+                  animate={{ opacity: [0.2, 0.9, 0.2] }}
+                  transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut", delay: i * 0.18 }}
+                />
+              ))}
+            </motion.g>
+          )}
+        </AnimatePresence>
+
+        {/* Streamed reply — SSE typewriter with blinking caret */}
+        {at("streaming") && (
+          <motion.g
+            initial={reduce ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.25, ease: EASE }}
+          >
+            {s.reply.map((line, i) => (
+              <text
+                key={i}
+                x={REPLY_X}
+                y={REPLY_Y + i * REPLY_LINE_H}
+                fontSize="8.5"
+                fontFamily="ui-monospace, monospace"
+                fill="currentColor"
+                fillOpacity="0.78"
+                stroke="none"
+              >
+                {line.slice(0, Math.max(0, Math.min(line.length, shownChars - lineStarts[i])))}
+              </text>
+            ))}
+            {phase === "streaming" && (
+              <motion.rect
+                x={REPLY_X + caretCol * HERO_CHAR_W + 1.5}
+                y={REPLY_Y + caretLine * REPLY_LINE_H - 8.5}
+                width="2"
+                height="11"
+                rx="0.5"
+                fill={GOLD}
+                stroke="none"
+                animate={{ opacity: [1, 0, 1] }}
+                transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
+              />
+            )}
+          </motion.g>
+        )}
+
+        {/* Numbered fix steps — reveal line by line */}
+        {s.steps.slice(0, shownSteps).map((step, i) => {
+          const y = STEP_Y + i * STEP_H;
+          return (
+            <motion.g
+              key={step}
+              initial={reduce ? false : { opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.45, ease: EASE }}
+            >
+              <circle
+                cx="103"
+                cy={y - 3}
+                r="7"
+                fill={GOLD}
+                fillOpacity="0.15"
+                stroke={GOLD}
+                strokeOpacity="0.8"
+                strokeWidth="1.2"
+              />
+              <text
+                x="103"
+                y={y - 0.4}
+                textAnchor="middle"
+                fontSize="7.5"
+                fontFamily="ui-sans-serif, sans-serif"
+                fontWeight="700"
+                fill={GOLD}
+                stroke="none"
+              >
+                {i + 1}
+              </text>
+              <text
+                x="118"
+                y={y}
+                fontSize="9"
+                fontFamily="ui-sans-serif, sans-serif"
+                fill="currentColor"
+                fillOpacity="0.72"
+                stroke="none"
+              >
+                {step}
+              </text>
+            </motion.g>
+          );
+        })}
+
+        {/* Status pill — amber crossfades to emerald with a check draw-on */}
+        {at("streaming") && (
+          <motion.g
+            initial={reduce ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35, ease: EASE }}
+          >
+            <line x1="96" y1="288" x2="384" y2="288" strokeOpacity="0.12" />
+            <motion.g
+              animate={{ opacity: statusDone ? 0 : 1 }}
+              transition={{ duration: 0.35, ease: EASE }}
+            >
+              <rect
+                x="96"
+                y="299"
+                width={s.pillFrom.width}
+                height="22"
+                rx="11"
+                fill={AMBER}
+                fillOpacity="0.1"
+                stroke={AMBER}
+                strokeOpacity="0.45"
+              />
+              <circle cx="109" cy="310" r="2.5" fill={AMBER} stroke="none" />
+              <text
+                x="117"
+                y="313"
+                fontSize="8"
+                fontFamily="ui-sans-serif, sans-serif"
+                fontWeight="600"
+                fill={AMBER}
+                stroke="none"
+              >
+                {s.pillFrom.label}
+              </text>
+            </motion.g>
+            <motion.g
+              initial={reduce ? false : { opacity: 0 }}
+              animate={{ opacity: statusDone ? 1 : 0 }}
+              transition={{ duration: 0.35, ease: EASE }}
+            >
+              <rect
+                x="96"
+                y="299"
+                width={s.pillTo.width}
+                height="22"
+                rx="11"
+                fill={EMERALD}
+                fillOpacity="0.1"
+                stroke={EMERALD}
+                strokeOpacity="0.5"
+              />
+              <motion.path
+                d="M105.5 310.5 l3 3 l6 -6.5"
+                stroke={EMERALD}
+                strokeWidth="1.8"
+                fill="none"
+                initial={reduce ? false : { pathLength: 0 }}
+                animate={{ pathLength: statusDone ? 1 : 0 }}
+                transition={{ duration: 0.45, ease: EASE, delay: statusDone ? 0.15 : 0 }}
+              />
+              <text
+                x="120"
+                y="313"
+                fontSize="8"
+                fontFamily="ui-sans-serif, sans-serif"
+                fontWeight="600"
+                fill={EMERALD}
+                stroke="none"
+              >
+                {s.pillTo.label}
+              </text>
+            </motion.g>
+          </motion.g>
+        )}
+      </motion.g>
+
+      {/* === Quiet gold sparkles outside the panel ======================== */}
+      {!reduce && (
+        <g stroke={GOLD} strokeOpacity="0.8" strokeWidth="1.5">
+          <motion.path
+            d="M436 84 v10 M441 89 h-10"
+            animate={{ opacity: [0.35, 0.9, 0.35] }}
+            transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.path
+            d="M48 268 v7 M51.5 271.5 h-7"
+            animate={{ opacity: [0.3, 0.8, 0.3] }}
+            transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
+          />
+        </g>
+      )}
     </motion.svg>
   );
 }

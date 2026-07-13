@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 import * as React from "react";
 import {
   ArrowRight,
@@ -146,45 +146,133 @@ function PersonaCard({ persona, index }: { persona: Persona; index: number }) {
   );
 }
 
-function SolutionsHeroIllustration() {
+/* =========================================================================
+   Hero illustration — "Three lenses, one core".
+   A central Focus Frame (the brand motif: four corner brackets + a gold
+   square) feeds three persona panels. After the entrance, a gold signal
+   dot cycles forever: core → panel, the panel brightens and its lead row
+   advances to an "updated" state, then the signal moves to the next
+   persona. Calm by construction: transform/opacity/cx-cy only, no
+   bounce, and reduced-motion renders the finished, equally-lit scene.
+   ========================================================================= */
 
-  // Three persona panels — each shows a snippet of "what they see"
-  // (rather than just a labeled circle). Center is the shared product.
-  const panels = [
-    {
-      x: 18,
-      y: 70,
-      label: "OPS MANAGER",
-      tone: GOLD,
-      rows: [
-        { dot: ROSE, text: "INV-4421 · rejected" },
-        { dot: "hsl(38 92% 50%)", text: "ISF · 4h" },
-        { dot: EMERALD, text: "3 ready" },
-      ],
+const EASE_OUT_QUINT = [0.22, 1, 0.36, 1] as const;
+const EASE_IN_OUT_CUBIC = [0.65, 0, 0.35, 1] as const;
+const AMBER = "hsl(38 92% 50%)";
+
+/** Focus Frame corner brackets — a 44x44 square centred on (240, 172). */
+const HERO_BRACKETS = [
+  "M 218 162 L 218 150 L 230 150",
+  "M 250 150 L 262 150 L 262 162",
+  "M 262 182 L 262 194 L 250 194",
+  "M 230 194 L 218 194 L 218 182",
+];
+
+/** Straight connectors, core edge → panel edge. Index matches HERO_PANELS. */
+const HERO_CONNECTORS = [
+  { x1: 215, y1: 163, x2: 152, y2: 127 },
+  { x1: 265, y1: 163, x2: 328, y2: 127 },
+  { x1: 240, y1: 198, x2: 240, y2: 238 },
+];
+
+type HeroRow = { dot: string; text: string };
+
+const HERO_PANELS: {
+  x: number;
+  y: number;
+  label: string;
+  /** Lead row crossfades base → done while the panel is active. */
+  lead: { base: HeroRow; done: HeroRow };
+  rows: HeroRow[];
+}[] = [
+  {
+    x: 18,
+    y: 70,
+    label: "OPS MANAGER",
+    lead: {
+      base: { dot: ROSE, text: "INV-4421 · rejected" },
+      done: { dot: EMERALD, text: "INV-4421 · resolved" },
     },
-    {
-      x: 330,
-      y: 70,
-      label: "BROKERAGE",
-      tone: GOLD,
-      rows: [
-        { dot: EMERALD, text: "12 imp. · 47 open" },
-        { dot: EMERALD, text: "Templates · 8" },
-        { dot: GOLD, text: "Audit · live" },
-      ],
+    rows: [
+      { dot: AMBER, text: "ISF · due 4h" },
+      { dot: EMERALD, text: "3 ready to file" },
+    ],
+  },
+  {
+    x: 330,
+    y: 70,
+    label: "BROKERAGE",
+    lead: {
+      base: { dot: EMERALD, text: "12 imp. · 47 open" },
+      done: { dot: GOLD, text: "12 imp. · 44 open" },
     },
-    {
-      x: 174,
-      y: 240,
-      label: "FORWARDER",
-      tone: GOLD,
-      rows: [
-        { dot: GOLD, text: "MAEU9381-2" },
-        { dot: EMERALD, text: "ABI · accepted" },
-        { dot: GOLD, text: "Liq · 53d" },
-      ],
+    rows: [
+      { dot: EMERALD, text: "Templates · 8" },
+      { dot: GOLD, text: "Audit · live" },
+    ],
+  },
+  {
+    x: 174,
+    y: 240,
+    label: "FORWARDER",
+    lead: {
+      base: { dot: GOLD, text: "ABI · pending" },
+      done: { dot: EMERALD, text: "ABI · accepted" },
     },
-  ];
+    rows: [
+      { dot: GOLD, text: "MAEU9381-2" },
+      { dot: EMERALD, text: "Liq · 53d" },
+    ],
+  },
+];
+
+const SIGNAL_TRAVEL_MS = 1000;
+const SIGNAL_ACTIVE_MS = 1500;
+const SIGNAL_REST_MS = 500;
+
+function SolutionsHeroIllustration() {
+  const reduced = useReducedMotion();
+
+  // Signal loop state machine: travel (dot flies core → panel) →
+  // active (panel holds bright, lead row advances) → rest (beat at the
+  // core) → travel to the next panel. 3 × 3s = one ~9s full cycle.
+  const [started, setStarted] = React.useState(false);
+  const [phase, setPhase] = React.useState<{
+    target: number;
+    mode: "travel" | "active" | "rest";
+  }>({ target: 0, mode: "travel" });
+
+  // Hold the loop until the entrance choreography has finished.
+  React.useEffect(() => {
+    if (reduced) return;
+    const t = setTimeout(() => setStarted(true), 2400);
+    return () => clearTimeout(t);
+  }, [reduced]);
+
+  React.useEffect(() => {
+    if (reduced || !started) return;
+    const hold =
+      phase.mode === "travel"
+        ? SIGNAL_TRAVEL_MS
+        : phase.mode === "active"
+          ? SIGNAL_ACTIVE_MS
+          : SIGNAL_REST_MS;
+    const t = setTimeout(() => {
+      setPhase((p) =>
+        p.mode === "travel"
+          ? { target: p.target, mode: "active" }
+          : p.mode === "active"
+            ? { target: p.target, mode: "rest" }
+            : { target: (p.target + 1) % HERO_PANELS.length, mode: "travel" },
+      );
+    }, hold);
+    return () => clearTimeout(t);
+  }, [phase, started, reduced]);
+
+  const travel =
+    !reduced && started && phase.mode === "travel"
+      ? HERO_CONNECTORS[phase.target]
+      : null;
 
   return (
     <motion.svg
@@ -196,256 +284,279 @@ function SolutionsHeroIllustration() {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      initial="hidden"
-      animate="visible"
-      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.15 } } }}
     >
       <defs>
         <radialGradient id="sol-glow" cx="50%" cy="50%" r="55%">
-          <stop offset="0%" stopColor={GOLD} stopOpacity="0.16" />
+          <stop offset="0%" stopColor={GOLD} stopOpacity="0.14" />
           <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
         </radialGradient>
         <radialGradient id="sol-particle" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={GOLD} stopOpacity="1" />
-          <stop offset="60%" stopColor={GOLD} stopOpacity="0.7" />
+          <stop offset="0%" stopColor={GOLD} stopOpacity="0.9" />
+          <stop offset="60%" stopColor={GOLD} stopOpacity="0.5" />
           <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
         </radialGradient>
       </defs>
-      <ellipse cx="240" cy="180" rx="200" ry="140" fill="url(#sol-glow)" stroke="none" />
 
-      {/* Connecting paths draw on with pathLength, then particles flow
-          along them toward the hub — each persona feeding the product.
-          Each path renders inline (so motion's pathLength stroke-dash
-          trick works) AND keeps its id so <animateMotion><mpath/> can
-          reference the same geometry without duplication. */}
-      {[
-        { id: "sol-path-ops", d: "M 150 125 Q 175 155 200 178", dur: 2.6, begin: 1.5 },
-        { id: "sol-path-brk", d: "M 330 125 Q 305 155 280 178", dur: 2.6, begin: 1.9 },
-        { id: "sol-path-fwd", d: "M 240 240 L 240 224", dur: 1.4, begin: 2.3 },
-      ].map((p, i) => (
-        <React.Fragment key={p.id}>
-          <motion.path
-            id={p.id}
-            d={p.d}
-            stroke="currentColor"
-            strokeOpacity="0.32"
-            strokeDasharray="3 5"
-            fill="none"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ pathLength: 1, opacity: 1 }}
-            transition={{
-              pathLength: { duration: 1.0, delay: 0.5 + i * 0.12, ease: EASE_OUT_QUART },
-              opacity: { duration: 0.5, delay: 0.5 + i * 0.12 },
-            }}
-          />
-          {/* Two staggered particles per path, so the flow feels
-              continuous rather than blinking once per cycle. */}
-          {[0, p.dur / 2].map((stagger) => (
-            <circle
-              key={stagger}
-              r="2.5"
-              fill="url(#sol-particle)"
-              stroke="none"
-              opacity="0"
-            >
-              <animateMotion
-                dur={`${p.dur}s`}
-                repeatCount="indefinite"
-                begin={`${p.begin + stagger}s`}
-              >
-                <mpath href={`#${p.id}`} />
-              </animateMotion>
-              <animate
-                attributeName="opacity"
-                values="0;1;1;0"
-                keyTimes="0;0.15;0.85;1"
-                dur={`${p.dur}s`}
-                begin={`${p.begin + stagger}s`}
-                repeatCount="indefinite"
-              />
-            </circle>
-          ))}
-        </React.Fragment>
-      ))}
+      <ellipse cx="240" cy="180" rx="190" ry="130" fill="url(#sol-glow)" stroke="none" />
 
-      {/* === Three persona "what they see" panels =================== */}
-      {panels.map((p, idx) => (
-        <motion.g
-          key={p.label}
-          variants={{
-            hidden: { opacity: 0, y: 14, scale: 0.95 },
-            visible: {
-              opacity: 1,
-              y: 0,
-              scale: 1,
-              transition: { duration: 0.6, ease: EASE_OUT_QUART, delay: idx * 0.12 },
-            },
+      {/* === Connectors — draw outward from the core ================== */}
+      {HERO_CONNECTORS.map((c, i) => (
+        <motion.line
+          key={i}
+          x1={c.x1}
+          y1={c.y1}
+          x2={c.x2}
+          y2={c.y2}
+          stroke="currentColor"
+          strokeOpacity="0.28"
+          initial={reduced ? false : { pathLength: 0, opacity: 0 }}
+          animate={reduced ? undefined : { pathLength: 1, opacity: 1 }}
+          transition={{
+            pathLength: { duration: 0.5, delay: 0.75 + i * 0.15, ease: EASE_OUT_QUINT },
+            opacity: { duration: 0.25, delay: 0.75 + i * 0.15 },
           }}
-        >
-          <motion.g
-            animate={{ y: [0, -3, 0] }}
-            transition={{
-              duration: 5 + idx,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: idx * 0.4,
-            }}
-          >
-            {/* Panel card */}
-            <rect
-              x={p.x}
-              y={p.y}
-              width="132"
-              height="110"
-              rx="10"
-              fill="currentColor"
-              fillOpacity="0.04"
-              strokeOpacity="0.6"
-            />
-            {/* Header */}
-            <text
-              x={p.x + 12}
-              y={p.y + 20}
-              fontSize="8"
-              fontFamily="ui-sans-serif, sans-serif"
-              fontWeight="700"
-              letterSpacing="0.8"
-              fill={p.tone}
-              stroke="none"
-            >
-              {p.label}
-            </text>
-            <line x1={p.x + 12} y1={p.y + 28} x2={p.x + 120} y2={p.y + 28} strokeOpacity="0.4" />
-
-            {/* Three "row" snippets */}
-            {p.rows.map((row, i) => (
-              <g key={i}>
-                <circle cx={p.x + 18} cy={p.y + 46 + i * 18} r="2.5" fill={row.dot} stroke="none" />
-                <text
-                  x={p.x + 26}
-                  y={p.y + 49 + i * 18}
-                  fontSize="8.5"
-                  fontFamily="ui-sans-serif, sans-serif"
-                  fontWeight="500"
-                  fill="currentColor"
-                  fillOpacity="0.75"
-                  stroke="none"
-                >
-                  {row.text}
-                </text>
-              </g>
-            ))}
-          </motion.g>
-        </motion.g>
+        />
       ))}
 
-      {/* === Central MyCargoLens hub ================================= */}
-      <motion.g
-        variants={{
-          hidden: { opacity: 0, scale: 0.7 },
-          visible: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: EASE_OUT_QUART, delay: 0.5 } },
-        }}
-      >
-        {/* Three staggered ripples — each starts at radius 44 and grows
-            outward as it fades, giving the hub a "live, receiving" feel.
-            SMIL handles the pivot exactly at (240,180) without needing
-            CSS transform-origin gymnastics. */}
-        {[0, 0.9, 1.8].map((begin, i) => (
-          <circle
-            key={i}
-            cx="240"
-            cy="180"
-            r="44"
-            stroke={GOLD}
-            strokeWidth="1.5"
-            fill="none"
-          >
-            <animate
-              attributeName="r"
-              values="44;76"
-              dur="2.7s"
-              begin={`${begin}s`}
-              repeatCount="indefinite"
-            />
-            <animate
-              attributeName="opacity"
-              values="0.55;0"
-              dur="2.7s"
-              begin={`${begin}s`}
-              repeatCount="indefinite"
-            />
-          </circle>
-        ))}
-        {/* Hub circle with gold */}
-        <circle
-          cx="240"
-          cy="180"
-          r="44"
-          fill={`${GOLD}26`}
-          stroke={GOLD}
-          strokeWidth="2"
-        />
-        {/* Inner ring */}
-        <circle
-          cx="240"
-          cy="180"
-          r="32"
-          stroke={GOLD}
-          strokeOpacity="0.55"
-          fill="none"
-        />
-        {/* Slow-rotating outer tick ring — 12 marks suggest "always on,
-            always working". SVG-native rotation pinned to the hub centre. */}
-        <g>
-          <animateTransform
-            attributeName="transform"
-            type="rotate"
-            from="0 240 180"
-            to="360 240 180"
-            dur="40s"
-            repeatCount="indefinite"
+      {/* === Travelling signal dot ==================================== */}
+      {travel && (
+        <g key={`signal-${phase.target}`}>
+          <motion.circle
+            r="6"
+            fill="url(#sol-particle)"
+            stroke="none"
+            initial={{ cx: travel.x1, cy: travel.y1, opacity: 0 }}
+            animate={{ cx: travel.x2, cy: travel.y2, opacity: 1 }}
+            transition={{
+              cx: { duration: 1, ease: EASE_IN_OUT_CUBIC },
+              cy: { duration: 1, ease: EASE_IN_OUT_CUBIC },
+              opacity: { duration: 0.25 },
+            }}
           />
-          {Array.from({ length: 12 }).map((_, i) => {
-            const deg = (i * 360) / 12;
-            const rad = (deg - 90) * (Math.PI / 180);
-            const x1 = 240 + Math.cos(rad) * 50;
-            const y1 = 180 + Math.sin(rad) * 50;
-            const x2 = 240 + Math.cos(rad) * (i % 3 === 0 ? 54 : 52);
-            const y2 = 180 + Math.sin(rad) * (i % 3 === 0 ? 54 : 52);
-            return (
-              <line
-                key={i}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                stroke={GOLD}
-                strokeOpacity={i % 3 === 0 ? 0.55 : 0.25}
-                strokeWidth="1.2"
+          <motion.circle
+            r="2.2"
+            fill={GOLD}
+            stroke="none"
+            initial={{ cx: travel.x1, cy: travel.y1, opacity: 0 }}
+            animate={{ cx: travel.x2, cy: travel.y2, opacity: 1 }}
+            transition={{
+              cx: { duration: 1, ease: EASE_IN_OUT_CUBIC },
+              cy: { duration: 1, ease: EASE_IN_OUT_CUBIC },
+              opacity: { duration: 0.25 },
+            }}
+          />
+        </g>
+      )}
+
+      {/* === Persona panels =========================================== */}
+      {HERO_PANELS.map((p, idx) => {
+        const isActive =
+          !reduced && started && phase.target === idx && phase.mode === "active";
+        const borderOpacity = reduced ? 0.75 : isActive ? 0.9 : 0.4;
+        return (
+          <motion.g
+            key={p.label}
+            initial={reduced ? false : { opacity: 0, y: 12 }}
+            animate={reduced ? undefined : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EASE_OUT_QUINT, delay: 1.15 + idx * 0.18 }}
+          >
+            {/* Idle float — panels only; the core stays anchored. */}
+            <motion.g
+              animate={reduced ? undefined : { y: [0, -2, 0, 2, 0] }}
+              transition={
+                reduced
+                  ? undefined
+                  : {
+                      duration: 6.5 + idx,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      delay: 2 + idx * 0.9,
+                    }
+              }
+            >
+              {/* One-shot halo when the signal arrives */}
+              {isActive && (
+                <motion.rect
+                  x={p.x - 6}
+                  y={p.y - 6}
+                  width={144}
+                  height={122}
+                  rx={14}
+                  fill={GOLD}
+                  stroke="none"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 0.14, 0] }}
+                  transition={{ duration: 1.4, ease: EASE_OUT_QUART }}
+                />
+              )}
+
+              {/* Panel card — border brightens while active */}
+              <motion.rect
+                x={p.x}
+                y={p.y}
+                width={132}
+                height={110}
+                rx={10}
+                fill="currentColor"
+                fillOpacity="0.04"
+                stroke="currentColor"
+                initial={false}
+                animate={{ strokeOpacity: borderOpacity }}
+                transition={{ duration: 0.45, ease: EASE_OUT_QUART }}
               />
-            );
-          })}
-        </g>
-        {/* MCL wordmark — three stacked chevrons */}
-        <g stroke={GOLD} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M 226 174 l 14 -8 l 14 8" fill="none" />
-          <path d="M 226 184 l 14 -8 l 14 8" strokeOpacity="0.7" fill="none" />
-        </g>
-        <text
-          x="240"
-          y="208"
-          textAnchor="middle"
-          fontSize="9"
-          fontFamily="ui-sans-serif, sans-serif"
-          fontWeight="700"
-          letterSpacing="1.2"
-          fill="currentColor"
-          fillOpacity="0.6"
+
+              {/* Header */}
+              <text
+                x={p.x + 12}
+                y={p.y + 20}
+                fontSize="8"
+                fontFamily="ui-sans-serif, sans-serif"
+                fontWeight="600"
+                letterSpacing="1"
+                fill="currentColor"
+                fillOpacity="0.7"
+                stroke="none"
+              >
+                {p.label}
+              </text>
+              <line
+                x1={p.x + 12}
+                y1={p.y + 28}
+                x2={p.x + 120}
+                y2={p.y + 28}
+                strokeOpacity="0.3"
+                strokeWidth="1"
+              />
+
+              {/* Lead row — crossfades to its updated variant when active */}
+              <motion.circle
+                cx={p.x + 18}
+                cy={p.y + 46}
+                r="2.5"
+                fill={p.lead.base.dot}
+                stroke="none"
+                initial={false}
+                animate={{ opacity: isActive ? 0 : 1 }}
+                transition={{ duration: 0.35 }}
+              />
+              <motion.circle
+                cx={p.x + 18}
+                cy={p.y + 46}
+                r="2.5"
+                fill={p.lead.done.dot}
+                stroke="none"
+                initial={false}
+                animate={{ opacity: isActive ? 1 : 0 }}
+                transition={{ duration: 0.35 }}
+              />
+              {isActive && (
+                <motion.circle
+                  cx={p.x + 18}
+                  cy={p.y + 46}
+                  r="6"
+                  fill={p.lead.done.dot}
+                  stroke="none"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 0.4, 0] }}
+                  transition={{ duration: 0.9, ease: EASE_OUT_QUART }}
+                />
+              )}
+              <motion.text
+                x={p.x + 26}
+                y={p.y + 49}
+                fontSize="7.5"
+                fontFamily="ui-monospace, monospace"
+                fill="currentColor"
+                fillOpacity="0.75"
+                stroke="none"
+                initial={false}
+                animate={{ opacity: isActive ? 0 : 1 }}
+                transition={{ duration: 0.35 }}
+              >
+                {p.lead.base.text}
+              </motion.text>
+              <motion.text
+                x={p.x + 26}
+                y={p.y + 49}
+                fontSize="7.5"
+                fontFamily="ui-monospace, monospace"
+                fill="currentColor"
+                fillOpacity="0.75"
+                stroke="none"
+                initial={false}
+                animate={{ opacity: isActive ? 1 : 0 }}
+                transition={{ duration: 0.35 }}
+              >
+                {p.lead.done.text}
+              </motion.text>
+
+              {/* Static rows */}
+              {p.rows.map((row, i) => (
+                <g key={i}>
+                  <circle
+                    cx={p.x + 18}
+                    cy={p.y + 64 + i * 18}
+                    r="2.5"
+                    fill={row.dot}
+                    stroke="none"
+                  />
+                  <text
+                    x={p.x + 26}
+                    y={p.y + 67 + i * 18}
+                    fontSize="7.5"
+                    fontFamily="ui-monospace, monospace"
+                    fill="currentColor"
+                    fillOpacity="0.7"
+                    stroke="none"
+                  >
+                    {row.text}
+                  </text>
+                </g>
+              ))}
+            </motion.g>
+          </motion.g>
+        );
+      })}
+
+      {/* === Core — the Focus Frame (anchored, never floats) =========== */}
+      <g>
+        {HERO_BRACKETS.map((d, i) => (
+          <motion.path
+            key={d}
+            d={d}
+            stroke={GOLD}
+            strokeWidth="2"
+            fill="none"
+            initial={reduced ? false : { pathLength: 0, opacity: 0 }}
+            animate={reduced ? undefined : { pathLength: 1, opacity: 1 }}
+            transition={{
+              pathLength: { duration: 0.45, delay: i * 0.08, ease: EASE_OUT_QUINT },
+              opacity: { duration: 0.2, delay: i * 0.08 },
+            }}
+          />
+        ))}
+        {/* Gold centre square scales in from the frame's centre point */}
+        <motion.rect
+          x={235}
+          y={167}
+          width={10}
+          height={10}
+          rx={2}
+          fill={GOLD}
           stroke="none"
-        >
-          MYCARGOLENS
-        </text>
-      </motion.g>
+          initial={
+            reduced
+              ? false
+              : { attrX: 240, attrY: 172, width: 0, height: 0, opacity: 0 }
+          }
+          animate={
+            reduced
+              ? undefined
+              : { attrX: 235, attrY: 167, width: 10, height: 10, opacity: 1 }
+          }
+          transition={{ duration: 0.5, delay: 0.4, ease: EASE_OUT_QUINT }}
+        />
+      </g>
     </motion.svg>
   );
 }

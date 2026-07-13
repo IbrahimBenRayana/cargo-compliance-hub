@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import * as React from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
   BellRing,
@@ -29,42 +29,113 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 import { GOLD } from "@/lib/colors";
 
 /**
- * Features overview hero — 5 floating tiles (one per platform surface) +
- * a "+30 more" tile in the 6th slot. No bg box; floats freely with a
- * soft gold glow behind.
+ * Features overview hero — "chaos → order" capability constellation.
+ * 36 scattered dots converge into 5 clusters (one per platform surface),
+ * labels stamp in, rings draw on, then the scene breathes: subtle per-cluster
+ * pulse + gold signal dots traveling the connector lines. A "+31 MORE"
+ * satellite arrives last. Fully deterministic (SSR-safe), reduced-motion aware.
  */
+
+/** Deterministic pseudo-random in [0, 1) — no Math.random (SSR hydration). */
+function ftrRand(n: number): number {
+  const v = Math.sin(n * 127.1 + 311.7) * 43758.5453123;
+  return v - Math.floor(v);
+}
+
+const FTR_CLUSTERS = [
+  { label: "FILINGS", cx: 106, cy: 96, count: 8 },
+  { label: "COMPLIANCE", cx: 252, cy: 72, count: 7 },
+  { label: "AI", cx: 392, cy: 116, count: 7 },
+  { label: "LIFECYCLE", cx: 130, cy: 236, count: 7 },
+  { label: "AUTOMATION", cx: 290, cy: 242, count: 7 },
+] as const;
+
+const FTR_RING_R = 24;
+
+/** Connector edges between cluster centers (indices into FTR_CLUSTERS). */
+const FTR_EDGES: ReadonlyArray<readonly [number, number]> = [
+  [0, 1],
+  [1, 2],
+  [2, 4],
+  [4, 3],
+  [3, 0],
+];
+
+/** Travel loop order for the signal dots. */
+const FTR_LOOP = [0, 1, 2, 4, 3] as const;
+
+/** Dot offsets within a cluster: one center dot + a ring of the rest. */
+function ftrClusterOffsets(count: number, clusterIndex: number) {
+  const pts: { x: number; y: number }[] = [{ x: 0, y: 0 }];
+  const ring = count - 1;
+  for (let j = 0; j < ring; j++) {
+    const a = (j / ring) * Math.PI * 2 + clusterIndex * 0.9;
+    pts.push({ x: Math.cos(a) * 13, y: Math.sin(a) * 13 });
+  }
+  return pts;
+}
+
 function FeaturesHeroIllustration() {
-  const tiles = [
-    { x: 70, y: 70, label: "FILINGS", delay: 0, draw: <>
-      <rect x="92" y="92" width="36" height="24" rx="2" stroke={GOLD} strokeOpacity="0.85" />
-      <line x1="98" y1="100" x2="122" y2="100" stroke={GOLD} strokeOpacity="0.6" />
-      <line x1="98" y1="106" x2="118" y2="106" stroke={GOLD} strokeOpacity="0.6" />
-      <line x1="98" y1="112" x2="110" y2="112" stroke={GOLD} strokeOpacity="0.6" />
-    </> },
-    { x: 180, y: 70, label: "COMPLIANCE", delay: 0.1, draw: <>
-      <circle cx="220" cy="105" r="14" stroke={GOLD} strokeOpacity="0.85" />
-      <path d="M 214 105 l 4 4 l 9 -9" stroke={GOLD} strokeOpacity="0.85" strokeWidth="2" />
-    </> },
-    { x: 290, y: 70, label: "AI", delay: 0.2, draw: <>
-      <circle cx="330" cy="105" r="14" stroke={GOLD} strokeOpacity="0.85" />
-      <circle cx="325" cy="102" r="1.5" fill={GOLD} stroke="none" />
-      <circle cx="335" cy="102" r="1.5" fill={GOLD} stroke="none" />
-      <path d="M 322 110 q 8 5 16 0" stroke={GOLD} strokeOpacity="0.85" />
-      <path d="M 330 91 v -4" stroke={GOLD} strokeOpacity="0.6" />
-    </> },
-    { x: 70, y: 190, label: "LIFECYCLE", delay: 0.3, draw: <>
-      <line x1="92" y1="225" x2="128" y2="225" stroke={GOLD} strokeOpacity="0.6" />
-      <circle cx="98" cy="225" r="4" stroke={GOLD} strokeOpacity="0.85" fill={`${GOLD}26`} />
-      <circle cx="110" cy="225" r="4" stroke={GOLD} strokeOpacity="0.85" fill={`${GOLD}26`} />
-      <circle cx="122" cy="225" r="4" stroke={GOLD} strokeOpacity="0.85" fill={GOLD} />
-    </> },
-    { x: 180, y: 190, label: "AUTOMATION", delay: 0.4, draw: <>
-      <circle cx="220" cy="225" r="14" stroke={GOLD} strokeOpacity="0.85" />
-      <line x1="220" y1="225" x2="220" y2="215" stroke={GOLD} strokeOpacity="0.85" strokeWidth="2" />
-      <line x1="220" y1="225" x2="226" y2="225" stroke={GOLD} strokeOpacity="0.85" strokeWidth="2" />
-      <circle cx="220" cy="225" r="1.5" fill={GOLD} stroke="none" />
-    </> },
-  ];
+  const reduce = useReducedMotion();
+
+  // Flatten clusters into one dot list with final + scattered positions.
+  const dots: {
+    key: string;
+    fx: number;
+    fy: number;
+    dx: number;
+    dy: number;
+    delay: number;
+    gold: boolean;
+  }[] = [];
+  let g = 0;
+  FTR_CLUSTERS.forEach((c, ci) => {
+    ftrClusterOffsets(c.count, ci).forEach((o, j) => {
+      const fx = c.cx + o.x;
+      const fy = c.cy + o.y;
+      const sx = 28 + ftrRand(g * 2 + 1) * 424;
+      const sy = 22 + ftrRand(g * 2 + 2) * 276;
+      dots.push({
+        key: `${c.label}-${j}`,
+        fx,
+        fy,
+        dx: sx - fx,
+        dy: sy - fy,
+        delay: 0.05 + ftrRand(g + 53) * 0.38,
+        gold: j === 0, // one gold anchor dot per cluster
+      });
+      g += 1;
+    });
+  });
+
+  // Signal-dot paths: the loop of cluster centers, rotated per dot so the
+  // three travelers are spread around the circuit. Times weighted by segment
+  // length so speed stays constant.
+  const loopPts = FTR_LOOP.map((i) => ({ x: FTR_CLUSTERS[i].cx, y: FTR_CLUSTERS[i].cy }));
+  const travelers = [0, 2, 4].map((offset, k) => {
+    const rotated = [...loopPts.slice(offset), ...loopPts.slice(0, offset)];
+    const path = [...rotated, rotated[0]];
+    const segs: number[] = [];
+    let total = 0;
+    for (let i = 1; i < path.length; i++) {
+      const d = Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+      segs.push(d);
+      total += d;
+    }
+    const times = [0];
+    let acc = 0;
+    for (const d of segs) {
+      acc += d;
+      times.push(acc / total);
+    }
+    return {
+      key: `traveler-${k}`,
+      xs: path.map((p) => p.x),
+      ys: path.map((p) => p.y),
+      times,
+      delay: 2.3 + k * 0.5,
+    };
+  });
 
   return (
     <motion.svg
@@ -76,9 +147,6 @@ function FeaturesHeroIllustration() {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      initial="hidden"
-      animate="visible"
-      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}
     >
       <defs>
         <radialGradient id="ftr-glow" cx="50%" cy="50%" r="55%">
@@ -88,23 +156,81 @@ function FeaturesHeroIllustration() {
       </defs>
       <ellipse cx="240" cy="160" rx="220" ry="130" fill="url(#ftr-glow)" stroke="none" />
 
-      {tiles.map((tile, i) => (
-        <motion.g
-          key={tile.label}
-          variants={{
-            hidden: { opacity: 0, y: 12, scale: 0.94 },
-            visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.55, ease: EASE, delay: tile.delay } },
-          }}
-        >
+      {/* Connector lines between cluster centers — fade in after settle */}
+      <motion.g
+        initial={reduce ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.9, ease: EASE, delay: 1.55 }}
+      >
+        {FTR_EDGES.map(([a, b]) => (
+          <line
+            key={`edge-${a}-${b}`}
+            x1={FTR_CLUSTERS[a].cx}
+            y1={FTR_CLUSTERS[a].cy}
+            x2={FTR_CLUSTERS[b].cx}
+            y2={FTR_CLUSTERS[b].cy}
+            strokeOpacity="0.1"
+            strokeWidth="1"
+          />
+        ))}
+        {/* faint tether to the satellite */}
+        <line x1="392" y1="116" x2="420" y2="256" strokeOpacity="0.07" strokeWidth="1" strokeDasharray="2 4" />
+      </motion.g>
+
+      {/* Clusters: converging dots + drawn-on ring + stamped label */}
+      {FTR_CLUSTERS.map((c, ci) => (
+        <g key={c.label}>
+          {/* breathing group — subtle scale pulse, per-cluster offset */}
           <motion.g
-            animate={{ y: [0, -3, 0] }}
-            transition={{ duration: 5 + i, repeat: Infinity, ease: "easeInOut", delay: tile.delay + 0.5 }}
+            style={{ transformBox: "fill-box", transformOrigin: "50% 50%" }}
+            animate={reduce ? undefined : { scale: [1, 1.03, 1] }}
+            transition={{
+              duration: 6.5 + ci * 1.1,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 2.4 + ci * 0.85,
+            }}
           >
-            <rect x={tile.x} y={tile.y} width="90" height="90" rx="10" fill="currentColor" fillOpacity="0.035" strokeOpacity="0.65" />
-            {tile.draw}
+            <motion.circle
+              cx={c.cx}
+              cy={c.cy}
+              r={FTR_RING_R}
+              strokeOpacity="0.22"
+              strokeWidth="1"
+              initial={reduce ? false : { pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 1 }}
+              transition={{ duration: 0.8, ease: EASE, delay: 1.35 + ci * 0.07 }}
+            />
+            {dots
+              .filter((d) => d.key.startsWith(`${c.label}-`))
+              .map((d) => (
+                <motion.circle
+                  key={d.key}
+                  cx={d.fx}
+                  cy={d.fy}
+                  r={d.gold ? 3 : 2.4}
+                  fill={d.gold ? GOLD : "currentColor"}
+                  fillOpacity={d.gold ? 0.95 : 0.5}
+                  stroke="none"
+                  initial={reduce ? false : { x: d.dx, y: d.dy, opacity: 0 }}
+                  animate={{ x: 0, y: 0, opacity: 1 }}
+                  transition={{
+                    x: { duration: 1.05, ease: EASE, delay: d.delay },
+                    y: { duration: 1.05, ease: EASE, delay: d.delay },
+                    opacity: { duration: 0.45, ease: EASE, delay: d.delay },
+                  }}
+                />
+              ))}
+          </motion.g>
+          {/* label stamps in after the dots settle */}
+          <motion.g
+            initial={reduce ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: EASE, delay: 1.42 + ci * 0.07 }}
+          >
             <text
-              x={tile.x + 45}
-              y={tile.y + 80}
+              x={c.cx}
+              y={c.cy + FTR_RING_R + 15}
               textAnchor="middle"
               fontSize="8"
               fontFamily="ui-sans-serif, sans-serif"
@@ -114,37 +240,56 @@ function FeaturesHeroIllustration() {
               fillOpacity="0.65"
               stroke="none"
             >
-              {tile.label}
+              {c.label}
             </text>
           </motion.g>
-        </motion.g>
+        </g>
       ))}
 
-      {/* +30 MORE tile */}
-      <motion.g
-        variants={{
-          hidden: { opacity: 0, y: 12, scale: 0.94 },
-          visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.55, ease: EASE, delay: 0.5 } },
-        }}
-      >
-        <motion.g
-          animate={{ y: [0, -3, 0] }}
-          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-        >
-          <rect
-            x="290"
-            y="190"
-            width="90"
-            height="90"
-            rx="10"
-            fill={`${GOLD}10`}
-            stroke={GOLD}
-            strokeOpacity="0.6"
-            strokeDasharray="3 4"
+      {/* Traveling gold signal dots along the connector circuit */}
+      {!reduce &&
+        travelers.map((t) => (
+          <motion.circle
+            key={t.key}
+            cx={t.xs[0]}
+            cy={t.ys[0]}
+            r="2"
+            fill={GOLD}
+            stroke="none"
+            initial={{ opacity: 0 }}
+            animate={{ cx: t.xs, cy: t.ys, opacity: 0.9 }}
+            transition={{
+              cx: { duration: 16, times: t.times, repeat: Infinity, ease: "linear", delay: t.delay },
+              cy: { duration: 16, times: t.times, repeat: Infinity, ease: "linear", delay: t.delay },
+              opacity: { duration: 0.7, ease: EASE, delay: t.delay },
+            }}
           />
-          <text x="335" y="232" textAnchor="middle" fontSize="20" fontFamily="ui-sans-serif, sans-serif" fontWeight="700" fill={GOLD} stroke="none">+30</text>
-          <text x="335" y="252" textAnchor="middle" fontSize="8" fontFamily="ui-sans-serif, sans-serif" fontWeight="700" letterSpacing="0.6" fill="currentColor" fillOpacity="0.65" stroke="none">MORE</text>
-        </motion.g>
+        ))}
+
+      {/* "+31 MORE" satellite — arrives last */}
+      <motion.g
+        initial={reduce ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: EASE, delay: 1.8 }}
+      >
+        <circle cx="420" cy="256" r="16" stroke={GOLD} strokeOpacity="0.55" strokeWidth="1" strokeDasharray="3 4" fill={`${GOLD}10`} />
+        <circle cx="416" cy="252" r="1.8" fill={GOLD} fillOpacity="0.8" stroke="none" />
+        <circle cx="425" cy="255" r="1.8" fill="currentColor" fillOpacity="0.5" stroke="none" />
+        <circle cx="418" cy="261" r="1.8" fill="currentColor" fillOpacity="0.5" stroke="none" />
+        <text
+          x="420"
+          y="286"
+          textAnchor="middle"
+          fontSize="8"
+          fontFamily="ui-sans-serif, sans-serif"
+          fontWeight="700"
+          letterSpacing="0.8"
+          fill="currentColor"
+          fillOpacity="0.65"
+          stroke="none"
+        >
+          +31 MORE
+        </text>
       </motion.g>
     </motion.svg>
   );

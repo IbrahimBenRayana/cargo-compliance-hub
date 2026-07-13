@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   Bot,
@@ -17,25 +18,110 @@ import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
 import { IconTile } from "@/components/ui/icon-tile";
 import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
-import { GOLD, EMERALD } from "@/lib/colors";
+import { GOLD, ROSE, AMBER, EMERALD } from "@/lib/colors";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
+const EASE_IN = [0.55, 0, 1, 0.45] as const;
+
+/** The four filings that rotate through the inbox. Ids are stable keys. */
+const FILINGS = [
+  { id: 0, label: "ISF-10 · INV-4421", dot: ROSE, pill: "URGENT", pillColor: ROSE },
+  { id: 1, label: "Entry 7501 · INV-4390", dot: EMERALD, pill: "READY", pillColor: EMERALD },
+  { id: 2, label: "Cargo Release 3461", dot: EMERALD, pill: "READY", pillColor: EMERALD },
+  { id: 3, label: "ISF-5 · deadline 4h", dot: AMBER, pill: "4H LEFT", pillColor: AMBER },
+] as const;
+
+/** Slot geometry: 4 fixed row positions inside the window frame. */
+const slotY = (slot: number) => 128 + slot * 42;
+
+/* --- Deterministic legacy-clutter geometry (no randomness: SSR-safe) --- */
+const CLUTTER_TOOLBAR = Array.from({ length: 16 }, (_, i) => ({
+  x: 104 + (i % 8) * 30,
+  y: 96 + Math.floor(i / 8) * 14,
+  w: 20 + ((i * 7) % 3) * 4,
+}));
+const CLUTTER_GRID = Array.from({ length: 20 }, (_, i) => ({
+  x: 104 + (i % 5) * 56,
+  y: 132 + Math.floor(i / 5) * 34,
+}));
+const CLUTTER_CONNECTORS = [
+  "M 116 150 C 220 240 260 120 372 232",
+  "M 120 250 C 190 130 300 280 368 150",
+  "M 140 128 C 250 300 240 110 352 268",
+];
+const CLUTTER_MENUS = [
+  { x: 176, y: 168, w: 92, h: 62, lines: 3 },
+  { x: 246, y: 196, w: 84, h: 52, lines: 2 },
+];
+
+type Phase = "mess" | "collapse" | "inbox";
+type Loop = { order: number[]; entering: number | null; exiting: number | null };
+
 /**
- * Why hero — a stylized "inbox for customs" card. Three queued filing
- * rows draw on in sequence; the top row carries a gold AI pre-flight
- * badge that pulses. Mirrors the About/Security hero idiom: framer-motion
- * staggered draw-on for the static composition, SMIL animate for the
- * looping pulse. SMIL ignores prefers-reduced-motion, so the pulse is
- * gated on useReducedMotion — reduced-motion users get the static card.
+ * Why hero — "legacy collapses into calm". A dense monochrome wireframe
+ * (the enterprise-software mess) accretes fast, collapses inward, and a
+ * calm three-row inbox assembles in its place. Then a continuous loop:
+ * a new urgent filing fades in at the bottom and re-sorts to the top
+ * while the rest shift down — urgency rises, the product's core behavior.
+ * Reduced motion renders the settled inbox statically with no loop.
  */
 function WhyHeroIllustration() {
   const reduceMotion = useReducedMotion();
-  const rows = [
-    { y: 132, label: "ISF-10 · INV-4421", tone: "ai" as const },
-    { y: 192, label: "Entry 7501 · INV-4390", tone: "ok" as const },
-    { y: 252, label: "Cargo Release 3461", tone: "ok" as const },
-  ];
+  const [phase, setPhase] = useState<Phase>("mess");
+  const [looping, setLooping] = useState(false);
+  const [loop, setLoop] = useState<Loop>({ order: [0, 1, 2], entering: null, exiting: null });
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const at = (fn: () => void, ms: number) => timers.push(setTimeout(fn, ms));
+
+    // Entrance phase machine
+    at(() => setPhase("collapse"), 1200);
+    at(() => setPhase("inbox"), 1800);
+    at(() => setLooping(true), 4600);
+
+    // Urgency re-sort loop (~7s per cycle)
+    const cycle = () => {
+      // 1. New filing fades in at the bottom slot
+      setLoop((prev) => ({
+        ...prev,
+        entering: FILINGS.map((f) => f.id).find((id) => !prev.order.includes(id)) ?? null,
+      }));
+      // 2. After a beat, it re-sorts to the top; the oldest is pushed below
+      at(() => {
+        setLoop((prev) =>
+          prev.entering == null
+            ? prev
+            : {
+                order: [prev.entering, prev.order[0], prev.order[1]],
+                entering: null,
+                exiting: prev.order[2],
+              }
+        );
+      }, 600);
+      // 3. The pushed-out row has faded; drop it from the DOM
+      at(() => setLoop((prev) => ({ ...prev, exiting: null })), 2600);
+      at(cycle, 7000);
+    };
+    at(cycle, 4800);
+
+    return () => timers.forEach(clearTimeout);
+  }, [reduceMotion]);
+
+  const showInbox = phase === "inbox" || reduceMotion;
+
+  // Rows to render: current order (slots 0-2) + entering/exiting at slot 3
+  const rows: { id: number; slot: number; exiting: boolean }[] = loop.order.map((id, i) => ({
+    id,
+    slot: i,
+    exiting: false,
+  }));
+  if (loop.entering != null) rows.push({ id: loop.entering, slot: 3, exiting: false });
+  if (loop.exiting != null) rows.push({ id: loop.exiting, slot: 3, exiting: true });
+  rows.sort((a, b) => a.id - b.id); // stable element order across re-sorts
+
   return (
     <motion.svg
       viewBox="0 0 480 360"
@@ -46,9 +132,6 @@ function WhyHeroIllustration() {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      initial="hidden"
-      animate="visible"
-      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
     >
       <defs>
         <radialGradient id="why-glow" cx="50%" cy="50%" r="55%">
@@ -58,131 +141,252 @@ function WhyHeroIllustration() {
       </defs>
       <ellipse cx="240" cy="180" rx="200" ry="140" fill="url(#why-glow)" stroke="none" />
 
-      {/* Inbox window frame */}
-      <motion.rect
-        x="92"
-        y="84"
-        width="296"
-        height="216"
-        rx="16"
-        stroke="currentColor"
-        strokeOpacity="0.28"
-        fill="currentColor"
-        fillOpacity="0.02"
-        variants={{
-          hidden: { pathLength: 0, opacity: 0 },
-          visible: { pathLength: 1, opacity: 1, transition: { duration: 0.9, ease: EASE } },
-        }}
-      />
-
-      {/* Inbox header: icon + "INBOX" */}
-      <motion.g
-        variants={{
-          hidden: { opacity: 0 },
-          visible: { opacity: 1, transition: { duration: 0.5, delay: 0.3 } },
-        }}
-      >
-        <rect x="112" y="100" width="14" height="11" rx="2" stroke={GOLD} strokeWidth="1.5" fill="none" />
-        <path d="M 112 104 L 119 108 L 126 104" stroke={GOLD} strokeWidth="1.5" fill="none" />
-        <text
-          x="134"
-          y="110"
-          fontSize="10"
-          fontFamily="ui-sans-serif, sans-serif"
-          fontWeight="700"
-          letterSpacing="2"
-          fill="currentColor"
-          fillOpacity="0.6"
-          stroke="none"
-        >
-          INBOX
-        </text>
-      </motion.g>
-
-      {/* Queued filing rows */}
-      {rows.map((row, i) => (
+      {/* ---- Phase 1-2: the legacy mess (accretes fast, then collapses) ---- */}
+      {!reduceMotion && phase !== "inbox" && (
         <motion.g
-          key={row.y}
-          variants={{
-            hidden: { opacity: 0, x: 14 },
-            visible: {
-              opacity: 1,
-              x: 0,
-              transition: { duration: 0.55, ease: EASE, delay: 0.4 + i * 0.18 },
-            },
-          }}
+          style={{ transformOrigin: "50% 50%", transformBox: "view-box" }}
+          animate={
+            phase === "mess"
+              ? { opacity: 1, scale: 1, y: 0 }
+              : { opacity: 0, scale: 0.9, y: 14 }
+          }
+          transition={{ duration: 0.55, ease: EASE_IN }}
         >
-          <rect
-            x="112"
-            y={row.y - 22}
-            width="256"
-            height="44"
-            rx="9"
+          {/* Cramped window frame — sharp corners, joyless */}
+          <motion.rect
+            x="92"
+            y="84"
+            width="296"
+            height="216"
+            rx="4"
             stroke="currentColor"
-            strokeOpacity="0.16"
-            fill="currentColor"
-            fillOpacity={i === 0 ? 0.05 : 0.015}
+            strokeOpacity="0.35"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.15 }}
           />
-          {/* status dot */}
-          <circle
-            cx="128"
-            cy={row.y}
-            r="4"
-            fill={row.tone === "ai" ? GOLD : EMERALD}
-            stroke="none"
-          />
-          <text
-            x="144"
-            y={row.y + 4}
-            fontSize="11"
-            fontFamily="ui-monospace, monospace"
-            fontWeight="600"
-            fill="currentColor"
-            fillOpacity="0.75"
-            stroke="none"
-          >
-            {row.label}
-          </text>
-          {row.tone === "ai" && (
-            <g>
-              {/* AI pre-flight badge */}
-              <rect x="296" y={row.y - 11} width="60" height="22" rx="11" fill={`${GOLD}26`} stroke={GOLD} strokeWidth="1" />
-              <text
-                x="326"
-                y={row.y + 4}
-                textAnchor="middle"
-                fontSize="9"
-                fontFamily="ui-sans-serif, sans-serif"
-                fontWeight="700"
-                letterSpacing="0.5"
-                fill={GOLD}
-                stroke="none"
-              >
-                AI ✓
-              </text>
-              {!reduceMotion && (
-                <circle cx="326" cy={row.y} r="14" stroke={GOLD} strokeOpacity="0.4" fill="none">
-                  <animate attributeName="r" values="14;22;14" dur="3s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.4;0;0.4" dur="3s" repeatCount="indefinite" />
-                </circle>
-              )}
-            </g>
-          )}
+          {/* Two rows of tiny toolbar chips */}
+          {CLUTTER_TOOLBAR.map((c, i) => (
+            <motion.rect
+              key={`tb-${i}`}
+              x={c.x}
+              y={c.y}
+              width={c.w}
+              height="9"
+              rx="1.5"
+              strokeWidth="1"
+              stroke="currentColor"
+              strokeOpacity="0.3"
+              fill="currentColor"
+              fillOpacity="0.05"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.15, delay: 0.05 + i * 0.028 }}
+            />
+          ))}
+          {/* Dense 4x5 grid of gray boxes */}
+          {CLUTTER_GRID.map((c, i) => (
+            <motion.rect
+              key={`gr-${i}`}
+              x={c.x}
+              y={c.y}
+              width="48"
+              height="26"
+              rx="2"
+              strokeWidth="1"
+              stroke="currentColor"
+              strokeOpacity="0.3"
+              fill="currentColor"
+              fillOpacity="0.05"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.15, delay: 0.32 + i * 0.03 }}
+            />
+          ))}
+          {/* Tangled dashed connectors crossing the grid */}
+          {CLUTTER_CONNECTORS.map((d, i) => (
+            <motion.path
+              key={`cn-${i}`}
+              d={d}
+              strokeWidth="1"
+              strokeOpacity="0.35"
+              strokeDasharray="4 4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.18, delay: 0.82 + i * 0.08 }}
+            />
+          ))}
+          {/* Overlapping fake dropdown menus */}
+          {CLUTTER_MENUS.map((m, i) => (
+            <motion.g
+              key={`mn-${i}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.15, delay: 0.95 + i * 0.09 }}
+            >
+              <rect
+                x={m.x}
+                y={m.y}
+                width={m.w}
+                height={m.h}
+                rx="2"
+                strokeWidth="1"
+                stroke="currentColor"
+                strokeOpacity="0.4"
+                fill="currentColor"
+                fillOpacity="0.06"
+              />
+              {Array.from({ length: m.lines }, (_, j) => (
+                <line
+                  key={j}
+                  x1={m.x + 8}
+                  y1={m.y + 14 + j * 14}
+                  x2={m.x + m.w - 16}
+                  y2={m.y + 14 + j * 14}
+                  strokeWidth="1"
+                  strokeOpacity="0.25"
+                />
+              ))}
+            </motion.g>
+          ))}
         </motion.g>
-      ))}
+      )}
 
-      {/* "an inbox for US customs" stamp top-left */}
-      <motion.g
-        variants={{
-          hidden: { opacity: 0 },
-          visible: { opacity: 1, transition: { duration: 0.5, delay: 1.1 } },
-        }}
-      >
-        <circle cx="60" cy="56" r="2.5" fill={EMERALD} stroke="none" />
-        <text x="72" y="60" fontSize="8.5" fontFamily="ui-monospace, monospace" fontWeight="600" fill="currentColor" fillOpacity="0.55" stroke="none">
-          an inbox for US customs
-        </text>
-      </motion.g>
+      {/* ---- Phase 3: the calm inbox assembles ---- */}
+      {showInbox && (
+        <g>
+          {/* Rounded window frame draws on */}
+          <motion.rect
+            x="92"
+            y="84"
+            width="296"
+            height="216"
+            rx="16"
+            stroke="currentColor"
+            strokeOpacity="0.28"
+            fill="currentColor"
+            fillOpacity="0.02"
+            initial={reduceMotion ? false : { pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ duration: 0.7, ease: EASE }}
+          />
+
+          {/* TODAY'S BRIEF header */}
+          <motion.g
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: reduceMotion ? 0 : 0.45 }}
+          >
+            <circle cx="118" cy="105" r="2.5" fill={GOLD} stroke="none" />
+            <text
+              x="128"
+              y="108.5"
+              fontSize="8"
+              fontFamily="ui-sans-serif, sans-serif"
+              fontWeight="700"
+              letterSpacing="2"
+              fill="currentColor"
+              fillOpacity="0.65"
+              stroke="none"
+            >
+              TODAY&apos;S BRIEF
+            </text>
+            <line x1="112" y1="118" x2="368" y2="118" strokeWidth="1" strokeOpacity="0.12" />
+          </motion.g>
+
+          {/* Filing rows — fixed slots, re-sorted by translating y */}
+          {rows.map(({ id, slot, exiting }) => {
+            const row = FILINGS[id];
+            const y = slotY(slot);
+            const entranceDelay = looping || reduceMotion ? 0 : 0.55 + slot * 0.15;
+            return (
+              <motion.g
+                key={id}
+                initial={reduceMotion ? false : { opacity: 0, y: y + 16 }}
+                animate={{ opacity: exiting ? 0 : 1, y }}
+                transition={{
+                  y: { duration: 0.6, ease: EASE, delay: entranceDelay },
+                  opacity: exiting
+                    ? { duration: 0.45, ease: "easeOut", delay: 0.9 }
+                    : { duration: 0.45, ease: EASE, delay: entranceDelay },
+                }}
+              >
+                <rect
+                  x="112"
+                  y="0"
+                  width="256"
+                  height="36"
+                  rx="9"
+                  stroke="currentColor"
+                  strokeOpacity="0.16"
+                  fill="currentColor"
+                  fillOpacity={slot === 0 ? 0.045 : 0.015}
+                />
+                <circle cx="128" cy="18" r="3.5" fill={row.dot} stroke="none" />
+                <text
+                  x="142"
+                  y="21"
+                  fontSize="9"
+                  fontFamily="ui-monospace, monospace"
+                  fontWeight="600"
+                  fill="currentColor"
+                  fillOpacity="0.75"
+                  stroke="none"
+                >
+                  {row.label}
+                </text>
+                {/* Severity pill */}
+                <rect
+                  x="306"
+                  y="10"
+                  width="52"
+                  height="16"
+                  rx="8"
+                  fill={row.pillColor}
+                  fillOpacity="0.1"
+                  stroke={row.pillColor}
+                  strokeOpacity="0.45"
+                  strokeWidth="1"
+                />
+                <text
+                  x="332"
+                  y="21"
+                  textAnchor="middle"
+                  fontSize="8"
+                  fontFamily="ui-sans-serif, sans-serif"
+                  fontWeight="700"
+                  letterSpacing="0.5"
+                  fill={row.pillColor}
+                  stroke="none"
+                >
+                  {row.pill}
+                </text>
+              </motion.g>
+            );
+          })}
+
+          {/* Stamp — top-left, outside the frame */}
+          <motion.g
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: reduceMotion ? 0 : 1.1 }}
+          >
+            <circle cx="60" cy="56" r="2.5" fill={EMERALD} stroke="none" />
+            <text
+              x="72"
+              y="60"
+              fontSize="8.5"
+              fontFamily="ui-monospace, monospace"
+              fontWeight="600"
+              fill="currentColor"
+              fillOpacity="0.65"
+              stroke="none"
+            >
+              an inbox for US customs
+            </text>
+          </motion.g>
+        </g>
+      )}
     </motion.svg>
   );
 }
