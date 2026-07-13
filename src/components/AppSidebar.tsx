@@ -163,14 +163,9 @@ export function AppSidebar() {
               reversed light-grey tint; the subject square stays gold. */}
 
           {!collapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className="font-bold text-[15px] tracking-tight text-sidebar-accent-foreground leading-none">
-                MyCargoLens
-              </span>
-              <span className="text-[10px] text-sidebar-foreground/50 font-medium tracking-widest uppercase mt-0.5">
-                ISF Platform
-              </span>
-            </div>
+            <span className="font-bold text-[15px] tracking-tight text-sidebar-accent-foreground leading-none min-w-0">
+              MyCargoLens
+            </span>
           )}
         </div>
       </SidebarHeader>
