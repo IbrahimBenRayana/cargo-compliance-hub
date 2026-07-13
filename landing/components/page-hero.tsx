@@ -186,7 +186,7 @@ export function PageHero({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45, ease: EASE }}
-                  className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gradient-gold mb-4"
+                  className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-eyebrow mb-4"
                 >
                   {label}
                 </motion.p>
@@ -270,7 +270,7 @@ export function PageHero({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45, ease: EASE }}
-                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gradient-gold mb-4"
+                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-eyebrow mb-4"
               >
                 {label}
               </motion.p>

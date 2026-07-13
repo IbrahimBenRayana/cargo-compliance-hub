@@ -16,7 +16,10 @@
     --secondary: 220 20% 89%;
     --secondary-foreground: 222 47% 15%;
     --muted: 220 20% 88%;
-    --muted-foreground: 220 14% 40%;
+    /* Darkened from 220 14% 40% to hit WCAG AA 4.5:1 against the light
+       background (`220 22% 93%`). Prior value failed axe on nav links,
+       footer links, section eyebrows, and small muted body text. */
+    --muted-foreground: 220 16% 32%;
     --accent: 43 96% 56%;
     --accent-foreground: 222 47% 8%;
     --destructive: 0 72% 51%;
@@ -81,7 +84,11 @@
   /* Gold palette */
   --color-gold: hsl(43 96% 56%);
   --color-gold-light: hsl(43 96% 70%);
-  --color-gold-dark: hsl(38 92% 44%);
+  /* Darkened from L=44% to L=24% so text at 10px passes WCAG AA 4.5:1
+     even when the effective background isn't pure white (mesh gradient
+     + tinted pills chip small amounts off). Used mainly in light mode;
+     dark-mode overrides (`dark:text-gold`) still take L=56%. */
+  --color-gold-dark: hsl(38 92% 24%);
 
   /* Border radius */
   --radius-lg: var(--radius);
@@ -187,6 +194,16 @@
     color: hsl(43 96% 56%);
   }
   :is(.dark) .text-gold-word {
+    color: hsl(43 96% 62%);
+  }
+  /* Solid darker gold for small (≤ 11px) eyebrow labels. The gradient
+     variant (`text-gradient-gold`) doesn't pass contrast at tiny sizes
+     because the light stop lands ~4.0:1 against most surfaces. This
+     utility hits WCAG AA on both themes. */
+  .text-gold-eyebrow {
+    color: hsl(38 92% 34%);
+  }
+  :is(.dark) .text-gold-eyebrow {
     color: hsl(43 96% 62%);
   }
 }
