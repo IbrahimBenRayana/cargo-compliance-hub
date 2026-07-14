@@ -77,7 +77,7 @@ export function ClosingCta() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="mb-10 text-base text-muted-foreground md:text-lg"
           >
-            A 20-minute demo. No credit card. Cancel anytime.
+            A 20-minute walkthrough. Card added when you&apos;re provisioned. Billed only when we file.
           </motion.p>
 
           <motion.div

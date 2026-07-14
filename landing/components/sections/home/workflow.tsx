@@ -161,23 +161,11 @@ export function Workflow() {
                         <p
                           className={cn(
                             "mt-1.5 text-[13px] leading-relaxed text-muted-foreground transition-opacity duration-200",
-                            isActive ? "opacity-100" : "opacity-70",
+                            isActive ? "opacity-100" : "opacity-85",
                           )}
                         >
                           {s.body}
                         </p>
-                        {isActive && (
-                          <Link
-                            href={s.href}
-                            className="group/link mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-foreground transition-colors hover:text-gold-dark dark:hover:text-gold"
-                          >
-                            {s.linkLabel}
-                            <ArrowRight
-                              size={14}
-                              className="transition-transform group-hover/link:translate-x-0.5"
-                            />
-                          </Link>
-                        )}
                       </div>
                     </div>
                     {/* Auto-advance progress along the bottom hairline */}
@@ -192,6 +180,23 @@ export function Workflow() {
                       />
                     )}
                   </button>
+                  {/* Link lives OUTSIDE the button — nested interactives fail
+                      axe's nested-interactive rule (button > a). Same visual
+                      position (pl-12 aligns with the body text above). */}
+                  {isActive && (
+                    <div className="pl-12 mt-3">
+                      <Link
+                        href={s.href}
+                        className="group/link inline-flex items-center gap-1.5 text-[13px] font-semibold text-foreground transition-colors hover:text-gold-dark dark:hover:text-gold"
+                      >
+                        {s.linkLabel}
+                        <ArrowRight
+                          size={14}
+                          className="transition-transform group-hover/link:translate-x-0.5"
+                        />
+                      </Link>
+                    </div>
+                  )}
                 </li>
               );
             })}

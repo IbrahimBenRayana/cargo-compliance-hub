@@ -569,7 +569,7 @@ function TierCard({ tier, index }: { tier: Tier; index: number }) {
           >
             {tier.priceNote}
           </span>
-          <span className="text-muted-foreground/70">Pay as you file</span>
+          <span className="text-muted-foreground">Pay as you file</span>
         </div>
       </div>
 
@@ -736,7 +736,7 @@ export function PricingPageClient() {
                           )}
                         >
                           {t.price}
-                          <span className="opacity-60"> / shipment</span>
+                          <span className="opacity-85"> / shipment</span>
                         </span>
                       </div>
                     </th>

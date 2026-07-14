@@ -127,13 +127,13 @@ export function ActTrack() {
           {/* Marker labels under the scale */}
           <div className="relative h-3 mt-1">
             <span
-              className="absolute -translate-x-1/2 text-[10px] font-mono text-amber-600 dark:text-amber-400 tabular-nums"
+              className="absolute -translate-x-1/2 text-[10px] font-mono text-amber-800 dark:text-amber-400 tabular-nums"
               style={{ left: `${(PSC_DAY / TOTAL_DAYS) * 100}%` }}
             >
               270
             </span>
             <span
-              className="absolute -translate-x-1/2 text-[10px] font-mono text-rose-600 dark:text-rose-400 tabular-nums"
+              className="absolute -translate-x-1/2 text-[10px] font-mono text-rose-800 dark:text-rose-400 tabular-nums"
               style={{ left: `${(URGENT_THRESHOLD / TOTAL_DAYS) * 100}%` }}
             >
               300

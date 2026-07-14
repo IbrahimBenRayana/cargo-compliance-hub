@@ -575,11 +575,13 @@ export function ComplianceClient() {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-border/60 bg-card p-5">
             <h3 className="text-sm font-semibold text-foreground mb-3">PGA Flag Lookup</h3>
-            <input
-              readOnly
+            <div
+              role="presentation"
+              aria-hidden="true"
               className="mb-4 w-full rounded-lg border border-border/60 bg-background/60 px-3 py-2 font-mono text-xs"
-              value="0207.13.00 · Chicken, fresh"
-            />
+            >
+              0207.13.00 · Chicken, fresh
+            </div>
             <ul className="grid grid-cols-2 gap-2.5">
               {PGA.map((p) => (
                 <li key={p.name} className="rounded-lg border border-border/60 bg-background/60 p-3">
@@ -596,11 +598,13 @@ export function ComplianceClient() {
               Catch malformed EINs and missing CBP 5106 registrations before
               CBP rejects your filing, plus a one-click jump to Form 5106.
             </p>
-            <input
-              readOnly
+            <div
+              role="presentation"
+              aria-hidden="true"
               className="mb-3 w-full rounded-lg border border-border/60 bg-background/60 px-3 py-2 font-mono text-xs"
-              value="12-3456789"
-            />
+            >
+              12-3456789
+            </div>
             <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
               <span className="size-2 rounded-full bg-emerald-500" />
               <span className="text-[12px] text-foreground">EIN format valid · 5106 reminder armed</span>
@@ -617,11 +621,13 @@ export function ComplianceClient() {
       >
         <div className="rounded-2xl border border-border/60 bg-card p-5 mb-6">
           <h3 className="text-sm font-semibold text-foreground mb-3">HTS Classifier</h3>
-          <input
-            readOnly
+          <div
+            role="presentation"
+            aria-hidden="true"
             className="mb-4 w-full rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 text-sm"
-            value="polyester athletic socks, women's"
-          />
+          >
+            polyester athletic socks, women&apos;s
+          </div>
           <ul className="space-y-2">
             {HTS_SUGGESTIONS.map((s) => (
               <li key={s.code} className="rounded-lg border border-border/60 bg-background/60 p-3">

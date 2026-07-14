@@ -142,7 +142,7 @@ function TrustGrid() {
         delay={0.25}
         inView={inView}
         heading="Every action logged."
-        body="Who filed, who amended, who marked liquidated. Exportable. SOC-2 friendly."
+        body="Who filed, who amended, who marked liquidated. Exportable as CSV for your compliance team."
         visual={<AuditVisual />}
       />
     </div>

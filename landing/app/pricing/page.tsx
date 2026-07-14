@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Pricing",
   description:
     "Per-shipment pricing for CBP compliance. No subscription, no monthly fee — sign up free, add a card, and pay per shipment filed, from $45.",
+  alternates: { canonical: "/pricing" },
 };
 
 export default function PricingPage() {
