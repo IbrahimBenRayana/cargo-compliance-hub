@@ -25,6 +25,9 @@ export const CRON = {
   ADD_CVD_SYNC: '0 4 * * *',
   /** Every 5 minutes — reap ABI documents stuck in SENDING > 15 min. */
   ABI_REAPER: '*/5 * * * *',
+  /** Every 5 min at :02 offset — sweep SENT ABI documents for CBP responses.
+   *  Offset from STATUS_POLL so the two CC sweeps don't burst together. */
+  ABI_STATUS_POLL: '2-57/5 * * * *',
   /** Hourly at :15 — retry per-shipment charges that failed (delinquent orgs). */
   CHARGE_RETRY: '15 * * * *',
 } as const;
@@ -37,3 +40,12 @@ export const ABI_SENDING_TIMEOUT_MS = 15 * 60 * 1000;
 
 /** CC poll-for-completion cadence used by abiDocuments + manifestQuery. */
 export const CC_POLL_INTERVAL_MS = 3000;
+
+/**
+ * ABI status sweep bounds. Documents older than the age cap stay resolvable
+ * via the manual /poll route but drop out of the automatic sweep so an
+ * unmatchable document can't occupy the batch forever.
+ */
+export const ABI_STATUS_POLL_MAX_AGE_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
+export const ABI_STATUS_POLL_BATCH = 50;
+export const ABI_STATUS_POLL_CONCURRENCY = 3;
