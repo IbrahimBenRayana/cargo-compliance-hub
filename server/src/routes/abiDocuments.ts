@@ -6,7 +6,6 @@ import { requireMfaEnrolled } from '../middleware/requireMfaEnrolled.js';
 import { requireCapability } from '../middleware/requireCapability.js';
 import { CAPABILITIES } from '../config/plans.js';
 import { billShipment } from '../services/shipmentBilling.js';
-import { ccClient } from '../services/customscity.js';
 import { ccApiLimiter } from '../middleware/rateLimiter.js';
 import {
   abiDocumentBodySchema,
