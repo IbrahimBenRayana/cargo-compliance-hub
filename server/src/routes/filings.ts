@@ -5,7 +5,8 @@ import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
 import { requireMfaEnrolled } from '../middleware/requireMfaEnrolled.js';
-import { ccClient, mapFilingToCC, mapFilingToISF5CC, mapFilingToCCPayload } from '../services/customscity.js';
+import { mapFilingToCC, mapFilingToISF5CC, mapFilingToCCPayload } from '../services/customscity.js';
+import { abiGateway } from '../services/abi/gateway.js';
 import { validateFiling, isValidTransition, getAllowedTransitions, ValidationResult } from '../services/validation.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { notifyFilingSubmitted, notifyFilingRejected, notifyFilingAmended, notifyFilingCancelled, notifyApiError } from '../services/notifications.js';
@@ -471,7 +472,7 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
       ccPayload.body[0].amendmentCode = 'FR'; // Full Replace for amendments
     }
 
-    const ccResult = await ccClient.createDocument(ccPayload);
+    const ccResult = await abiGateway.createDocument(ccPayload);
 
     // Log the API call
     await prisma.submissionLog.create({
@@ -510,7 +511,7 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
       const ccAmendId = ccResult.processId ?? ccResult.data?._id ?? ccResult.data?.id;
       const amendDocType = filing.filingType === 'ISF-5' ? 'isf-5' : 'isf';
       const amendSendPayload = { type: amendDocType, sendAs: 'change', BOLNumber: [filing.houseBol ?? filing.masterBol] };
-      const sendResult = await ccClient.sendDocument(amendSendPayload);
+      const sendResult = await abiGateway.sendDocument(amendSendPayload);
 
       await prisma.submissionLog.create({
         data: {
@@ -584,7 +585,7 @@ router.post('/:id/cancel', filingMutationLimiter, requireVerifiedEmail, requireM
       const ccPayload = mapFilingToCCPayload(filing);
       ccPayload.sendAs = 'cancel'; // Cancel/Delete per official docs
 
-      const ccResult = await ccClient.createDocument(ccPayload);
+      const ccResult = await abiGateway.createDocument(ccPayload);
 
       await prisma.submissionLog.create({
         data: {
@@ -606,7 +607,7 @@ router.post('/:id/cancel', filingMutationLimiter, requireVerifiedEmail, requireM
         // Send the cancel to CBP
         const cancelDocType = filing.filingType === 'ISF-5' ? 'isf-5' : 'isf';
         const cancelSendPayload = { type: cancelDocType, sendAs: 'cancel', BOLNumber: [filing.houseBol ?? filing.masterBol] };
-        const sendResult = await ccClient.sendDocument(cancelSendPayload);
+        const sendResult = await abiGateway.sendDocument(cancelSendPayload);
         await prisma.submissionLog.create({
           data: {
             orgId: req.user!.orgId,
@@ -780,7 +781,7 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
     if (masterBol) statusParams.masterBOLNumber = masterBol;
     else if (houseBol) statusParams.houseBOLNumber = houseBol;
 
-    const statusResult = await ccClient.getDocumentStatus(statusParams);
+    const statusResult = await abiGateway.getDocumentStatus(statusParams);
 
     // Log the API call
     await prisma.submissionLog.create({
@@ -826,7 +827,7 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
         };
         if (masterBol) msgParams.masterBOLNumber = masterBol;
 
-        const msgResult = await ccClient.getMessages(msgParams);
+        const msgResult = await abiGateway.getMessages(msgParams);
         messages = msgResult.data?.data ?? [];
 
         // Log
@@ -1005,7 +1006,7 @@ router.post('/check-all-statuses', ccApiLimiter, async (req: AuthRequest, res: R
       if (masterBol) statusParams.masterBOLNumber = masterBol;
       else if (houseBol) statusParams.houseBOLNumber = houseBol;
 
-      const statusResult = await ccClient.getDocumentStatus(statusParams);
+      const statusResult = await abiGateway.getDocumentStatus(statusParams);
       const documents = statusResult.data?.data ?? [];
       const matchingDoc = documents.find((d: any) =>
         (houseBol && d.bol === houseBol) || (masterBol && d.masterBOL === masterBol)
@@ -1253,7 +1254,7 @@ router.post('/bulk-submit', filingMutationLimiter, ccApiLimiter, requireVerified
 
         // Map and submit to CC API
         const payload = mapFilingToCCPayload(filing);
-        const ccResult = await ccClient.createDocument(payload);
+        const ccResult = await abiGateway.createDocument(payload);
 
         // Update filing status
         const ccFilingId = ccResult?.data?._id || ccResult?.data?.id || null;

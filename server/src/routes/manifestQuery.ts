@@ -2,7 +2,8 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { ccClient, CCManifestQueryPayload } from '../services/customscity.js';
+import { abiGateway } from '../services/abi/gateway.js';
+import type { CCManifestQueryPayload } from '../services/customscity.js';
 import { ccApiLimiter } from '../middleware/rateLimiter.js';
 import { notify } from '../services/notifications.js';
 import logger from '../config/logger.js';
@@ -82,7 +83,7 @@ router.post('/', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<
 
   try {
     // Call CC to create the query
-    const ccResult = await ccClient.createManifestQuery(ccPayload);
+    const ccResult = await abiGateway.createManifestQuery(ccPayload);
 
     // Log the CC API call
     await prisma.submissionLog.create({
@@ -147,7 +148,7 @@ async function pollManifestQueryResult(queryId: string, ccRequestId: string, org
     await new Promise(resolve => setTimeout(resolve, CC_POLL_INTERVAL_MS));
 
     try {
-      const result = await ccClient.getManifestQueryById(ccRequestId);
+      const result = await abiGateway.getManifestQueryById(ccRequestId);
 
       // Log each poll attempt
       await prisma.submissionLog.create({
@@ -320,7 +321,7 @@ router.post('/:id/poll', ccApiLimiter, async (req: AuthRequest, res: Response): 
   }
 
   try {
-    const result = await ccClient.getManifestQueryById(query.ccRequestId);
+    const result = await abiGateway.getManifestQueryById(query.ccRequestId);
 
     await prisma.submissionLog.create({
       data: {

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { ccClient } from '../services/customscity.js';
+import { abiGateway } from '../services/abi/gateway.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireCapability } from '../middleware/requireCapability.js';
 import { CAPABILITIES } from '../config/plans.js';
@@ -12,7 +12,7 @@ router.use(authMiddleware);
 // ─── POST /api/v1/integrations/test — Test CC API connection
 router.post('/test', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const connected = await ccClient.testConnection();
+    const connected = await abiGateway.testConnection();
     res.json({
       connected,
       environment: env.CC_ENVIRONMENT,
@@ -35,7 +35,7 @@ router.post('/hts-classify', requireCapability(CAPABILITIES.HTS_CLASSIFICATION),
   }
   
   try {
-    const result = await ccClient.classifyHTS(description.trim());
+    const result = await abiGateway.classifyHTS(description.trim());
     const raw = result.data as any;
 
     // Actual CC API response structure:
@@ -108,7 +108,7 @@ router.post('/hts-classify', requireCapability(CAPABILITIES.HTS_CLASSIFICATION),
 // ─── GET /api/v1/integrations/mid-list — MID lookup ───────
 router.get('/mid-list', requireCapability(CAPABILITIES.ABI_ENTRY), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const result = await ccClient.getMIDList();
+    const result = await abiGateway.getMIDList();
     res.json(result.data);
   } catch (err: any) {
     res.status(502).json({ error: 'MID lookup failed', message: err.message });
