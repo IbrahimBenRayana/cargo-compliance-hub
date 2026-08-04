@@ -28,7 +28,7 @@ import { computeLiquidation } from '../services/compliance/liquidation.js';
 import { lookupAddCvd, getAddCvdMeta, invalidateAddCvdCache } from '../services/compliance/addCvd.js';
 import { syncFromFederalRegister } from '../services/compliance/addCvdSync.js';
 import { lookupFtaForCountry, getFtaMeta } from '../services/compliance/fta.js';
-import { ccClient } from '../services/customscity.js';
+import { abiGateway } from '../services/abi/gateway.js';
 import { parseRejectionReason } from '../services/errorTranslator.js';
 import { validateFiling } from '../services/validation.js';
 import logger from '../config/logger.js';
@@ -977,7 +977,7 @@ router.post('/classify-hts', authLimiter, requireCapability(CAPABILITIES.HTS_CLA
     return;
   }
   try {
-    const result = await ccClient.classifyHTS(parsed.data.description.trim());
+    const result = await abiGateway.classifyHTS(parsed.data.description.trim());
     const raw = result.data as any;
     const item = raw?.items?.[0];
     if (!item) {

@@ -15,7 +15,7 @@
 
 import cron, { type ScheduledTask } from 'node-cron';
 import { prisma } from '../config/database.js';
-import { ccClient } from './customscity.js';
+import { abiGateway } from './abi/gateway.js';
 import logger from '../config/logger.js';
 import { isValidTransition } from './validation.js';
 import {
@@ -30,6 +30,7 @@ import { billShipmentForFiling, retryFailedCharges } from './shipmentBilling.js'
 import { syncFromFederalRegister } from './compliance/addCvdSync.js';
 import { invalidateAddCvdCache } from './compliance/addCvd.js';
 import { CRON, ABI_SENDING_TIMEOUT_MS } from '../config/schedules.js';
+import { pollSentAbiDocuments } from './abiPolling.js';
 import { withAdvisoryLock } from './distributedLock.js';
 
 // ─── Job State ─────────────────────────────────────────────
@@ -96,7 +97,7 @@ async function pollSubmittedFilings(): Promise<void> {
           if (masterBol) statusParams.masterBOLNumber = masterBol;
           else if (houseBol) statusParams.houseBOLNumber = houseBol;
 
-          const statusResult = await ccClient.getDocumentStatus(statusParams);
+          const statusResult = await abiGateway.getDocumentStatus(statusParams);
           checked++;
 
           const documents = statusResult.data?.data ?? [];
@@ -115,7 +116,7 @@ async function pollSubmittedFilings(): Promise<void> {
                 type: 'ISF', houseBOLNumber: houseBol, skip: '0', dateFrom, dateTo, typeDate: 'createdDate',
               };
               if (masterBol) msgParams.masterBOLNumber = masterBol;
-              const msgResult = await ccClient.getMessages(msgParams);
+              const msgResult = await abiGateway.getMessages(msgParams);
               messages = msgResult.data?.data ?? [];
             } catch (err: any) {
               // Non-fatal — we may have created the filing before CC
@@ -469,6 +470,7 @@ let staleCheckTask: ScheduledTask | null = null;
 let deliveryDrainTask: ScheduledTask | null = null;
 let addCvdSyncTask: ScheduledTask | null = null;
 let abiReaperTask: ScheduledTask | null = null;
+let abiStatusPollTask: ScheduledTask | null = null;
 let chargeRetryTask: ScheduledTask | null = null;
 
 /** Retry per-shipment charges that failed, for every delinquent org. */
@@ -548,6 +550,15 @@ export function startBackgroundJobs(): void {
   }, cronOpts);
   logger.info('[Jobs] ABI document reaper scheduled — every 5 minutes (UTC)');
 
+  // ABI status sweep — the in-process post-send poller only covers ~30s;
+  // this cron carries SENT documents to their terminal status (and therefore
+  // to notification, webhook, and billing) no matter when CBP responds.
+  abiStatusPollTask = cron.schedule(CRON.ABI_STATUS_POLL, () => {
+    withAdvisoryLock('jobs:abi-status-poll', pollSentAbiDocuments)
+      .catch(err => logger.error({ err }, '[Jobs:AbiStatusPoll] Unhandled'));
+  }, cronOpts);
+  logger.info('[Jobs] ABI status sweep scheduled — every 5 minutes at :02 offset (UTC)');
+
   chargeRetryTask = cron.schedule(CRON.CHARGE_RETRY, () => {
     withAdvisoryLock('jobs:charge-retry', retryDelinquentCharges)
       .catch(err => logger.error({ err }, '[Jobs:ChargeRetry] Unhandled'));
@@ -569,6 +580,7 @@ export function stopBackgroundJobs(): void {
   deliveryDrainTask?.stop();
   addCvdSyncTask?.stop();
   abiReaperTask?.stop();
+  abiStatusPollTask?.stop();
   chargeRetryTask?.stop();
   statusPollTask = null;
   deadlineTask = null;
@@ -576,6 +588,7 @@ export function stopBackgroundJobs(): void {
   deliveryDrainTask = null;
   addCvdSyncTask = null;
   abiReaperTask = null;
+  abiStatusPollTask = null;
   chargeRetryTask = null;
 }
 

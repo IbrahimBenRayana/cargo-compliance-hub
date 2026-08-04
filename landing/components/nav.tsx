@@ -30,12 +30,6 @@ import { Wordmark } from "@/components/wordmark";
 import { Container } from "@/components/ui/container";
 import { Magnetic } from "@/components/ui/magnetic";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SeverityPill } from "@/components/ui/severity-pill";
-import {
-  CHANGELOG_ENTRIES,
-  KIND_LABEL,
-  KIND_TONE,
-} from "@/lib/changelog";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -50,51 +44,60 @@ type MenuItem = {
   href: string;
 };
 
-const platformColumns: Array<{ heading: string; items: MenuItem[] }> = [
+// Platform dropdown — two-column brief (docs: Platform Dropdown Before/After).
+// Left: the five core workflows in product order, labels naming the exact
+// tasks. Right: the Explore set (All features, Security, Changelog) plus a
+// "new here?" card pointing at /why-mycargolens.
+const coreWorkflows: MenuItem[] = [
   {
-    heading: "Filing & data",
-    items: [
-      {
-        icon: Ship,
-        title: "Filings",
-        description: "ISF-10, ISF-5, ABI Entry, bulk, templates",
-        href: "/platform/filings",
-      },
-      {
-        icon: ListChecks,
-        title: "Lifecycle",
-        description: "Timeline, score history, PDF export",
-        href: "/platform/lifecycle",
-      },
-    ],
+    icon: Ship,
+    title: "Filings",
+    description: "ISF-10, ISF-5, ABI Entry, in-bond, bulk submit, and templates.",
+    href: "/platform/filings",
   },
   {
-    heading: "Compliance & alerts",
-    items: [
-      {
-        icon: BarChart3,
-        title: "Compliance Center",
-        description: "Action queue, UFLPA, ADD/CVD, liquidation",
-        href: "/platform/compliance",
-      },
-      {
-        icon: Sparkles,
-        title: "Automation",
-        description: "CBP polling, Federal Register sync, alerts",
-        href: "/platform/automation",
-      },
-    ],
+    icon: BarChart3,
+    title: "Compliance Center",
+    description: "Action queue, UFLPA, ADD/CVD, classification, and liquidation.",
+    href: "/platform/compliance",
   },
   {
-    heading: "AI",
-    items: [
-      {
-        icon: Bot,
-        title: "AI tools",
-        description: "Today's brief, rejection coach, HTS classifier",
-        href: "/platform/ai",
-      },
-    ],
+    icon: Bot,
+    title: "AI tools",
+    description: "Pre-flight review, rejection coach, and HTS classification.",
+    href: "/platform/ai",
+  },
+  {
+    icon: ListChecks,
+    title: "Lifecycle",
+    description: "Filing timeline, score history, linked records, and PDF export.",
+    href: "/platform/lifecycle",
+  },
+  {
+    icon: Sparkles,
+    title: "Automation",
+    description: "CBP polling, Federal Register sync, alerts, and team workflows.",
+    href: "/platform/automation",
+  },
+];
+
+type ExploreItem = { title: string; description: string; href: string };
+
+const exploreItems: ExploreItem[] = [
+  {
+    title: "All features",
+    description: "View every live and planned capability.",
+    href: "/features",
+  },
+  {
+    title: "Security",
+    description: "Authentication, encryption, access controls, and audit trails.",
+    href: "/security",
+  },
+  {
+    title: "Changelog",
+    description: "See recent releases and fixes.",
+    href: "/changelog",
   },
 ];
 
@@ -498,7 +501,7 @@ function MorphPanel({
             initial={false}
             transition={{ duration: 0.32, ease: EASE }}
             style={{ width: box.width, marginLeft: box.left, borderRadius: 16 }}
-            className="relative overflow-hidden border border-border/50 bg-card shadow-[0_24px_80px_-20px_hsl(var(--foreground)/0.25)]"
+            className="relative overflow-hidden border border-border/50 bg-[hsl(var(--card)/0.97)] backdrop-blur-2xl backdrop-saturate-150 shadow-[0_24px_80px_-20px_hsl(var(--foreground)/0.25)]"
           >
             {/* Soft gold breath in the panel's top-right corner */}
             <span
@@ -574,10 +577,34 @@ function MenuLink({ item, close }: { item: MenuItem; close: () => void }) {
   );
 }
 
+function ExploreLink({ item, close }: { item: ExploreItem; close: () => void }) {
+  return (
+    <motion.li variants={itemVariants}>
+      <Link
+        href={item.href}
+        className="group -mx-2 block rounded-lg px-2 py-2 transition-colors hover:bg-background/70"
+        onClick={close}
+      >
+        <p className="flex items-center gap-1 text-[13.5px] font-semibold leading-tight text-foreground">
+          {item.title}
+          <ArrowRight
+            size={11}
+            className="-translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-60"
+            aria-hidden
+          />
+        </p>
+        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+          {item.description}
+        </p>
+      </Link>
+    </motion.li>
+  );
+}
+
 function PlatformPanel({ close }: { close: () => void }) {
   return (
-    <div className="grid grid-cols-[1fr_1fr_minmax(200px,230px)]">
-      {/* Two product columns (third column folds into the first two) */}
+    <div className="grid grid-cols-[minmax(0,1.25fr)_minmax(230px,1fr)]">
+      {/* Core workflows — the five product surfaces, in product order */}
       <motion.div
         className="px-5 py-5"
         initial="hidden"
@@ -585,53 +612,16 @@ function PlatformPanel({ close }: { close: () => void }) {
         variants={listVariants}
       >
         <p className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {platformColumns[0].heading}
+          Core workflows
         </p>
         <ul className="space-y-1">
-          {platformColumns[0].items.map((item) => (
-            <MenuLink key={item.href} item={item} close={close} />
-          ))}
-        </ul>
-        <p className="mb-3 mt-5 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {platformColumns[2].heading}
-        </p>
-        <ul className="space-y-1">
-          {platformColumns[2].items.map((item) => (
+          {coreWorkflows.map((item) => (
             <MenuLink key={item.href} item={item} close={close} />
           ))}
         </ul>
       </motion.div>
 
-      <motion.div
-        className="px-5 py-5"
-        initial="hidden"
-        animate="visible"
-        variants={listVariants}
-      >
-        <p className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {platformColumns[1].heading}
-        </p>
-        <ul className="space-y-1">
-          {platformColumns[1].items.map((item) => (
-            <MenuLink key={item.href} item={item} close={close} />
-          ))}
-        </ul>
-        <Link
-          href="/features"
-          onClick={close}
-          className="group mt-5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-foreground transition-colors hover:text-gold-dark dark:hover:text-gold"
-        >
-          All features
-          <ArrowRight
-            size={12}
-            className="transition-transform duration-200 group-hover:translate-x-0.5"
-          />
-        </Link>
-      </motion.div>
-
-      {/* "What's new" rail — real release notes, straight from the
-          changelog. The GitHub/Linear nav pattern: evergreen product
-          proof instead of mocked data. */}
+      {/* Explore rail + "new here?" card */}
       <motion.div
         initial="hidden"
         animate="visible"
@@ -642,43 +632,35 @@ function PlatformPanel({ close }: { close: () => void }) {
           variants={itemVariants}
           className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground"
         >
-          What&apos;s new
+          Explore
         </motion.p>
-        <ul className="flex flex-1 flex-col gap-0.5">
-          {CHANGELOG_ENTRIES.slice(0, 3).map((entry) => (
-            <motion.li key={`${entry.date}-${entry.title}`} variants={itemVariants}>
-              <Link
-                href="/changelog"
-                onClick={close}
-                className="group -mx-2 block rounded-lg px-2 py-2 transition-colors hover:bg-background/70"
-              >
-                <div className="flex items-center gap-2">
-                  <SeverityPill tone={KIND_TONE[entry.kind]}>
-                    {KIND_LABEL[entry.kind]}
-                  </SeverityPill>
-                  <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-                    {entry.date.slice(5).replace("-", "/")}
-                  </span>
-                </div>
-                <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-snug text-foreground/90 transition-colors group-hover:text-foreground">
-                  {entry.title}
-                </p>
-              </Link>
-            </motion.li>
+        <ul className="flex flex-col gap-0.5">
+          {exploreItems.map((item) => (
+            <ExploreLink key={item.href} item={item} close={close} />
           ))}
         </ul>
-        <motion.div variants={itemVariants}>
-          <Link
-            href="/changelog"
-            onClick={close}
-            className="group mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-foreground transition-colors hover:text-gold-dark dark:hover:text-gold"
-          >
-            View changelog
-            <ArrowRight
-              size={12}
-              className="transition-transform duration-200 group-hover:translate-x-0.5"
-            />
-          </Link>
+
+        <motion.div variants={itemVariants} className="mt-auto pt-4">
+          <div className="rounded-xl border border-gold/30 bg-gold/10 p-3.5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-dark dark:text-gold">
+              New to MyCargoLens?
+            </p>
+            <p className="mt-1.5 text-[12px] leading-snug text-foreground/85">
+              See how the filing, compliance, and lifecycle workflows fit
+              together.
+            </p>
+            <Link
+              href="/why-mycargolens"
+              onClick={close}
+              className="group mt-2.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-foreground transition-colors hover:text-gold-dark dark:hover:text-gold"
+            >
+              See how it works
+              <ArrowRight
+                size={12}
+                className="transition-transform duration-200 group-hover:translate-x-0.5"
+              />
+            </Link>
+          </div>
         </motion.div>
       </motion.div>
     </div>
@@ -736,16 +718,54 @@ function MobileSheet({ open, close }: { open: boolean; close: () => void }) {
                 setOpenGroup((g) => (g === "platform" ? null : "platform"))
               }
             >
-              <MobileChild href="/features" close={close} icon={ArrowRight} title="All features" />
-              {platformColumns.flatMap((c) => c.items).map((item) => (
+              <li className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Core workflows
+              </li>
+              {coreWorkflows.map((item) => (
                 <MobileChild
                   key={item.href}
                   href={item.href}
                   close={close}
                   icon={item.icon}
                   title={item.title}
+                  description={item.description}
                 />
               ))}
+              <li className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Explore
+              </li>
+              {exploreItems.map((item) => (
+                <MobileChild
+                  key={item.href}
+                  href={item.href}
+                  close={close}
+                  icon={ArrowRight}
+                  title={item.title}
+                  description={item.description}
+                />
+              ))}
+              {/* "New here?" card — same pointer as the desktop rail. Sits
+                  inside the scrollable drawer so it can never clip below
+                  the viewport (audit brief: reachability at 768/390). */}
+              <li className="px-3 pb-1 pt-3">
+                <div className="rounded-xl border border-gold/30 bg-gold/10 p-3.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-dark dark:text-gold">
+                    New to MyCargoLens?
+                  </p>
+                  <p className="mt-1.5 text-[12px] leading-snug text-foreground/85">
+                    See how the filing, compliance, and lifecycle workflows fit
+                    together.
+                  </p>
+                  <Link
+                    href="/why-mycargolens"
+                    onClick={close}
+                    className="mt-2.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-foreground"
+                  >
+                    See how it works
+                    <ArrowRight size={12} />
+                  </Link>
+                </div>
+              </li>
             </MobileGroup>
 
             {plainLinks.map((link) => (
@@ -853,21 +873,32 @@ function MobileChild({
   close,
   icon: Icon,
   title,
+  description,
 }: {
   href: string;
   close: () => void;
   icon: typeof Ship;
   title: string;
+  description?: string;
 }) {
   return (
     <li>
       <Link
         href={href}
-        className="flex items-center gap-2 rounded-md py-2 pl-8 pr-3 text-[13.5px] text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
+        className="flex items-start gap-2 rounded-md py-2 pl-8 pr-3 transition-colors hover:bg-secondary/60"
         onClick={close}
       >
-        <Icon size={14} className="flex-shrink-0" />
-        {title}
+        <Icon size={14} className="mt-0.5 flex-shrink-0 text-muted-foreground" />
+        <span className="min-w-0">
+          <span className="block text-[13.5px] font-medium text-foreground/85">
+            {title}
+          </span>
+          {description && (
+            <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
+              {description}
+            </span>
+          )}
+        </span>
       </Link>
     </li>
   );

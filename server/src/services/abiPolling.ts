@@ -10,19 +10,37 @@ import { notify } from './notifications.js';
 import { emitWebhook } from './webhooks.js';
 import { billShipment } from './shipmentBilling.js';
 import logger from '../config/logger.js';
-import { CC_POLL_INTERVAL_MS } from '../config/schedules.js';
+import {
+  CC_POLL_INTERVAL_MS,
+  ABI_STATUS_POLL_MAX_AGE_MS,
+  ABI_STATUS_POLL_BATCH,
+  ABI_STATUS_POLL_CONCURRENCY,
+} from '../config/schedules.js';
 
 /**
- * Compute a YYYY-MM-DD window around "today" for the CC list call.
- * We widen by 30 days on either side so freshly-sent docs always fall
- * inside the search window regardless of CBP-assigned entryDate drift.
+ * Compute a YYYY-MM-DD window for the CC list call. We widen by 30 days on
+ * either side of "today" so freshly-sent docs always fall inside the search
+ * window regardless of CBP-assigned entryDate drift. When an anchor is given
+ * (the document's own entry/sent date) the lower bound extends to cover it,
+ * so the cron sweep can still match documents sent more than 30 days ago.
  */
-function buildPollDateWindow(): { dateFrom: string; dateTo: string } {
+function buildPollDateWindow(anchor?: Date | null): { dateFrom: string; dateTo: string } {
   const now = new Date();
-  const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const to = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const DAY = 24 * 60 * 60 * 1000;
+  let from = new Date(now.getTime() - 30 * DAY);
+  if (anchor && !Number.isNaN(anchor.getTime()) && anchor.getTime() < from.getTime()) {
+    from = new Date(anchor.getTime() - 30 * DAY);
+  }
+  const to = new Date(now.getTime() + 30 * DAY);
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
   return { dateFrom: fmt(from), dateTo: fmt(to) };
+}
+
+/** Parse a denormalised YYYYMMDD entry-date string into a Date (or null). */
+function parseEntryDate(yyyymmdd: string | null): Date | null {
+  if (!yyyymmdd || !/^\d{8}$/.test(yyyymmdd)) return null;
+  const d = new Date(`${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 /**
@@ -83,10 +101,12 @@ export async function runSinglePoll(args: {
   entryType: '01' | '11' | '86';
   entryNumber: string | null;
   mbolNumber: string | null;
+  /** Doc's own entry/sent date — extends the CC search window for old docs. */
+  anchorDate?: Date | null;
 }): Promise<{ terminal: boolean }> {
-  const { docId, orgId, userId, entryType, entryNumber, mbolNumber } = args;
+  const { docId, orgId, userId, entryType, entryNumber, mbolNumber, anchorDate } = args;
 
-  const { dateFrom, dateTo } = buildPollDateWindow();
+  const { dateFrom, dateTo } = buildPollDateWindow(anchorDate);
   const result = await abiGateway.listABIDocuments({
     dateFrom,
     dateTo,
@@ -209,5 +229,77 @@ export async function pollABIDocumentStatus(
         return;
       }
     }
+  }
+}
+
+// ─── Cron sweep over SENT documents ────────────────────────
+// The in-process poller above only covers ~30 seconds after transmit; CBP
+// routinely responds later than that. Without this sweep a document accepted
+// after the poller gives up sits at SENT forever — never notified, never
+// webhooked, and (because billing fires on acceptance) never billed.
+// runSinglePoll is idempotent on all side effects: notify() dedupes on
+// dedupeKey and billShipment() is INSERT … ON CONFLICT DO NOTHING, so
+// sweeping an already-resolved document is harmless.
+
+let isSweepRunning = false;
+
+export async function pollSentAbiDocuments(): Promise<void> {
+  if (isSweepRunning) return; // re-entrant guard (mirrors backgroundJobs flags)
+  isSweepRunning = true;
+  const startTime = Date.now();
+  let checked = 0;
+  let resolved = 0;
+  let errors = 0;
+
+  try {
+    const ageCutoff = new Date(Date.now() - ABI_STATUS_POLL_MAX_AGE_MS);
+    const docs = await prisma.abiDocument.findMany({
+      where: { status: 'SENT', sentAt: { gte: ageCutoff } },
+      select: {
+        id: true,
+        orgId: true,
+        entryType: true,
+        entryNumber: true,
+        mbolNumber: true,
+        entryDate: true,
+        sentAt: true,
+      },
+      orderBy: { sentAt: 'asc' },
+      take: ABI_STATUS_POLL_BATCH,
+    });
+    if (docs.length === 0) return;
+
+    for (let i = 0; i < docs.length; i += ABI_STATUS_POLL_CONCURRENCY) {
+      const chunk = docs.slice(i, i + ABI_STATUS_POLL_CONCURRENCY);
+      await Promise.all(
+        chunk.map(async (doc) => {
+          try {
+            const { terminal } = await runSinglePoll({
+              docId: doc.id,
+              orgId: doc.orgId,
+              userId: null,
+              entryType: doc.entryType as '01' | '11' | '86',
+              entryNumber: doc.entryNumber,
+              mbolNumber: doc.mbolNumber,
+              anchorDate: parseEntryDate(doc.entryDate) ?? doc.sentAt,
+            });
+            checked++;
+            if (terminal) resolved++;
+          } catch (err: any) {
+            errors++;
+            logger.warn({ err: err.message, docId: doc.id }, '[Jobs:AbiStatusPoll] Poll failed');
+          }
+        })
+      );
+    }
+
+    logger.info(
+      { checked, resolved, errors, durationMs: Date.now() - startTime },
+      '[Jobs:AbiStatusPoll] Sweep complete'
+    );
+  } catch (err: any) {
+    logger.error({ err: err.message }, '[Jobs:AbiStatusPoll] Sweep failed');
+  } finally {
+    isSweepRunning = false;
   }
 }
