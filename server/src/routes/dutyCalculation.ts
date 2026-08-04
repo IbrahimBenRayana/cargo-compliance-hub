@@ -18,7 +18,7 @@ import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireCapability } from '../middleware/requireCapability.js';
 import { CAPABILITIES } from '../config/plans.js';
-import { ccClient } from '../services/customscity.js';
+import { abiGateway } from '../services/abi/gateway.js';
 import { ccApiLimiter } from '../middleware/rateLimiter.js';
 import {
   dutyCalcStandardSchema,
@@ -81,7 +81,7 @@ router.post('/', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<
 
   const startedAt = Date.now();
   try {
-    const result = await ccClient.calculateDuty(ccPayload as any);
+    const result = await abiGateway.calculateDuty(ccPayload as any);
 
     await prisma.submissionLog.create({
       data: {
@@ -161,7 +161,7 @@ router.post('/ai', ccApiLimiter, async (req: AuthRequest, res: Response): Promis
 
   const startedAt = Date.now();
   try {
-    const result = await ccClient.calculateDutyAI(ccPayload as any);
+    const result = await abiGateway.calculateDutyAI(ccPayload as any);
 
     await prisma.submissionLog.create({
       data: {

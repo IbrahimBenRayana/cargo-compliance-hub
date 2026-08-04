@@ -15,7 +15,7 @@
 
 import cron, { type ScheduledTask } from 'node-cron';
 import { prisma } from '../config/database.js';
-import { ccClient } from './customscity.js';
+import { abiGateway } from './abi/gateway.js';
 import logger from '../config/logger.js';
 import { isValidTransition } from './validation.js';
 import {
@@ -96,7 +96,7 @@ async function pollSubmittedFilings(): Promise<void> {
           if (masterBol) statusParams.masterBOLNumber = masterBol;
           else if (houseBol) statusParams.houseBOLNumber = houseBol;
 
-          const statusResult = await ccClient.getDocumentStatus(statusParams);
+          const statusResult = await abiGateway.getDocumentStatus(statusParams);
           checked++;
 
           const documents = statusResult.data?.data ?? [];
@@ -115,7 +115,7 @@ async function pollSubmittedFilings(): Promise<void> {
                 type: 'ISF', houseBOLNumber: houseBol, skip: '0', dateFrom, dateTo, typeDate: 'createdDate',
               };
               if (masterBol) msgParams.masterBOLNumber = masterBol;
-              const msgResult = await ccClient.getMessages(msgParams);
+              const msgResult = await abiGateway.getMessages(msgParams);
               messages = msgResult.data?.data ?? [];
             } catch (err: any) {
               // Non-fatal — we may have created the filing before CC
