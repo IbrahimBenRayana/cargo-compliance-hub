@@ -10,34 +10,41 @@
  * interface is declared here, on our terms, and `ccClient` merely happens
  * to satisfy it structurally today.
  *
- * Interim compromise, on purpose: the payload/response *types* below are
- * still aliases of the CC-shaped declarations in services/customscity.ts,
- * because every caller, the zod schema, and the frontend types speak that
- * shape. Phase 0.4 (customscity.ts split) moves ownership of these types
- * into this module and makes the CC client depend on them — flipping the
- * last arrow. Do not add new CC-specific fields to callers in the meantime.
+ * Phase 0.4 (customscity.ts split) flipped the last arrow for the ABI entry
+ * types: they are now OWNED by ./types.ts under neutral names, and the CC
+ * client depends on them. Interim compromise still in force for the rest:
+ * the ISF / manifest / duty payload/response *types* below remain aliases
+ * of the CC-shaped declarations in services/customscity/*, because every
+ * caller, the zod schema, and the frontend types speak that shape. Do not
+ * add new CC-specific fields to callers in the meantime.
  */
+import type {
+  AbiCreatePayload,
+  AbiListParams,
+  AbiListResponse,
+  AbiDeleteParams,
+  AbiSendPayload,
+} from './types.js';
 import type {
   // ISF
   CCDocumentCreatePayload,
   CCDocumentResponse,
   CCListResponse,
-  // ABI entry
-  CCABICreateDocumentPayload,
-  CCABIListParams,
-  CCABIListResponse,
-  CCABIDeleteParams,
-  CCABISendPayload,
+  // Tools
+  CCHTSClassifyResponse,
+} from '../customscity/isfTypes.js';
+import type {
   // Manifest query
   CCManifestQueryPayload,
   CCManifestQueryCreateResponse,
   CCManifestQueryResult,
-  // Tools
-  CCHTSClassifyResponse,
+} from '../customscity/manifestTypes.js';
+import type {
+  // Duty tools
   CCDutyCalcPayload,
   CCDutyCalcResponse,
   CCDutyCalcAIResponse,
-} from '../customscity.js';
+} from '../customscity/dutyTypes.js';
 
 // ─── Envelope ──────────────────────────────────────────────
 
@@ -64,11 +71,15 @@ export interface IsfCreateResult extends GatewayResult<CCDocumentResponse> {
 export type IsfDocumentPayload = CCDocumentCreatePayload;
 export type IsfListResponse = CCListResponse;
 
-export type AbiCreatePayload = CCABICreateDocumentPayload;
-export type AbiListParams = CCABIListParams;
-export type AbiListResponse = CCABIListResponse;
-export type AbiDeleteParams = CCABIDeleteParams;
-export type AbiSendPayload = CCABISendPayload;
+// ABI entry types are owned by ./types.ts (Phase 0.4) — re-exported here so
+// importers of contract.ts keep resolving the same names.
+export type {
+  AbiCreatePayload,
+  AbiListParams,
+  AbiListResponse,
+  AbiDeleteParams,
+  AbiSendPayload,
+} from './types.js';
 
 export type ManifestQueryPayload = CCManifestQueryPayload;
 export type ManifestQueryCreateResponse = CCManifestQueryCreateResponse;
