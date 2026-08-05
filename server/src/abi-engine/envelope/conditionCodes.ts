@@ -1,0 +1,81 @@
+/**
+ * Batch & Block Control condition codes — X1-record positions 5–7.
+ * Source: chapter V23 June 2023, Output X1-Record Note 2 (B&B-31..33),
+ * plus X44 (added rev 18, Dec 2020).
+ */
+export const CONDITION_CODES: Record<string, string> = {
+  X03: 'BLOCK CONTROL MISSING - B-RECORD',
+  X04: 'TRANSACTION DETAIL MISSING',
+  X05: 'BLOCK CONTROL MISSING - Y-RECORD',
+  X06: 'BATCH CONTROL MISSING - Z-RECORD',
+  X07: 'SENDER/RECEIVER SITE CODE MISSING',
+  X08: 'SENDER/RECEIVER ID CODE MISSING',
+  X09: 'SENDER/RECEIVER NOT AUTHORIZED',
+  X10: 'TRANSMISSION DATE UNKNOWN',
+  X11: 'APPLICATION ID CODE MISSING',
+  X12: 'NOT A KNOWN ACE APPLICATION ID CODE',
+  X13: 'APPLICATION NOT CURRENTLY AVAILABLE',
+  X14: 'Z-REC DOES NOT MATCH A-REC',
+  X15: 'PROCESSING PORT CODE MISSING',
+  X16: 'PROCESSING FILER CODE MISSING',
+  X17: 'PROCESSING FILER NOT AUTHORIZED',
+  X18: 'PROC PORT/FLR NOT AUTHRZD FOR SENDR/RCVR',
+  X19: 'BLOCK APP ID / BATCH APP ID CONFLICT',
+  X20: 'FILER NOT AUTHORIZED FOR APPLICATION ID',
+  X21: 'PREPARER INDICATOR UNKNOWN',
+  X22: 'PREPARER/PREPARER IND CONFLICT',
+  X23: 'PREPARER CODES NOT ALLOWED FOR APP ID',
+  X24: 'PREPARER PORT CODE MISSING',
+  X25: 'PREPARER FILER CODE MISSING',
+  X26: 'PREPARER AND PRSSNG FILER NOT THE SAME',
+  X27: 'BRKR DOES NOT HOLD NATIONAL PERMIT',
+  X28: 'PREPARER UNKNOWN',
+  X29: 'PREPARER NOT AUTHORIZED',
+  X30: 'PREPARER NOT AUTHRZD FOR APP ID',
+  X31: 'PREPARER NOT AUTHRZD FOR PORT',
+  X32: 'Y-REC DOES NOT MATCH B-REC',
+  X33: 'TRANSACTION HDR CONTROL MISSING',
+  X34: 'UNKNOWN RECORD ID FOUND IN GROUPING',
+  X35: 'OUT OF SEQUENCE RECORD FOUND IN GROUPING',
+  X36: 'LOOP EXCEEDED',
+  X37: 'MISSING DATA RECORD FOUND IN GROUPING',
+  X38: 'NON-CONTIGUOUS ITEM FOUND IN GROUPING',
+  X39: 'DATA FOUND IN FILLER',
+  X40: 'NON-STANDARD DATA FOUND',
+  X41: 'MULTIPLE QUERIES IN BATCH NOT ALLOWED',
+  X42: 'LAST RECORD LESS THAN 80-CHAR LENGTH',
+  X43: 'RMT PORT/FLR NOT AUTHRZD FOR SENDR/RCVR',
+  X44: 'LOCAL PERMIT PORT NOT VALID',
+  '999': 'BATCH REJECTED',
+};
+
+/**
+ * Application identifier codes we will transmit or receive, from the input
+ * A-record Note 3 and output A-record Note 2 tables (V23).
+ */
+export const APPLICATION_CODES = {
+  // input → response pairs (subset relevant to the certification scenarios)
+  entrySummary: { input: 'AE', response: 'AX' },
+  entrySummaryQuery: { input: 'EQ', response: 'ER' },
+  cargoRelease: { input: 'SE', response: 'SX' },
+  censusWarningOverride: { input: 'CW', response: 'CO' },
+  censusWarningQuery: { input: 'CJ', response: 'CL' },
+  adCvdCaseQuery: { input: 'AD', response: 'AC' },
+  quotaQuery: { input: 'QA', response: 'QB' },
+  tibExtension: { input: 'TE', response: 'TX' },
+  importerBondQuery: { input: 'KI', response: 'KR' },
+  manufacturerQuery: { input: 'MA', response: 'MY' },
+  cargoManifestEntryReleaseQuery: { input: 'CQ', response: 'C1' },
+  currencyExchangeRatesQuery: { input: 'FI', response: 'FR' },
+  statementUpdate: { input: 'SU', response: 'SQ' },
+  pmsRequestReroute: { input: 'MO', response: 'MQ' },
+  achDebitAuthorization: { input: 'RM', response: 'PZ' },
+  // notification-only (no input code)
+  entrySummaryStatusNotification: { response: 'UC' },
+  cargoReleaseStatusNotification: { response: 'SO' },
+  dailyStatement: { response: 'PF' },
+  periodicMonthlyStatement: { response: 'MS' },
+  courtesyNotice: { response: 'NR' },
+  tibExpirationNotice: { response: 'TS' },
+  currencyExchangeRatesUpdate: { response: '%R' },
+} as const;
