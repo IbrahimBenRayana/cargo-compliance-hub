@@ -965,3 +965,24 @@ model ChatMessage {
   @@index([conversationId, createdAt])
   @@map("chat_messages")
 }
+
+// ── ABI engine refdata: USITC HTS rate lines (workstream F) ──
+// One row per 8/10-digit HTS number (dots stripped). generalRate is
+// RESOLVED at ingest time: statistical 10-digit lines inherit from the
+// nearest ancestor rate line, so lookups never need to walk the tree.
+model HtsRateLine {
+  htsNumber   String   @id @map("hts_number") @db.VarChar(10)
+  description String   @db.Text
+  indent      Int
+  // True when this row carried its own General rate in the USITC export.
+  isRateLine  Boolean  @map("is_rate_line")
+  generalRate String   @map("general_rate") @db.Text
+  specialRate String   @map("special_rate") @db.Text
+  otherRate   String   @map("other_rate") @db.Text
+  units       String[]
+  // USITC edition tag, e.g. '2026-rev-15' — supplied by the ingest run.
+  revision    String   @db.VarChar(40)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("hts_rate_lines")
+}
