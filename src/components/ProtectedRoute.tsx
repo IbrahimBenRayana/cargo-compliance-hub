@@ -58,9 +58,17 @@ export function ProtectedRoute() {
   // to /mfa-setup, which we whitelist so they can actually reach it. The
   // server-side requireMfaEnrolled middleware is the load-bearing gate; this
   // is UX so the user doesn't hit raw 403s mid-flow.
+  //
+  // /verify-email must ALSO be whitelisted here: an invited user starts with
+  // emailVerified=false AND mfaSetupRequired=true, and without it this gate
+  // hijacks /verify-email → /mfa-setup while the email gate above bounces
+  // /mfa-setup → /verify-email — an infinite <Navigate> loop that renders a
+  // blank page and locks every new invitee out. Email verification runs
+  // first; this gate catches them right after.
   if (
     user && user.mfaSetupRequired === true &&
-    location.pathname !== '/mfa-setup'
+    location.pathname !== '/mfa-setup' &&
+    location.pathname !== '/verify-email'
   ) {
     return <Navigate to="/mfa-setup" replace />;
   }
@@ -68,11 +76,15 @@ export function ProtectedRoute() {
   // If onboarding not completed and not already on onboarding page, redirect.
   // Also let /verify-email through so unverified-with-incomplete-onboarding
   // users hit the verify gate first (handled above) and aren't bounced here.
+  // /mfa-setup is whitelisted for the same reason as /verify-email: the MFA
+  // gate above outranks onboarding, so without it a must-enroll user in a
+  // not-yet-onboarded org loops /mfa-setup ⇄ /onboarding (blank page).
   if (
     user?.organization &&
     user.organization.onboardingCompleted === false &&
     location.pathname !== '/onboarding' &&
-    location.pathname !== '/verify-email'
+    location.pathname !== '/verify-email' &&
+    location.pathname !== '/mfa-setup'
   ) {
     return <Navigate to="/onboarding" replace />;
   }
