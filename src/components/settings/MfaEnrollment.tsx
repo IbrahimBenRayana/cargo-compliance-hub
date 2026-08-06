@@ -55,6 +55,13 @@ export function MfaEnrollment({ onComplete }: { onComplete: () => void }) {
       setSecretBase32(res.secretBase32);
       setStep('scan');
     } catch (err: any) {
+      // Account is already protected — the only way to be here is stale
+      // client state (e.g. enrollment finished in another tab/session).
+      // Finish the flow instead of stranding the user on a dead end.
+      if (err?.body?.code === 'mfa_already_enabled') {
+        onComplete();
+        return;
+      }
       setInlineError(err?.body?.error || 'That password is not correct.');
     }
   };
