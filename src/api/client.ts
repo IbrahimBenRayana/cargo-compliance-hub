@@ -249,6 +249,13 @@ export const authApi = {
     return apiFetch<User>('/api/v1/auth/me');
   },
 
+  // Invitation lookup for the register page. Public — the token is the credential.
+  getInvitation(token: string) {
+    return apiFetch<{ email: string; organizationName: string; inviterName: string; role: string }>(
+      `/api/v1/auth/invitation/${encodeURIComponent(token)}`,
+    );
+  },
+
   // Set-password (sales-led onboarding / reset). Public — the token is the credential.
   validateSetupToken(token: string) {
     return apiFetch<{ valid: boolean; email?: string; error?: string }>(
