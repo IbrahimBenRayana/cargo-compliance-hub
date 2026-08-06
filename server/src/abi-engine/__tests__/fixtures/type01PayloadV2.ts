@@ -16,6 +16,7 @@ export const TYPE01_PAYLOAD_V2: AbiPayloadV2 = {
       estimatedArrival: '20260814',
     },
     importerOfRecord: { number: '26-164751100', name: 'SIGMA TECHNOLOGY PARTNERS LLC' },
+    consigneeNumber: '26-164751100',
     usStateOfDestination: 'CA',
     bonds: [{ bondTypeCode: '8', designationTypeCode: 'B', suretyCompanyCode: '123' }],
     payment: { typeCode: '2', preliminaryStatementPrintDate: '20260901' },
