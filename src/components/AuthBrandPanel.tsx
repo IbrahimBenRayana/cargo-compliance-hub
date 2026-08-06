@@ -1,7 +1,7 @@
 import { motion, MotionConfig } from 'framer-motion';
 import { Shield, Lock, Zap } from 'lucide-react';
 import { LoginScene } from './illustrations/login-scene';
-import { RegisterScene } from './illustrations/register-scene';
+import { RegisterJourneyScene } from './illustrations/register-journey';
 import { LogoMark } from '@/components/LogoMark';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -117,7 +117,7 @@ export function AuthBrandPanel({ variant = 'login' }: AuthBrandPanelProps) {
           transition={{ duration: 0.7, delay: 0.2, ease: EASE }}
         >
           <div className="w-full max-w-sm mx-auto h-auto">
-            {variant === 'login' ? <LoginScene /> : <RegisterScene />}
+            {variant === 'login' ? <LoginScene /> : <RegisterJourneyScene />}
           </div>
         </motion.div>
 
