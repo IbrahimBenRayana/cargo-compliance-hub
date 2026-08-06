@@ -60,3 +60,16 @@ export {
 export * as aeHeaderRecordDefs from './ae/headerRecordDefs.js';
 export * as aeLineRecordDefs from './ae/lineRecordDefs.js';
 export * as aeResponseDefs from './ae/responseDefs.js';
+
+// ── Payload schema v2 (decision D2) ────────────────────────
+export {
+  zAbiPayloadV2,
+  zEntrySummaryV2,
+  zLineV2,
+  zTariffV2,
+  parseAbiPayloadV2,
+  isAbiPayloadV2,
+} from './payload/schemaV2.js';
+export type { AbiPayloadV2, EntrySummaryV2, LineV2, TariffV2 } from './payload/schemaV2.js';
+export { toAeEntrySummaryInput, toWireDate } from './payload/toAeInput.js';
+export { migrateV1ToV2, splitV1EntryNumber } from './payload/migrateV1.js';
