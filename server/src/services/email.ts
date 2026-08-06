@@ -138,7 +138,18 @@ async function sendMail(options: SendMailOptions): Promise<boolean> {
 
 // ─── HTML helpers ─────────────────────────────────────────
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  // Drop entire non-content blocks FIRST — <style>/<script>/<head> keep their
+  // inner text under a naive tag-strip, which is how raw CSS ended up leading
+  // the text/plain part (and therefore Gmail's inbox snippet).
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&zwnj;|&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 const FONT_STACK =

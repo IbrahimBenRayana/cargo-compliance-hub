@@ -157,8 +157,13 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
     // is registered is an account-enumeration primitive (lets an attacker
     // collect valid logins to brute-force), so we never do it.
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    // Takeover also applies to a deactivated member (team "delete" is a
+    // soft-deactivate that preserves filing attribution): revoke + re-invite
+    // of the same address is an explicit re-onboarding intent.
     const takeoverUserId =
-      existing && invitation && existing.emailVerified === false ? existing.id : null;
+      existing && invitation && (existing.emailVerified === false || existing.isActive === false)
+        ? existing.id
+        : null;
     if (existing && !takeoverUserId) {
       res.status(400).json({
         error: 'We could not create an account with these details. If you already have an account, sign in instead.',
@@ -209,7 +214,7 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
           // posture on the stale, never-verified row.
           await tx.user.update({
             where: { id: takeoverUserId },
-            data: { ...userData, mfaEnabled: false, mfaSecretEnc: null },
+            data: { ...userData, isActive: true, mfaEnabled: false, mfaSecretEnc: null, refreshToken: null },
           })
         : await tx.user.create({ data: userData });
 
