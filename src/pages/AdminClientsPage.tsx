@@ -21,10 +21,10 @@ import {
 } from '@/components/ui/table';
 import {
   Building2, UserPlus, Loader2, MoreHorizontal, CheckCircle2, Clock,
-  Mail, ArrowRightLeft,
+  Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck,
 } from 'lucide-react';
 import { adminApi } from '@/api/client';
-import type { AdminOrganization } from '@/api/client';
+import type { AdminOrganization, AdminUserLookup } from '@/api/client';
 import { PLAN_META } from '@/lib/planMeta';
 import { toast } from 'sonner';
 
@@ -54,6 +54,152 @@ interface ProvisionForm {
   ownerEmail: string;
   planId: string;
   maxUsers: string;
+}
+
+/**
+ * Cross-org user lookup. Emails are globally unique, so an account anywhere on
+ * the platform blocks that address from being invited to any other team. This
+ * card answers "where does this email live?" and clears stray rows.
+ */
+function UserLookupCard() {
+  const [email, setEmail] = useState('');
+  const [result, setResult] = useState<{ searched: string; user: AdminUserLookup | null } | null>(null);
+
+  const lookup = useMutation({
+    mutationFn: (address: string) => adminApi.lookupUser(address),
+    onSuccess: (data, address) => setResult({ searched: address, user: data.user }),
+    onError: (err: any) => toast.error(err.body?.error || 'Lookup failed'),
+  });
+
+  const refresh = () => {
+    if (result) lookup.mutate(result.searched);
+  };
+
+  const setActive = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      adminApi.setUserActive(id, isActive),
+    onSuccess: (_, vars) => {
+      toast.success(vars.isActive ? 'Account reactivated' : 'Account deactivated');
+      refresh();
+    },
+    onError: (err: any) => toast.error(err.body?.error || 'Update failed'),
+  });
+
+  const deleteUser = useMutation({
+    mutationFn: (id: string) => adminApi.deleteUser(id),
+    onSuccess: (data) => {
+      toast.success(`Account deleted — ${data.releasedEmail} can now be invited anywhere.`);
+      refresh();
+    },
+    onError: (err: any) => toast.error(err.body?.error || 'Delete failed'),
+  });
+
+  const user = result?.user ?? null;
+  const activityTotal = user ? Object.values(user.activity).reduce((a, b) => a + b, 0) : 0;
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const address = email.trim();
+    if (address) lookup.mutate(address);
+  };
+
+  const handleDelete = (u: AdminUserLookup) => {
+    if (!window.confirm(
+      `Permanently delete ${u.email} from "${u.organization.name}"? This frees the email for re-invitation and cannot be undone.`,
+    )) return;
+    deleteUser.mutate(u.id);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Find a user</CardTitle>
+        <CardDescription>
+          Look up which organization holds an email address — useful when an invitation fails
+          because the address is already taken somewhere on the platform.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <Input
+            type="email"
+            placeholder="person@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="max-w-sm"
+          />
+          <Button type="submit" variant="secondary" disabled={lookup.isPending || !email.trim()}>
+            {lookup.isPending
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <Search className="h-4 w-4" />}
+            <span className="ml-2">Search</span>
+          </Button>
+        </form>
+
+        {result && !user && (
+          <p className="text-sm text-muted-foreground">
+            No account holds <span className="font-medium text-foreground">{result.searched}</span> —
+            this address is free to invite.
+          </p>
+        )}
+
+        {user && (
+          <div className="rounded-lg border p-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">
+                {[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email}
+              </span>
+              <span className="text-sm text-muted-foreground">{user.email}</span>
+              <Badge variant={user.isActive ? 'default' : 'secondary'}>
+                {user.isActive ? 'Active' : 'Deactivated'}
+              </Badge>
+              <Badge variant="outline">{user.role}</Badge>
+              {user.isPlatformAdmin && <Badge variant="outline">Platform admin</Badge>}
+              {!user.emailVerified && <Badge variant="secondary">Email unverified</Badge>}
+            </div>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <div>
+                Organization: <span className="text-foreground font-medium">{user.organization.name}</span>
+              </div>
+              <div>Created {formatDate(user.createdAt)} · Last login {formatDate(user.lastLoginAt)}</div>
+              <div>
+                {activityTotal === 0
+                  ? 'No filings or other work product — safe to delete.'
+                  : `Has work product (${Object.entries(user.activity)
+                      .filter(([, n]) => n > 0)
+                      .map(([k, n]) => `${n} ${k}`)
+                      .join(', ')}) — deactivate instead of deleting.`}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setActive.mutate({ id: user.id, isActive: !user.isActive })}
+                disabled={setActive.isPending}
+              >
+                {user.isActive
+                  ? <><UserX className="mr-2 h-3.5 w-3.5" />Deactivate</>
+                  : <><UserCheck className="mr-2 h-3.5 w-3.5" />Reactivate</>}
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => handleDelete(user)}
+                disabled={deleteUser.isPending || activityTotal > 0 || user.isPlatformAdmin}
+                title={activityTotal > 0 ? 'Users with filings or documents cannot be hard-deleted' : undefined}
+              >
+                {deleteUser.isPending
+                  ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  : <Trash2 className="mr-2 h-3.5 w-3.5" />}
+                Delete permanently
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 const EMPTY_FORM: ProvisionForm = {
@@ -393,6 +539,8 @@ export function AdminClientsPage() {
           )}
         </CardContent>
       </Card>
+
+      <UserLookupCard />
 
       {/* Change plan dialog */}
       <Dialog open={!!planDialogOrg} onOpenChange={(open) => !open && setPlanDialogOrg(null)}>
