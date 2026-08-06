@@ -26,7 +26,9 @@ type Role = typeof ROLES[number];
 router.get('/members', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const members = await prisma.user.findMany({
-      where: { orgId: req.user!.orgId },
+      // Removed members are soft-deactivated (filing attribution survives via
+      // the relation) — they must not reappear in the team table.
+      where: { orgId: req.user!.orgId, isActive: true },
       select: {
         id: true,
         email: true,

@@ -138,13 +138,33 @@ async function sendMail(options: SendMailOptions): Promise<boolean> {
 
 // ─── HTML helpers ─────────────────────────────────────────
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  // Drop entire non-content blocks FIRST — <style>/<script>/<head> keep their
+  // inner text under a naive tag-strip, which is how raw CSS ended up leading
+  // the text/plain part (and therefore Gmail's inbox snippet).
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&zwnj;|&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 const FONT_STACK =
   "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
-function wrapTemplate(body: string): string {
+/** Default inbox-preview line when a template doesn't provide its own. */
+const DEFAULT_PREHEADER = 'MyCargoLens — U.S. customs compliance for import teams.';
+
+function wrapTemplate(body: string, preheader: string = DEFAULT_PREHEADER): string {
+  // Hidden preview text + whitespace padding so inbox snippets show OUR
+  // sentence. Without real text here, Gmail's snippet extractor fell
+  // through to raw <style>/conditional-comment content and previews looked
+  // like CSS code — which is also why the head below carries no CSS
+  // comments, no @import, and no MSO conditional style block.
+  const preheaderHtml = `<div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all;">${preheader}${'&nbsp;&zwnj;'.repeat(40)}</div>`;
   return `
 <!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -154,10 +174,7 @@ function wrapTemplate(body: string): string {
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="color-scheme" content="light" />
   <meta name="supported-color-schemes" content="light" />
-  <!--[if mso]><style>* { font-family: 'Segoe UI', Arial, sans-serif !important; }</style><![endif]-->
   <style>
-    /* Inter as progressive enhancement — clients that ignore it fall back cleanly. */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap');
     a { color: ${BRAND.goldText}; }
     .mcl-body-cell { padding: 36px 40px !important; }
     @media only screen and (max-width: 600px) {
@@ -168,8 +185,7 @@ function wrapTemplate(body: string): string {
   </style>
 </head>
 <body style="margin:0; padding:0; width:100%; font-family:${FONT_STACK}; background-color:${BRAND.surface}; color:${BRAND.body}; -webkit-font-smoothing:antialiased;">
-  <!-- preheader spacer keeps inbox previews clean -->
-  <div style="display:none; max-height:0; overflow:hidden; opacity:0;">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
+  ${preheaderHtml}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.surface}; padding:40px 0;">
     <tr>
       <td align="center">
@@ -271,7 +287,10 @@ export async function sendInvitationEmail(params: {
       on MyCargoLens as a <strong style="text-transform:capitalize;">${params.role}</strong>.
     </p>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
-      MyCargoLens helps import teams manage ISF 10+2 filings with U.S. Customs and Border Protection.
+      MyCargoLens gives import teams one workspace for U.S. customs — ISF 10+2 and
+      Entry Summary filings, live Manifest Query, AI-assisted HTS classification, an
+      AI compliance coach, a U.S. duty calculator, and continuous CBP compliance
+      monitoring.
     </p>
     ${buttonHtml('Accept invitation', inviteUrl)}
     <p style="margin:0; font-size:13px; color:#94a3b8;">
@@ -283,7 +302,10 @@ export async function sendInvitationEmail(params: {
   return sendMail({
     to: params.to,
     subject: `${params.inviterName} invited you to ${params.organizationName} — MyCargoLens`,
-    html: wrapTemplate(body),
+    html: wrapTemplate(
+      body,
+      `${params.inviterName} invited you to join ${params.organizationName} on MyCargoLens.`
+    ),
   });
 }
 
@@ -466,7 +488,7 @@ export async function sendWelcomeEmail(params: {
   const body = `
     <h2 style="margin:0 0 16px; font-size:20px; color:#14213D;">Welcome to MyCargoLens, ${params.firstName}.</h2>
     <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
-      Your account for <strong>${params.organizationName}</strong> has been created. You're all set to start managing ISF 10+2 filings.
+      Your account for <strong>${params.organizationName}</strong> has been created. You're all set — ISF 10+2 and Entry Summary filings, Manifest Query, AI-assisted classification, your AI compliance coach, and the U.S. duty calculator are ready to go.
     </p>
     <p style="margin:0 0 8px; font-size:15px; line-height:1.6; color:#475569;">
       Here's what you can do:
@@ -810,7 +832,7 @@ function renderGeneric(n: RenderableNotification): RenderedEmail {
     ${n.message ? `<p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">${n.message}</p>` : ''}
     ${n.linkUrl ? buttonHtml('Open in MyCargoLens', dashboardUrl) : ''}
   `;
-  return { subject, html: wrapTemplate(body) };
+  return { subject, html: wrapTemplate(body, n.message || n.title) };
 }
 
 /** Dispatcher — maps known kinds to their bespoke renderers; falls back to generic. */
@@ -845,7 +867,7 @@ function renderFilingSubmitted(n: RenderableNotification): RenderedEmail {
     </p>
     ${buttonHtml('View filing', dashboardUrl)}
   `;
-  return { subject: `ISF filing submitted — ${bol}`, html: wrapTemplate(body) };
+  return { subject: `ISF filing submitted — ${bol}`, html: wrapTemplate(body, `Your ISF filing for ${bol} was submitted to CBP.`) };
 }
 
 function renderFilingAccepted(n: RenderableNotification): RenderedEmail {
@@ -863,7 +885,7 @@ function renderFilingAccepted(n: RenderableNotification): RenderedEmail {
     </table>
     ${buttonHtml('View filing details', dashboardUrl)}
   `;
-  return { subject: `ISF filing accepted — ${bol}`, html: wrapTemplate(body) };
+  return { subject: `ISF filing accepted — ${bol}`, html: wrapTemplate(body, `Good news — CBP accepted your ISF filing for ${bol}.`) };
 }
 
 function renderFilingRejected(n: RenderableNotification): RenderedEmail {
@@ -884,7 +906,7 @@ function renderFilingRejected(n: RenderableNotification): RenderedEmail {
     </p>
     ${buttonHtml('Review filing', dashboardUrl)}
   `;
-  return { subject: `ISF filing rejected — ${bol}`, html: wrapTemplate(body) };
+  return { subject: `ISF filing rejected — ${bol}`, html: wrapTemplate(body, `CBP rejected your ISF filing for ${bol} — action needed.`) };
 }
 
 function renderDeadlineWarning(n: RenderableNotification): RenderedEmail {
@@ -903,5 +925,5 @@ function renderDeadlineWarning(n: RenderableNotification): RenderedEmail {
     </p>
     ${buttonHtml('Open filing', dashboardUrl)}
   `;
-  return { subject: `${urgencyLabel}: ISF deadline in ${hours}h — ${bol}`, html: wrapTemplate(body) };
+  return { subject: `${urgencyLabel}: ISF deadline in ${hours}h — ${bol}`, html: wrapTemplate(body, `ISF deadline in ${hours} hours for ${bol}.`) };
 }

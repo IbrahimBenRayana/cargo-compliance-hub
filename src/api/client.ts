@@ -249,6 +249,13 @@ export const authApi = {
     return apiFetch<User>('/api/v1/auth/me');
   },
 
+  // Invitation lookup for the register page. Public — the token is the credential.
+  getInvitation(token: string) {
+    return apiFetch<{ email: string; organizationName: string; inviterName: string; role: string }>(
+      `/api/v1/auth/invitation/${encodeURIComponent(token)}`,
+    );
+  },
+
   // Set-password (sales-led onboarding / reset). Public — the token is the credential.
   validateSetupToken(token: string) {
     return apiFetch<{ valid: boolean; email?: string; error?: string }>(
@@ -1023,7 +1030,42 @@ export const adminApi = {
       { method: 'POST' },
     );
   },
+
+  lookupUser(email: string) {
+    return apiFetch<{ user: AdminUserLookup | null }>(
+      `/api/v1/admin/users?email=${encodeURIComponent(email)}`,
+    );
+  },
+
+  setUserActive(userId: string, isActive: boolean) {
+    return apiFetch<{ success: true; isActive: boolean }>(
+      `/api/v1/admin/users/${userId}`,
+      { method: 'PATCH', body: JSON.stringify({ isActive }) },
+    );
+  },
+
+  deleteUser(userId: string) {
+    return apiFetch<{ success: true; releasedEmail: string }>(
+      `/api/v1/admin/users/${userId}`,
+      { method: 'DELETE' },
+    );
+  },
 };
+
+export interface AdminUserLookup {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+  isPlatformAdmin: boolean;
+  isActive: boolean;
+  emailVerified: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  organization: { id: string; name: string };
+  activity: Record<string, number>;
+}
 
 // ─── Manifest Query API ───────────────────────────────────
 // ─── Container Tracking (Terminal 49) ─────────────────────
