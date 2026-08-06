@@ -237,4 +237,141 @@ router.post('/organizations/:id/resend-setup', async (req: AuthRequest, res: Res
   res.json({ success: true, sentTo: owner.email });
 });
 
+// ─── Cross-org user tooling ────────────────────────────────
+// Email addresses are globally unique across organizations, so a stray row in
+// any org (an abandoned test account, a provisioned owner that never logged
+// in) blocks that email from being invited anywhere else. These endpoints let
+// platform staff see WHERE an email lives and clear it when it's safe to.
+
+// Relations that represent real work product. All of them are Restrict at the
+// DB level, so a hard delete physically cannot orphan filings — the guard here
+// exists to return a friendly 409 instead of a raw FK error.
+const USER_ACTIVITY_COUNTS = {
+  filings: true,
+  uploadedDocs: true,
+  filingTemplates: true,
+  manifestQueries: true,
+  abiDocuments: true,
+  apiKeys: true,
+  trackedShipments: true,
+} as const;
+
+// GET /api/v1/admin/users?email= — find which org holds an email.
+router.get('/users', async (req: AuthRequest, res: Response): Promise<void> => {
+  const email = String(req.query.email ?? '').trim();
+  if (!email) {
+    res.status(400).json({ error: 'email query parameter is required' });
+    return;
+  }
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    include: {
+      organization: { select: { id: true, name: true } },
+      _count: { select: USER_ACTIVITY_COUNTS },
+    },
+  });
+  if (!user) {
+    res.json({ user: null });
+    return;
+  }
+  res.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      isPlatformAdmin: user.isPlatformAdmin,
+      isActive: user.isActive,
+      emailVerified: user.emailVerified,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      organization: user.organization,
+      activity: user._count,
+    },
+  });
+});
+
+// PATCH /api/v1/admin/users/:id — activate/deactivate in any org (fallback
+// when a hard delete is blocked by filing activity).
+router.patch('/users/:id', async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = String(req.params.id);
+  const body = z.object({ isActive: z.boolean() }).parse(req.body);
+  const target = await prisma.user.findUnique({ where: { id: userId } });
+  if (!target) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  if (target.id === req.user!.id) {
+    res.status(400).json({ error: 'You cannot deactivate your own account.' });
+    return;
+  }
+  await prisma.user.update({
+    where: { id: userId },
+    data: { isActive: body.isActive, ...(body.isActive ? {} : { refreshToken: null }) },
+  });
+  await writeAuditLog({
+    orgId: target.orgId, userId: req.user!.id,
+    action: body.isActive ? 'admin.user_activated' : 'admin.user_deactivated',
+    entityType: 'user', entityId: target.id,
+    ...getRequestMeta(req),
+  });
+  res.json({ success: true, isActive: body.isActive });
+});
+
+// DELETE /api/v1/admin/users/:id — hard delete, only for rows with no work
+// product. Frees the email for re-invitation elsewhere.
+router.delete('/users/:id', async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = String(req.params.id);
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { _count: { select: USER_ACTIVITY_COUNTS } },
+  });
+  if (!target) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  if (target.id === req.user!.id) {
+    res.status(400).json({ error: 'You cannot delete your own account.' });
+    return;
+  }
+  if (target.isPlatformAdmin) {
+    res.status(400).json({ error: 'Platform admin accounts cannot be deleted from here.' });
+    return;
+  }
+  const blocking = Object.entries(target._count).filter(([, n]) => n > 0);
+  if (blocking.length > 0) {
+    res.status(409).json({
+      error: `This user has work product (${blocking.map(([k, n]) => `${n} ${k}`).join(', ')}) and cannot be hard-deleted. Deactivate them instead.`,
+      code: 'user_has_activity',
+      activity: target._count,
+    });
+    return;
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Invitations they sent are safe to drop; everything else either
+      // cascades (tokens, MFA, notifications) or nulls out (audit trail).
+      await tx.orgInvitation.deleteMany({ where: { invitedById: target.id } });
+      await tx.user.delete({ where: { id: target.id } });
+    });
+  } catch (err) {
+    // FK race (activity created between the check and the delete).
+    logger.error({ err: (err as Error).message, userId }, '[Admin] User hard-delete blocked');
+    res.status(409).json({
+      error: 'This user acquired activity while the delete was running. Deactivate them instead.',
+      code: 'user_has_activity',
+    });
+    return;
+  }
+  await writeAuditLog({
+    orgId: target.orgId, userId: req.user!.id,
+    action: 'admin.user_deleted', entityType: 'user', entityId: target.id,
+    oldValue: { email: target.email, orgId: target.orgId, role: target.role },
+    ...getRequestMeta(req),
+  });
+  logger.info({ email: target.email, orgId: target.orgId }, '[Admin] User hard-deleted, email released');
+  res.json({ success: true, releasedEmail: target.email });
+});
+
 export default router;

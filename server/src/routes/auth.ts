@@ -156,7 +156,11 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
     // Any other conflict returns a GENERIC message: confirming that an email
     // is registered is an account-enumeration primitive (lets an attacker
     // collect valid logins to brute-force), so we never do it.
-    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    // Case-insensitive on purpose: a legacy row saved with different casing
+    // must still be found here rather than colliding at insert time.
+    const existing = await prisma.user.findFirst({
+      where: { email: { equals: data.email, mode: 'insensitive' } },
+    });
     // Takeover also applies to a deactivated member (team "delete" is a
     // soft-deactivate that preserves filing attribution): revoke + re-invite
     // of the same address is an explicit re-onboarding intent.
@@ -165,10 +169,17 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
         ? existing.id
         : null;
     if (existing && !takeoverUserId) {
-      res.status(400).json({
-        error: 'We could not create an account with these details. If you already have an account, sign in instead.',
-        code: 'registration_unavailable',
-      });
+      // With a VALID invitation token we can be specific: the token was
+      // delivered to this inbox, so the requester already controls the email —
+      // telling them the address has an account reveals nothing an attacker
+      // could harvest (they cannot mint tokens for arbitrary addresses).
+      // Without a token, stay deliberately vague (anti-enumeration).
+      const error = invitation
+        ? existing.orgId === invitation.orgId
+          ? 'You are already a member of this team. Sign in with your existing password instead.'
+          : 'This email is already attached to an active MyCargoLens account in another workspace, so it cannot join this team. Sign in with that account, or ask MyCargoLens support to release the email.'
+        : 'We could not create an account with these details. If you already have an account, sign in instead.';
+      res.status(400).json({ error, code: 'registration_unavailable' });
       return;
     }
 
