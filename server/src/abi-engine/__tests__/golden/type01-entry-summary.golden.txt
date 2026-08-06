@@ -1,0 +1,19 @@
+ALGB1ABCSECRET082026     AE                                                     
+B  2704ABCAE                                               SCENARIO 001         
+10AABC  12345676 2704REF001      0111 X           2090126                       
+1126-164751100                           082026081526       CA                  
+20MAEU2704081426    EVER GIVEN                                                  
+22     100CTNS                                                                  
+23MMAEU123456789012                                                             
+318B 123                                                                        
+40  001 CNCN080126               500           1200    N                        
+44LITHIUM ION BATTERY PACKS                                                     
+47MCNSHEBAT123SHA                                                               
+47S26-164751100                                                                 
+508507600020      34100      10000        50000NO                               
+62499    3464                                                                   
+62501    1250                                                                   
+89499       3464501       1250                                                  
+90      34100        4714           0           0           0           0       
+Y  2704ABCAE                                                                    
+ZLGB1ABC      082026                                                            
