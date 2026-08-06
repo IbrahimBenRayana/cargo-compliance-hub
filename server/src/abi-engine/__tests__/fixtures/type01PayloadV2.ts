@@ -63,6 +63,6 @@ export const TYPE01_PAYLOAD_V2: AbiPayloadV2 = {
       { classCode: '499', amountCents: 3464 },
       { classCode: '501', amountCents: 1250 },
     ],
-    grandTotals: { dutyCents: 34100, userFeeCents: 4714, irTaxCents: 0, adDutyCents: 0, cvDutyCents: 0 },
+    grandTotals: { dutyCents: 34100, userFeeCents: 4714, irTaxCents: 0, adDutyCents: 0, cvDutyCents: 0, otherRevenueCents: 0 },
   },
 };
