@@ -97,3 +97,7 @@ export { fetchUsitcRows, normalizeUsitcRows, ingestChapter } from './refdata/usi
 export type { UsitcRow, NormalizedHtsLine, HtsRateLineStore } from './refdata/usitcHts.js';
 export { DbHtsRateSource } from './refdata/dbRateSource.js';
 export type { HtsRateLineReader } from './refdata/dbRateSource.js';
+
+// ── Validation rules (workstream G) ────────────────────────
+export { validateEntrySummary } from './validate/entrySummary.js';
+export type { ValidationIssue } from './validate/entrySummary.js';
