@@ -73,3 +73,21 @@ export {
 export type { AbiPayloadV2, EntrySummaryV2, LineV2, TariffV2 } from './payload/schemaV2.js';
 export { toAeEntrySummaryInput, toWireDate } from './payload/toAeInput.js';
 export { migrateV1ToV2, splitV1EntryNumber } from './payload/migrateV1.js';
+
+// ── Duty engine (workstream F) ─────────────────────────────
+export { parseRateExpression, computeDutyCents } from './duty/rateExpression.js';
+export type { RateComponent, DutyBasis } from './duty/rateExpression.js';
+export {
+  computeLineMpfCents,
+  applyMpfMinMax,
+  computeLineHmfCents,
+  hmfApplies,
+  informalEntryFeeCents,
+  dutiableMailFeeCents,
+  manualEntrySurchargeCents,
+  MPF_RATE_PER_MILLION,
+  HMF_RATE_PER_MILLION,
+  HMF_DE_MINIMIS_CENTS,
+} from './duty/fees.js';
+export { enrichWithDuty, StaticRateSource } from './duty/engine.js';
+export type { HtsRate, HtsRateSource, DutyEngineOptions } from './duty/engine.js';
