@@ -56,10 +56,10 @@ describe('DbHtsRateSource', () => {
     let calls = 0;
     return {
       calls: () => calls,
-      findUnique: async ({ where }: { where: { htsNumber: string } }) => {
+      findUnique: async ({ where }: { where: { htsNumber: string } }): Promise<{ generalRate: string; specialRate: string } | null> => {
         calls++;
         const generalRate = rows[where.htsNumber];
-        return generalRate === undefined ? null : { generalRate };
+        return generalRate === undefined ? null : { generalRate, specialRate: '' };
       },
     };
   }

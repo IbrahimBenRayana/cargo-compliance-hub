@@ -10,7 +10,9 @@
 import type { HtsRate, HtsRateSource } from '../duty/engine.js';
 
 export interface HtsRateLineReader {
-  findUnique(args: { where: { htsNumber: string } }): Promise<{ generalRate: string } | null>;
+  findUnique(args: {
+    where: { htsNumber: string };
+  }): Promise<{ generalRate: string; specialRate: string } | null>;
 }
 
 export class DbHtsRateSource implements HtsRateSource {
@@ -31,7 +33,10 @@ export class DbHtsRateSource implements HtsRateSource {
     if (!row && key.length === 10) {
       row = await this.reader.findUnique({ where: { htsNumber: key.slice(0, 8) } });
     }
-    const rate: HtsRate | null = row && row.generalRate !== '' ? { general: row.generalRate } : null;
+    const rate: HtsRate | null =
+      row && row.generalRate !== ''
+        ? { general: row.generalRate, ...(row.specialRate !== '' ? { special: row.specialRate } : {}) }
+        : null;
 
     if (this.cache.size >= this.maxCacheEntries) this.cache.clear();
     this.cache.set(key, rate);
