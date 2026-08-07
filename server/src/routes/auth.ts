@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { emailField } from '../schemas/common.js';
+import logger from '../config/logger.js';
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
@@ -112,13 +113,6 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
   try {
     const data = registerSchema.parse(req.body);
 
-    // Check existing user
-    const existing = await prisma.user.findUnique({ where: { email: data.email } });
-    if (existing) {
-      res.status(409).json({ error: 'Email already registered' });
-      return;
-    }
-
     const passwordHash = await bcrypt.hash(data.password, 12);
 
     // Check if registering via invite
@@ -152,6 +146,43 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
       return;
     }
 
+    // Duplicate handling — deliberately AFTER invitation validation.
+    //
+    // A previously abandoned signup (registered but never verified — e.g. the
+    // pre-#161 invitees stranded on the blank MFA loop) leaves a stale user
+    // row. When a VALID invitation matches that address and the row was never
+    // verified, the new registration takes the row over instead of failing.
+    //
+    // Any other conflict returns a GENERIC message: confirming that an email
+    // is registered is an account-enumeration primitive (lets an attacker
+    // collect valid logins to brute-force), so we never do it.
+    // Case-insensitive on purpose: a legacy row saved with different casing
+    // must still be found here rather than colliding at insert time.
+    const existing = await prisma.user.findFirst({
+      where: { email: { equals: data.email, mode: 'insensitive' } },
+    });
+    // Takeover also applies to a deactivated member (team "delete" is a
+    // soft-deactivate that preserves filing attribution): revoke + re-invite
+    // of the same address is an explicit re-onboarding intent.
+    const takeoverUserId =
+      existing && invitation && (existing.emailVerified === false || existing.isActive === false)
+        ? existing.id
+        : null;
+    if (existing && !takeoverUserId) {
+      // With a VALID invitation token we can be specific: the token was
+      // delivered to this inbox, so the requester already controls the email —
+      // telling them the address has an account reveals nothing an attacker
+      // could harvest (they cannot mint tokens for arbitrary addresses).
+      // Without a token, stay deliberately vague (anti-enumeration).
+      const error = invitation
+        ? existing.orgId === invitation.orgId
+          ? 'You are already a member of this team. Sign in with your existing password instead.'
+          : 'This email is already attached to an active MyCargoLens account in another workspace, so it cannot join this team. Sign in with that account, or ask MyCargoLens support to release the email.'
+        : 'We could not create an account with these details. If you already have an account, sign in instead.';
+      res.status(400).json({ error, code: 'registration_unavailable' });
+      return;
+    }
+
     // Create org + user (or join existing org) in a transaction
     const result = await prisma.$transaction(async (tx) => {
       let org;
@@ -174,25 +205,29 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
         });
       }
 
-      const user = await tx.user.create({
-        data: {
-          orgId: org.id,
-          email: data.email,
-          passwordHash,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          role,
-          // New accounts start unverified — a 6-digit code is sent below and
-          // the frontend gates writes (filing submit, ABI submit, billing
-          // checkout) on emailVerified=true via the requireVerifiedEmail
-          // middleware. Existing accounts pre-dating this rollout are not
-          // affected (they're already true in the DB).
-          emailVerified: false,
-          // New accounts must enroll in MFA at first login — the
-          // requireMfaEnrolled gate 403s sensitive writes until they do.
-          mfaEnforced: true,
-        },
-      });
+      // New accounts start unverified — a 6-digit code is sent below and
+      // the frontend gates writes (filing submit, ABI submit, billing
+      // checkout) on emailVerified=true via the requireVerifiedEmail
+      // middleware. New accounts must also enroll in MFA at first login —
+      // the requireMfaEnrolled gate 403s sensitive writes until they do.
+      const userData = {
+        orgId: org.id,
+        email: data.email,
+        passwordHash,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role,
+        emailVerified: false,
+        mfaEnforced: true,
+      };
+      const user = takeoverUserId
+        ? // Abandoned-signup takeover: fresh credentials and a clean security
+          // posture on the stale, never-verified row.
+          await tx.user.update({
+            where: { id: takeoverUserId },
+            data: { ...userData, isActive: true, mfaEnabled: false, mfaSecretEnc: null, refreshToken: null },
+          })
+        : await tx.user.create({ data: userData });
 
       return { org, user };
     });
@@ -292,6 +327,38 @@ router.post('/register', authLimiter, async (req: Request, res: Response): Promi
       return;
     }
     throw err;
+  }
+});
+
+// ─── GET /api/v1/auth/invitation/:token ───────────────────
+// Public invitation lookup for the /register?invite= page: possession of
+// the (unguessable) token is the credential. Lets the form prefill and
+// lock the invited email so the invitee cannot register a different one.
+router.get('/invitation/:token', authLimiter, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const invitation = await prisma.orgInvitation.findUnique({
+      where: { token: String(req.params.token) },
+      include: {
+        organization: { select: { name: true } },
+        invitedBy: { select: { firstName: true, lastName: true, email: true } },
+      },
+    });
+    if (!invitation || invitation.status !== 'pending' || invitation.expiresAt < new Date()) {
+      res.status(404).json({ error: 'Invitation not found or expired' });
+      return;
+    }
+    res.json({
+      email: invitation.email,
+      role: invitation.role,
+      organizationName: invitation.organization.name,
+      inviterName:
+        `${invitation.invitedBy.firstName ?? ''} ${invitation.invitedBy.lastName ?? ''}`.trim() ||
+        invitation.invitedBy.email,
+      expiresAt: invitation.expiresAt,
+    });
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, '[Auth] Error looking up invitation');
+    res.status(500).json({ error: 'Failed to look up invitation' });
   }
 });
 

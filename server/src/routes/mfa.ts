@@ -288,7 +288,10 @@ router.post('/setup', authLimiter, authMiddleware, async (req: AuthRequest, res:
     return;
   }
   if (user.mfaEnabled) {
-    res.status(400).json({ error: 'MFA already enabled' });
+    // Machine-readable code: the SPA treats this as "enrollment already done"
+    // and completes the flow instead of dead-ending (a stale mfaSetupRequired
+    // can strand an enrolled user on the forced setup page).
+    res.status(400).json({ error: 'MFA already enabled', code: 'mfa_already_enabled' });
     return;
   }
 
