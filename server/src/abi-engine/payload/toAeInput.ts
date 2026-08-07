@@ -78,6 +78,7 @@ function toAeLine(line: LineV2, index: number): AeLine {
     otherRevenue: line.otherRevenue,
     fees: line.fees,
     censusOverrides: line.censusOverrides,
+    pscReasonCodes: line.pscReasonCodes,
   };
 }
 
