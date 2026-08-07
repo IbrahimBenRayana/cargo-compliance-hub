@@ -15,7 +15,8 @@
     "db:studio": "prisma studio",
     "stripe:bootstrap": "tsx scripts/stripe-bootstrap.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "hts:ingest": "tsx src/abi-engine/refdata/ingestCli.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.9.0",

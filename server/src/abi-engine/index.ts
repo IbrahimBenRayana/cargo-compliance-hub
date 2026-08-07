@@ -91,3 +91,13 @@ export {
 } from './duty/fees.js';
 export { enrichWithDuty, StaticRateSource } from './duty/engine.js';
 export type { HtsRate, HtsRateSource, DutyEngineOptions } from './duty/engine.js';
+
+// ── Refdata: USITC HTS (workstream F) ──────────────────────
+export { fetchUsitcRows, normalizeUsitcRows, ingestChapter } from './refdata/usitcHts.js';
+export type { UsitcRow, NormalizedHtsLine, HtsRateLineStore } from './refdata/usitcHts.js';
+export { DbHtsRateSource } from './refdata/dbRateSource.js';
+export type { HtsRateLineReader } from './refdata/dbRateSource.js';
+
+// ── Validation rules (workstream G) ────────────────────────
+export { validateEntrySummary } from './validate/entrySummary.js';
+export type { ValidationIssue } from './validate/entrySummary.js';
