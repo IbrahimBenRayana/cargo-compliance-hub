@@ -105,6 +105,8 @@ export const zLineV2 = z.object({
     .array(z.object({ conditionCode: z.string().max(3), overrideCode: z.string().max(2) }))
     .max(7)
     .optional(),
+  /** Line-level PSC reason codes (max 5, PSC filings only). */
+  pscReasonCodes: z.array(z.string().max(3)).max(5).optional(),
   /** Commercial context (not transmitted on AE records). */
   sku: z.string().optional(),
 });
