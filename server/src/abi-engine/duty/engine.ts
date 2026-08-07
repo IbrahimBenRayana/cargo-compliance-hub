@@ -5,13 +5,14 @@
  * subtotals, and grand totals.
  *
  * Sources of rules: Entry Summary Create/Update usage notes (l)–(r), (w),
- * (x), (ff) — July 2026 chapter. Known limitations (deferred to refdata
- * enrichment work): SPI preference rates, per-program MPF exemptions,
- * article-set aggregation. Where a limitation would silently produce a
- * wrong amount, the engine throws instead.
+ * (x), (ff) — July 2026 chapter. Known limitations: SPI-implied MPF
+ * exemption is NOT inferred — the filer declares it via the line's
+ * feeExemptionCode (honored here); article-set aggregation is deferred.
+ * Where a limitation would silently produce a wrong amount, the engine
+ * throws instead.
  */
 import { RecordCodecError, type CodecIssue } from '../records/codec.js';
-import { parseRateExpression, computeDutyCents } from './rateExpression.js';
+import { parseRateExpression, pickSpecialRate, computeDutyCents } from './rateExpression.js';
 import {
   computeLineMpfCents,
   applyMpfMinMax,
@@ -33,6 +34,8 @@ function fail(field: string, message: string): never {
 export interface HtsRate {
   /** HTS "General" column rate expression, e.g. 'Free', '3.4%'. */
   general: string;
+  /** HTS "Special" column expression, e.g. 'Free (A*, AU, CL)'. */
+  special?: string;
 }
 
 export interface HtsRateSource {
@@ -42,10 +45,11 @@ export interface HtsRateSource {
 
 /** In-memory rate source (tests, fixtures, cert scenario supplied values). */
 export class StaticRateSource implements HtsRateSource {
-  constructor(private readonly rates: Record<string, string>) {}
+  constructor(private readonly rates: Record<string, string | HtsRate>) {}
   getRate(htsNumber: string): HtsRate | null {
-    const general = this.rates[htsNumber];
-    return general === undefined ? null : { general };
+    const rate = this.rates[htsNumber];
+    if (rate === undefined) return null;
+    return typeof rate === 'string' ? { general: rate } : rate;
   }
 }
 
@@ -96,23 +100,51 @@ export async function enrichWithDuty(
   let cvCashCents = 0;
 
   for (const [index, line] of es.lines.entries()) {
-    // 1. Line duty per tariff.
+    // 1. Line duty per tariff. Ch.99 overlay surcharges ("duty of the
+    //    applicable subheading + X%") are computed on the combined value of
+    //    the line's OTHER tariffs — the ch.1–97 classification(s) the
+    //    overlay rides on.
     for (const [tIndex, tariff] of line.tariffs.entries()) {
       if (tariff.dutyCents === undefined) {
-        if (line.spiClaimCode) {
-          fail(
-            `lines[${index}].tariffs[${tIndex}]`,
-            `SPI '${line.spiClaimCode}' preference rates not yet supported — supply dutyCents explicitly`
-          );
-        }
+        const where = `lines[${index}].tariffs[${tIndex}]`;
         const rate = await rateSource.getRate(tariff.htsNumber, date);
         if (!rate) {
-          fail(`lines[${index}].tariffs[${tIndex}]`, `no HTS rate available for ${tariff.htsNumber}`);
+          fail(where, `no HTS rate available for ${tariff.htsNumber}`);
         }
+
+        // SPI preference claim: use the Special-column rate for the claimed
+        // program. A claim the subheading does not list is a filer error.
+        let expression = rate.general;
+        if (line.spiClaimCode) {
+          const preferred = rate.special
+            ? pickSpecialRate(rate.special, line.spiClaimCode)
+            : null;
+          if (preferred === null && !tariff.htsNumber.startsWith('99')) {
+            fail(
+              where,
+              `SPI '${line.spiClaimCode}' is not a listed program for ${tariff.htsNumber} — remove the claim or supply dutyCents explicitly`
+            );
+          }
+          // Ch.99 overlays are unaffected by the preference claim; they keep
+          // their own (general) expression.
+          if (preferred !== null && !tariff.htsNumber.startsWith('99')) {
+            expression = preferred;
+          }
+        }
+
+        const othersValueDollars = line.tariffs.reduce(
+          (sum, t, i) => (i === tIndex ? sum : sum + t.valueDollars),
+          0
+        );
         tariff.dutyCents = computeDutyCents(
-          parseRateExpression(rate.general),
-          { valueDollars: tariff.valueDollars, quantity1Hundredths: tariff.quantity1Hundredths },
-          rate.general
+          parseRateExpression(expression),
+          {
+            valueDollars: tariff.valueDollars,
+            quantity1Hundredths: tariff.quantity1Hundredths,
+            applicableSubheadingValueDollars:
+              othersValueDollars > 0 ? othersValueDollars : tariff.valueDollars,
+          },
+          expression
         );
       }
       totalDutyCents += tariff.dutyCents;
@@ -123,7 +155,10 @@ export async function enrichWithDuty(
     const fees = [...keptFees];
     const value = lineValueDollars(line);
 
-    if (!mpfExempt) {
+    // The filer's explicit fee-exemption code (e.g. an MPF-exempt FTA
+    // program) suppresses the line MPF; the engine never infers exemption
+    // from the SPI claim alone.
+    if (!mpfExempt && !line.feeExemptionCode) {
       const mpf = computeLineMpfCents(value);
       totalLineMpfCents += mpf;
       fees.push({ classCode: '499', amountCents: mpf });
