@@ -3,7 +3,7 @@
  * Create/Update usage notes (l)–(r), (w), (x) (ESF page refs in comments).
  */
 import { describe, it, expect } from 'vitest';
-import { parseRateExpression, computeDutyCents } from '../duty/rateExpression.js';
+import { parseRateExpression, pickSpecialRate, computeDutyCents } from '../duty/rateExpression.js';
 import {
   computeLineMpfCents,
   applyMpfMinMax,
@@ -163,7 +163,7 @@ describe('enrichWithDuty', () => {
     expect(priced.entrySummary.grandTotals?.cvDutyCents).toBe(100000);
   });
 
-  it('refuses SPI lines and unknown HTS numbers instead of guessing', async () => {
+  it('refuses unlisted SPI claims and unknown HTS numbers instead of guessing', async () => {
     const spi = unpriced();
     spi.entrySummary.lines[0].spiClaimCode = 'A';
     await expect(enrichWithDuty(spi, RATES, { applicabilityDate: '20260820' })).rejects.toThrow(/SPI/);
@@ -171,5 +171,105 @@ describe('enrichWithDuty', () => {
     const unknown = unpriced();
     unknown.entrySummary.lines[0].tariffs[0].htsNumber = '9999999999';
     await expect(enrichWithDuty(unknown, RATES, { applicabilityDate: '20260820' })).rejects.toThrow(/no HTS rate/);
+  });
+});
+
+describe('SPI preference rates (Special column)', () => {
+  it('extracts the program group a claim qualifies for', () => {
+    const special = 'Free (A*, AU, BH, CL, D, E, IL, JO, MA, OM, P, PA, PE, S, SG) 2.5% (KR)';
+    expect(pickSpecialRate(special, 'AU')).toBe('Free');
+    expect(pickSpecialRate(special, 'A')).toBe('Free'); // A* listing covers an A claim
+    expect(pickSpecialRate(special, 'KR')).toBe('2.5%');
+    expect(pickSpecialRate(special, 'A+')).toBeNull(); // GSP-LDC is a distinct program
+    expect(pickSpecialRate(special, 'MX')).toBeNull();
+  });
+
+  it('prices a claimed line with the preference rate', async () => {
+    const p = structuredClone(TYPE01_PAYLOAD_V2);
+    delete p.entrySummary.lines[0].tariffs[0].dutyCents;
+    delete p.entrySummary.grandTotals;
+    p.entrySummary.lines[0].fees = undefined;
+    p.entrySummary.feeTotals = undefined;
+    p.entrySummary.lines[0].spiClaimCode = 'AU';
+    const rates = new StaticRateSource({
+      '8507600020': { general: '3.41%', special: 'Free (A*, AU, CL)' },
+    });
+    const priced = await enrichWithDuty(p, rates, { applicabilityDate: '20260820' });
+    expect(priced.entrySummary.lines[0].tariffs[0].dutyCents).toBe(0);
+    expect(priced.entrySummary.grandTotals?.dutyCents).toBe(0);
+    // MPF is NOT dropped by the claim alone — that takes an explicit
+    // fee-exemption code (next test).
+    expect(priced.entrySummary.lines[0].fees).toContainEqual({ classCode: '499', amountCents: 3464 });
+  });
+
+  it('suppresses line MPF only via the explicit fee-exemption code', async () => {
+    const p = structuredClone(TYPE01_PAYLOAD_V2);
+    delete p.entrySummary.lines[0].tariffs[0].dutyCents;
+    delete p.entrySummary.grandTotals;
+    p.entrySummary.lines[0].fees = undefined;
+    p.entrySummary.feeTotals = undefined;
+    p.entrySummary.lines[0].feeExemptionCode = 'F';
+    const rates = new StaticRateSource({ '8507600020': 'Free' });
+    const priced = await enrichWithDuty(p, rates, { applicabilityDate: '20260820' });
+    expect(priced.entrySummary.lines[0].fees?.some((f) => f.classCode === '499')).not.toBe(true);
+  });
+});
+
+describe('ch.99 overlay surcharges (Section 301/232)', () => {
+  const OVERLAY_RATES = new StaticRateSource({
+    '8507600020': '3.41%',
+    '9903880300': 'The duty provided in the applicable subheading + 25%',
+  });
+
+  it('parses the overlay wording into a surcharge component', () => {
+    expect(parseRateExpression('The duty provided in the applicable subheading + 25%')).toEqual([
+      { kind: 'overlaySurcharge', perMillion: 250000 },
+    ]);
+    expect(parseRateExpression('The duty provided in the applicable subheading + 7.5%')).toEqual([
+      { kind: 'overlaySurcharge', perMillion: 75000 },
+    ]);
+  });
+
+  it('computes the surcharge on the ch.1–97 value of the same line', async () => {
+    const p = structuredClone(TYPE01_PAYLOAD_V2);
+    delete p.entrySummary.lines[0].tariffs[0].dutyCents;
+    delete p.entrySummary.grandTotals;
+    p.entrySummary.lines[0].fees = undefined;
+    p.entrySummary.feeTotals = undefined;
+    // 301 List-3 style pairing: ch.99 line carries no value of its own.
+    p.entrySummary.lines[0].tariffs.unshift({
+      htsNumber: '9903880300',
+      valueDollars: 0,
+      uomCode1: 'X',
+    });
+    const priced = await enrichWithDuty(p, OVERLAY_RATES, { applicabilityDate: '20260820' });
+    const [overlay, base] = priced.entrySummary.lines[0].tariffs;
+    expect(base.dutyCents).toBe(34100); // $10,000 × 3.41%
+    expect(overlay.dutyCents).toBe(250000); // $10,000 × 25%
+    expect(priced.entrySummary.grandTotals?.dutyCents).toBe(284100);
+    // MPF/HMF stay computed on the line value once, not per tariff.
+    expect(priced.entrySummary.lines[0].fees).toContainEqual({ classCode: '499', amountCents: 3464 });
+  });
+
+  it('the overlay keeps its surcharge under an SPI claim on the base line', async () => {
+    const p = structuredClone(TYPE01_PAYLOAD_V2);
+    delete p.entrySummary.lines[0].tariffs[0].dutyCents;
+    delete p.entrySummary.grandTotals;
+    p.entrySummary.lines[0].fees = undefined;
+    p.entrySummary.feeTotals = undefined;
+    p.entrySummary.lines[0].spiClaimCode = 'AU';
+    p.entrySummary.lines[0].tariffs.unshift({
+      htsNumber: '9903880300',
+      valueDollars: 0,
+      uomCode1: 'X',
+    });
+    const rates = new StaticRateSource({
+      '8507600020': { general: '3.41%', special: 'Free (A*, AU, CL)' },
+      '9903880300': 'The duty provided in the applicable subheading + 25%',
+    });
+    const priced = await enrichWithDuty(p, rates, { applicabilityDate: '20260820' });
+    const [overlay, base] = priced.entrySummary.lines[0].tariffs;
+    expect(base.dutyCents).toBe(0); // preference
+    expect(overlay.dutyCents).toBe(250000); // 301 unaffected by the claim
   });
 });
