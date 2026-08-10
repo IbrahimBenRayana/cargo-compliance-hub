@@ -119,7 +119,11 @@ export async function enrichWithDuty(
           const preferred = rate.special
             ? pickSpecialRate(rate.special, line.spiClaimCode)
             : null;
-          if (preferred === null && !tariff.htsNumber.startsWith('99')) {
+          // Duty-free subheadings list no programs in the Special column, yet
+          // an SPI claim on them is legitimate (made for fee/statistical
+          // treatment) — cert scenario 001 files SPI on a Free-rate HTS.
+          const generalFree = /^free$/i.test(rate.general.trim());
+          if (preferred === null && !generalFree && !tariff.htsNumber.startsWith('99')) {
             fail(
               where,
               `SPI '${line.spiClaimCode}' is not a listed program for ${tariff.htsNumber} — remove the claim or supply dutyCents explicitly`

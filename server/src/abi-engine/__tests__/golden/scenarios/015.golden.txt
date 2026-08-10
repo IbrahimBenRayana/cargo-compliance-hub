@@ -1,0 +1,5 @@
+ALA  MCLPASSWD           AE                                                     
+B  2704ZZZAE                                               SCENARIO 015         
+10DZZZ  00000151 2704015         01                                             
+Y  2704ZZZAE                                                                    
+ZLA  MCL                                                                        

@@ -1,0 +1,1 @@
+F ScenarioValidation.cargo.inBondDate: in-bond date cannot be earlier than the import date (ESF-155)
