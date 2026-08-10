@@ -158,6 +158,26 @@ export type {
 } from './apps/uc/parser.js';
 export * as ucRecordDefs from './apps/uc/recordDefs.js';
 
+// ── PGA Message Set (workstream D) ─────────────────────────
+export { buildPgaLine } from './pga/builder.js';
+export type {
+  PgaLineInput,
+  PgaSet,
+  PgaDataSet,
+  PgaDisclaimerSet,
+  PgaDisclaimerCode,
+  PgaProductCode,
+  PgaEntity,
+  PgaContact,
+  PgaSourceCountry,
+  PgaItemIdentity,
+  PgaQuantity,
+  PgaArrival,
+  PgaConformance,
+} from './pga/builder.js';
+export { DISCLAIMER_CODES } from './pga/recordDefs.js';
+export * as pgaRecordDefs from './pga/recordDefs.js';
+
 // ── Payload schema v2 (decision D2) ────────────────────────
 export {
   zAbiPayloadV2,

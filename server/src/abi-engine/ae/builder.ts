@@ -12,6 +12,7 @@
  * Quantities carry their implied-decimal factor in the name.
  */
 import { writeRecord, RecordCodecError, type CodecIssue } from '../records/codec.js';
+import { buildPgaLine, type PgaLineInput } from '../pga/builder.js';
 import {
   INPUT_10,
   INPUT_11,
@@ -162,6 +163,8 @@ export interface AeLine {
   fees?: AeFee[];
   pscReasonCodes?: string[];
   censusOverrides?: { conditionCode: string; overrideCode: string }[];
+  /** PGA message-set data for the line (OI + PG records follow the 50s). */
+  pga?: PgaLineInput;
 }
 
 export interface AeEntrySummaryInput {
@@ -533,6 +536,12 @@ export function buildEntrySummary(input: AeEntrySummaryInput): string[] {
           uomCode3: tariff.uomCode3,
         })
       );
+    }
+
+    // PGA message set attaches directly after the 50-records (MS p.13:
+    // "AE Entry Summary \u2192 50-record then PGA set").
+    if (line.pga) {
+      lines.push(...buildPgaLine(line.pga));
     }
 
     if (line.visaNumber) {

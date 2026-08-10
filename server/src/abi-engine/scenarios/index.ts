@@ -1485,6 +1485,90 @@ export const SCENARIOS: Scenario[] = [
     },
   }),
 
+  aeScenario('083', 'FDA Entry', {
+    rates: { '8516710020': '3.7%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CN';
+      line.countryOfExport = 'CN';
+      line.descriptions = ['ELECTRIC COFFEE MAKERS'];
+      line.parties = [
+        { type: 'M', identifier: 'TWNICSAN435TAI' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '8516710020', valueDollars: 737953, uomCode1: 'NO', quantity1Hundredths: 5546800 },
+      ];
+    },
+    postMap: (input, params) => {
+      // FDA food-contact article set per SG ch.10 (FOO/CCW): OI + PG01 +
+      // PG02 'P' (FDP 52AOJ51) + PG06 country of production + PG10 name +
+      // PG19/20/21 role trios (MF/DEQ/FD1/DP) + PG26 quantities + PG30.
+      input.lines![0].pga = {
+        commercialDescription: 'ELECTRIC DRIP COFFEE MAKERS, HOUSEHOLD',
+        sets: [
+          {
+            kind: 'data',
+            agencyCode: 'FDA',
+            programCode: 'FOO',
+            processingCode: 'CCW',
+            intendedUseCode: '130.029',
+            product: { codes: [{ qualifier: 'FDP', number: '52AOJ51' }] },
+            sources: [{ typeCode: '39', countryCode: 'CN' }],
+            productName: 'COFFEE MAKER',
+            entities: [
+              {
+                // FDA actual manufacturer (CSMS 00-0824); the Appendix-PGA
+                // entity-id qualifier for a MID is pending confirmation.
+                roleCode: 'MF',
+                identificationCode: 'MID',
+                number: 'TWNICSAN435TAI',
+                name: 'NICSAN APPLIANCE WORKS',
+                address1: '435 INDUSTRIAL RD',
+                city: 'TAICHUNG',
+                country: 'TW',
+              },
+              {
+                roleCode: 'DEQ',
+                name: 'NICSAN APPLIANCE WORKS',
+                address1: '435 INDUSTRIAL RD',
+                city: 'TAICHUNG',
+                country: 'TW',
+              },
+              {
+                roleCode: 'FD1',
+                name: 'SIGMA TECHNOLOGY PARTNERS LLC',
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [
+                  { qualifier: 'FD1', name: 'IMRAN SIDDIQUE', emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM' },
+                ],
+              },
+              {
+                roleCode: 'DP',
+                name: 'SIGMA TECHNOLOGY PARTNERS LLC',
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+              },
+            ],
+            quantities: [
+              { qualifier: 1, quantityHundredths: 27734, uom: 'CS' },
+              { qualifier: 2, quantityHundredths: 20000, uom: 'PCS' },
+            ],
+            arrival: { status: 'A', dateMMDDCCYY: `0820${params.currentYear}`, timeHHMM: '0900' },
+          },
+        ],
+      };
+    },
+    notes: 'FDA FOO/CCW set per SG ch.10. Entity-id qualifier for the MID + FD1 address details: confirm with rep.',
+  }),
+
   aeScenario('084', 'NAFTA/USMCA Net Cost', {
     rates: { '1004100000': 'Free' },
     mutate: (p) => {
@@ -1503,6 +1587,37 @@ export const SCENARIOS: Scenario[] = [
       ];
     },
     notes: 'XC = Canadian USMCA origin convention; net-cost RVC indicator Y.',
+  }),
+
+  aeScenario('086', 'PGA Form Disclaimers', {
+    rates: { '8527910500': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'HK';
+      line.countryOfExport = 'HK';
+      line.descriptions = ['RADIO BROADCAST RECEIVERS'];
+      line.parties = [
+        { type: 'M', identifier: 'HKHKGRAD529HKG' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '8527910500', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000 },
+      ];
+    },
+    postMap: (input) => {
+      // Legacy FC0 (FCC) / FD0 (FDA) disclaim records are replaced by the
+      // PG01 position-80 disclaimer (MS p.13/19): one OI + PG01-only set per
+      // disclaimed agency. FDA accepts only codes A or F; when disclaiming,
+      // FDA program/processing positions carry 'FDA' (SG p.171).
+      input.lines![0].pga = {
+        commercialDescription: 'RADIO BROADCAST RECEIVERS, HOUSEHOLD',
+        sets: [
+          { kind: 'disclaimer', agencyCode: 'FCC', programCode: 'RAD', disclaimerCode: 'A' },
+          { kind: 'disclaimer', agencyCode: 'FDA', programCode: 'FDA', processingCode: 'FDA', disclaimerCode: 'A' },
+        ],
+      };
+    },
+    notes: 'FCC program code RAD is an Appendix-PGA placeholder \u2014 confirm with rep; FDA disclaim per SG p.171.',
   }),
 
   aeScenario('087', 'Multiple Bills of Lading', {

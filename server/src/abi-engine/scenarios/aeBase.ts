@@ -126,6 +126,11 @@ export interface AeScenarioOptions {
   rates: Record<string, string | HtsRate>;
   /** Scenario-specific payload edits, applied to the baseline. */
   mutate: (payload: AbiPayloadV2, params: CertParams) => void;
+  /**
+   * Builder-input edits applied AFTER the payload\u2192input mapping — for data
+   * the payload schema does not yet model (e.g. PGA message-set groupings).
+   */
+  postMap?: (input: import('../ae/builder.js').AeEntrySummaryInput, params: CertParams) => void;
   /** Builder action; scenarios 015/017 use D/R. */
   action?: 'A' | 'R' | 'D';
   notes?: string;
@@ -197,6 +202,7 @@ async function buildAeWire(
     });
     input = toAeEntrySummaryInput(priced, action);
   }
+  options.postMap?.(input, params);
 
   const issues = validateEntrySummary(input);
   if (issues.length > 0) {

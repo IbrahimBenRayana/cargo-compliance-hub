@@ -1,0 +1,36 @@
+ALA  MCLPASSWD           AE                                                     
+B  2704ZZZAE                                               SCENARIO 083         
+10AZZZ  00000839 2704083         0111 X           2090126                       
+1126-16475110026-164751100               082026081526       CA                  
+20MAEU3001081426    EVER GIVEN                                                  
+22     100CTNS                                                                  
+23MMAEU123456789012                                                             
+318B 123                                                                        
+40  001 CNCN080126               500           1200    N                        
+44ELECTRIC COFFEE MAKERS                                                        
+47MTWNICSAN435TAI                                                               
+47S26-164751100                                                                 
+508516710020    2730426     737953      5546800NO                               
+OI        ELECTRIC DRIP COFFEE MAKERS, HOUSEHOLD                                
+PG01001FDAFOOCCW                         130.029                                
+PG02PFDP 52AOJ51                                                                
+PG0639 CN                                                                       
+PG10                   COFFEE MAKER                                             
+PG19MF MIDTWNICSAN435TAI NICSAN APPLIANCE WORKS          435 INDUSTRIAL RD      
+PG20                                     TAICHUNG                TW             
+PG19DEQ                  NICSAN APPLIANCE WORKS          435 INDUSTRIAL RD      
+PG20                                     TAICHUNG                TW             
+PG19FD1                  SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG21FD1IMRAN SIDDIQUE                        ISIDDIQUE@SIGMATECHLLC.COM         
+PG19DP                   SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG261000000027734CS                                                             
+PG262000000020000PCS                                                            
+PG30A082020260900                                                               
+62499  255627                                                                   
+62501   92244                                                                   
+89499      65150501      92244                                                  
+90    2730426      157394           0           0           0           0       
+Y  2704ZZZAE                                                                    
+ZLA  MCL                                                                        
