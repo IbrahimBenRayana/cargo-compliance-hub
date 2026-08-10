@@ -12,7 +12,10 @@
  * land batch by batch; companion-app scenarios (006/021/022/050/062–066/
  * 080) reuse the apps/ builders.
  */
-import { type Scenario, aeScenario, aeRejectScenario } from './aeBase.js';
+import { type Scenario, aeScenario, aeRejectScenario, appScenario } from './aeBase.js';
+import { buildEntrySummaryQuery } from '../apps/esQuery/builder.js';
+import { buildAdCvdCaseQuery } from '../apps/adcvd/builder.js';
+import { buildQuotaQuery } from '../apps/quota/builder.js';
 
 export const SCENARIOS: Scenario[] = [
   aeScenario('001', 'Singapore Free Trade Agreement', {
@@ -884,6 +887,248 @@ export const SCENARIOS: Scenario[] = [
     },
     notes: 'PGA disclaimer FC0 rides the PG-record message set (workstream D \u2014 spec download pending); dry-run transmits the ruling core without the PG grouping.',
   }),
+
+  appScenario('050', 'Entry Summary Query', 'EQ', (params) => {
+    // Package: EES criteria, from 30 days prior to today \u2014 derived from the
+    // applicability date so dry-run goldens stay stable.
+    const cy = params.currentYear.slice(2);
+    return buildEntrySummaryQuery({
+      returnDetail: true,
+      criteria: {
+        type: 'EES',
+        fromDateTime: `0721${cy}120000AM`,
+        toDateTime: `0820${cy}115959PM`,
+        entrySummaries: true,
+      },
+    });
+  }),
+
+  aeScenario('051', 'African Growth and Opportunity Act (AGOA)', {
+    rates: {
+      '4113903000': { general: '3.3%', special: 'Free (A+,AU,BH,CL,CO,D,E,IL, JO,KR,MA, OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'ZA';
+      line.countryOfExport = 'ZA';
+      line.spiClaimCode = 'D'; // AGOA
+      line.descriptions = ['LEATHER OF GOATS, WITHOUT HAIR'];
+      line.parties = [
+        { type: 'M', identifier: 'ZAJNBLEA318JNB' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '4113903000', valueDollars: 10000, uomCode1: 'M2', quantity1Hundredths: 50000 },
+      ];
+    },
+  }),
+
+  aeScenario('054', 'Korea Free Trade Agreement', {
+    rates: {
+      '4409106500': { general: '4.9%', special: 'Free (A+,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'KR';
+      line.countryOfExport = 'KR';
+      line.spiClaimCode = 'KR';
+      line.descriptions = ['CONIFEROUS WOOD MOLDINGS'];
+      line.parties = [
+        { type: 'M', identifier: 'KRSELWOO471SEL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '4409106500', valueDollars: 10000, uomCode1: 'M3', quantity1Hundredths: 4000 },
+      ];
+    },
+  }),
+
+  aeScenario('055', 'Haiti Earned Import Allowance Program', {
+    rates: { '98206225': 'Free', '6109901007': '32%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '02';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'HT';
+      line.countryOfExport = 'HT';
+      line.descriptions = ['KNIT T-SHIRTS, MAN-MADE FIBERS'];
+      line.parties = [
+        { type: 'M', identifier: 'HTPAPTEX593PAP' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // 9820.62.25 Haiti EIAP provision + apparel line; in-program = Free
+      // (pinned). 52-Record type 13 = Haiti Earned Import Allowance.
+      line.tariffs = [
+        { htsNumber: '98206225', valueDollars: 0, uomCode1: 'X' },
+        { htsNumber: '6109901007', valueDollars: 309, uomCode1: 'DOZ', quantity1Hundredths: 500, dutyCents: 0 },
+      ];
+      line.license = { typeCode: '13', number: 'H623AD329' };
+      line.visaNumber = '123456';
+      line.textileCategoryCode = '638';
+    },
+    notes: 'EIAP certificate as 52-rec type 13; in-program preference pinned to Free.',
+  }),
+
+  aeScenario('056', 'Informal Entry \u2014 Commercial Sales Sample', {
+    rates: { '98110060': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '11';
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, shipmentUsageTypeCode: 'X' };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CA';
+      line.countryOfExport = 'CA';
+      line.relatedPartyIndicator = undefined;
+      line.descriptions = ['SAMPLES FOR SOLICITING ORDERS'];
+      line.parties = [];
+      // 9811.00.60: sample of negligible value \u2014 $1.
+      line.tariffs = [
+        { htsNumber: '98110060', valueDollars: 1, uomCode1: 'NO', quantity1Hundredths: 100 },
+      ];
+    },
+  }),
+
+  aeScenario('057', 'Consolidated Release Details', {
+    rates: { '8514908000': 'Free' },
+    mutate: (p, params) => {
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, consolidatedSummary: true };
+      p.entrySummary.releases = [
+        { filerCode: params.filerCode, entryNumber: '00100501' },
+        { filerCode: params.filerCode, entryNumber: '00100502' },
+        { filerCode: params.filerCode, entryNumber: '00100503' },
+      ];
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CA';
+      line.countryOfExport = 'CA';
+      line.descriptions = ['INDUSTRIAL FURNACE PARTS'];
+      line.parties = [
+        { type: 'M', identifier: 'CATORFUR815TOR' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '8514908000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 1000000 },
+      ];
+    },
+  }),
+
+  aeScenario('058', 'Reporting the Commercial Description', {
+    rates: { '3918101020': '5.3%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CA';
+      line.countryOfExport = 'CA';
+      line.descriptions = ['VINYL FLOOR TILE - MARBLE SIMULATED, 12X12'];
+      line.parties = [
+        { type: 'M', identifier: 'CATORVIN926TOR' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '3918101020', valueDollars: 10000, uomCode1: 'M2', quantity1Hundredths: 100000 },
+      ];
+    },
+  }),
+
+  aeScenario('059', 'Prototypes', {
+    rates: { '98178501': 'Free', '8703330145': '2.5%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'JP';
+      line.countryOfExport = 'JP';
+      line.descriptions = ['AUTOMOBILE PROTOTYPE'];
+      line.parties = [
+        { type: 'M', identifier: 'JPTYOAUT137TYO' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // 9817.85.01 prototype provision governs \u2014 the ch.87 line rides at
+      // the provision's Free rate (pinned).
+      line.tariffs = [
+        { htsNumber: '98178501', valueDollars: 0, uomCode1: 'X' },
+        { htsNumber: '8703330145', valueDollars: 500000, uomCode1: 'NO', quantity1Hundredths: 100, dutyCents: 0 },
+      ];
+    },
+    notes: 'Prototype provision 9817.85.01: base line duty pinned Free.',
+  }),
+
+  aeScenario('060', 'Flag for Future Reconciliation', {
+    rates: { '8414513000': '4.7%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GB';
+      line.countryOfExport = 'GB';
+      line.descriptions = ['CEILING FANS'];
+      line.parties = [
+        { type: 'M', identifier: 'GBLONFAN204LON' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '8414513000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000 },
+      ];
+      // Value reconciliation flag: conventional recon issue code 001
+      // (note aa) \u2014 requires the continuous bond the baseline carries.
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, reconciliationIssueCode: '001' };
+    },
+    notes: 'Value recon flagged via reconciliation issue code 001 \u2014 confirm code with client rep.',
+  }),
+
+  aeScenario('061', 'Cargo Release Certification', {
+    rates: { '9106908500': '15\u00a2 each + 2.3% + 0.8\u00a2/jewel' },
+    mutate: (p) => {
+      p.entrySummary.cargoReleaseCertification = true;
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'KR';
+      line.countryOfExport = 'KR';
+      line.descriptions = ['TIME SWITCHES'];
+      line.parties = [
+        { type: 'M', identifier: 'KRSELTIM682SEL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // Compound watch-style rate pinned (no jewels): 15\u00a2\u00d7500 = $75.00 +
+      // 2.3%\u00d7$10,000 = $230.00 \u2192 $305.00.
+      line.tariffs = [
+        { htsNumber: '9106908500', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000, dutyCents: 30500 },
+      ];
+    },
+    notes: 'Certify-for-release on the Add; AMS bill assumed on file (SE16/SE20 only for non-AMS, ESF-45).',
+  }),
+
+  appScenario('063', 'AD/CVD Case Information Query \u2014 HTS Number', 'AD', () =>
+    buildAdCvdCaseQuery({ type: 'criteria', companyCaseStatus: 'A', htsNumber: '7210703000' })
+  ),
+
+  appScenario('064', 'AD/CVD Case Information Query \u2014 Date Since Last Update', 'AD', (params) => {
+    // Two days prior to transmission, derived from the applicability date.
+    const d = params.applicabilityDate;
+    const dayMinus2 = String(Number(d.slice(6, 8)) - 2).padStart(2, '0');
+    return buildAdCvdCaseQuery({
+      type: 'criteria',
+      companyCaseStatus: 'A',
+      dateSinceLastUpdate: `${d.slice(4, 6)}${dayMinus2}${d.slice(2, 4)}`,
+    });
+  }),
+
+  aeScenario('065', 'Deferred Tax', {
+    rates: { '2208202000': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, deferredTaxPaymentCode: '2' };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'FR';
+      line.countryOfExport = 'FR';
+      line.descriptions = ['GRAPE BRANDY, PIKE-VALUED'];
+      line.parties = [
+        { type: 'M', identifier: 'FRCOGBRA759COG' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // IRC distilled-spirits tax pinned: $13.50/proof gallon \u00d7 324 PFL =
+      // $4,374.00, accounting class 016, EFT deferral (code 2).
+      line.tariffs = [
+        { htsNumber: '2208202000', valueDollars: 5022, uomCode1: 'PFL', quantity1Hundredths: 32400 },
+      ];
+      line.irTax = { classCode: '016', amountCents: 437400 };
+    },
+    notes: 'IR tax on a DAILY statement (monthly would be barred by note y); EFT deferral code 2.',
+  }),
+
+  appScenario('066', 'Quota Query', 'QA', () =>
+    buildQuotaQuery([{ typeCode: 'R', queryId: '0202305085', countryOfOrigin: 'NZ' }])
+  ),
 ];
 
 export const SCENARIO_INDEX: Map<string, Scenario> = new Map(SCENARIOS.map((s) => [s.id, s]));

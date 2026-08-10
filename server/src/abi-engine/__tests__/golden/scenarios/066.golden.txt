@@ -1,0 +1,5 @@
+ALA  MCLPASSWD           QA                                                     
+B  2704ZZZQA                                               SCENARIO 066         
+Q1R0202305085          NZ                                                       
+Y  2704ZZZQA                                                                    
+ZLA  MCL                                                                        

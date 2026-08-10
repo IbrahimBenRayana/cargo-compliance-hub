@@ -1,0 +1,6 @@
+ALA  MCLPASSWD           EQ                                                     
+B  2704ZZZEQ                                               SCENARIO 050         
+J0Y                                                                             
+J2 EES 072126120000AM082026115959PM Y                                           
+Y  2704ZZZEQ                                                                    
+ZLA  MCL                                                                        

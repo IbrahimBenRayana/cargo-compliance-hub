@@ -36,6 +36,40 @@ export interface Scenario {
   notes?: string;
 }
 
+/**
+ * Companion-application scenario (CW/CJ/AD/QA/EQ …): the callback builds
+ * the transaction lines with the app's own builder; the helper wraps them
+ * in the batch envelope with the scenario tag.
+ */
+export function appScenario(
+  id: string,
+  title: string,
+  appId: string,
+  buildTransaction: (params: CertParams) => string[],
+  notes?: string
+): Scenario {
+  return {
+    id,
+    title,
+    application: appId,
+    kind: 'transmit',
+    notes,
+    run: async (params: CertParams): Promise<string[]> =>
+      buildBatch({
+        sender: params.sender,
+        appId,
+        blocks: [
+          {
+            port: params.districtPortOfEntry,
+            filerCode: params.filerCode,
+            userData: scenarioTag(id),
+            transactionLines: buildTransaction(params),
+          },
+        ],
+      }),
+  };
+}
+
 /** Baseline type-01 consumption entry, parameterized per scenario. */
 export function baseAePayload(params: CertParams, scenarioId: string): AbiPayloadV2 {
   return {
