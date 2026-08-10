@@ -61,6 +61,103 @@ export * as aeHeaderRecordDefs from './ae/headerRecordDefs.js';
 export * as aeLineRecordDefs from './ae/lineRecordDefs.js';
 export * as aeResponseDefs from './ae/responseDefs.js';
 
+// ── Census Warning Override (CW/CO) + Query (CJ/CL) ────────
+export { buildCensusOverride } from './apps/census/cwBuilder.js';
+export type { CwCensusOverrideInput, CwEntryOverrides, CwLineOverrides, CwOverride } from './apps/census/cwBuilder.js';
+export { parseCwResponse, parseCwResponseBatch } from './apps/census/cwResponseParser.js';
+export type { CwOverrideDisposition, CwResponseBatch } from './apps/census/cwResponseParser.js';
+export { buildCensusWarningQuery } from './apps/census/cjBuilder.js';
+export type { CjCensusWarningQueryInput, CjQuery } from './apps/census/cjBuilder.js';
+export { parseCjResponse, parseCjResponseBatch } from './apps/census/cjResponseParser.js';
+export type { CjWarningRow, CjResponseBatch } from './apps/census/cjResponseParser.js';
+export * as cwRecordDefs from './apps/census/cwRecordDefs.js';
+export * as cjRecordDefs from './apps/census/cjRecordDefs.js';
+
+// ── Companion apps: TIB extend/close (TE/TX) + expiration notice (TS) ──
+export { buildTibExtension } from './apps/tib/builder.js';
+export type { TibExtendCloseInput, TibAction } from './apps/tib/builder.js';
+export {
+  parseTibResponse,
+  parseTibResponseBatch,
+  parseTibExpirationNotices,
+  parseTibExpirationNoticeBatch,
+  TIB_CONDITION_CODES,
+} from './apps/tib/responseParser.js';
+export type {
+  TibResponse,
+  TibCondition,
+  TibDisposition,
+  TibResponseBatch,
+  TibExpirationNotice,
+  TibExpirationNoticeBatch,
+} from './apps/tib/responseParser.js';
+export * as tibRecordDefs from './apps/tib/recordDefs.js';
+
+// ── Companion query applications (workstream E) ────────────
+export { buildAdCvdCaseQuery } from './apps/adcvd/builder.js';
+export type {
+  AdCvdCaseQueryInput,
+  AdCvdCaseNumberQueryInput,
+  AdCvdCriteriaQueryInput,
+} from './apps/adcvd/builder.js';
+export { parseAdCvdResponse, parseAdCvdResponseBatch } from './apps/adcvd/responseParser.js';
+export type {
+  AdCvdQueryResponse,
+  AdCvdCaseResult,
+  AdCvdNamedParty,
+  AdCvdContact,
+  AdCvdDepositRate,
+  AdCvdCaseEvent,
+  AdCvdBondCashDetail,
+  AdCvdTariffDetail,
+  AdCvdSuspensionDetail,
+  AdCvdFailedQuery,
+  AdCvdResponseBatch,
+} from './apps/adcvd/responseParser.js';
+export * as adCvdRecordDefs from './apps/adcvd/recordDefs.js';
+export { buildQuotaQuery } from './apps/quota/builder.js';
+export type { QuotaQueryRequest } from './apps/quota/builder.js';
+export { parseQuotaResponse, parseQuotaResponseBatch } from './apps/quota/responseParser.js';
+export type {
+  QuotaQueryResponse,
+  QuotaStatusResult,
+  QuotaQueryError,
+  QuotaResponseBatch,
+} from './apps/quota/responseParser.js';
+export * as quotaRecordDefs from './apps/quota/recordDefs.js';
+
+// ── Entry Summary Query (EQ/ER) ────────────────────────────
+export { buildEntrySummaryQuery } from './apps/esQuery/builder.js';
+export type { EsQueryInput, EsQueryEntry, EsQueryCriteria } from './apps/esQuery/builder.js';
+export { parseEsQueryResponse, parseEsQueryResponseBatch } from './apps/esQuery/responseParser.js';
+export type {
+  EsQueryResponse,
+  EsQueryResponseBatch,
+  EsQuerySummary,
+  EsQueryStatus,
+  EsQueryLiquidation,
+  EsQueryEstimates,
+  EsQueryBond,
+  EsQueryProtest,
+  EsQueryBill,
+  EsQueryCollection,
+  EsQueryClassAmount,
+  EsQueryCondition,
+} from './apps/esQuery/responseParser.js';
+export * as esQueryRecordDefs from './apps/esQuery/recordDefs.js';
+
+// ── Entry Summary Status Notification (UC, inbound only) ───
+export { parseUcNotification, parseUcNotificationBatch } from './apps/uc/parser.js';
+export type {
+  UcNotification,
+  UcNotificationBatch,
+  UcCbpAction,
+  UcQuotaLine,
+  UcPgaGroup,
+  UcPgaReview,
+} from './apps/uc/parser.js';
+export * as ucRecordDefs from './apps/uc/recordDefs.js';
+
 // ── Payload schema v2 (decision D2) ────────────────────────
 export {
   zAbiPayloadV2,
