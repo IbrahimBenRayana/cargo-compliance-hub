@@ -1,0 +1,20 @@
+ALA  MCLPASSWD           AE                                                     
+B  2704ZZZAE                                               SCENARIO 013         
+10AZZZ  00000136 2704013         0111 X           2090126                       
+1126-16475110026-164751100               082026081526       CA                  
+20MAEU3001081426    EVER GIVEN                                                  
+22     100CTNS                                                                  
+23MMAEU123456789012                                                             
+318B 123                                                                        
+40  001 AUAU080126               500           1200    N                        
+44UNWORKED INDUSTRIAL DIAMONDS                                                  
+47MAUPERDIA987PER                                                               
+47S26-164751100                                                                 
+507102211020          0      10000        25000CAR                              
+5206AU0863015                                                                   
+62499    3464                                                                   
+62501    1250                                                                   
+89499       3464501       1250                                                  
+90          0        4714           0           0           0           0       
+Y  2704ZZZAE                                                                    
+ZLA  MCL                                                                        

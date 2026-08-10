@@ -81,7 +81,9 @@ export const INPUT_20: RecordDef = {
   name: 'CargoReferenceInformation',
   fields: [
     { name: 'controlIdentifier', start: 1, end: 2, class: 'AN', designation: 'M', constant: '20' },
-    { name: 'carrierCode', start: 3, end: 6, class: 'AN', designation: 'C' }, // SCAC or IATA
+    // Printed 4AN, but the generic air-carrier convention transmits
+    // asterisk codes ('*F' — cert scenario 014), so class X in practice.
+    { name: 'carrierCode', start: 3, end: 6, class: 'X', designation: 'C' }, // SCAC or IATA or *-code
     { name: 'districtPortOfUnlading', start: 7, end: 10, class: 'AN', designation: 'C' },
     { name: 'estimatedDateOfArrival', start: 11, end: 16, class: 'D', designation: 'C' }, // 6D or 6S
     { name: 'locationOfGoodsCode', start: 17, end: 20, class: 'AN', designation: 'C' }, // FIRMS code

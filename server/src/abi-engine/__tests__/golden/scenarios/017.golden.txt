@@ -1,19 +1,19 @@
 ALA  MCLPASSWD           AE                                                     
 B  2704ZZZAE                                               SCENARIO 017         
-10RZZZ  00000177 2704017         0111 X           2090126                       
+10RZZZ  00000177 2704020REPLCE   0111 X           2090126                       
 1126-16475110026-164751100               082026081526       CA                  
 20MAEU3001081426    EVER GIVEN                                                  
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-40  001 CNCN080126               500           1200    N                        
-44LITHIUM ION BATTERY PACKS                                                     
-47MCNSHEBAT123SHA                                                               
+40  001 GBGB080126               500           1200    N                        
+44NAVIGATIONAL INSTRUMENTS                                                      
+47MGBLONNAV321LON                                                               
 47S26-164751100                                                                 
-508507600020      34100      10000        50000NO                               
-62499    3464                                                                   
-62501    1250                                                                   
-89499       3464501       1250                                                  
-90      34100        4714           0           0           0           0       
+509014805000          0      53000          100NO                               
+62499   18359                                                                   
+62501    6625                                                                   
+89499      18359501       6625                                                  
+90          0       24984           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        

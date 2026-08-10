@@ -140,10 +140,19 @@ export async function enrichWithDuty(
           (sum, t, i) => (i === tIndex ? sum : sum + t.valueDollars),
           0
         );
+        // A ch.99 additional-duty tariff reported without a value of its own
+        // (the pairing convention: value rides on the ch.1–97 line) computes
+        // its ad valorem on the base value — this covers both the overlay
+        // wording AND plain-percentage ch.99 rates (e.g. 9903.41.10 '40%',
+        // cert scenario 024).
+        const effectiveValueDollars =
+          tariff.valueDollars === 0 && tariff.htsNumber.startsWith('99') && othersValueDollars > 0
+            ? othersValueDollars
+            : tariff.valueDollars;
         tariff.dutyCents = computeDutyCents(
           parseRateExpression(expression),
           {
-            valueDollars: tariff.valueDollars,
+            valueDollars: effectiveValueDollars,
             quantity1Hundredths: tariff.quantity1Hundredths,
             applicableSubheadingValueDollars:
               othersValueDollars > 0 ? othersValueDollars : tariff.valueDollars,

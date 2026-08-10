@@ -1,0 +1,33 @@
+ALA  MCLPASSWD           AE                                                     
+B  2704ZZZAE                                               SCENARIO 019         
+10AZZZ  00000193 2704019         0111 X           2090126                       
+1126-16475110026-164751100               082026081526       CA                  
+20MAEU3001081426    EVER GIVEN                                                  
+22     100CTNS                                                                  
+23MMAEU123456789012                                                             
+318B 123                                                                        
+40  001XCHCH080126                 0              0    N                        
+44SPAGHETTI MEAL SET - PASTA                                                    
+47MCHZURPAS135ZUR                                                               
+47S26-164751100                                                                 
+501902194000      15360       2400       120000KG                               
+62499     831                                                                   
+62501     300                                                                   
+40  002VFRCH080126                 0              0    N                        
+44SPAGHETTI MEAL SET - DRIED MUSHROOMS                                          
+47MFRPARMUS791PAR                                                               
+47S26-164751100                                                                 
+500712311000       8320       1300        20000KG                               
+62499     450                                                                   
+62501     163                                                                   
+40  003VITCH080126                 0              0    N                        
+44SPAGHETTI MEAL SET - TOMATO PASTE                                             
+47MITMILTOM468MIL                                                               
+47S26-164751100                                                                 
+502002908020       8320       1300        30000KG                               
+62499     450                                                                   
+62501     163                                                                   
+89499       3358501        626                                                  
+90      32000        3984           0           0           0           0       
+Y  2704ZZZAE                                                                    
+ZLA  MCL                                                                        

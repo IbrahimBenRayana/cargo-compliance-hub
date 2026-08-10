@@ -190,9 +190,279 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('017', 'Replacement of an Entry Summary', {
-    rates: { '8507600020': '3.41%' },
+    rates: { '9014805000': 'Free' },
     action: 'R',
-    mutate: () => {},
+    mutate: (p) => {
+      // Step-2 replacement data from the package.
+      p.entrySummary.brokerReferenceNumber = '020REPLCE';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GB';
+      line.countryOfExport = 'GB';
+      line.descriptions = ['NAVIGATIONAL INSTRUMENTS'];
+      line.parties = [
+        { type: 'M', identifier: 'GBLONNAV321LON' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '9014805000', valueDollars: 53000, uomCode1: 'NO', quantity1Hundredths: 100 },
+      ];
+    },
+    notes: 'Step 1 (original acceptance) is the live-cert half; this fixture is the step-2 Replace transmission.',
+  }),
+
+  aeScenario('011', 'Estimated Date of Arrival Validation', {
+    rates: { '8507600020': '3.41%' },
+    mutate: (p, params) => {
+      const cy = params.currentYear;
+      p.entrySummary.dates = {
+        estimatedEntry: `${cy}0820`,
+        importation: `${cy}0125`,
+        estimatedArrival: `${cy}0210`,
+        inBond: `${cy}0201`,
+      };
+      p.entrySummary.lines[0].dateOfExportation = `${cy}0110`;
+      p.entrySummary.manifests = [
+        {
+          manifestedQuantity: 100,
+          uomCode: 'CTNS',
+          bills: [
+            { type: 'I', identifier: '115581395' },
+            { type: 'I', identifier: '012345684978' },
+            { type: 'M', issuerCode: 'MAEU', identifier: '123456789012' },
+          ],
+        },
+      ];
+    },
+  }),
+
+  aeScenario('012', 'Product Exclusion Number', {
+    rates: { '7208900000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'MX';
+      line.countryOfExport = 'MX';
+      line.descriptions = ['FLAT-ROLLED STEEL PRODUCTS'];
+      line.parties = [
+        { type: 'M', identifier: 'MXMTYSTL654MTY' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '7208900000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
+      ];
+      // Steel product exclusion rides the 54-Record Importer Additional
+      // Declaration, type 02 (chapter change log #76 documents STXnnnnnn /
+      // STL… identifier formats).
+      line.declarations = [{ typeCode: '02', information: 'STL999995' }];
+    },
+  }),
+
+  aeScenario('013', 'Diamond Certificate', {
+    rates: { '7102211020': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'AU';
+      line.countryOfExport = 'AU';
+      line.descriptions = ['UNWORKED INDUSTRIAL DIAMONDS'];
+      line.parties = [
+        { type: 'M', identifier: 'AUPERDIA987PER' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '7102211020', valueDollars: 10000, uomCode1: 'CAR', quantity1Hundredths: 25000 },
+      ];
+      // 52-Record type 06 = Diamond Certificate (Kimberley process, ESF-167;
+      // OFAC-format number ≤9 chars — Admin Message 04-002229).
+      line.license = { typeCode: '06', number: 'AU0863015' };
+    },
+  }),
+
+  aeScenario('014', 'Airline Carrier Code', {
+    rates: { '8507600020': '3.41%' },
+    mutate: (p) => {
+      p.entrySummary.motCode = '40';
+      // Package value: the '*F' generic air-carrier convention.
+      p.entrySummary.cargo = { carrierCode: '*F', conveyanceName: 'FLIGHT 100' };
+      // Air rules (ESF-153): master bill identifier mandatory, issuer code
+      // never allowed for air.
+      p.entrySummary.manifests = [
+        { manifestedQuantity: 100, uomCode: 'CTNS', bills: [{ type: 'M', identifier: '12345678' }] },
+      ];
+    },
+  }),
+
+  aeScenario('018', 'Chile Free Trade Agreement', {
+    rates: {
+      '0811908040': { general: '14.5%', special: 'Free (A+,AU,BH,CL,CO,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CL';
+      line.countryOfExport = 'CL';
+      line.spiClaimCode = 'CL';
+      line.descriptions = ['FROZEN BERRIES'];
+      line.parties = [
+        { type: 'M', identifier: 'CLSCLBER246SCL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '0811908040', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 400000 },
+      ];
+    },
+  }),
+
+  aeScenario('019', 'Sets under GRI 3(b)/(c) — X & V Article Set Indicators', {
+    rates: { '1902194000': '6.4%', '0712311000': '1.3¢/kg + 1.8%', '2002908020': '11.6%' },
+    mutate: (p) => {
+      const ior = p.entrySummary.importerOfRecord.number;
+      // GRI 3(b) set: every component is dutiable at the set's essential-
+      // character rate (spaghetti, 6.4%) — the engine's article-set
+      // aggregation is deferred, so the set-rate duties are pinned:
+      // X 2400×6.4%=153.60, V 1300×6.4%=83.20 each.
+      p.entrySummary.lines = [
+        {
+          articleSetIndicator: 'X',
+          countryOfOrigin: 'CH',
+          countryOfExport: 'CH',
+          dateOfExportation: p.entrySummary.lines[0].dateOfExportation,
+          relatedPartyIndicator: 'N',
+          descriptions: ['SPAGHETTI MEAL SET - PASTA'],
+          parties: [
+            { type: 'M', identifier: 'CHZURPAS135ZUR' },
+            { type: 'S', identifier: ior },
+          ],
+          tariffs: [
+            { htsNumber: '1902194000', valueDollars: 2400, uomCode1: 'KG', quantity1Hundredths: 120000, dutyCents: 15360 },
+          ],
+        },
+        {
+          articleSetIndicator: 'V',
+          countryOfOrigin: 'FR',
+          countryOfExport: 'CH',
+          dateOfExportation: p.entrySummary.lines[0].dateOfExportation,
+          relatedPartyIndicator: 'N',
+          descriptions: ['SPAGHETTI MEAL SET - DRIED MUSHROOMS'],
+          parties: [
+            { type: 'M', identifier: 'FRPARMUS791PAR' },
+            { type: 'S', identifier: ior },
+          ],
+          tariffs: [
+            { htsNumber: '0712311000', valueDollars: 1300, uomCode1: 'KG', quantity1Hundredths: 20000, dutyCents: 8320 },
+          ],
+        },
+        {
+          articleSetIndicator: 'V',
+          countryOfOrigin: 'IT',
+          countryOfExport: 'CH',
+          dateOfExportation: p.entrySummary.lines[0].dateOfExportation,
+          relatedPartyIndicator: 'N',
+          descriptions: ['SPAGHETTI MEAL SET - TOMATO PASTE'],
+          parties: [
+            { type: 'M', identifier: 'ITMILTOM468MIL' },
+            { type: 'S', identifier: ior },
+          ],
+          tariffs: [
+            { htsNumber: '2002908020', valueDollars: 1300, uomCode1: 'KG', quantity1Hundredths: 30000, dutyCents: 8320 },
+          ],
+        },
+      ];
+    },
+    notes: 'Set-rate duties pinned (engine article-set aggregation deferred): all components at the 6.4% essential-character rate.',
+  }),
+
+  aeScenario('020', 'Census Warning', {
+    rates: { '4703110000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CL';
+      line.countryOfExport = 'CL';
+      line.chargesDollars = 17810;
+      line.grossWeightKg = 245939;
+      line.descriptions = ['CHEMICAL WOODPULP, UNBLEACHED'];
+      line.parties = [
+        { type: 'M', identifier: 'CLSCLPUL802SCL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // The absurd quantity/UOM pairing is the census-warning trigger; the
+      // transmission itself is valid and must go out (ACE responds with the
+      // warning that scenarios 021/022 then query and override).
+      line.tariffs = [
+        { htsNumber: '4703110000', valueDollars: 2054587, uomCode1: 'CTN', quantity1Hundredths: 2455580000 },
+      ];
+    },
+  }),
+
+  aeScenario('023', 'Steel License', {
+    rates: { '7222110006': 'Free' },
+    mutate: (p, params) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'KR';
+      line.countryOfExport = 'KR';
+      line.descriptions = ['STAINLESS STEEL BARS'];
+      line.parties = [
+        { type: 'M', identifier: 'KRSELSTE579SEL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '7222110006', valueDollars: 3876, uomCode1: 'KG', quantity1Hundredths: 150000 },
+      ];
+      // 52-Record type 01 = Steel Import License (ESF-166). Package: replace
+      // MMDDYY with today's date — derived from the applicability date so
+      // dry-run goldens stay stable.
+      const d = params.applicabilityDate;
+      line.license = { typeCode: '01', number: `S23${d.slice(4, 8)}${d.slice(2, 4)}` };
+    },
+  }),
+
+  aeScenario('024', 'Additional Duty Reporting', {
+    rates: { '99034110': '40%', '6403599045': '10%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'JP';
+      line.countryOfExport = 'JP';
+      line.descriptions = ['LEATHER FOOTWEAR'];
+      line.parties = [
+        { type: 'M', identifier: 'JPTYOSHO913TYO' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // 9903.41.10 additional duty rides first; the value/quantity report on
+      // the ch.64 base line and the 40% computes on that base value.
+      line.tariffs = [
+        { htsNumber: '99034110', valueDollars: 0, uomCode1: 'X' },
+        { htsNumber: '6403599045', valueDollars: 12290, uomCode1: 'PRS', quantity1Hundredths: 260000 },
+      ];
+    },
+  }),
+
+  aeScenario('025', 'Full Bill Data for Rail AMS Shipment', {
+    rates: { '8507600020': '3.41%' },
+    mutate: (p) => {
+      p.entrySummary.motCode = '21';
+      p.entrySummary.cargo = { carrierCode: 'CNRU', districtPortOfUnlading: '3802' };
+      p.entrySummary.manifests = [
+        { manifestedQuantity: 100, uomCode: 'CTNS', bills: [{ type: 'M', issuerCode: 'CNRU', identifier: '32560834' }] },
+      ];
+    },
+  }),
+
+  aeScenario('026', 'Freely Associated States', {
+    rates: { '4602198000': { general: '2.3%', special: 'Free (A,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' } },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'FM';
+      line.countryOfExport = 'FM';
+      // SPI Z (Freely Associated States) is statutory (general note 10) and
+      // not printed in the USITC Special column — preference pinned to Free.
+      line.spiClaimCode = 'Z';
+      line.descriptions = ['BASKETWORK OF VEGETABLE MATERIALS'];
+      line.parties = [
+        { type: 'M', identifier: 'FMPNIBAS753PNI' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '4602198000', valueDollars: 54575, uomCode1: 'NO', quantity1Hundredths: 500000, dutyCents: 0 },
+      ];
+    },
+    notes: 'SPI Z is statutory (HTS general note 10), not in the Special column — duty pinned to Free.',
   }),
 ];
 
