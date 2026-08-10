@@ -233,7 +233,10 @@ export async function enrichWithDuty(
   }
 
   // 7. AD/CVD subtotals (88-record) + grand totals (90-record, note x).
-  const hasAdCvd = adBondedCents + adCashCents + cvBondedCents + cvCashCents > 0;
+  // Presence of cases (not their amounts) drives the 88-record: an explicit
+  // AD/CVD summary with zero-deposit cases still reports the subtotals
+  // (mandatory for types 03/07/34/38, ESF-134 — cert scenario 043).
+  const hasAdCvd = es.lines.some((line) => (line.adCvdCases?.length ?? 0) > 0);
   if (hasAdCvd) {
     es.adCvdTotals = { bondedAdCents: adBondedCents, cashAdCents: adCashCents, bondedCvCents: cvBondedCents, cashCvCents: cvCashCents };
   } else {

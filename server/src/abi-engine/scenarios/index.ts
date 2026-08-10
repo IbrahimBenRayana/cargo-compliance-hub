@@ -701,6 +701,189 @@ export const SCENARIOS: Scenario[] = [
       ];
     },
   }),
+
+  aeScenario('040', 'U.S. Insular Possession', {
+    rates: { '7101223000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GU';
+      line.countryOfExport = 'GU';
+      // SPI Y (insular possessions, general note 3(a)(iv)) — statutory.
+      line.spiClaimCode = 'Y';
+      line.descriptions = ['CULTURED PEARLS, WORKED'];
+      line.parties = [
+        { type: 'M', identifier: 'GUHAGPEA842HAG' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '7101223000', valueDollars: 10000, uomCode1: 'GM', quantity1Hundredths: 100000 },
+      ];
+    },
+  }),
+
+  aeScenario('041', 'Mail MOT', {
+    rates: { '9106100000': '36\u00a2 each + 5.6% + 2\u00a2/jewel' },
+    mutate: (p) => {
+      p.entrySummary.motCode = '50';
+      // Mail: no carrier/manifest data.
+      p.entrySummary.cargo = undefined;
+      p.entrySummary.manifests = undefined;
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['TIME REGISTERS'];
+      // Compound watch-style rate pinned by hand (the '\u00a2 each'/'\u00a2 per
+      // jewel' forms are outside the parser; no jewels on time registers):
+      // 36\u00a2\u00d7120 = $43.20 + 5.6%\u00d7$1,189 = $66.584 \u2192 $109.78 total.
+      line.tariffs = [
+        { htsNumber: '9106100000', valueDollars: 1189, uomCode1: 'NO', quantity1Hundredths: 12000, dutyCents: 10978 },
+      ];
+    },
+    notes: 'MOT 50 + duty due triggers the 496 dutiable-mail fee automatically (engine). Rate pinned: 36\u00a2 each + 5.6% (no jewels).',
+  }),
+
+  aeScenario('042', 'Country of Export - US', {
+    rates: { '6704190000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'KR';
+      line.countryOfExport = 'US'; // U.S. goods returned via export country US
+      line.descriptions = ['WIGS OF SYNTHETIC TEXTILE MATERIALS'];
+      line.parties = [
+        { type: 'M', identifier: 'KRSELWIG217SEL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '6704190000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100000 },
+      ];
+    },
+  }),
+
+  aeScenario('043', 'ADD/CVD & Quota', {
+    rates: {
+      // 9903.85.37 (Sec 232 aluminum): overlay wording pinned — confirm the
+      // exact provision text with the client rep at cert time.
+      '99038537': 'The duty provided in the applicable subheading + 25%',
+      '7606123096': '3%',
+    },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '07';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'ES';
+      line.countryOfExport = 'ES';
+      line.descriptions = ['ALUMINUM ALLOY SHEET'];
+      line.parties = [
+        { type: 'M', identifier: 'ESMADALU365MAD' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99038537', valueDollars: 0, uomCode1: 'X' },
+        { htsNumber: '7606123096', valueDollars: 68707, uomCode1: 'KG', quantity1Hundredths: 2192600 },
+      ];
+      // AD deposit rate comes from the AD case query at cert time (scenario
+      // 063); dry-run pins a zero deposit.
+      line.adCvdCases = [
+        { caseNumber: 'A470820000', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+      ];
+    },
+    notes: 'AD deposit rate arrives from the AD query (scenario 063) at cert; pinned 0 for the dry run.',
+  }),
+
+  aeScenario('044', 'Special Program Claim Code W', {
+    rates: { '0210992000': { general: '2.3%', special: 'Free (A,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' } },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'VC';
+      line.countryOfExport = 'VC';
+      // SPI W (CBERA beneficiary meat provision) is statutory — not printed
+      // in the Special column; preference pinned to Free.
+      line.spiClaimCode = 'W';
+      line.descriptions = ['DRIED MEAT PRODUCTS'];
+      line.parties = [
+        { type: 'M', identifier: 'VCKINMEA754KIN' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '0210992000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 1000500, dutyCents: 0 },
+      ];
+    },
+    notes: 'SPI W statutory, duty pinned to Free \u2014 confirm program letter treatment with client rep.',
+  }),
+
+  aeScenario('045', 'Currency Conversion', {
+    rates: { '3103190000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'IT';
+      line.countryOfExport = 'IT';
+      line.descriptions = ['SUPERPHOSPHATE FERTILIZERS'];
+      line.parties = [
+        { type: 'M', identifier: 'ITMILFER426MIL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // \u20ac5,000 converted at the CBP-certified quarterly rate; dry-run pins
+      // 1.08 USD/EUR \u2192 $5,400 (cert run uses the actual quarterly rate).
+      line.tariffs = [
+        { htsNumber: '3103190000', valueDollars: 5400, uomCode1: 'T', quantity1Hundredths: 10000 },
+      ];
+    },
+    notes: 'Foreign-currency value: \u20ac5,000 \u00d7 CBP quarterly rate. Dry-run pinned at 1.08; substitute the certified rate at cert time.',
+  }),
+
+  aeScenario('046', 'Multiple Countries', {
+    rates: { '3103110000': 'Free' },
+    mutate: (p) => {
+      const ior = p.entrySummary.importerOfRecord.number;
+      const base = p.entrySummary.lines[0];
+      p.entrySummary.lines = [
+        {
+          ...base,
+          countryOfOrigin: 'TW',
+          countryOfExport: 'TW',
+          descriptions: ['SUPERPHOSPHATES 35%+ P2O5'],
+          parties: [{ type: 'M', identifier: 'TWTPEFER538TPE' }, { type: 'S', identifier: ior }],
+          tariffs: [{ htsNumber: '3103110000', valueDollars: 10000, uomCode1: 'T', quantity1Hundredths: 1000 }],
+        },
+        {
+          ...base,
+          countryOfOrigin: 'KR',
+          countryOfExport: 'KR',
+          descriptions: ['SUPERPHOSPHATES 35%+ P2O5'],
+          parties: [{ type: 'M', identifier: 'KRSELFER649SEL' }, { type: 'S', identifier: ior }],
+          tariffs: [{ htsNumber: '3103110000', valueDollars: 10000, uomCode1: 'T', quantity1Hundredths: 1000 }],
+        },
+      ];
+    },
+  }),
+
+  aeScenario('047', 'Warehouse Entry', {
+    rates: { '6601990000': '8.2%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '21';
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['UMBRELLAS'];
+      line.tariffs = [
+        { htsNumber: '6601990000', valueDollars: 50000, uomCode1: 'DOZ', quantity1Hundredths: 120000 },
+      ];
+    },
+  }),
+
+  aeScenario('049', 'Ruling Details', {
+    rates: { '8536490055': '2.7%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'JP';
+      line.countryOfExport = 'JP';
+      line.descriptions = ['ELECTROMECHANICAL RELAYS'];
+      line.parties = [
+        { type: 'M', identifier: 'JPMATELE288OSA' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.ruling = { typeCode: 'C', number: '832264' };
+      line.tariffs = [
+        { htsNumber: '8536490055', valueDollars: 17100, uomCode1: 'NO', quantity1Hundredths: 900000 },
+      ];
+    },
+    notes: 'PGA disclaimer FC0 rides the PG-record message set (workstream D \u2014 spec download pending); dry-run transmits the ruling core without the PG grouping.',
+  }),
 ];
 
 export const SCENARIO_INDEX: Map<string, Scenario> = new Map(SCENARIOS.map((s) => [s.id, s]));

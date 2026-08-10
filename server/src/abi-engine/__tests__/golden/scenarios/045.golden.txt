@@ -1,0 +1,19 @@
+ALA  MCLPASSWD           AE                                                     
+B  2704ZZZAE                                               SCENARIO 045         
+10AZZZ  00000458 2704045         0111 X           2090126                       
+1126-16475110026-164751100               082026081526       CA                  
+20MAEU3001081426    EVER GIVEN                                                  
+22     100CTNS                                                                  
+23MMAEU123456789012                                                             
+318B 123                                                                        
+40  001 ITIT080126               500           1200    N                        
+44SUPERPHOSPHATE FERTILIZERS                                                    
+47MITMILFER426MIL                                                               
+47S26-164751100                                                                 
+503103190000          0       5400        10000T                                
+62499    1871                                                                   
+62501     675                                                                   
+89499       3358501        675                                                  
+90          0        4033           0           0           0           0       
+Y  2704ZZZAE                                                                    
+ZLA  MCL                                                                        
