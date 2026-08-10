@@ -215,6 +215,18 @@ export interface PgaDataSet {
   item?: PgaItemIdentity;
   /** PG10 commodity characteristic description (FDA: common/market product name). */
   productName?: string;
+  /**
+   * Full PG10 characteristic rows (NHTSA: category type/code + V-qualifier
+   * rows, e.g. OFFTYP/OFF1 and V06 model-year CCYY — NHTSA guide Notes
+   * 16-19). Emitted after `productName`'s PG10 when both are present.
+   */
+  characteristics?: {
+    categoryTypeCode?: string;
+    categoryCode?: string;
+    commodityQualifierCode?: string;
+    characteristicQualifier?: string;
+    characteristicDescription?: string;
+  }[];
   /** PG19→PG20→PG21 trios, emitted in order, one trio per entity (p.63-64). */
   entities: PgaEntity[];
   /** PG22 conformance/substantiating-document declarations. */
@@ -296,8 +308,10 @@ export function buildPgaLine(input: PgaLineInput): string[] {
     pg01.intendedUseDescription = set.intendedUseDescription;
     lines.push(writeRecord(INPUT_PG01, pg01));
 
-    // PG02 'P' — required when no disclaimer is given (p.21, p.63).
-    if (!set.product || set.product.codes.length === 0) {
+    // PG02 'P' — required when no disclaimer is given (p.21, p.63). The
+    // qualifier/number pairs are conditional: NHTSA's own OFF-vehicle sample
+    // transmits a bare 'PG02P' (NHTSA guide p.65), so zero pairs is legal.
+    if (!set.product) {
       fail(`${at}.product`, "a PG02 with item type 'P' is required when no disclaimer is provided (p.21)");
     }
     const codes = set.product.codes;
@@ -365,6 +379,17 @@ export function buildPgaLine(input: PgaLineInput): string[] {
     // PG10 product name / characteristic description.
     if (set.productName !== undefined) {
       lines.push(writeRecord(INPUT_PG10, { commodityCharacteristicDescription: set.productName }));
+    }
+    for (const row of set.characteristics ?? []) {
+      lines.push(
+        writeRecord(INPUT_PG10, {
+          categoryTypeCode: row.categoryTypeCode,
+          categoryCode: row.categoryCode,
+          commodityQualifierCode: row.commodityQualifierCode,
+          commodityCharacteristicQualifier: row.characteristicQualifier,
+          commodityCharacteristicDescription: row.characteristicDescription,
+        })
+      );
     }
 
     // Entity trios PG19 → PG20 → PG21, kept together per entity (p.63-64).

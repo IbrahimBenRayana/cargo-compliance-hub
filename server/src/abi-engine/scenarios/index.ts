@@ -1589,6 +1589,89 @@ export const SCENARIOS: Scenario[] = [
     notes: 'XC = Canadian USMCA origin convention; net-cost RVC indicator Y.',
   }),
 
+  aeScenario('085', 'DOT Form Data (HS-7)', {
+    rates: { '8703210130': '2.5%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'DE';
+      line.countryOfExport = 'DE';
+      line.descriptions = ['SNOWMOBILE'];
+      line.parties = [
+        { type: 'M', identifier: 'DEMUNSNO347MUN' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '8703210130', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100 },
+      ];
+    },
+    postMap: (input, params) => {
+      // NHTSA Box-8 set per the supplemental guide's own OFF-vehicle sample
+      // (p.65-66): NHT/OFF, PG02 P, PG07 make/model/VIN (AKG), PG10
+      // OFFTYP/OFF1 + V06 model year (the package's 'clarification code V'
+      // family), IM + CI entities, PG22 946 box 8 + 871 substantiating
+      // statement, both NH1-certified.
+      const signed = `0820${params.currentYear}`;
+      input.lines![0].pga = {
+        commercialDescription: 'SNOWMOBILE, NOT FOR ON-ROAD USE',
+        sets: [
+          {
+            kind: 'data',
+            agencyCode: 'NHT',
+            programCode: 'OFF',
+            product: { codes: [] }, // bare PG02 'P' (NHTSA Note 6: always P)
+            item: {
+              tradeName: 'ABC',
+              model: 'UTV-001',
+              numberQualifier: 'AKG',
+              number: 'TEST-VIN-NUMBER',
+            },
+            characteristics: [
+              { categoryTypeCode: 'OFFTYP', categoryCode: 'OFF1' },
+              { commodityQualifierCode: 'V06', characteristicQualifier: '2008' },
+            ],
+            entities: [
+              {
+                roleCode: 'IM',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [{ qualifier: 'IM', name: 'IMRAN SIDDIQUE', emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM' }],
+              },
+              {
+                roleCode: 'CI',
+                name: 'IMRAN SIDDIQUE',
+                contacts: [{ qualifier: 'CI', name: 'IMRAN SIDDIQUE', telephone: '2135550100' }],
+              },
+            ],
+            conformance: [
+              {
+                importersSubstantiatingDocument: 'Y',
+                documentIdentifier: '946',
+                conformanceDeclaration: '8',
+                entityRoleCode: 'CI',
+                declarationCode: 'NH1',
+                declarationCertification: 'Y',
+                dateOfSignature: signed,
+              },
+              {
+                importersSubstantiatingDocument: 'Y',
+                documentIdentifier: '871',
+                entityRoleCode: 'CI',
+                declarationCode: 'NH1',
+                declarationCertification: 'Y',
+                dateOfSignature: signed,
+              },
+            ],
+          },
+        ],
+      };
+    },
+    notes: "Package's 'HS-7 Clarification Code V' maps to the PG10 V-qualifier family (V06 = model year CCYY), not a PG22 code — NHTSA guide Notes 16-19/38. Box 8 via PG22 946; 871 substantiating statement attached.",
+  }),
+
   aeScenario('086', 'PGA Form Disclaimers', {
     rates: { '8527910500': 'Free' },
     mutate: (p) => {
