@@ -26,7 +26,9 @@ export const INPUT_40: RecordDef = {
     { name: 'countryOfExportCode', start: 11, end: 12, class: 'AN', designation: 'C' },
     { name: 'dateOfExportation', start: 13, end: 18, class: 'D', designation: 'C' },
     { name: 'textileExportDate', start: 19, end: 24, class: 'D', designation: 'C' }, // Date of Exportation (for Textiles)
-    { name: 'spiClaimCode', start: 25, end: 26, class: 'AN', designation: 'C' }, // Trade Agreement/Special Program Claim Code
+    // Printed 2AN, but the chapter's own SPI values include 'A+' and 'S+'
+    // (GSP-LDC, USMCA TPL — cert scenario 027), so class X in practice.
+    { name: 'spiClaimCode', start: 25, end: 26, class: 'X', designation: 'C' }, // Trade Agreement/Special Program Claim Code
     { name: 'chargesAmount', start: 27, end: 36, class: 'SN', designation: 'C' }, // whole U.S. dollars
     { name: 'foreignPortOfLadingCode', start: 37, end: 41, class: 'AN', designation: 'C' },
     { name: 'grossShippingWeight', start: 42, end: 51, class: 'SN', designation: 'C' }, // kilograms

@@ -92,6 +92,13 @@ const EXPLICIT_ADCVD_TYPES = new Set(['03', '07', '34', '38']);
 /** Warehouse / re-warehouse / withdrawal types where HMF-501 is never assessed (note bb). */
 const NO_HMF_TYPES = new Set(['22', '31', '32', '34', '38']);
 
+/**
+ * Comprehensively embargoed countries of origin: consumption entries are
+ * prohibited (Cuba — 31 CFR 515; North Korea — 31 CFR 510). A filer system
+ * must refuse these client-side (cert scenario 031 tests exactly this).
+ */
+const EMBARGOED_ORIGINS = new Set(['CU', 'KP']);
+
 /** MMDDYY (wire format) → YYYYMMDD comparable string; pivot 1970. */
 function wireDateToComparable(mmddyy: string): string {
   const yy = Number(mmddyy.slice(4, 6));
@@ -156,6 +163,13 @@ export function validateEntrySummary(input: AeEntrySummaryInput): ValidationIssu
         entryType,
         issues
       );
+    }
+    if (EMBARGOED_ORIGINS.has(line.countryOfOrigin)) {
+      issues.push({
+        severity: 'F',
+        field: `lines[${index}].countryOfOrigin`,
+        message: `imports originating in '${line.countryOfOrigin}' are embargoed (OFAC 31 CFR 510/515) — transmission refused`,
+      });
     }
   }
 

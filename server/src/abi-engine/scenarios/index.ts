@@ -464,6 +464,243 @@ export const SCENARIOS: Scenario[] = [
     },
     notes: 'SPI Z is statutory (HTS general note 10), not in the Special column — duty pinned to Free.',
   }),
+
+  aeScenario('027', 'USMCA Apparel (TRQ)', {
+    rates: { '98235202': 'Free', '6203315020': '17.5%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '02';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'XQ';
+      line.countryOfExport = 'MX';
+      // S+ (USMCA textile TPL) is claimed against the 9823.52.02 TRQ
+      // provision; in-quota preferential rate pinned to Free (the Special
+      // column prints S, not S+).
+      line.spiClaimCode = 'S+';
+      line.descriptions = ['MENS WOOL TROUSERS'];
+      line.parties = [
+        { type: 'M', identifier: 'MXMEXAPP159MEX' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '98235202', valueDollars: 0, uomCode1: 'X' },
+        { htsNumber: '6203315020', valueDollars: 2500, uomCode1: 'DOZ', quantity1Hundredths: 2000, dutyCents: 0 },
+      ];
+      line.textileCategoryCode = '447';
+    },
+    notes: 'Package: UC response arrives only after end-of-day TRQ processing (~8pm). XQ = Canada/Mexico TPL origin convention.',
+  }),
+
+  aeScenario('028', 'State of Destination with Multiple Lines', {
+    rates: {
+      '1205100090': { general: '0.58¢/kg', special: 'Free (A+,AU,BH,CL,CO,D,E, IL,JO,KR,MA,OM,P,PA,PE,S, SG)' },
+      '3306900000': 'Free',
+      '3702100060': { general: '3.7%', special: 'Free (A*,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const ior = p.entrySummary.importerOfRecord.number;
+      // Wire carries ONE header state: with multiple destination states the
+      // 7501 block-5 rule reports the state of greatest aggregate value —
+      // line 3 (WA, $15,000).
+      p.entrySummary.usStateOfDestination = 'WA';
+      const base = p.entrySummary.lines[0];
+      p.entrySummary.lines = [
+        {
+          ...base,
+          descriptions: ['RAPESEED, LOW ERUCIC ACID'],
+          parties: [{ type: 'M', identifier: 'CNSHERAP321SHA' }, { type: 'S', identifier: ior }],
+          tariffs: [{ htsNumber: '1205100090', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 100000000 }],
+        },
+        {
+          ...base,
+          descriptions: ['ORAL HYGIENE PREPARATIONS'],
+          parties: [{ type: 'M', identifier: 'CNSHEORA654SHA' }, { type: 'S', identifier: ior }],
+          tariffs: [{ htsNumber: '3306900000', valueDollars: 5000, uomCode1: 'NO', quantity1Hundredths: 100000 }],
+        },
+        {
+          ...base,
+          descriptions: ['INSTANT PRINT FILM'],
+          parties: [{ type: 'M', identifier: 'CNSHEFLM987SHA' }, { type: 'S', identifier: ior }],
+          tariffs: [{ htsNumber: '3702100060', valueDollars: 15000, uomCode1: 'NO', quantity1Hundredths: 200000 }],
+        },
+      ];
+    },
+    notes: 'Source data: line states MT/NY/WA — header reports WA (greatest aggregate value, 7501 block 5).',
+  }),
+
+  aeScenario('029', 'Charges Amount', {
+    rates: { '3001900110': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GB';
+      line.countryOfExport = 'GB';
+      line.chargesDollars = 200;
+      line.descriptions = ['HEPARIN AND ITS SALTS'];
+      line.parties = [
+        { type: 'M', identifier: 'GBLONHEP531LON' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '3001900110', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 10000 },
+      ];
+    },
+  }),
+
+  aeScenario('030', 'HTS Number/Date Restriction', {
+    rates: { '0809402000': 'Free' },
+    mutate: (p, params) => {
+      const cy = params.currentYear;
+      // Package: importation + estimated entry = current date. 0809.40.20
+      // (fresh apricots) is valid for entry only Jan 1 – May 31; ACE
+      // enforces the date window server-side at cert time.
+      p.entrySummary.dates = { estimatedEntry: `${cy}0820`, importation: `${cy}0820`, estimatedArrival: `${cy}0819` };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CL';
+      line.countryOfExport = 'CL';
+      line.dateOfExportation = `${cy}0801`;
+      line.descriptions = ['APRICOTS, FRESH'];
+      line.parties = [
+        { type: 'M', identifier: 'CLSCLAPR864SCL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '0809402000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
+      ];
+    },
+    notes: 'ACE enforces the Jan 1 – May 31 entry-date window for this HTS; at cert time the rep confirms expected disposition for an out-of-window date.',
+  }),
+
+  aeRejectScenario('031', 'Restricted Country', {
+    rates: { '6402191541': '5.1%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      // Cuba origin: comprehensively embargoed (31 CFR 515) — our system
+      // must refuse the transmission client-side.
+      line.countryOfOrigin = 'CU';
+      line.countryOfExport = 'MX';
+      line.descriptions = ['SPORTS FOOTWEAR'];
+      line.tariffs = [
+        { htsNumber: '6402191541', valueDollars: 10000, uomCode1: 'PRS', quantity1Hundredths: 100000 },
+      ];
+    },
+    notes: 'Intentionally invalid: embargoed country of origin (OFAC).',
+  }),
+
+  aeScenario('032', 'Knife Sets', {
+    rates: {
+      '8211100000': 'Free', // set provision: rate is the highest-rate article's — components pinned below
+      '8211929045': '0.4¢ each + 6.1%',
+      '8211930035': '3¢ each + 5.4%',
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'DE';
+      line.countryOfExport = 'DE';
+      line.descriptions = ['KNIFE SETS, 5-PIECE'];
+      line.parties = [
+        { type: 'M', identifier: 'DESOLKNI275SOL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // 4,000 sets: 16,000 knives @ $1 (8211.92.90) + 4,000 @ $2
+      // (8211.93.00). The 8211.10 set provision duties the WHOLE set at the
+      // highest-rate article's rate — 8211.93 (3¢ each + 5.4% ≈ 6.9% AVE
+      // beats 8211.92's ≈ 6.5%). That rate applied per component:
+      //   8211.92: 5.4%×$16,000 + 3¢×16,000 pcs = $864.00+$480.00 = $1,344.00
+      //   8211.93: 5.4%×$8,000  + 3¢×4,000 pcs  = $432.00+$120.00 =   $552.00
+      line.tariffs = [
+        { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'X', dutyCents: 0 },
+        { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 134400 },
+        { htsNumber: '8211930035', valueDollars: 8000, uomCode1: 'NO', quantity1Hundredths: 400000, dutyCents: 55200 },
+      ];
+    },
+    notes: 'Set duty pinned at the highest-rate article (8211.93.00: 3¢ each + 5.4%) applied to each component — confirm interpretation with client rep.',
+  }),
+
+  aeScenario('033', 'Multiple Bonds', {
+    rates: { '8507600020': '3.41%' },
+    mutate: (p) => {
+      // Continuous basic + additional STB (allowable configuration 3,
+      // ESF-157), surety 054 per the package.
+      p.entrySummary.bonds = [
+        { bondTypeCode: '8', designationTypeCode: 'B', suretyCompanyCode: '054' },
+        { bondTypeCode: '9', designationTypeCode: 'A', suretyCompanyCode: '054', stbAmountDollars: 25000 },
+      ];
+    },
+  }),
+
+  aeScenario('034', 'Personal Shipment', {
+    rates: { '7419803000': '3%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '11';
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, shipmentUsageTypeCode: 'P' };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'HK';
+      line.countryOfExport = 'HK';
+      line.relatedPartyIndicator = undefined;
+      line.descriptions = ['COPPER HOUSEHOLD ARTICLES'];
+      line.parties = [];
+      line.tariffs = [
+        { htsNumber: '7419803000', valueDollars: 3000, uomCode1: 'NO', quantity1Hundredths: 5000 },
+      ];
+    },
+  }),
+
+  aeScenario('035', 'Civil Aircraft', {
+    rates: {
+      '8302496055': { general: '5.7%', special: 'Free (A*,AU,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GL';
+      line.countryOfExport = 'GL';
+      line.spiClaimCode = 'C'; // Agreement on Trade in Civil Aircraft
+      line.descriptions = ['CIVIL AIRCRAFT MOUNTINGS AND FITTINGS'];
+      line.parties = [
+        { type: 'M', identifier: 'GLGOHAIR428GOH' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '8302496055', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 10000 },
+      ];
+    },
+  }),
+
+  aeScenario('036', 'Commercial Samples', {
+    rates: { '6205202016': '19.7%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '11';
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, shipmentUsageTypeCode: 'X' };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'JP';
+      line.countryOfExport = 'JP';
+      line.relatedPartyIndicator = undefined;
+      line.descriptions = ['MENS COTTON SHIRTS - SAMPLES'];
+      line.parties = [];
+      line.tariffs = [
+        { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200 },
+      ];
+      line.textileCategoryCode = '340';
+    },
+  }),
+
+  aeScenario('038', 'Morocco Free Trade Agreement', {
+    rates: {
+      '4203300000': { general: '2.7%', special: 'Free (A,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'MA';
+      line.countryOfExport = 'MA';
+      line.spiClaimCode = 'MA';
+      line.descriptions = ['LEATHER BELTS'];
+      line.parties = [
+        { type: 'M', identifier: 'MACASBEL713CAS' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '4203300000', valueDollars: 10000, uomCode1: 'DOZ', quantity1Hundredths: 5000 },
+      ];
+    },
+  }),
 ];
 
 export const SCENARIO_INDEX: Map<string, Scenario> = new Map(SCENARIOS.map((s) => [s.id, s]));
