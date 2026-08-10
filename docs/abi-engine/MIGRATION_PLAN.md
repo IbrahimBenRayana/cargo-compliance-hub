@@ -185,7 +185,7 @@ B/C build on A's model; D/E/G/H parallel as capacity allows.
 
 | Item | Owner | State |
 |---|---|---|
-| Continuous Type 1 bond against IR# 26-164751100 | Imran + surety agent | **Do now** |
+| Continuous (activity-1) importer bond against IR# 26-164751100 | Imran + surety agent | **Deferred — not needed for software-provider certification.** CERT scenarios use rep-supplied test importers (with bonds already on file in CERT); production entries ride each client importer's own bond. Only needed if Sigma ever self-files real entries as importer of record. |
 | ACE Secure Data Portal importer account | Imran | **Do now** (~15 min application) |
 | Filer code issuance | CBP (Cahill confirmed submitted) | Waiting |
 | Comms method + CERT queue + ISA | CBP client rep after filer code | Waiting |
