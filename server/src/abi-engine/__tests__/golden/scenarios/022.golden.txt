@@ -1,0 +1,6 @@
+ALA  MCLPASSWD           CW                                                     
+B  2704ZZZCW                                               SCENARIO 022         
+CW01ZZZ  00000201                                                               
+CW02  00113Q49                                                                  
+Y  2704ZZZCW                                                                    
+ZLA  MCL                                                                        

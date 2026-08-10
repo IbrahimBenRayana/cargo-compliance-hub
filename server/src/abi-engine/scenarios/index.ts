@@ -17,6 +17,8 @@ import { buildEntrySummaryQuery } from '../apps/esQuery/builder.js';
 import { buildAdCvdCaseQuery } from '../apps/adcvd/builder.js';
 import { buildQuotaQuery } from '../apps/quota/builder.js';
 import { buildTibExtension } from '../apps/tib/builder.js';
+import { buildCensusOverride } from '../apps/census/cwBuilder.js';
+import { buildCensusWarningQuery } from '../apps/census/cjBuilder.js';
 
 export const SCENARIOS: Scenario[] = [
   aeScenario('001', 'Singapore Free Trade Agreement', {
@@ -110,6 +112,50 @@ export const SCENARIOS: Scenario[] = [
       line.censusOverrides = [{ conditionCode: '13Q', overrideCode: '49' }];
     },
     notes: 'Census condition code comes from the live AX warning during cert; 13Q is a dry-run placeholder.',
+  }),
+
+  appScenario('006', 'Census Warning Override \u2014 standalone transmission', 'CW', (params) =>
+    buildCensusOverride({
+      filerCode: params.filerCode,
+      entries: [
+        {
+          // The scenario-006 AE entry (8415.82.01.20, \$145,682, qty 1 NO) is
+          // filed first; once the AX census warning returns, this standalone
+          // CW resolves it. Warning code is a dry-run placeholder \u2014 the
+          // cert run copies it from the live AX response.
+          entryNumber: '0000006',
+          lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: '13Q', overrideCode: '49' }] }],
+        },
+      ],
+    })
+  , 'AE half filed separately at cert; warning code from the live AX response (13Q is a dry-run placeholder).'),
+
+  aeScenario('009', 'Quota Informal', {
+    rates: {
+      '1806901500': { general: '3.5%', special: 'Free (A*,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '12';
+      // Quota requires certification for cargo release (package note).
+      p.entrySummary.cargoReleaseCertification = true;
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GB';
+      line.countryOfExport = 'GB';
+      line.relatedPartyIndicator = undefined;
+      line.descriptions = ['CHOCOLATE CONFECTIONERY, QUOTA'];
+      line.parties = [];
+      line.tariffs = [
+        {
+          htsNumber: '1806901500',
+          valueDollars: 30,
+          uomCode1: 'KG',
+          quantity1Hundredths: 500,
+          uomCode2: 'CKG',
+          quantity2Hundredths: 131,
+        },
+      ];
+    },
+    notes: 'FDA data for this HTS rides the PG-record message set (workstream D pending) \u2014 note for the rep.',
   }),
 
   aeScenario('007', 'MOT/Port of Unlading', {
@@ -394,6 +440,25 @@ export const SCENARIOS: Scenario[] = [
       ];
     },
   }),
+
+  appScenario('021', 'Census Warning Query', 'CJ', (params) =>
+    buildCensusWarningQuery({
+      filerCode: params.filerCode,
+      queries: [{ districtPortOfEntry: params.districtPortOfEntry, entryNumbers: ['0000020'] }],
+    })
+  , 'Queries the census warning raised by the scenario-020 entry; run before 022.'),
+
+  appScenario('022', 'Census Warning Override', 'CW', (params) =>
+    buildCensusOverride({
+      filerCode: params.filerCode,
+      entries: [
+        {
+          entryNumber: '0000020',
+          lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: '13Q', overrideCode: '49' }] }],
+        },
+      ],
+    })
+  , 'Overrides the warning surfaced by 020/021; warning code from the CL response (13Q dry-run placeholder).'),
 
   aeScenario('023', 'Steel License', {
     rates: { '7222110006': 'Free' },
