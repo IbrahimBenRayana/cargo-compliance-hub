@@ -16,6 +16,7 @@ import { type Scenario, aeScenario, aeRejectScenario, appScenario } from './aeBa
 import { buildEntrySummaryQuery } from '../apps/esQuery/builder.js';
 import { buildAdCvdCaseQuery } from '../apps/adcvd/builder.js';
 import { buildQuotaQuery } from '../apps/quota/builder.js';
+import { buildTibExtension } from '../apps/tib/builder.js';
 
 export const SCENARIOS: Scenario[] = [
   aeScenario('001', 'Singapore Free Trade Agreement', {
@@ -1129,6 +1130,398 @@ export const SCENARIOS: Scenario[] = [
   appScenario('066', 'Quota Query', 'QA', () =>
     buildQuotaQuery([{ typeCode: 'R', queryId: '0202305085', countryOfOrigin: 'NZ' }])
   ),
+
+  // \u2500\u2500 Type-03 AD/CVD block (067\u2013073): deposit rates arrive from the AD
+  // query at cert time \u2014 dry-run pins zero deposits; the 88-record emits on
+  // case presence.
+  aeScenario('067', 'Related Cases', {
+    rates: { '1902192020': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'IT';
+      line.countryOfExport = 'IT';
+      line.descriptions = ['DRIED PASTA'];
+      line.parties = [
+        { type: 'M', identifier: 'ITROMPAS284ROM' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [{ htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 }];
+      line.adCvdCases = [
+        { caseNumber: 'A475818029', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+        { caseNumber: 'C475819011', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+      ];
+    },
+  }),
+
+  aeScenario('068', 'Case Status', {
+    rates: { '1902192020': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['STEEL WIRE ROD'];
+      line.tariffs = [{ htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 }];
+      line.adCvdCases = [
+        { caseNumber: 'A427109040', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+      ];
+    },
+    notes: 'Package gives only the case number; commodity/HTS reuse the 067 pasta line \u2014 confirm with rep.',
+  }),
+
+  aeScenario('069', 'HTS Number and Case Number', {
+    rates: { '3912390000': '4.2%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['CELLULOSE ETHERS'];
+      line.tariffs = [{ htsNumber: '3912390000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 200000 }];
+      line.adCvdCases = [
+        { caseNumber: 'A405803001', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+      ];
+    },
+  }),
+
+  aeScenario('070', 'Case with Ad Valorem Rate', {
+    rates: { '1902192020': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['CASED PENCILS'];
+      line.tariffs = [{ htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 }];
+      // Rate qualifier S = specific (per package title/qualifier pairing).
+      line.adCvdCases = [
+        { caseNumber: 'A570967000', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'S', quantityTenThousandths: 5000000, dutyCents: 0 },
+      ];
+    },
+  }),
+
+  aeScenario('071', 'Case with Cash Deposit', {
+    rates: { '1902192020': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['PORCELAIN-ON-STEEL COOKWARE'];
+      line.tariffs = [{ htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 }];
+      line.adCvdCases = [
+        { caseNumber: 'A588602001', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+      ];
+    },
+  }),
+
+  aeScenario('072', 'Case with Differing Values', {
+    rates: { '1902192030': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'IT';
+      line.countryOfExport = 'IT';
+      line.descriptions = ['DRIED EGG PASTA'];
+      line.parties = [
+        { type: 'M', identifier: 'ITROMPAS284ROM' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [{ htsNumber: '1902192030', valueDollars: 20000, uomCode1: 'KG', quantity1Hundredths: 32000 }];
+      // The AD case covers a $15,000 subset of the $20,000 line (53-record
+      // Value of Goods differs from the 50-record value).
+      line.adCvdCases = [
+        { caseNumber: 'A475818001', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', valueOfGoodsDollars: 15000, dutyCents: 0 },
+        { caseNumber: 'C475819001', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', valueOfGoodsDollars: 15000, dutyCents: 0 },
+      ];
+    },
+  }),
+
+  aeScenario('073', 'Case and Deposit Rate', {
+    rates: { '1902192020': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CN';
+      line.countryOfExport = 'CN';
+      line.descriptions = ['WOODEN BEDROOM FURNITURE'];
+      line.tariffs = [{ htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 }];
+      line.adCvdCases = [
+        { caseNumber: 'A570001002', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+      ];
+    },
+  }),
+
+  aeScenario('074', 'FTZ Withdrawal with Privilege Date', {
+    rates: { '8536410060': '2.7%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '06';
+      p.entrySummary.foreignTradeZoneId = '124';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CN';
+      line.countryOfExport = 'CN';
+      line.descriptions = ['ELECTRICAL RELAYS'];
+      line.parties = [
+        { type: 'M', identifier: 'CNSHEREL491SHA' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // Privileged foreign status: rates fixed as of the privilege date.
+      line.ftz = { statusCode: 'P', privilegedFilingDate: '20200513', quantity: 5000 };
+      line.tariffs = [{ htsNumber: '8536410060', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 500000 }];
+    },
+    notes: 'FTZ id 124 is a dry-run placeholder \u2014 rep supplies the zone. Privilege date 05/13/2020 fixes the rate era.',
+  }),
+
+  // \u2500\u2500 PSC scenarios (075\u2013078): Replace of an accepted summary; statement
+  // fields are banned in a PSC (ESF-184) so the baseline payment is removed.
+  aeScenario('075', 'PSC with ES Header Change', {
+    rates: { '8507600020': '3.41%' },
+    action: 'R',
+    mutate: (p) => {
+      p.entrySummary.payment = undefined;
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
+      p.entrySummary.psc = {
+        headerReasonCodes: ['H10', 'H12'],
+        explanationLines: ['CONSIGNEE AND STATE OF DESTINATION CORRECTED PER IMPORTER RECORDS.'],
+      };
+      p.entrySummary.usStateOfDestination = 'RI';
+    },
+    notes: 'Consignee number: client rep will supply (flows from CertParams).',
+  }),
+
+  aeScenario('076', 'PSC with ES Line Change', {
+    rates: { '8507600020': '3.41%' },
+    action: 'R',
+    mutate: (p) => {
+      p.entrySummary.payment = undefined;
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
+      p.entrySummary.psc = {
+        headerReasonCodes: ['H99'],
+        explanationLines: ['LINE COUNTRY OF ORIGIN AND MANUFACTURER CORRECTED.'],
+      };
+      const line = p.entrySummary.lines[0];
+      line.pscReasonCodes = ['L07', 'L19'];
+      line.countryOfOrigin = 'CN';
+      line.parties = [
+        { type: 'M', identifier: 'CNCAWBAT7057SHE' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+    },
+  }),
+
+  aeScenario('077', 'PSC with Entry Type Change', {
+    rates: { '1902192020': 'Free' },
+    action: 'R',
+    mutate: (p) => {
+      p.entrySummary.payment = undefined;
+      p.entrySummary.entryTypeCode = '03';
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
+      p.entrySummary.psc = {
+        headerReasonCodes: ['H01'],
+        explanationLines: ['ENTRY TYPE CORRECTED TO 03: MERCHANDISE SUBJECT TO AD/CVD CASES.'],
+      };
+      const line = p.entrySummary.lines[0];
+      line.pscReasonCodes = ['L03', 'L04', 'L07', 'L29'];
+      line.countryOfOrigin = 'IT';
+      line.countryOfExport = 'IT';
+      line.descriptions = ['DRIED PASTA'];
+      line.parties = [
+        { type: 'M', identifier: 'ITROMPAS284ROM' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [{ htsNumber: '1902192020', valueDollars: 17367, uomCode1: 'KG', quantity1Hundredths: 436600 }];
+      line.adCvdCases = [
+        { caseNumber: 'A475818001', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+        { caseNumber: 'C475819000', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+      ];
+    },
+  }),
+
+  aeScenario('078', "PSC for Another Filer's ES", {
+    rates: { '8507600020': '3.41%' },
+    action: 'R',
+    mutate: (p) => {
+      p.entrySummary.payment = undefined;
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
+      p.entrySummary.psc = {
+        headerReasonCodes: ['H10'],
+        explanationLines: ['PSC FILED FOR ANOTHER FILERS SUMMARY; CONSIGNEE CORRECTED.'],
+      };
+      const line = p.entrySummary.lines[0];
+      line.pscReasonCodes = ['L07', 'L19'];
+      line.countryOfOrigin = 'CN';
+      line.parties = [
+        { type: 'M', identifier: 'CNCAWBAT7057SHE' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+    },
+    notes: 'Entry number / IOR / consignee: rep-supplied at cert (another filer\u2019s accepted summary \u2014 ownership transfers per note gg).',
+  }),
+
+  aeScenario('079', 'Temporary Import under Bond (TIB)', {
+    rates: {
+      '98130020': 'Free', // 'Free, under bond' \u2014 provision text pinned
+      '7113195090': 'Free', // TIB: no duty collected under the bond
+    },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '23';
+      p.entrySummary.motCode = '40';
+      p.entrySummary.cargo = { carrierCode: '*F', conveyanceName: 'FLIGHT 220' };
+      p.entrySummary.manifests = [
+        { manifestedQuantity: 10, uomCode: 'CTNS', bills: [{ type: 'M', identifier: '87654321' }] },
+      ];
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'HK';
+      line.countryOfExport = 'HK';
+      line.descriptions = ['GOLD JEWELRY FOR EXHIBITION'];
+      line.parties = [
+        { type: 'M', identifier: 'HKHKGJEW368HKG' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '98130020', valueDollars: 0, uomCode1: 'X' },
+        { htsNumber: '7113195090', valueDollars: 81408, uomCode1: 'G', quantity1Hundredths: 226695 },
+      ];
+    },
+  }),
+
+  appScenario('080', 'TIB Extension', 'TE', (params) =>
+    buildTibExtension({
+      action: 'extend',
+      districtPortOfEntrySummary: params.districtPortOfEntry,
+      filerCode: params.filerCode,
+      entryNumber: '0000079', // the scenario-079 TIB entry
+    })
+  , 'Extends the scenario-079 TIB summary (same entry sequence).'),
+
+  aeScenario('081', 'In-Bond', {
+    rates: { '8507600020': '3.41%' },
+    mutate: (p, params) => {
+      p.entrySummary.dates = { ...p.entrySummary.dates, inBond: `${params.currentYear}0816` };
+      // Paperless in-bond (VXXNNNNNNNN) \u21d2 the bill of lading is required.
+      p.entrySummary.manifests = [
+        {
+          manifestedQuantity: 287,
+          uomCode: 'CTN',
+          bills: [
+            { type: 'I', identifier: 'V1111124247' },
+            { type: 'M', issuerCode: 'MAEU', identifier: '123456789012' },
+          ],
+        },
+      ];
+      p.entrySummary.cargo = { ...p.entrySummary.cargo, districtPortOfUnlading: '3001' };
+    },
+  }),
+
+  aeScenario('082', 'PMS Statement Designation', {
+    rates: { '8507600020': '3.41%' },
+    mutate: (p, params) => {
+      const cy = params.currentYear;
+      // Package: print date ~10 days out, statement month = next month.
+      // Dry-run pins Sep 1 (a Tuesday \u2014 weekends are barred by note y).
+      p.entrySummary.payment = {
+        typeCode: '6',
+        preliminaryStatementPrintDate: `${cy}0901`,
+        periodicStatementMonth: '09',
+      };
+    },
+  }),
+
+  aeScenario('084', 'NAFTA/USMCA Net Cost', {
+    rates: { '1004100000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'XC';
+      line.countryOfExport = 'CA';
+      line.spiClaimCode = 'S';
+      line.naftaNetCostIndicator = 'Y';
+      line.descriptions = ['SEED OATS'];
+      line.parties = [
+        { type: 'M', identifier: 'CAWPGOAT173WPG' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '1004100000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 8500000 },
+      ];
+    },
+    notes: 'XC = Canadian USMCA origin convention; net-cost RVC indicator Y.',
+  }),
+
+  aeScenario('087', 'Multiple Bills of Lading', {
+    rates: { '8507600020': '3.41%' },
+    mutate: (p, params) => {
+      p.entrySummary.dates = { ...p.entrySummary.dates, inBond: `${params.currentYear}0816` };
+      p.entrySummary.cargo = { ...p.entrySummary.cargo, districtPortOfUnlading: '3001' };
+      // Two manifest groupings share the movement/master/house; each carries
+      // its own sub-house bill and manifested quantity.
+      const shared = [
+        { type: 'I' as const, identifier: '111271845' },
+        { type: 'M' as const, issuerCode: 'MAEU', identifier: '9786543' },
+        { type: 'H' as const, issuerCode: 'DMAL', identifier: '15075' },
+      ];
+      p.entrySummary.manifests = [
+        { manifestedQuantity: 5, uomCode: 'CTNS', bills: [...shared, { type: 'S', identifier: 'H273' }] },
+        { manifestedQuantity: 10, uomCode: 'CTNS', bills: [...shared, { type: 'S', identifier: 'J878' }] },
+      ];
+    },
+  }),
+
+  aeScenario('088', 'Aluminum Licensing', {
+    rates: { '7601103000': '2.6%' },
+    mutate: (p, params) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'KR';
+      line.countryOfExport = 'KR';
+      line.descriptions = ['UNWROUGHT ALUMINUM, 99.8% PURE'];
+      line.parties = [
+        { type: 'M', identifier: 'KRSELALU906SEL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '7601103000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 400000 },
+      ];
+      // 52-Record type 28 = Aluminum Import License (chapter change log #79/
+      // license table). CERT format AALUMmmdd from the import date.
+      const d = params.applicabilityDate;
+      line.license = { typeCode: '28', number: `AALUM${d.slice(4, 8)}` };
+    },
+  }),
+
+  aeScenario('089', 'Watches \u2014 Components with Multiple Countries of Origin', {
+    rates: {
+      '9102114510': 'Free', '9102114520': 'Free', '9102114530': 'Free', '9102114540': 'Free',
+      '99038815': 'The duty provided in the applicable subheading + 7.5%',
+    },
+    mutate: (p) => {
+      const ior = p.entrySummary.importerOfRecord.number;
+      const base = p.entrySummary.lines[0];
+      // 9102.11.45 constituent rate: 40\u00a2 each + 8.5% case + 2.8% strap +
+      // 5.3% battery. Package gives no values/quantities \u2014 $10k per line
+      // (standing rule), 1,000 watches. Pinned per constituent (suffix
+      // mapping per CSMS #50019756 \u2014 CONFIRM WITH REP):
+      //   .4510 movements: 40\u00a2\u00d71,000       = $400.00
+      //   .4520 cases:     8.5%\u00d7$10,000     = $850.00
+      //   .4530 straps CN: 2.8%\u00d7$10,000     = $280.00 (+301 7.5% on 9903 line)
+      //   .4540 batteries: 5.3%\u00d7$10,000     = $530.00
+      const mk = (hts: string, dutyCents: number, coo: string, desc: string) => ({
+        ...base,
+        countryOfOrigin: coo,
+        countryOfExport: 'CH',
+        descriptions: [desc],
+        parties: [
+          { type: 'M' as const, identifier: 'CHGENWAT552GEN' },
+          { type: 'S' as const, identifier: ior },
+        ],
+        tariffs: [{ htsNumber: hts, valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents }],
+      });
+      p.entrySummary.lines = [
+        mk('9102114510', 40000, 'CH', 'WATCH MOVEMENTS'),
+        mk('9102114520', 85000, 'CH', 'WATCH CASES'),
+        {
+          ...mk('9102114530', 28000, 'CN', 'WATCH STRAPS'),
+          tariffs: [
+            { htsNumber: '99038815', valueDollars: 0, uomCode1: 'X' },
+            { htsNumber: '9102114530', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 28000 },
+          ],
+        },
+        mk('9102114540', 53000, 'CH', 'WATCH BATTERIES'),
+      ];
+    },
+    notes: 'Constituent duties pinned from the 9102.11.45 compound rate; CN strap line carries 301 List-4A (9903.88.15 +7.5%). Confirm suffix\u2194constituent mapping with rep (CSMS #50019756).',
+  }),
 ];
 
 export const SCENARIO_INDEX: Map<string, Scenario> = new Map(SCENARIOS.map((s) => [s.id, s]));

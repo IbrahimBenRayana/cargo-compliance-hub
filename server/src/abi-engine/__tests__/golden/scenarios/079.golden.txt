@@ -1,0 +1,17 @@
+ALA  MCLPASSWD           AE                                                     
+B  2704ZZZAE                                               SCENARIO 079         
+10AZZZ  00000797 2704079         2340 X           2090126                       
+1126-16475110026-164751100               082026081526       CA                  
+20*F      081426    FLIGHT 220                                                  
+22      10CTNS                                                                  
+23M    87654321                                                                 
+318B 123                                                                        
+40  001 HKHK080126               500           1200    N                        
+44GOLD JEWELRY FOR EXHIBITION                                                   
+47MHKHKGJEW368HKG                                                               
+47S26-164751100                                                                 
+5098130020            0          0             X                                
+507113195090          0      81408       226695G                                
+90          0           0           0           0           0           0       
+Y  2704ZZZAE                                                                    
+ZLA  MCL                                                                        
