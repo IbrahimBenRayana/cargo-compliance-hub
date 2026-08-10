@@ -40,10 +40,10 @@ Broker Download, Line Release, GBI ×3, CATAIR change records,
 
 ## Known gaps (chase via client rep)
 
-1. **PGA Message Set implementation guide** (the full PG-record spec + FDA
-   Supplemental Guide + DOT/NHTSA HS-7 supplement) — needed for scenarios
-   083/085/086 (Phase 2D). Lives on a separate CBP page ("PGA" under ACE
-   tech docs), not in the CATAIR chapter list. We only have PGA Query + DIS.
+1. ~~PGA Message Set implementation guide~~ **DOWNLOADED Aug 10 2026**:
+   `pga/pga-message-set-2026-07.pdf` + `pga/fda-supplemental-guide-v2.6.pdf`.
+   Still missing: the **DOT/NHTSA supplemental guide** (HS-7 data elements)
+   if the Message Set chapter does not embed them — needed for scenario 085.
 2. **"Introduction and Getting Started"** — named as required reading by the
    test doc; the 2022 Automation Requirements chapter appears to be its
    successor. Confirm with Morishita.
