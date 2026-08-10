@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +22,7 @@ import {
 } from '@/components/ui/table';
 import {
   Building2, UserPlus, Loader2, MoreHorizontal, CheckCircle2, Clock,
-  Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck,
+  Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck, Radio,
 } from 'lucide-react';
 import { adminApi } from '@/api/client';
 import type { AdminOrganization, AdminUserLookup } from '@/api/client';
@@ -315,7 +316,14 @@ export function AdminClientsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
           <p className="text-muted-foreground">Provision and manage client accounts</p>
         </div>
-        <Dialog open={provisionOpen} onOpenChange={setProvisionOpen}>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/admin/cert">
+              <Radio className="mr-2 h-3.5 w-3.5" />
+              Certification console
+            </Link>
+          </Button>
+          <Dialog open={provisionOpen} onOpenChange={setProvisionOpen}>
           <DialogTrigger asChild>
             <Button>
               <UserPlus className="mr-2 h-4 w-4" />
@@ -421,7 +429,8 @@ export function AdminClientsPage() {
               </Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {/* Clients table */}

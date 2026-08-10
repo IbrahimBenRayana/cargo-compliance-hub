@@ -14,6 +14,7 @@ import RegisterPage from "@/pages/RegisterPage";
 import { SetPasswordPage } from "@/pages/SetPasswordPage";
 import { AdminClientsPage } from "@/pages/AdminClientsPage";
 import { AdminChatConsolePage } from "@/pages/AdminChatConsolePage";
+import { AdminCertConsolePage } from "@/pages/AdminCertConsolePage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import MfaSetupPage from "@/pages/MfaSetupPage";
 import OnboardingPage from "@/pages/OnboardingPage";
@@ -108,6 +109,7 @@ const App = () => (
                 <Route element={<PlatformAdminRoute />}>
                   <Route path="/admin" element={<ErrorBoundary><AdminClientsPage /></ErrorBoundary>} />
                   <Route path="/admin/chat" element={<ErrorBoundary><AdminChatConsolePage /></ErrorBoundary>} />
+                  <Route path="/admin/cert" element={<ErrorBoundary><AdminCertConsolePage /></ErrorBoundary>} />
                 </Route>
               </Route>
             </Route>

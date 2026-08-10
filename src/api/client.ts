@@ -1067,6 +1067,97 @@ export interface AdminUserLookup {
   activity: Record<string, number>;
 }
 
+// ─── ABI Certification Console API (platform admin) ───────
+// Ops console for the CBP CERT test — scenario generation, transmission
+// lifecycle tracking, and response parsing (server/src/routes/certConsole.ts).
+export interface CertParamsRow {
+  filerCode: string;
+  importerOfRecordNumber: string;
+  importerName: string;
+  consigneeNumber: string;
+  suretyCompanyCode: string;
+  districtPortOfEntry: string;
+  currentYear: string;
+  applicabilityDate: string;
+  senderSiteCode: string;
+  senderIdCode: string;
+  senderPassword: string;
+  updatedAt: string;
+}
+
+export type CertParamsInput = Omit<CertParamsRow, 'updatedAt'>;
+
+export type CertTransmissionStatus =
+  | 'generated'
+  | 'rejected_clientside'
+  | 'transmitted'
+  | 'accepted'
+  | 'rejected'
+  | 'conditional';
+
+export interface CertScenario {
+  id: string;
+  title: string;
+  application: string;
+  kind: 'transmit' | 'reject';
+  notes: string | null;
+  encoded: boolean;
+  latest: { id: string; status: CertTransmissionStatus; updatedAt: string } | null;
+}
+
+export interface CertTransmission {
+  id: string;
+  scenarioId: string;
+  status: CertTransmissionStatus;
+  wireText: string;
+  evidenceText: string | null;
+  responseText: string | null;
+  responseParsed: unknown;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const certApi = {
+  params() {
+    return apiFetch<{ params: CertParamsRow }>('/api/v1/admin/cert/params');
+  },
+
+  updateParams(body: CertParamsInput) {
+    return apiFetch<{ params: CertParamsRow }>('/api/v1/admin/cert/params', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  },
+
+  scenarios() {
+    return apiFetch<{ scenarios: CertScenario[] }>('/api/v1/admin/cert/scenarios');
+  },
+
+  generate(scenarioId: string) {
+    return apiFetch<{ transmission: CertTransmission }>(
+      `/api/v1/admin/cert/scenarios/${scenarioId}/generate`,
+      { method: 'POST' },
+    );
+  },
+
+  transmissions(scenarioId: string) {
+    return apiFetch<{ transmissions: CertTransmission[] }>(
+      `/api/v1/admin/cert/scenarios/${scenarioId}/transmissions`,
+    );
+  },
+
+  updateTransmission(
+    id: string,
+    body: { status?: CertTransmissionStatus; responseText?: string; notes?: string },
+  ) {
+    return apiFetch<{ transmission: CertTransmission; parseError?: string }>(
+      `/api/v1/admin/cert/transmissions/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    );
+  },
+};
+
 // ─── Manifest Query API ───────────────────────────────────
 // ─── Container Tracking (Terminal 49) ─────────────────────
 

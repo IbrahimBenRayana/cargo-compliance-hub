@@ -970,6 +970,44 @@ model ChatMessage {
 // One row per 8/10-digit HTS number (dots stripped). generalRate is
 // RESOLVED at ingest time: statistical 10-digit lines inherit from the
 // nearest ancestor rate line, so lookups never need to walk the tree.
+// ── ABI certification console (workstream H) ──────────────
+// One row of cert-run parameters (singleton id 'default') + one row per
+// scenario transmission attempt during the CBP CERT test.
+model CertParamsConfig {
+  id                     String   @id @default("default")
+  filerCode              String   @default("ZZZ") @map("filer_code") @db.VarChar(3)
+  importerOfRecordNumber String   @default("26-164751100") @map("importer_of_record_number") @db.VarChar(12)
+  importerName           String   @default("SIGMA TECHNOLOGY PARTNERS LLC") @map("importer_name") @db.VarChar(60)
+  consigneeNumber        String   @default("26-164751100") @map("consignee_number") @db.VarChar(12)
+  suretyCompanyCode      String   @default("123") @map("surety_company_code") @db.VarChar(3)
+  districtPortOfEntry    String   @default("2704") @map("district_port_of_entry") @db.VarChar(4)
+  currentYear            String   @default("2026") @map("current_year") @db.VarChar(4)
+  applicabilityDate      String   @default("20260820") @map("applicability_date") @db.VarChar(8)
+  senderSiteCode         String   @default("LA") @map("sender_site_code") @db.VarChar(4)
+  senderIdCode           String   @default("MCL") @map("sender_id_code") @db.VarChar(4)
+  senderPassword         String   @default("PASSWD") @map("sender_password") @db.VarChar(6)
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("cert_params_config")
+}
+
+model CertTransmission {
+  id             String   @id @default(uuid()) @db.Uuid
+  scenarioId     String   @map("scenario_id") @db.VarChar(3)
+  // generated | rejected_clientside | transmitted | accepted | rejected | conditional
+  status         String   @default("generated") @db.VarChar(24)
+  wireText       String   @map("wire_text") @db.Text
+  evidenceText   String?  @map("evidence_text") @db.Text
+  responseText   String?  @map("response_text") @db.Text
+  responseParsed Json?    @map("response_parsed")
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([scenarioId])
+  @@map("cert_transmissions")
+}
+
 model HtsRateLine {
   htsNumber   String   @id @map("hts_number") @db.VarChar(10)
   description String   @db.Text
