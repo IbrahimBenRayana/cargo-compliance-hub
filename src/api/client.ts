@@ -1845,6 +1845,247 @@ export const abiDocumentsApi = {
   },
 };
 
+// ─── In-Bond (7512) API ───────────────────────────────────
+//
+// Server contract: server/src/routes/inbond.ts. The stored `payload` is the
+// abi-engine's InbondAddInput WITHOUT `kind` (the route adds kind:'add' at
+// build time) and WITH `entryType` merged in by the route on every write.
+// POST /:id/build and POST /:id/events return structured 422s of shape
+// { error, issues: [{ field, message }] } when the engine rejects the data.
+
+/** 61 IT (arrive only) | 62 T&E (arrive then export) | 63 IE (export only). */
+export type InbondEntryType = '61' | '62' | '63';
+
+export type InbondStatus =
+  | 'DRAFT'
+  | 'READY'
+  | 'TRANSMITTED'
+  | 'AUTHORIZED'
+  | 'ARRIVED'
+  | 'EXPORTED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+/** WP action: 1/2/3 arrive, 5/6/7 export, A transfer of liability, Z diversion. */
+export type InbondEventAction = '1' | '2' | '3' | '5' | '6' | '7' | 'A' | 'Z';
+
+export type InbondWeightUnit = 'LB' | 'KG' | 'LT' | 'ST' | 'ET' | 'MT';
+
+/** Engine validation issue returned in 422 bodies. */
+export interface InbondIssue {
+  field: string;
+  message: string;
+}
+
+export interface InbondPartyDraft {
+  name?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  addressLine3?: string;
+  telephoneOrTelex?: string;
+}
+
+export interface InbondCommodityDraft {
+  /** 6-10 digits. */
+  htsNumber?: string;
+  /** Whole USD, > 0. */
+  valueDollars?: number;
+  /** Net weight, whole number > 0. */
+  weight?: number;
+  weightUnit?: InbondWeightUnit;
+}
+
+export interface InbondCargoLineDraft {
+  pieceCount?: number;
+  description?: string;
+  manifestUnitCode?: string;
+}
+
+export interface InbondCargoGroupDraft {
+  commodities?: InbondCommodityDraft[];
+  descriptions?: InbondCargoLineDraft[];
+  marksAndNumbers?: string[];
+}
+
+export interface InbondContainerDraft {
+  containerNumber?: string;
+  sealNumber1?: string;
+  sealNumber2?: string;
+  cargo?: InbondCargoGroupDraft[];
+}
+
+export interface InbondBillDetailsDraft {
+  /** 5-digit Schedule K ('99999' only for FTZ withdrawals). */
+  foreignPortOfLading?: string;
+  /** Must equal the sum of all container piece counts. */
+  manifestQuantity?: number;
+  manifestUnits?: string;
+  weight?: number;
+  weightUnit?: InbondWeightUnit;
+  foreignShipper?: InbondPartyDraft;
+  consignee?: InbondPartyDraft;
+  containers?: InbondContainerDraft[];
+}
+
+export interface InbondBillDraft {
+  /** SCAC or 3-char AWB prefix. */
+  issuerCode?: string;
+  billNumber?: string;
+  /** Air only. */
+  houseBillNumber?: string;
+  previousInBondNumber?: string;
+  /** Partial quantity — only valid against a bill already on file (short form). */
+  inBondQuantity?: number;
+  /** Present = full bill details (QP-Long); absent = bill already on file (QP-Short). */
+  details?: InbondBillDetailsDraft;
+}
+
+export interface InbondConveyanceDraft {
+  /** SCAC / ICAO / IATA — or the FTZ FIRMS code for withdrawals. */
+  importingCarrierCode?: string;
+  /** 30 truck / 40 air / 70 pipeline. */
+  importMotCode?: string;
+  /** Schedule D port of unlading. */
+  portOfArrival?: string;
+  /** MMDDYY. */
+  estimatedDateOfArrival?: string;
+  /** FIRMS of the FTZ/warehouse — required when the FTZ flag is set. */
+  ftzFirmsCode?: string;
+}
+
+/**
+ * The filing payload — maps 1:1 onto the engine's InbondAddInput minus `kind`.
+ * `inBondCarrierCode` duplicates `carrierCode`: the engine reads `carrierCode`,
+ * while the server's list denormalizer reads `inBondCarrierCode`; the client
+ * writes both so search/list columns populate.
+ */
+export interface InbondPayloadDraft {
+  entryType?: InbondEntryType;
+  /** Conventional 9-digit number with a MOD-7 check digit (validated at build). */
+  inBondNumber?: string;
+  /** QP10 in-bond carrier SCAC (or FTZ FIRMS code). */
+  carrierCode?: string;
+  /** Denormalization mirror of carrierCode — keep in sync. */
+  inBondCarrierCode?: string;
+  /** Schedule D: termination (61), export (62) or arrival (63) port. */
+  usPortOfDestination?: string;
+  /** Schedule K — required for 62/63, forbidden for 61. */
+  portOfForeignDestination?: string;
+  /** Whole USD, > 0. */
+  valueDollars?: number;
+  /** IRS / CBP-assigned / SSN number of the bonded carrier. */
+  bondedCarrierId?: string;
+  /** FTZ or bonded-warehouse withdrawal. */
+  ftzWithdrawal?: boolean;
+  /** 63 and FTZ moves must be 'N'. */
+  btaIndicator?: 'Y' | 'N';
+  conveyance?: InbondConveyanceDraft;
+  bills?: InbondBillDraft[];
+}
+
+/** Row returned by GET /api/v1/inbond (list). */
+export interface InbondListItem {
+  id: string;
+  status: InbondStatus;
+  entryType: InbondEntryType;
+  inbondNumber: string | null;
+  carrierCode: string | null;
+  portOfDestination: string | null;
+  primaryBill: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count: { events: number };
+}
+
+export interface InbondEvent {
+  id: string;
+  filingId: string;
+  action: InbondEventAction;
+  payload: Record<string, unknown>;
+  wireText: string | null;
+  status: string;
+  occurredAt: string;
+  createdAt: string;
+}
+
+/** Full filing returned by GET /:id (events included) and mutations. */
+export interface InbondFiling {
+  id: string;
+  orgId: string;
+  createdById: string;
+  status: InbondStatus;
+  entryType: InbondEntryType;
+  inbondNumber: string | null;
+  carrierCode: string | null;
+  portOfDestination: string | null;
+  primaryBill: string | null;
+  payload: InbondPayloadDraft;
+  wireText: string | null;
+  createdAt: string;
+  updatedAt: string;
+  events?: InbondEvent[];
+}
+
+export interface InbondListParams {
+  search?: string;
+  status?: InbondStatus;
+}
+
+export interface InbondRecordEventBody {
+  action: InbondEventAction;
+  /** ISO datetime — the server derives the wire YYMMDD/HHMMSS from it (UTC). */
+  occurredAt: string;
+  /** Action-specific InbondEventInput fields (firmsCode, port, bill, …). */
+  payload: Record<string, unknown>;
+}
+
+export const inbondApi = {
+  list(params?: InbondListParams) {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.status) query.set('status', params.status);
+    const qs = query.toString();
+    return apiFetch<{ filings: InbondListItem[] }>(`/api/v1/inbond${qs ? `?${qs}` : ''}`);
+  },
+
+  create(body: { entryType: InbondEntryType; payload?: InbondPayloadDraft }) {
+    return apiFetch<{ filing: InbondFiling }>('/api/v1/inbond', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  get(id: string) {
+    return apiFetch<{ filing: InbondFiling }>(`/api/v1/inbond/${id}`);
+  },
+
+  update(id: string, body: { entryType?: InbondEntryType; payload?: InbondPayloadDraft }) {
+    return apiFetch<{ filing: InbondFiling }>(`/api/v1/inbond/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  },
+
+  remove(id: string) {
+    return apiFetch<{ success: true }>(`/api/v1/inbond/${id}`, { method: 'DELETE' });
+  },
+
+  /** Validate the payload through the abi-engine; 422 carries InbondIssue[]. */
+  build(id: string) {
+    return apiFetch<{ filing: InbondFiling; wireLines: string[] }>(
+      `/api/v1/inbond/${id}/build`,
+      { method: 'POST' },
+    );
+  },
+
+  recordEvent(id: string, body: InbondRecordEventBody) {
+    return apiFetch<{ event: InbondEvent; wireLines: string[] }>(
+      `/api/v1/inbond/${id}/events`,
+      { method: 'POST', body: JSON.stringify(body) },
+    );
+  },
+};
+
 // ─── Compliance Center API ────────────────────────────────
 
 export interface AiStatusResponse {

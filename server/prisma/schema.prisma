@@ -40,6 +40,7 @@ model Organization {
   apiKeys           ApiKey[]
   webhookEndpoints  WebhookEndpoint[]
   chatConversations ChatConversation[]
+  inbondFilings     InbondFiling[]
 
   @@map("organizations")
 }
@@ -98,6 +99,7 @@ model User {
   apiKeys                 ApiKey[]                 @relation("ApiKeyCreator")
   chatConversations       ChatConversation[]       @relation("ChatUser")
   assignedChats           ChatConversation[]       @relation("ChatAgent")
+  inbondFilings           InbondFiling[]           @relation("InbondCreator")
 
   @@index([orgId])
   @@index([email])
@@ -970,6 +972,51 @@ model ChatMessage {
 // One row per 8/10-digit HTS number (dots stripped). generalRate is
 // RESOLVED at ingest time: statistical 10-digit lines inherit from the
 // nearest ancestor rate line, so lookups never need to walk the tree.
+// ── In-bond (7512) filings ──────────────────────────
+// Native QP/WP in-bond movements (abi-engine/inbond). `payload` is the
+// engine's InbondAddInput (sans kind), validated by buildInbond on save;
+// events record the WP lifecycle (arrive/export/transfer/divert).
+model InbondFiling {
+  id                String   @id @default(uuid()) @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
+  createdById       String   @map("created_by") @db.Uuid
+  // DRAFT | READY | TRANSMITTED | AUTHORIZED | ARRIVED | EXPORTED | REJECTED | CANCELLED
+  status            String   @default("DRAFT") @db.VarChar(20)
+  entryType         String   @map("entry_type") @db.VarChar(2) // 61 IT | 62 T&E | 63 IE
+  inbondNumber      String?  @map("inbond_number") @db.VarChar(12)
+  carrierCode       String?  @map("carrier_code") @db.VarChar(4)
+  portOfDestination String?  @map("port_of_destination") @db.VarChar(4)
+  primaryBill       String?  @map("primary_bill") @db.VarChar(30)
+  payload           Json
+  wireText          String?  @map("wire_text") @db.Text
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy    User          @relation("InbondCreator", fields: [createdById], references: [id])
+  events       InbondEvent[]
+
+  @@index([orgId])
+  @@map("inbond_filings")
+}
+
+model InbondEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  filingId   String   @map("filing_id") @db.Uuid
+  // WP action: 1/2/3 arrive, 5/6/7 export, A transfer, Z diversion
+  action     String   @db.VarChar(1)
+  payload    Json
+  wireText   String?  @map("wire_text") @db.Text
+  status     String   @default("RECORDED") @db.VarChar(20)
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz()
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  filing InbondFiling @relation(fields: [filingId], references: [id], onDelete: Cascade)
+
+  @@index([filingId])
+  @@map("inbond_events")
+}
+
 // ── ABI certification console (workstream H) ──────────────
 // One row of cert-run parameters (singleton id 'default') + one row per
 // scenario transmission attempt during the CBP CERT test.

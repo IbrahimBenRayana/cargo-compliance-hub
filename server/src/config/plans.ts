@@ -26,6 +26,8 @@ export const CAPABILITIES = {
   ABI_ENTRY: 'ABI_ENTRY',
   CONTAINER_TRACKING: 'CONTAINER_TRACKING',
   HTS_CLASSIFICATION: 'HTS_CLASSIFICATION',
+  // Native in-bond (7512) movements — premium tiers only.
+  IN_BOND: 'IN_BOND',
 } as const;
 
 export type Capability = (typeof CAPABILITIES)[keyof typeof CAPABILITIES];
@@ -83,6 +85,7 @@ export const TIERS: TierDef[] = [
       CAPABILITIES.ABI_ENTRY,
       CAPABILITIES.CONTAINER_TRACKING,
       CAPABILITIES.HTS_CLASSIFICATION,
+      CAPABILITIES.IN_BOND,
     ],
     stripePriceId: () => env.STRIPE_PRICE_FULL || null,
     isPublic: true,
@@ -105,6 +108,7 @@ export const TIERS: TierDef[] = [
       CAPABILITIES.ABI_ENTRY,
       CAPABILITIES.CONTAINER_TRACKING,
       CAPABILITIES.HTS_CLASSIFICATION,
+      CAPABILITIES.IN_BOND,
     ],
     stripePriceId: () => null, // negotiated; not a self-serve metered price
     isPublic: false,

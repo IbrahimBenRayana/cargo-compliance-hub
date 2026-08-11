@@ -31,6 +31,9 @@ import DutyCalculatorPage from "@/pages/DutyCalculatorPage";
 import ABIDocumentsListPage from "@/pages/ABIDocumentsListPage";
 import ABIDocumentDetailPage from "@/pages/ABIDocumentDetailPage";
 import ABIDocumentWizard from "@/pages/ABIDocumentWizard";
+import InbondListPage from "@/pages/InbondListPage";
+import InbondDetailPage from "@/pages/InbondDetailPage";
+import InbondWizard from "@/pages/InbondWizard";
 import IntegrationsApi from "@/pages/IntegrationsApi";
 import TrackingPage from "@/pages/TrackingPage";
 import TrackingDetailPage from "@/pages/TrackingDetailPage";
@@ -100,6 +103,10 @@ const App = () => (
                 <Route path="/abi-documents/new" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.ABI_ENTRY}><ABIDocumentWizard /></CapabilityGate></ErrorBoundary>} />
                 <Route path="/abi-documents/:id" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.ABI_ENTRY}><ABIDocumentDetailPage /></CapabilityGate></ErrorBoundary>} />
                 <Route path="/abi-documents/:id/edit" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.ABI_ENTRY}><ABIDocumentWizard /></CapabilityGate></ErrorBoundary>} />
+                <Route path="/inbond" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.IN_BOND}><InbondListPage /></CapabilityGate></ErrorBoundary>} />
+                <Route path="/inbond/new" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.IN_BOND}><InbondWizard /></CapabilityGate></ErrorBoundary>} />
+                <Route path="/inbond/:id" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.IN_BOND}><InbondDetailPage /></CapabilityGate></ErrorBoundary>} />
+                <Route path="/inbond/:id/edit" element={<ErrorBoundary><CapabilityGate capability={CAPABILITIES.IN_BOND}><InbondWizard /></CapabilityGate></ErrorBoundary>} />
                 <Route path="/integrations/api" element={<ErrorBoundary><IntegrationsApi /></ErrorBoundary>} />
                 <Route path="/integrations/logs" element={<ErrorBoundary><SubmissionLogs /></ErrorBoundary>} />
                 <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />

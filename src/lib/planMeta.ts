@@ -10,6 +10,8 @@ export const CAPABILITIES = {
   ABI_ENTRY: 'ABI_ENTRY',
   CONTAINER_TRACKING: 'CONTAINER_TRACKING',
   HTS_CLASSIFICATION: 'HTS_CLASSIFICATION',
+  // Native in-bond (7512) movements — premium tiers only.
+  IN_BOND: 'IN_BOND',
 } as const;
 
 export type Capability = (typeof CAPABILITIES)[keyof typeof CAPABILITIES];
@@ -81,11 +83,13 @@ export const PLAN_META: Record<string, PlanMeta> = {
       CAPABILITIES.ABI_ENTRY,
       CAPABILITIES.CONTAINER_TRACKING,
       CAPABILITIES.HTS_CLASSIFICATION,
+      CAPABILITIES.IN_BOND,
     ],
     features: [
       'Everything in ISF + Entry',
       'Container tracking (Terminal 49)',
       'HTS classification & Duty Calculator',
+      'In-Bond (7512) movements',
       'Priority support',
     ],
   },
@@ -102,6 +106,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   ABI_ENTRY: 'ABI Entry',
   CONTAINER_TRACKING: 'Container Tracking',
   HTS_CLASSIFICATION: 'HTS Classification',
+  IN_BOND: 'In-Bond Movements',
 };
 
 /** The cheapest public tier that includes a given capability (for "upgrade to

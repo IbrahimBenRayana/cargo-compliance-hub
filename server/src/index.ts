@@ -21,6 +21,7 @@ import authRoutes from './routes/auth.js';
 import mfaRoutes from './routes/mfa.js';
 import adminRoutes from './routes/admin.js';
 import certConsoleRoutes from './routes/certConsole.js';
+import inbondRoutes from './routes/inbond.js';
 import apiKeyRoutes from './routes/apiKeys.js';
 import webhookRoutes from './routes/webhooks.js';
 import publicApiRoutes from './routes/publicApi.js';
@@ -135,6 +136,7 @@ app.use('/api/v1/auth/mfa', mfaRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/admin/cert', certConsoleRoutes);
+app.use('/api/v1/inbond', inbondRoutes);
 app.use('/api/v1/api-keys', apiKeyRoutes);
 app.use('/api/v1/webhooks', webhookRoutes);
 // Public, API-key-authenticated surface for broker/3PL/ERP integrations.
