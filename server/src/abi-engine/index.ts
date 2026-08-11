@@ -119,6 +119,72 @@ export {
 } from './isf/recordDefs.js';
 export * as isfRecordDefs from './isf/recordDefs.js';
 
+// ── In-Bond (QP/QT + WP/WT events + NS notifications) ──────
+export { buildInbond, buildInbondEvent } from './inbond/builder.js';
+export type {
+  InbondInput,
+  InbondAddInput,
+  InbondDeleteBillInput,
+  InbondDeleteInput,
+  InbondEventInput,
+  InbondEntryType,
+  InbondEventAction,
+  InbondWeightUnit,
+  InbondConveyance,
+  InbondParty,
+  InbondCommodity,
+  InbondCargoLine,
+  InbondCargoGroup,
+  InbondHazmat,
+  InbondHazmatContinuation,
+  InbondContainer,
+  InbondBillDetails,
+  InbondBill,
+  InbondReference,
+} from './inbond/builder.js';
+export {
+  computeInbondCheckDigit,
+  formatInbondNumber,
+  isAcceptableInbondNumber,
+} from './inbond/checkDigit.js';
+export {
+  parseInbondResponse,
+  parseInbondResponseBatch,
+  parseInbondEventResponse,
+  parseInbondEventResponseBatch,
+  parseInbondStatus,
+  parseInbondStatusBatch,
+  parseInbondStructureRejects,
+} from './inbond/responseParser.js';
+export type {
+  InbondMessage,
+  InbondStructureReject,
+  InbondEchoedRecord,
+  InbondBillResult,
+  InbondResponse,
+  InbondResponseBatch,
+  InbondEventResponse,
+  InbondEventResponseBatch,
+  InbondStatusConveyanceHeader,
+  InbondStatusInbondHeader,
+  InbondStatusContainer,
+  InbondStatusNotification,
+  InbondStatusBatch,
+} from './inbond/responseParser.js';
+export {
+  IN_BOND_ENTRY_TYPES,
+  QP10_ACTION_CODES,
+  QP30_ACTION_CODES,
+  WP_ACTION_CODES,
+  QP33_REFERENCE_QUALIFIERS,
+  WEIGHT_UNITS,
+  VOLUME_UNITS,
+  NARRATIVE_MESSAGE_TYPES,
+  HAZMAT_QUALIFIERS,
+  INLAND_LADING_CODES,
+} from './inbond/recordDefs.js';
+export * as inbondRecordDefs from './inbond/recordDefs.js';
+
 // ── Census Warning Override (CW/CO) + Query (CJ/CL) ────────
 export { buildCensusOverride } from './apps/census/cwBuilder.js';
 export type { CwCensusOverrideInput, CwEntryOverrides, CwLineOverrides, CwOverride } from './apps/census/cwBuilder.js';

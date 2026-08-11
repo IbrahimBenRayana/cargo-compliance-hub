@@ -71,6 +71,8 @@ export const APPLICATION_CODES = {
   pmsRequestReroute: { input: 'MO', response: 'MQ' },
   achDebitAuthorization: { input: 'RM', response: 'PZ' },
   importerSecurityFiling: { input: 'SF', response: 'SN' },
+  inBond: { input: 'QP', response: 'QT' },
+  inBondEvent: { input: 'WP', response: 'WT' },
   // notification-only (no input code)
   entrySummaryStatusNotification: { response: 'UC' },
   cargoReleaseStatusNotification: { response: 'SO' },
@@ -79,5 +81,6 @@ export const APPLICATION_CODES = {
   courtesyNotice: { response: 'NR' },
   tibExpirationNotice: { response: 'TS' },
   isfStatusAdvisory: { response: 'SA' },
+  inBondStatusNotification: { response: 'NS' },
   currencyExchangeRatesUpdate: { response: '%R' },
 } as const;
