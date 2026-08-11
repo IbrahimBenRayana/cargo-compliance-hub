@@ -61,6 +61,64 @@ export * as aeHeaderRecordDefs from './ae/headerRecordDefs.js';
 export * as aeLineRecordDefs from './ae/lineRecordDefs.js';
 export * as aeResponseDefs from './ae/responseDefs.js';
 
+// ── Importer Security Filing (SF/SN + SA advisory) ─────────
+export { buildIsf } from './isf/builder.js';
+export type {
+  IsfInput,
+  IsfImporter,
+  IsfBond,
+  IsfShipmentInfo,
+  IsfBill,
+  IsfReference,
+  IsfContainer,
+  IsfEntity,
+  IsfEntityBase,
+  IsfEntityGeography,
+  IsfAddressComponent,
+  IsfManufacturer,
+  IsfTariff,
+  IsfSubmissionType,
+  IsfShipmentType,
+  IsfActionCode,
+  IsfActionReasonCode,
+  IsfEntityCode,
+  IsfEntityIdentifierQualifier,
+} from './isf/builder.js';
+export { mapFilingToIsfInput } from './isf/fromFiling.js';
+export type { PlatformIsfFiling, MapFilingToIsfOptions } from './isf/fromFiling.js';
+export {
+  parseIsfResponse,
+  parseIsfResponseBatch,
+  parseIsfStatusAdvisory,
+  parseIsfStatusAdvisoryBatch,
+} from './isf/responseParser.js';
+export type {
+  IsfResponse,
+  IsfResponseBatch,
+  IsfEchoedRecord,
+  IsfRecordError,
+  IsfDisposition,
+  IsfStatusAdvisory,
+  IsfStatusAdvisoryBatch,
+  IsfBillStatus,
+} from './isf/responseParser.js';
+export {
+  SUBMISSION_TYPES,
+  SHIPMENT_TYPES,
+  ACTION_REASON_CODES,
+  IMPORTER_NUMBER_QUALIFIERS,
+  ENTITY_CODES,
+  ENTITY_SECONDARY_NAME_CODES,
+  ENTITY_IDENTIFIER_QUALIFIERS,
+  ADDRESS_COMPONENT_QUALIFIERS,
+  REFERENCE_IDENTIFIER_QUALIFIERS,
+  BOND_ACTIVITY_CODES,
+  BOND_TYPES,
+  SF90_MESSAGE_TYPES,
+  SA_DISPOSITION_CODES,
+} from './isf/recordDefs.js';
+export * as isfRecordDefs from './isf/recordDefs.js';
+
 // ── Census Warning Override (CW/CO) + Query (CJ/CL) ────────
 export { buildCensusOverride } from './apps/census/cwBuilder.js';
 export type { CwCensusOverrideInput, CwEntryOverrides, CwLineOverrides, CwOverride } from './apps/census/cwBuilder.js';

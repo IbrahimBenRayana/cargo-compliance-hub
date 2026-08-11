@@ -70,6 +70,7 @@ export const APPLICATION_CODES = {
   statementUpdate: { input: 'SU', response: 'SQ' },
   pmsRequestReroute: { input: 'MO', response: 'MQ' },
   achDebitAuthorization: { input: 'RM', response: 'PZ' },
+  importerSecurityFiling: { input: 'SF', response: 'SN' },
   // notification-only (no input code)
   entrySummaryStatusNotification: { response: 'UC' },
   cargoReleaseStatusNotification: { response: 'SO' },
@@ -77,5 +78,6 @@ export const APPLICATION_CODES = {
   periodicMonthlyStatement: { response: 'MS' },
   courtesyNotice: { response: 'NR' },
   tibExpirationNotice: { response: 'TS' },
+  isfStatusAdvisory: { response: 'SA' },
   currencyExchangeRatesUpdate: { response: '%R' },
 } as const;
