@@ -636,7 +636,7 @@ async function main(): Promise<void> {
             description: c.description,
             quantity: c.quantity,
             quantityUOM: c.quantityUOM,
-            weight: { value: c.weightKg, unit: 'KG' },
+            weight: { value: c.weightKg, unit: 'K' }, // CC accepts only 'K'/'L'
             value: { amount: c.valueUsd, currency: 'USD' },
           }))
         ),

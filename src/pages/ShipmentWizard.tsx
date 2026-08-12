@@ -1094,7 +1094,17 @@ export default function ShipmentWizard() {
         const msgs = body.validationErrors.map((e: any) => e.message).join('\n');
         toast.error(`Validation failed:\n${msgs}`, { duration: 8000 });
       } else if (body?.details) {
-        toast.error(`Validation: ${JSON.stringify(body.details)}`, { duration: 8000 });
+        // Zod flatten shape: { formErrors: string[], fieldErrors: Record<string, string[]> }.
+        // Render human-readable lines, never raw JSON.
+        const fieldErrors: Record<string, string[]> = body.details.fieldErrors ?? {};
+        const lines = [
+          ...((body.details.formErrors ?? []) as string[]),
+          ...Object.entries(fieldErrors).map(([field, msgs]) => `${field}: ${msgs.join('; ')}`),
+        ];
+        toast.error(
+          lines.length > 0 ? `Please fix before submitting:\n${lines.join('\n')}` : 'Validation failed',
+          { duration: 8000 }
+        );
       } else {
         toast.error(body?.error || 'Failed to save filing');
       }
