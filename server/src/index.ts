@@ -48,6 +48,7 @@ import { startBackgroundJobs, stopBackgroundJobs, getJobStatus, pollSubmittedFil
 import { startNotificationStream, stopNotificationStream } from './services/notificationStream.js';
 import { startChatStream, stopChatStream, getChatStreamStats } from './services/chat/chatStream.js';
 import { verifyEmailConnection } from './services/email.js';
+import { syncPlansFromTiers } from './services/planSync.js';
 
 const app = express();
 
@@ -230,6 +231,9 @@ async function main() {
   try {
     await prisma.$connect();
     console.log('✅ Database connected');
+
+    // Keep tier capabilities in the plans table aligned with the code.
+    await syncPlansFromTiers();
 
     const server = app.listen(env.PORT, () => {
       console.log(`🚀 MyCargoLens API running on http://localhost:${env.PORT}`);
