@@ -22,10 +22,14 @@ import { parseQuotaResponseBatch } from '../abi-engine/apps/quota/responseParser
 import { parseTibResponseBatch } from '../abi-engine/apps/tib/responseParser.js';
 import { parseEsQueryResponseBatch } from '../abi-engine/apps/esQuery/responseParser.js';
 import { parseUcNotificationBatch } from '../abi-engine/apps/uc/parser.js';
+import { createTransport } from '../abi-engine/transport/index.js';
 
 const router = Router();
 router.use(authMiddleware);
 router.use(requirePlatformAdmin);
+
+// Phase-4 transport: mock loopback until CBP's MQIPT parameters land in env.
+const transport = createTransport(process.env as Record<string, string | undefined>);
 
 const PARAMS_ID = 'default';
 
@@ -217,6 +221,55 @@ router.patch('/transmissions/:id', async (req: AuthRequest, res: Response): Prom
     },
   });
   res.json({ transmission, parseError });
+});
+
+// ─── POST /transmissions/:id/transmit ─────────────────────
+// Send a generated transmission through the configured transport. With the
+// mock transport this rehearses the full flow; once MQIPT is configured the
+// same button reaches CBP CERT.
+router.post('/transmissions/:id/transmit', async (req: AuthRequest, res: Response): Promise<void> => {
+  const existing = await prisma.certTransmission.findUnique({ where: { id: String(req.params.id) } });
+  if (!existing) {
+    res.status(404).json({ error: 'Transmission not found' });
+    return;
+  }
+  if (existing.status !== 'generated') {
+    res.status(409).json({ error: `Only freshly generated transmissions can be transmitted (status: ${existing.status})` });
+    return;
+  }
+  if (!existing.wireText) {
+    res.status(422).json({ error: 'This transmission has no wire text (client-side rejection scenarios are never transmitted)' });
+    return;
+  }
+  try {
+    const receipt = await transport.send(existing.wireText.split('\n'), { correlationId: existing.scenarioId });
+    const transmission = await prisma.certTransmission.update({
+      where: { id: existing.id },
+      data: {
+        status: 'transmitted',
+        notes: `${existing.notes ? existing.notes + '\n' : ''}[transport:${transport.kind}] message ${receipt.messageId}`,
+      },
+    });
+    await writeAuditLog({
+      orgId: req.user!.orgId, userId: req.user!.id,
+      action: 'cert.transmitted', entityType: 'cert_transmission', entityId: existing.id,
+      newValue: { scenarioId: existing.scenarioId, transport: transport.kind, messageId: receipt.messageId },
+      ...getRequestMeta(req),
+    });
+    res.json({ transmission, transport: transport.kind, messageId: receipt.messageId });
+  } catch (err) {
+    res.status(502).json({
+      error: 'Transport send failed',
+      detail: err instanceof Error ? err.message : String(err),
+      transport: transport.kind,
+    });
+  }
+});
+
+// ─── GET /transport ───────────────────────────────────────
+router.get('/transport', async (_req: AuthRequest, res: Response): Promise<void> => {
+  const health = await transport.healthcheck();
+  res.json({ transport: transport.kind, ...health });
 });
 
 export default router;
