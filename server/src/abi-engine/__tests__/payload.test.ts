@@ -155,6 +155,28 @@ describe('migrateV1ToV2', () => {
     expect(v2.commercial?.consignee?.name).toBe('SIGMA TECHNOLOGY PARTNERS LLC');
   });
 
+  it('survives the full shadow pipeline: migrate \u2192 duty \u2192 validate \u2192 build', async () => {
+    // The exact chain services/abiShadow.ts runs after every CC submission.
+    const { enrichWithDuty, StaticRateSource } = await import('../duty/engine.js');
+    const { toAeEntrySummaryInput } = await import('../payload/toAeInput.js');
+    const { validateEntrySummary } = await import('../validate/entrySummary.js');
+    const priced = await enrichWithDuty(
+      migrateV1ToV2(V1),
+      new StaticRateSource({ '8507600020': '3.41%' }),
+      { applicabilityDate: '20260820' }
+    );
+    const input = toAeEntrySummaryInput(priced, 'A');
+    // Known gap the shadow note reports on real captures: CC documents carry
+    // manufacturers as name+address, not the IRS-format identifier the
+    // 47-record needs \u2014 MID derivation (CBP 3500-13) is future enrichment.
+    const issues = validateEntrySummary(input);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].field).toBe('lines[0].parties[M]');
+    const lines = buildEntrySummary(input);
+    expect(lines[0].startsWith('10')).toBe(true);
+    expect(lines[lines.length - 1].startsWith('90')).toBe(true);
+  });
+
   it('refuses unmappable values instead of degrading silently', () => {
     expect(() => migrateV1ToV2({ ...V1, entryNumber: 'BAD' })).toThrow(/cannot split/);
     expect(() => migrateV1ToV2({ ...V1, bond: { ...V1.bond, type: 'X' } })).toThrow(/bond type/);

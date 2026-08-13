@@ -769,6 +769,12 @@ model AbiDocument {
   mbolNumber String? @map("mbol_number") @db.VarChar(100)
   hbolNumber String? @map("hbol_number") @db.VarChar(100)
 
+  // Phase-5 shadow run: the native CATAIR wire generated alongside each CC
+  // submission (cutover evidence), plus a note ('ok', validation issues, or
+  // the mapping/build failure). Best-effort — never blocks the CC path.
+  nativeWireText   String? @map("native_wire_text") @db.Text
+  nativeShadowNote String? @map("native_shadow_note") @db.Text
+
   // Parties denorm
   iorNumber     String? @map("ior_number") @db.VarChar(100)
   iorName       String? @map("ior_name") @db.VarChar(255)

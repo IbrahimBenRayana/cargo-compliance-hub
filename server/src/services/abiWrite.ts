@@ -24,6 +24,7 @@ import { createABIDocumentSchema, abiDocumentBodySchema } from '../schemas/abiDo
 import { writeAuditLog } from './auditLog.js';
 import { notify } from './notifications.js';
 import { getOrgEntitlements } from './entitlements.js';
+import { captureNativeShadow } from './abiShadow.js';
 import { pollABIDocumentStatus } from './abiPolling.js';
 import { emitWebhook } from './webhooks.js';
 import logger from '../config/logger.js';
@@ -255,6 +256,11 @@ export async function sendAbiDocumentToCBP(params: {
       where: { id: postCreateDoc.id },
       data: { status: 'SENT' },
     });
+
+    // Phase-5 parallel-run evidence: generate the native CATAIR equivalent
+    // of what was just filed through CC. Fire-and-forget — a shadow failure
+    // is recorded on the document, never surfaced to this flow.
+    captureNativeShadow(sentDoc.id).catch(() => { /* recorded internally */ });
 
     writeAuditLog({
       orgId, userId,
