@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Bot, MoreHorizontal, Sparkles } from "lucide-react";
+import { Bot, MoreHorizontal, Sparkles } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
@@ -191,14 +191,16 @@ function ComplianceHeroIllustration() {
           fillOpacity="0.7"
           stroke="none"
         >
-          TODAY'S BRIEF · 3 drafts waiting
+          TODAY’S BRIEF Â· 3 drafts waiting
         </text>
       </motion.g>
 
       {/* === Score donut (top-left of card) ============================ */}
       <motion.g
         variants={{
-          hidden: { opacity: 0, scale: 0.85 },
+          // 0.92, not lower — entrances from near-zero scale read as
+          // "appearing from nothing" (nothing real does that).
+          hidden: { opacity: 0, scale: 0.92 },
           visible: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: EASE, delay: 0.3 } },
         }}
       >
@@ -448,7 +450,7 @@ export function ComplianceClient() {
             <a
               key={t.id}
               href={`#${t.id}`}
-              className="group inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-4 py-1.5 text-[12px] font-semibold text-foreground shadow-card transition-all hover:-translate-y-0.5 hover:border-gold/60 hover:bg-gold/10 hover:text-gold-dark dark:hover:text-gold"
+              className="group inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-4 py-1.5 text-[12px] font-semibold text-foreground shadow-card transition-[transform,border-color,background-color,color] duration-150 ease-out hover:-translate-y-0.5 hover:border-gold/60 hover:bg-gold/10 hover:text-gold-dark dark:hover:text-gold"
             >
               <span className="size-1.5 rounded-full bg-gold/70 group-hover:bg-gold" aria-hidden />
               {t.label}
@@ -480,7 +482,7 @@ export function ComplianceClient() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles size={14} className="text-gold-dark dark:text-gold" />
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Today's brief</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Today’s brief</span>
                 </div>
                 <p className="text-foreground font-medium leading-snug">
                   3 drafts waiting on you. Run an AI pre-flight before submitting. One rejection is blocking re-file.

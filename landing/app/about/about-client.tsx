@@ -276,7 +276,7 @@ export function AboutClient() {
           {NUMBERS.map(({ value, label, icon: Icon }, idx) => (
             <li key={label} className="rounded-2xl border border-border/60 bg-card p-5">
               <IconTile icon={Icon} hover="lift" reveal revealDelay={idx * 0.06} className="size-9 mb-3" />
-              <div className="text-2xl font-semibold tabular-nums text-foreground">{value}</div>
+              <div className="text-2xl font-semibold tracking-tight tabular-nums text-foreground">{value}</div>
               <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground mt-1">{label}</div>
             </li>
           ))}
@@ -290,11 +290,11 @@ export function AboutClient() {
             <Ship size={20} />
           </div>
           <p className="text-base leading-relaxed mb-4 opacity-90">
-            We're a small team based in the US, building MyCargoLens from a mix of ops, software,
+            We’re a small team based in the US, building MyCargoLens from a mix of ops, software,
             and customs experience. We file our own ISFs to dogfood every release.
           </p>
           <p className="text-sm opacity-65">
-            Want to chat? <Link href="/contact" className="font-semibold underline underline-offset-4 hover:text-gold">Talk to founders →</Link>
+            Want to chat? <Link href="/contact" className="font-semibold underline underline-offset-4 transition-colors duration-200 hover:text-gold-dark dark:hover:text-gold">Talk to founders →</Link>
           </p>
         </div>
       </SectionShell>

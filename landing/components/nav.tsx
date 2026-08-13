@@ -242,10 +242,14 @@ export function Nav() {
     <MotionConfig reducedMotion="user">
       <header
         className={cn(
-          "sticky top-0 z-50 w-full transition-[backdrop-filter,background-color,border-color,box-shadow] duration-500 ease-out",
+          // Apple "materials": the scrolled bar reads as translucent glass with
+          // a soft scroll-edge (diffuse shadow + fading gold hairline) — no
+          // hard 1px divider. border-b stays transparent in both states so
+          // toggling never shifts layout.
+          "sticky top-0 z-50 w-full border-b border-transparent transition-[backdrop-filter,background-color,box-shadow] duration-300 ease-[var(--ease-out-quart)]",
           scrolled || active !== null
-            ? "border-b border-border/40 bg-[hsl(var(--background)/0.82)] shadow-[0_1px_0_0_hsl(var(--border)/0.4),0_8px_24px_-8px_hsl(var(--foreground)/0.08)] backdrop-blur-xl backdrop-saturate-150"
-            : "border-b border-transparent bg-transparent shadow-none backdrop-blur-0",
+            ? "bg-[hsl(var(--background)/0.82)] shadow-[0_4px_16px_-8px_hsl(var(--foreground)/0.08),0_12px_32px_-16px_hsl(var(--foreground)/0.1)] backdrop-blur-xl backdrop-saturate-150"
+            : "bg-transparent shadow-none backdrop-blur-0",
         )}
       >
         {/* Gold hairline — fades in once the page is scrolled */}
@@ -261,7 +265,7 @@ export function Nav() {
           <nav
             ref={navRef}
             className={cn(
-              "relative flex items-center justify-between transition-[height] duration-500 ease-out",
+              "relative flex items-center justify-between transition-[height] duration-300 ease-[var(--ease-out-quart)]",
               scrolled ? "h-14" : "h-16",
             )}
           >
@@ -334,13 +338,15 @@ export function Nav() {
                   <Link href="/book-a-demo">
                     <span className="relative z-10 inline-flex items-center gap-1.5">
                       Request a demo
-                      <motion.span
+                      {/* group-hover so the nudge fires when hovering the
+                          whole button — whileHover on the tiny span only
+                          triggered when the pointer crossed the arrow itself. */}
+                      <span
                         aria-hidden
-                        className="inline-flex"
-                        whileHover={reducedMotion ? undefined : { x: 2 }}
+                        className="inline-flex transition-transform duration-200 ease-[var(--ease-out-quart)] group-hover:translate-x-0.5"
                       >
                         <ArrowRight size={13} />
-                      </motion.span>
+                      </span>
                     </span>
                     <span
                       aria-hidden
@@ -487,8 +493,18 @@ function MorphPanel({
           key="morph-panel"
           initial={{ opacity: 0, y: 10, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.98 }}
+          // Exit mirrors the entry path (same y, same scale) so the panel
+          // leaves the way it arrived — just a touch faster on the way out.
+          exit={{
+            opacity: 0,
+            y: 10,
+            scale: 0.98,
+            transition: { duration: 0.18, ease: EASE },
+          }}
           transition={{ duration: 0.24, ease: EASE }}
+          // Scale from under the trigger, not the panel's own centre —
+          // anchors the surface to the element that summoned it.
+          style={{ transformOrigin: `${box.left + box.width / 2}px top` }}
           className="absolute left-0 right-0 top-full z-50 hidden pt-3 lg:block"
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
@@ -499,7 +515,7 @@ function MorphPanel({
           <motion.div
             layout
             initial={false}
-            transition={{ duration: 0.32, ease: EASE }}
+            transition={{ duration: 0.3, ease: EASE }}
             style={{ width: box.width, marginLeft: box.left, borderRadius: 16 }}
             className="relative overflow-hidden border border-border/50 bg-[hsl(var(--card)/0.97)] backdrop-blur-2xl backdrop-saturate-150 shadow-[0_24px_80px_-20px_hsl(var(--foreground)/0.25)]"
           >
@@ -563,7 +579,7 @@ function MenuLink({ item, close }: { item: MenuItem; close: () => void }) {
               {item.title}
               <ArrowRight
                 size={11}
-                className="-translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-60"
+                className="-translate-x-1 opacity-0 transition-[transform,opacity] duration-200 ease-[var(--ease-out-quart)] group-hover:translate-x-0 group-hover:opacity-60"
                 aria-hidden
               />
             </p>
@@ -589,7 +605,7 @@ function ExploreLink({ item, close }: { item: ExploreItem; close: () => void }) 
           {item.title}
           <ArrowRight
             size={11}
-            className="-translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-60"
+            className="-translate-x-1 opacity-0 transition-[transform,opacity] duration-200 ease-[var(--ease-out-quart)] group-hover:translate-x-0 group-hover:opacity-60"
             aria-hidden
           />
         </p>

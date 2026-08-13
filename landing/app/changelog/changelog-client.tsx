@@ -14,9 +14,12 @@ import {
   KIND_LABEL,
   KIND_TONE,
   formatChangelogDate,
+  type Entry,
 } from "@/lib/changelog";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
+
+const ALL_ENTRIES: Entry[] = CHANGELOG_ENTRIES;
 
 
 export function ChangelogClient() {
@@ -31,9 +34,55 @@ export function ChangelogClient() {
       />
 
       <SectionShell tone="default">
+        {/* IN PROGRESS — not shipped. Sits above the timeline, visually
+            distinct (dashed border, no date) so it never reads as a release. */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.5, ease: EASE }}
+          className="mb-12 grid gap-6 lg:grid-cols-12 lg:gap-10"
+        >
+          <div className="lg:col-span-3">
+            <div className="sticky top-24">
+              <span className="font-mono text-[12.5px] font-semibold text-muted-foreground">
+                Up next
+              </span>
+              <div className="mt-2">
+                <SeverityPill tone="neutral">In progress</SeverityPill>
+              </div>
+            </div>
+          </div>
+          <div className="lg:col-span-9">
+            <article className="rounded-2xl border border-dashed border-gold/50 bg-gold/[0.04] p-6">
+              <p className="mb-2 font-mono text-[10.5px] font-semibold tracking-[0.14em] text-gold-dark dark:text-gold">
+                IN CBP CERTIFICATION
+              </p>
+              <h2 className="text-lg md:text-xl font-semibold tracking-tight text-foreground mb-3">
+                Native CBP ABI engine
+              </h2>
+              <p className="text-[14.5px] text-muted-foreground leading-relaxed">
+                We&apos;re building our own CATAIR engine for CBP&apos;s Automated Broker
+                Interface. Our CBP filer code is assigned and the engine is in CBP&apos;s
+                certification process now. Until it&apos;s certified, filings continue to
+                transmit through our existing ABI gateway — nothing changes for you.
+              </p>
+            </article>
+          </div>
+        </motion.div>
+
         <ol className="space-y-10">
-          {CHANGELOG_ENTRIES.map((entry) => (
-            <li key={entry.date + entry.title} className="grid gap-6 lg:grid-cols-12 lg:gap-10">
+          {ALL_ENTRIES.map((entry, i) => (
+            <motion.li
+              key={entry.date + entry.title}
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              // Stagger only the first viewport batch; items further down
+              // reveal individually as they scroll in.
+              transition={{ duration: 0.55, ease: EASE, delay: i < 3 ? i * 0.07 : 0 }}
+              className="grid gap-6 lg:grid-cols-12 lg:gap-10"
+            >
               <div className="lg:col-span-3">
                 <div className="sticky top-24">
                   <time className="font-mono text-[12.5px] font-semibold tabular-nums text-muted-foreground">
@@ -62,7 +111,7 @@ export function ChangelogClient() {
                   )}
                 </article>
               </div>
-            </li>
+            </motion.li>
           ))}
         </ol>
       </SectionShell>
@@ -99,22 +148,23 @@ type FeedEntry = { date: string; title: string; kind: FeedKind };
 
 // The four launch nodes (index 0 = newest, at the top of the stream).
 const FEED_INITIAL: FeedEntry[] = [
-  { date: "JUL 13", title: "Live status strip", kind: "new" },
+  { date: "AUG 6", title: "Type 86 entries", kind: "new" },
+  { date: "JUL 22", title: "Public API v1", kind: "new" },
   { date: "JUL 8", title: "MFA for every account", kind: "new" },
-  { date: "JUL 8", title: "Platform pages redesign", kind: "improved" },
   { date: "JUL 3", title: "Homepage rework", kind: "improved" },
 ];
 
 // Deterministic pool cycled by index for the endless feed. No randomness —
-// content is a pure function of stream position (SSR-safe).
+// content is a pure function of stream position (SSR-safe). Dates sit after
+// FEED_INITIAL's newest so arrivals stay chronological as they enter on top.
 const FEED_POOL: FeedEntry[] = [
-  { date: "JUL 14", title: "Email OTP fallback", kind: "new" },
-  { date: "JUL 15", title: "Scroll-linked automation hero", kind: "improved" },
-  { date: "JUL 15", title: "Per-route canonicals", kind: "fix" },
-  { date: "JUL 16", title: "Magnetic CTAs", kind: "improved" },
-  { date: "JUL 17", title: "AI chat handoff", kind: "new" },
-  { date: "JUL 17", title: "Rails marquee", kind: "improved" },
-  { date: "JUL 18", title: "Case-insensitive login", kind: "fix" },
+  { date: "AUG 7", title: "Email OTP fallback", kind: "new" },
+  { date: "AUG 8", title: "Entry status webhooks", kind: "new" },
+  { date: "AUG 8", title: "Per-route canonicals", kind: "fix" },
+  { date: "AUG 10", title: "XML entry upload", kind: "improved" },
+  { date: "AUG 11", title: "AI chat handoff", kind: "new" },
+  { date: "AUG 11", title: "Recovery-code regen", kind: "improved" },
+  { date: "AUG 12", title: "Case-insensitive login", kind: "fix" },
 ];
 
 // Stream position p: larger = newer. p <= 0 maps into FEED_INITIAL,

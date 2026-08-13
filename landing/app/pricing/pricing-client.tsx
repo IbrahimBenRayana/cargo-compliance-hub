@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import * as React from "react";
-import { animate, motion, useMotionValue, useTransform } from "framer-motion";
+import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "framer-motion";
 import { Check, Layers, Sparkles, Wallet, Zap } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
@@ -20,6 +20,9 @@ import { GOLD, EMERALD } from "@/lib/colors";
  * the recommended pick. More dynamic + sells the "this is the one" feel.
  */
 function PricingHeroIllustration() {
+  // SMIL ignores prefers-reduced-motion, so the footer-stamp pulse below is
+  // gated manually; framer loops are handled by the site-wide MotionConfig.
+  const reduceMotion = useReducedMotion();
   // Animated counting price for the featured tier
   const animatedPrice = useMotionValue(0);
   const displayPrice = useTransform(animatedPrice, (v) => `$${Math.round(v)}`);
@@ -310,7 +313,9 @@ function PricingHeroIllustration() {
         }}
       >
         <circle cx="60" cy="338" r="2.5" fill={EMERALD} stroke="none">
-          <animate attributeName="opacity" values="1;0.3;1" dur="1.6s" repeatCount="indefinite" />
+          {!reduceMotion && (
+            <animate attributeName="opacity" values="1;0.3;1" dur="1.6s" repeatCount="indefinite" />
+          )}
         </circle>
         <text x="72" y="342" fontSize="8.5" fontFamily="ui-monospace, monospace" fontWeight="600" fill="currentColor" fillOpacity="0.55" stroke="none">
           no monthly fee · billed per shipment
@@ -467,6 +472,14 @@ const FAQ = [
     a: "No. Signing up is free, and you can browse and draft at no cost. Filing requires picking a tier and adding a card — but you pay from your first filing, and only per shipment. No setup fees, no monthly minimums.",
   },
   {
+    q: "Can you file Type 86 (Section 321) entries?",
+    a: "Yes. Low-value de-minimis shipments under $800 can be filed as Type 86 entries on the same rails as your other filings — same inbox, same pre-flight checks. If de-minimis is a big part of your volume, talk to us about the right setup.",
+  },
+  {
+    q: "Is there an API?",
+    a: "Yes — Public API v1, built for brokers and 3PLs who'd rather integrate than click. Scoped, revocable API keys, ISF and entry read/write, XML upload, and webhooks for status changes. Talk to us about API access for your team.",
+  },
+  {
     q: "What about high volume?",
     a: "For high-volume importers and brokerages, our Enterprise option offers custom per-shipment pricing plus SSO and SLAs. Talk to us about terms that fit your numbers.",
   },
@@ -482,7 +495,9 @@ function TierCard({ tier, index }: { tier: Tier; index: number }) {
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.65, ease: EASE, delay: index * 0.08 }}
       className={cn(
-        "group relative rounded-2xl p-7 transition-all duration-300",
+        // Name the animated properties — never transition-all — and keep the
+        // hover response fast (200ms ease-out) so the card feels attentive.
+        "group relative rounded-2xl p-7 transition-[transform,border-color,box-shadow] duration-200 ease-out",
         // overflow-visible (default) lets the "Most popular" badge sit
         // above the top edge. We bound the internal gradient layer to
         // the card's rounded box with its own overflow-hidden span.
@@ -787,11 +802,19 @@ export function PricingPageClient() {
       <SectionShell tone="default" eyebrow="FAQ" title="Pricing questions.">
         <div className="mx-auto max-w-3xl">
           <ul className="divide-y divide-border/60">
-            {FAQ.map((item) => (
-              <li key={item.q} className="py-5">
+            {FAQ.map((item, i) => (
+              <motion.li
+                key={item.q}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                // Stagger only the first viewport batch; the rest reveal on scroll.
+                transition={{ duration: 0.45, ease: EASE, delay: i < 4 ? i * 0.05 : 0 }}
+                className="py-5"
+              >
                 <h3 className="text-sm font-semibold text-foreground mb-1.5">{item.q}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{item.a}</p>
-              </li>
+              </motion.li>
             ))}
           </ul>
         </div>

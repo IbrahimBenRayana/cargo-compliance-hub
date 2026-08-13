@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
-import { Bot, Search, Sparkles, Sun } from "lucide-react";
+import { ArrowUpRight, Bot, Compass, FolderSearch, Headset, Search, Sparkles, Sun } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { IconTile } from "@/components/ui/icon-tile";
@@ -38,8 +38,27 @@ const HOW_IT_WORKS = [
   { title: "Your data", body: "Your data is not used for model training. OpenAI's API tier we use has zero-retention by contract." },
 ];
 
+const ASSISTANT_POINTS = [
+  {
+    icon: Compass,
+    title: "It takes you there",
+    body: "Ask where something lives and the assistant deep-links you to the exact screen: the filing, the tab, the field that needs fixing.",
+  },
+  {
+    icon: FolderSearch,
+    title: "It knows your filings",
+    body: "Signed in, it answers from your own org's data — statuses, deadlines, rejection reasons. Scoped to your org, never anyone else's.",
+  },
+  {
+    icon: Headset,
+    title: "Humans, one message away",
+    body: "Say the word and a live specialist joins the same conversation. No new ticket, no lost context, no starting over.",
+  },
+];
+
 const FAQ = [
   { q: "Is the AI required to use MyCargoLens?", a: "No. AI is opt-in per team. The rule-based gate runs on every filing regardless." },
+  { q: "Can I talk to a human instead of the AI?", a: "Yes. Ask the assistant for a human anytime — on the website or in the app — and a live specialist joins the same conversation with the full context." },
   { q: "How long does AI Coach take to respond?", a: "First token typically 1.5 to 3 seconds. Full numbered fix steps in 6 to 12 seconds. Streams as it generates." },
   { q: "What if the AI gets it wrong?", a: "You're the final reviewer. Every fix step is suggested, not auto-applied. You always click submit." },
   { q: "Does the AI know my templates?", a: "Yes. Pre-flight reads your saved templates to suggest field reuse and flag inconsistencies." },
@@ -556,13 +575,73 @@ function HeroAIIllustration() {
   );
 }
 
+/**
+ * Static mock of the site-wide assistant widget: question → agentic answer
+ * with a deep-link chip → human handoff in the same thread. Rows cascade
+ * in dialogue order (marketing reveal; site MotionConfig handles reduced
+ * motion). Deliberately not a typewriter — this page already streams in
+ * three other places, and the handoff story reads better at a glance.
+ */
+function AssistantExchange() {
+  const row = (i: number) => ({
+    initial: { opacity: 0, y: 8 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true, amount: 0.5 },
+    transition: { duration: 0.45, ease: EASE, delay: 0.1 + i * 0.14 },
+  });
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.3 }}
+      transition={{ duration: 0.6, ease: EASE }}
+      className="lg:col-span-2 rounded-2xl border border-border/60 bg-card shadow-card overflow-hidden"
+    >
+      <div className="flex items-center gap-2 border-b border-border/60 px-4 py-2.5">
+        <span className="grid size-6 place-items-center rounded-full bg-gold/15 text-gold-dark dark:text-gold">
+          <Bot size={13} />
+        </span>
+        <span className="text-[12px] font-semibold text-foreground">Assistant</span>
+        <span className="ml-auto text-[10.5px] text-muted-foreground">on every page</span>
+      </div>
+      <div className="flex flex-col gap-3 p-4 text-[12.5px] leading-relaxed">
+        <motion.div {...row(0)} className="self-end max-w-[85%] rounded-2xl rounded-br-md border border-gold/30 bg-gold/10 px-3.5 py-2 text-foreground">
+          Why is INV-4421 stuck?
+        </motion.div>
+        <motion.div {...row(1)} className="self-start max-w-[90%] rounded-2xl rounded-bl-md border border-border/60 bg-background/60 px-3.5 py-2 text-foreground">
+          <p className="mb-2">
+            CBP rejected it — the manufacturer party is missing a tax ID. I can
+            take you straight there.
+          </p>
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-gold/30 bg-gold/10 px-2 py-1 font-mono text-[11px] font-semibold text-gold-dark dark:text-gold">
+            Filings · INV-4421 · Parties
+            <ArrowUpRight size={11} />
+          </span>
+        </motion.div>
+        <motion.div {...row(2)} className="self-end max-w-[85%] rounded-2xl rounded-br-md border border-gold/30 bg-gold/10 px-3.5 py-2 text-foreground">
+          Can you loop in a human?
+        </motion.div>
+        <motion.div {...row(3)} className="flex items-center gap-2 self-center py-0.5 text-[11px] text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
+          Sarah · filing specialist joined the thread
+        </motion.div>
+        <motion.div {...row(4)} className="self-start max-w-[90%] rounded-2xl rounded-bl-md border border-emerald-500/30 bg-emerald-500/5 px-3.5 py-2 text-foreground">
+          Hi — I can see the whole thread. Give me two minutes on that
+          manufacturer ID.
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+}
+
 export function AiClient() {
   return (
     <>
       <PageHero
         label="Platform"
         title="Plain English explains every CBP rejection."
-        description="Built on gpt-4o. Reads your filing, your party data, and the CBP response. Streams numbered fix steps. Gated behind your team's enable flag, so you can toggle it off anytime."
+        description="Built on gpt-4o. Reads your filing, your party data, and the CBP response. Streams numbered fix steps. Gated behind your team's enable flag, so you can toggle it off anytime — and a live human specialist is always one message away."
         breadcrumbs={[
           { label: "Platform", href: "/features" },
           { label: "AI", href: "/platform/ai" },
@@ -572,7 +651,7 @@ export function AiClient() {
 
       <SectionShell
         tone="default"
-        eyebrow="The AI features"
+        eyebrow="In the workflow"
         title="One model. Three surfaces."
         className="pb-32 md:pb-40"
       >
@@ -582,7 +661,7 @@ export function AiClient() {
               rule-based fallback example, and the generation cadence. */}
           <li className="rounded-2xl border border-border/60 bg-card p-5 flex flex-col min-h-[520px]">
             <IconTile icon={Sun} hover="spin" reveal className="size-9 mb-4" />
-            <h3 className="text-base font-semibold text-foreground mb-2">Today's brief</h3>
+            <h3 className="text-base font-semibold text-foreground mb-2">Today’s brief</h3>
             <p className="text-sm text-muted-foreground leading-relaxed mb-5">
               One sentence at the top of your day. Auto-generated when you open
               the Compliance Center. Capped at 140 characters so you can read
@@ -595,7 +674,7 @@ export function AiClient() {
                 With AI enabled
               </div>
               <div className="rounded-lg border border-gold/30 bg-gold/5 p-3 text-[12.5px] text-foreground font-medium leading-snug">
-                "Three drafts waiting on you. Run an AI pre-flight before submitting. One rejection is blocking re-file."
+                “Three drafts waiting on you. Run an AI pre-flight before submitting. One rejection is blocking re-file.”
               </div>
             </div>
 
@@ -604,7 +683,7 @@ export function AiClient() {
                 Rule-based fallback (AI off)
               </div>
               <div className="rounded-lg border border-border/60 bg-background/60 p-3 text-[12.5px] text-muted-foreground font-medium leading-snug">
-                "5 cards in your queue. 1 needs attention before EOD."
+                “5 cards in your queue. 1 needs attention before EOD.”
               </div>
             </div>
 
@@ -636,11 +715,44 @@ export function AiClient() {
         </ul>
       </SectionShell>
 
+      {/* AI assistant with human handoff — floating chat on site + app */}
+      <SectionShell
+        tone="default"
+        className="bg-muted/30"
+        eyebrow="AI Assistant"
+        title="Ask anywhere. It takes you there."
+        intro="A floating assistant on this site and inside the app. Agentic: it deep-links you to the right screen and reads your own org's filings to answer — with a seamless handoff to a live human specialist when you want one."
+      >
+        <div className="grid gap-8 lg:grid-cols-5 lg:items-center">
+          <AssistantExchange />
+          <ul className="space-y-2 lg:col-span-3">
+            {ASSISTANT_POINTS.map(({ icon, title, body }, i) => (
+              <motion.li
+                key={title}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{ duration: 0.5, ease: EASE, delay: i * 0.05 }}
+                className="flex items-start gap-4 rounded-xl p-3 -mx-3 transition-colors hover:bg-card"
+              >
+                <IconTile icon={icon} size="md" hover="lift" />
+                <div className="min-w-0">
+                  <h3 className="text-[15px] font-semibold leading-tight tracking-tight text-foreground">
+                    {title}
+                  </h3>
+                  <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{body}</p>
+                </div>
+              </motion.li>
+            ))}
+          </ul>
+        </div>
+      </SectionShell>
+
       <SectionShell tone="default" title="Describe goods, get the right HTS code.">
         <div className="mx-auto max-w-3xl">
           <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 mb-5">
             <Search size={16} className="text-muted-foreground" />
-            <span className="flex-1 text-sm text-foreground">polyester athletic socks, women's</span>
+            <span className="flex-1 text-sm text-foreground">polyester athletic socks, women’s</span>
             <kbd className="rounded border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">↵</kbd>
           </div>
           <ul className="space-y-2.5">

@@ -11,7 +11,10 @@ import {
   ClipboardList,
   Clock,
   Database,
+  FileCode,
   FileDown,
+  FileUp,
+  KeyRound,
   Layers,
   ListChecks,
   RefreshCw,
@@ -19,10 +22,12 @@ import {
   Ship,
   Sparkles,
   Users,
+  Webhook,
 } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
+import { IconTile } from "@/components/ui/icon-tile";
 import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -310,9 +315,9 @@ const SURFACES: Surface[] = [
     id: "filings",
     label: "Filings",
     title: "One wizard. Every shipment type.",
-    blurb: "ISF-10, ISF-5, Entry, Entry Summary, In-Bond. Templates, duplicate, bulk submit, rule-based gate + AI pre-flight.",
+    blurb: "ISF-10, ISF-5, Entry, Entry Summary, In-Bond, Type 86. Templates, duplicate, bulk submit, rule-based gate + AI pre-flight.",
     href: "/platform/filings",
-    count: 12,
+    count: 13,
     icon: Ship,
   },
   {
@@ -328,9 +333,9 @@ const SURFACES: Surface[] = [
     id: "ai",
     label: "AI",
     title: "Plain English explains every rejection.",
-    blurb: "Today's brief. AI Coach (rejection + pre-flight modes). HTS Classifier. Built on gpt-4o, gated by your team's enable flag.",
+    blurb: "Today's brief. AI Coach (rejection + pre-flight modes). HTS Classifier. Site-wide assistant with live human handoff.",
     href: "/platform/ai",
-    count: 4,
+    count: 5,
     icon: Bot,
   },
   {
@@ -346,9 +351,9 @@ const SURFACES: Surface[] = [
     id: "automation",
     label: "Automation",
     title: "Background work, happening 24/7.",
-    blurb: "CBP polled every 5 min. Federal Register synced daily at 04:00 UTC. Hourly deadline alerts. Multi-user RBAC. Notifications.",
+    blurb: "CBP polled every 5 min. Federal Register synced daily at 04:00 UTC. Hourly deadline alerts. Multi-user RBAC. Public API + webhooks.",
     href: "/platform/automation",
-    count: 10,
+    count: 12,
     icon: RefreshCw,
   },
 ];
@@ -370,6 +375,7 @@ const FEATURES: Feature[] = [
   { name: "ABI 7501 Entry Summary", surface: "filings", status: "live", blurb: "Prefilled from accepted ISF. The bond carries over.", icon: ClipboardList },
   { name: "ABI 3461 Entry", surface: "filings", status: "live", blurb: "Manifest queries by Master BOL + hold notices.", icon: ClipboardList },
   { name: "In-Bond filing", surface: "filings", status: "live", blurb: "Cross-port moves with hand-off tracking.", icon: Layers },
+  { name: "Type 86 entry (Section 321)", surface: "filings", status: "live", blurb: "De-minimis (≤ $800) e-commerce entries. Same wizard, same API.", icon: Boxes },
   { name: "Templates", surface: "filings", status: "live", blurb: "Save parties, ports, HTS, bond as reusable templates.", icon: Boxes },
   { name: "Duplicate any filing", surface: "filings", status: "live", blurb: "Clone a draft/accepted/rejected filing in one click.", icon: Boxes },
   { name: "Bulk submit", surface: "filings", status: "live", blurb: "Submit up to 50 drafts in parallel.", icon: Layers },
@@ -399,6 +405,7 @@ const FEATURES: Feature[] = [
   { name: "AI Coach: pre-flight mode", surface: "ai", status: "live", blurb: "Review before submit. Catches UFLPA / PGA / HTS issues.", icon: Sparkles },
   { name: "Today's brief generation", surface: "ai", status: "live", blurb: "≤140 char auto-generated summary at top of day.", icon: Sparkles },
   { name: "HTS Classifier (AI)", surface: "ai", status: "live", blurb: "Best match + alternatives + reasoning.", icon: Sparkles },
+  { name: "AI assistant + human handoff", surface: "ai", status: "live", blurb: "Deep-links to the right screen, answers from your own filings, hands off to a live specialist.", icon: Bot },
 
   // Lifecycle
   { name: "Per-filing timeline", surface: "lifecycle", status: "live", blurb: "Created → Submitted → CBP → Amended → Liquidated.", icon: ListChecks },
@@ -418,7 +425,43 @@ const FEATURES: Feature[] = [
   { name: "Multi-user accounts", surface: "automation", status: "live", blurb: "Email-verified invites with 6-digit code.", icon: Users },
   { name: "4-role RBAC", surface: "automation", status: "live", blurb: "Owner / Admin / Operator / Viewer.", icon: Users },
   { name: "Audit log export (CSV)", surface: "automation", status: "live", blurb: "Full audit trail exportable for compliance.", icon: FileDown },
+  { name: "Public API (REST)", surface: "automation", status: "live", blurb: "Scoped keys. ISF + entry read/write, XML upload, at /api/public/v1.", icon: Database },
+  { name: "Status webhooks", surface: "automation", status: "live", blurb: "Filing-status events delivered as JSON to your endpoint.", icon: BellRing },
   { name: "SSO / SAML", surface: "automation", status: "q4-2026", blurb: "Okta, Azure AD, Google Workspace.", icon: ShieldCheck },
+];
+
+/** Public API capability rows — everything here is live in production. */
+const API_POINTS = [
+  {
+    icon: KeyRound,
+    title: "Scoped API keys",
+    body: "Issue mcl_live_ keys from settings. Read and write scopes per resource. Revoke in one click.",
+  },
+  {
+    icon: FileCode,
+    title: "ISF + entry read/write",
+    body: "Create, submit, and track ISF filings and customs entries programmatically — Type 86 included.",
+  },
+  {
+    icon: FileUp,
+    title: "XML document upload",
+    body: "Already generating filing XML in your system? Post the document as-is and we take it from there.",
+  },
+  {
+    icon: Webhook,
+    title: "Filing-status webhooks",
+    body: "Accepted, rejected, on-hold: every status change POSTs to your endpoint as soon as we see it.",
+  },
+] as const;
+
+/** Terminal-style request/response exchange for the Public API section. */
+const API_EXCHANGE: { kind: "request" | "response" | "event"; left: string; right?: string }[] = [
+  { kind: "request", left: "POST /api/public/v1/shipments", right: "mcl_live_••••" },
+  { kind: "response", left: '201 · { "id": "shp_4k2f", "status": "draft" }' },
+  { kind: "request", left: "POST /api/public/v1/shipments/shp_4k2f/submit" },
+  { kind: "response", left: "202 · queued to CBP" },
+  { kind: "event", left: "webhook → your endpoint", right: "2.1s later" },
+  { kind: "response", left: '{ "event": "filing.accepted", "id": "shp_4k2f" }' },
 ];
 
 const STATUS_TONE: Record<Status, Severity> = {
@@ -453,7 +496,7 @@ export function FeaturesClient() {
       <PageHero
         label="All features"
         title="Every shipped capability, on one page."
-        description={`${liveCount} features live in production today, plus what's on the roadmap. Five platform surfaces, each with its own deep-dive page: Filings, Compliance Center, AI, Lifecycle, and Automation.`}
+        description={`${liveCount} features live in production today, plus what's on the roadmap. Five platform surfaces, each with its own deep-dive page: Filings, Compliance Center, AI, Lifecycle, and Automation — plus a public API for brokers and 3PLs.`}
         breadcrumbs={[{ label: "All features", href: "/features" }]}
         illustration={<FeaturesHeroIllustration />}
       />
@@ -476,6 +519,38 @@ export function FeaturesClient() {
               </motion.div>
             );
           })}
+        </div>
+      </SectionShell>
+
+      {/* Public API — the sixth surface, for machines */}
+      <SectionShell
+        tone="default"
+        eyebrow="Public API"
+        title="And one surface you'll never see."
+        intro="Everything the wizard can file, your stack can file. A REST API at /api/public/v1 for customs brokers, 3PLs, and in-house systems — same validation gates, same lifecycle, same audit trail."
+      >
+        <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+          <ul className="space-y-2">
+            {API_POINTS.map(({ icon, title, body }, i) => (
+              <motion.li
+                key={title}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{ duration: 0.5, ease: EASE, delay: i * 0.05 }}
+                className="flex items-start gap-4 rounded-xl p-3 -mx-3 transition-colors hover:bg-card"
+              >
+                <IconTile icon={icon} size="md" hover="lift" />
+                <div className="min-w-0">
+                  <h3 className="text-[15px] font-semibold leading-tight tracking-tight text-foreground">
+                    {title}
+                  </h3>
+                  <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{body}</p>
+                </div>
+              </motion.li>
+            ))}
+          </ul>
+          <ApiExchangePanel />
         </div>
       </SectionShell>
 
@@ -582,6 +657,62 @@ export function FeaturesClient() {
   );
 }
 
+/**
+ * Terminal-style card showing the create → submit → webhook exchange.
+ * Lines cascade in with a 60ms stagger when scrolled into view — a
+ * marketing reveal, not UI, so the slightly longer per-line duration
+ * is intentional. Reduced motion is handled by the site MotionConfig.
+ */
+function ApiExchangePanel() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.3 }}
+      transition={{ duration: 0.6, ease: EASE }}
+      className="rounded-2xl border border-border/60 bg-[hsl(220_22%_12%)] shadow-card overflow-hidden"
+    >
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
+        <div className="flex items-center gap-1.5" aria-hidden>
+          <span className="size-2.5 rounded-full bg-white/15" />
+          <span className="size-2.5 rounded-full bg-white/15" />
+          <span className="size-2.5 rounded-full bg-white/15" />
+        </div>
+        <span className="font-mono text-[10px] tracking-wider text-white/40">
+          api.mycargolens.com
+        </span>
+      </div>
+      <div className="p-5 font-mono text-[12px] leading-relaxed">
+        {API_EXCHANGE.map((line, i) => (
+          <motion.div
+            key={`${line.kind}-${i}`}
+            initial={{ opacity: 0, y: 6 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 0.45, ease: EASE, delay: 0.15 + i * 0.06 }}
+            className="flex items-baseline justify-between gap-4 py-1"
+          >
+            <span
+              className={
+                line.kind === "request"
+                  ? "text-gold"
+                  : line.kind === "event"
+                    ? "text-white/50 italic"
+                    : "text-emerald-300/90"
+              }
+            >
+              {line.left}
+            </span>
+            {line.right && (
+              <span className="shrink-0 text-[10.5px] text-white/35">{line.right}</span>
+            )}
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
 function SurfaceCard({ surf, featured }: { surf: Surface; featured: boolean }) {
   const Icon = surf.icon;
   return (
@@ -589,8 +720,8 @@ function SurfaceCard({ surf, featured }: { surf: Surface; featured: boolean }) {
       href={surf.href}
       className={
         featured
-          ? "group flex h-full flex-col rounded-2xl border border-gold/25 bg-gold/[0.05] p-7 transition-all hover:-translate-y-0.5 hover:border-gold/40 hover:shadow-card-hover"
-          : "group flex h-full flex-col rounded-2xl border border-border/60 bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-gold/40 hover:shadow-card-hover"
+          ? "group flex h-full flex-col rounded-2xl border border-gold/25 bg-gold/[0.05] p-7 transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-gold/40 hover:shadow-card-hover"
+          : "group flex h-full flex-col rounded-2xl border border-border/60 bg-card p-5 transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-gold/40 hover:shadow-card-hover"
       }
     >
       <div className="mb-4 flex items-start justify-between">

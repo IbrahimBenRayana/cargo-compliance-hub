@@ -7,10 +7,12 @@ import {
   ClipboardList,
   Database,
   KeyRound,
+  KeySquare,
   Lock,
   Mail,
   Server,
   ShieldCheck,
+  Smartphone,
   Users,
 } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
@@ -185,10 +187,12 @@ function SecurityHeroIllustration() {
 }
 
 const AUTH_ITEMS = [
+  { icon: Smartphone, title: "Multi-factor authentication", body: "Available on every account: authenticator-app TOTP, email one-time codes as a fallback, and single-use recovery codes if you lose your device." },
   { icon: Mail, title: "Email-verified accounts", body: "Sign-up requires a 6-digit code sent to your work email. Account isn't usable until verified." },
   { icon: KeyRound, title: "Password hashing", body: "bcrypt with cost 12. We never store, log, or transmit raw passwords. Reset flows time-bound, single-use." },
   { icon: ShieldCheck, title: "Session security", body: "HTTP-only, secure, SameSite=Lax session cookies. Sessions invalidate on password change. Server-side session store." },
   { icon: AlertCircle, title: "Brute-force protection", body: "Per-account rate limits on login attempts. Suspicious activity flagged in the audit log and emailed to admins." },
+  { icon: KeySquare, title: "Scoped API keys", body: "Public-API access runs on scoped keys (prefixed mcl_live_), separate from user sessions. Revoke a key in one click without touching anyone's login." },
 ];
 
 const ROLES: { name: string; tone: Severity; body: string }[] = [
@@ -213,6 +217,17 @@ const VENDORS = [
   { name: "Resend", role: "Transactional email", data: "Recipient email + message body", region: "US" },
 ];
 
+/** Shared scroll-reveal for card grids: fade + small rise, 60ms stagger.
+ * Marketing beat (once, on scroll) — 500ms is intentional; UI interactions
+ * elsewhere stay under 300ms. MotionConfig reducedMotion="user" strips the
+ * y-transform for reduced-motion users, leaving a plain fade. */
+const cardReveal = (i: number) => ({
+  initial: { opacity: 0, y: 12 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.3 },
+  transition: { duration: 0.5, ease: EASE, delay: i * 0.06 },
+});
+
 const AUDIT_FIELDS = [
   "Who did it (user email + role)",
   "When (UTC timestamp + IP)",
@@ -235,14 +250,14 @@ export function SecurityClient() {
       {/* AUTH */}
       <SectionShell tone="default" eyebrow="Authentication" title="How we know it's you.">
         <ul className="grid gap-4 md:grid-cols-2">
-          {AUTH_ITEMS.map(({ icon: Icon, title, body }) => (
-            <li key={title} className="rounded-2xl border border-border/60 bg-card p-5">
+          {AUTH_ITEMS.map(({ icon: Icon, title, body }, i) => (
+            <motion.li key={title} {...cardReveal(i)} className="rounded-2xl border border-border/60 bg-card p-5">
               <div className="flex items-start gap-3 mb-3">
                 <IconTile icon={Icon} hover="lift" reveal className="size-9" />
                 <h3 className="text-sm font-semibold text-foreground mt-1">{title}</h3>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
-            </li>
+            </motion.li>
           ))}
         </ul>
       </SectionShell>
@@ -255,14 +270,14 @@ export function SecurityClient() {
         intro="Role assignment is set at invite time. Owners and admins can change roles for any member. Email-verified invites with a 6-digit code; suspend access in one click."
       >
         <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {ROLES.map((r) => (
-            <li key={r.name} className="rounded-2xl border border-border/60 bg-card p-5">
+          {ROLES.map((r, i) => (
+            <motion.li key={r.name} {...cardReveal(i)} className="rounded-2xl border border-border/60 bg-card p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Users size={14} className="opacity-70" />
                 <SeverityPill tone={r.tone}>{r.name}</SeverityPill>
               </div>
               <p className="text-[13px] leading-relaxed opacity-80">{r.body}</p>
-            </li>
+            </motion.li>
           ))}
         </ul>
       </SectionShell>
@@ -270,14 +285,14 @@ export function SecurityClient() {
       {/* DATA */}
       <SectionShell tone="default" eyebrow="Data" title="Where it lives, how it's protected.">
         <ul className="grid gap-4 md:grid-cols-2">
-          {DATA_ITEMS.map(({ icon: Icon, title, body }) => (
-            <li key={title} className="rounded-2xl border border-border/60 bg-card p-5">
+          {DATA_ITEMS.map(({ icon: Icon, title, body }, i) => (
+            <motion.li key={title} {...cardReveal(i)} className="rounded-2xl border border-border/60 bg-card p-5">
               <div className="flex items-start gap-3 mb-3">
                 <IconTile icon={Icon} hover="lift" reveal className="size-9" />
                 <h3 className="text-sm font-semibold text-foreground mt-1">{title}</h3>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
-            </li>
+            </motion.li>
           ))}
         </ul>
       </SectionShell>

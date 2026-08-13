@@ -128,7 +128,9 @@ function LifecycleHeroIllustration() {
         <motion.g
           key={m.label}
           variants={{
-            hidden: { opacity: 0, scale: 0.7 },
+            // 0.9, not lower — milestone nodes should arrive, not pop
+            // out of nothing.
+            hidden: { opacity: 0, scale: 0.9 },
             visible: {
               opacity: 1,
               scale: 1,
@@ -504,7 +506,7 @@ export function LifecycleClient() {
                   <>
                     <motion.path
                       d={path}
-                      stroke="hsl(43 96% 56%)"
+                      stroke={GOLD}
                       strokeWidth="2"
                       fill="none"
                       strokeLinecap="round"
@@ -520,7 +522,7 @@ export function LifecycleClient() {
                         cx={p.x}
                         cy={p.y}
                         r="3"
-                        fill="hsl(43 96% 56%)"
+                        fill={GOLD}
                         initial={{ opacity: 0 }}
                         whileInView={{ opacity: 1 }}
                         viewport={{ once: true }}

@@ -28,6 +28,34 @@ export const KIND_LABEL: Record<EntryKind, string> = {
 
 export const CHANGELOG_ENTRIES: Entry[] = [
   {
+    date: "2026-08-06",
+    kind: "feature",
+    title: "Type 86 (Section 321 de-minimis) entries",
+    body: "Low-value shipments under the $800 de-minimis threshold can now be filed as Type 86 entries — same inbox, same pre-flight checks, same ranked queue as your ISF and entry work.",
+    link: { label: "Filings", href: "/platform/filings" },
+  },
+  {
+    date: "2026-07-22",
+    kind: "feature",
+    title: "Public API v1 for brokers & 3PLs",
+    body: "A REST API for teams who'd rather integrate than click. Scoped API keys (prefixed mcl_live_, revocable), ISF and entry read/write, XML upload, and webhooks for status changes.",
+    link: { label: "Talk to founders", href: "/contact" },
+  },
+  {
+    date: "2026-07-08",
+    kind: "feature",
+    title: "Multi-factor authentication",
+    body: "Every account can now enroll in MFA: authenticator-app TOTP, email one-time codes as a fallback, and single-use recovery codes for when you lose your device.",
+    link: { label: "Security", href: "/security" },
+  },
+  {
+    date: "2026-06-29",
+    kind: "feature",
+    title: "AI assistant with live human handoff",
+    body: "A chat assistant that answers questions about your own filings and deep-links you to the exact screen. When you'd rather talk to a person, it hands the conversation to our team live — with full context, no repeating yourself.",
+    link: { label: "AI", href: "/platform/ai" },
+  },
+  {
     date: "2026-05-22",
     kind: "fix",
     title: "HTS codes preserved in full",

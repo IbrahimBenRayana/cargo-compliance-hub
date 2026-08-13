@@ -36,8 +36,9 @@ type Rail = {
  * nothing ever truncates.
  */
 const RAILS: Rail[] = [
-  { name: "CBP ABI", descriptor: "Direct connection" },
-  { name: "CustomsCity", descriptor: "ABI gateway" },
+  { name: "CBP ACE", descriptor: "Every filing lands here" },
+  { name: "CustomsCity", descriptor: "Certified ABI gateway" },
+  { name: "REST API", descriptor: "For brokers & 3PLs" },
   { name: "Federal Register", descriptor: "Daily ADD/CVD sync" },
   { name: "FDA", descriptor: "PGA partner agency" },
   { name: "USDA-APHIS", descriptor: "PGA partner agency" },
@@ -65,7 +66,7 @@ export function Trust() {
           Built for teams. Built on the rails CBP actually uses.
         </span>
       }
-      intro="Invite your team, set roles, log every action — on a direct line to CBP's own infrastructure."
+      intro="Invite your team, set roles, log every action — with every filing carried over CBP-certified ABI rails."
     >
       <TrustGrid />
 

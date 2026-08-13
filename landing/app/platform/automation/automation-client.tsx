@@ -11,7 +11,7 @@ import {
   useTransform,
   type MotionValue,
 } from "framer-motion";
-import { BellRing, Clock, Database, Mail, RefreshCw, ShieldCheck, Users } from "lucide-react";
+import { BellRing, Clock, Database, Mail, RefreshCw, ShieldCheck, Users, Webhook } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
@@ -212,7 +212,9 @@ function ClockGroup({
   return (
     <motion.g
       variants={{
-        hidden: { opacity: 0, scale: 0.7 },
+        // scale starts at 0.9, not lower — entrances from near-zero read
+        // as "appearing from nothing" (Emil: nothing real does that).
+        hidden: { opacity: 0, scale: 0.9 },
         visible: {
           opacity: 1,
           scale: 1,
@@ -356,6 +358,21 @@ const NOTIF_KINDS = [
   { kind: "billing.event", channels: "email", body: "Plan-limit warnings and invoice events from Stripe." },
 ];
 
+const WEBHOOK_POINTS = [
+  {
+    title: "The same event stream",
+    body: "filing.accepted, filing.rejected, filing.on_hold — the exact kinds that power the in-app bell, delivered as JSON to your endpoint.",
+  },
+  {
+    title: "No polling on your side",
+    body: "Your integration reacts instead of asking. Status changes reach your systems minutes after CBP responds, not at your next cron run.",
+  },
+  {
+    title: "Part of the public API",
+    body: "Webhooks ship with the REST API at /api/public/v1 — scoped keys, ISF + entry read/write, XML upload. Built for brokers and 3PLs.",
+  },
+];
+
 const ROLES: { name: string; tone: Severity; can: string[] }[] = [
   { name: "Owner", tone: "amber", can: ["Everything Admin can do", "Billing", "Delete the team", "Manage org-level integrations"] },
   { name: "Admin", tone: "neutral", can: ["Invite + manage users", "Configure templates", "Toggle AI features", "View audit log"] },
@@ -369,7 +386,7 @@ export function AutomationClient() {
       <PageHero
         label="Platform"
         title="Background work, happening 24/7."
-        description="Polling, syncs, alerts, sweeps: the plumbing that keeps your queue honest. Plus the notifications, roles, and audit trail your team needs to share the workload."
+        description="Polling, syncs, alerts, sweeps: the plumbing that keeps your queue honest. Plus the notifications, webhooks, roles, and audit trail your team needs to share the workload."
         breadcrumbs={[
           { label: "Platform", href: "/features" },
           { label: "Automation", href: "/platform/automation" },
@@ -429,6 +446,74 @@ export function AutomationClient() {
               </li>
             ))}
           </ul>
+        </div>
+      </SectionShell>
+
+      {/* Webhooks — machine-facing twin of the notifications above */}
+      <SectionShell
+        tone="default"
+        className="bg-muted/30"
+        eyebrow="Webhooks"
+        title="The same events, delivered to your systems."
+        intro="Everything that rings the bell can also POST to your stack. Register an endpoint and every filing-status event arrives the moment our five-minute CBP poll sees it."
+      >
+        <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+          <ul className="space-y-2">
+            {WEBHOOK_POINTS.map((p, i) => (
+              <motion.li
+                key={p.title}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{ duration: 0.5, ease: EASE, delay: i * 0.05 }}
+                className="flex items-start gap-4 rounded-xl p-3 -mx-3 transition-colors hover:bg-card"
+              >
+                <IconTile icon={Webhook} size="md" hover="lift" />
+                <div className="min-w-0">
+                  <h3 className="text-[15px] font-semibold leading-tight tracking-tight text-foreground">
+                    {p.title}
+                  </h3>
+                  <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{p.body}</p>
+                </div>
+              </motion.li>
+            ))}
+          </ul>
+
+          {/* Example delivery — terminal card, cascading line reveal */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.6, ease: EASE }}
+            className="rounded-2xl border border-border/60 bg-[hsl(220_22%_12%)] shadow-card overflow-hidden"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
+              <span className="font-mono text-[10px] tracking-wider text-white/40">
+                example delivery
+              </span>
+              <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-emerald-300/80">
+                <span className="size-1.5 rounded-full bg-emerald-400/80" />
+                200 OK · 84ms
+              </span>
+            </div>
+            <div className="p-5 font-mono text-[12px] leading-relaxed">
+              <div className="text-gold mb-2">POST https://yourapp.example/hooks/mycargolens</div>
+              <div className="text-white/70">{"{"}</div>
+              <div className="pl-4 text-white/70">
+                <span className="text-emerald-300/90">&quot;event&quot;</span>: &quot;filing.accepted&quot;,
+              </div>
+              <div className="pl-4 text-white/70">
+                <span className="text-emerald-300/90">&quot;filingId&quot;</span>: &quot;shp_4k2f&quot;,
+              </div>
+              <div className="pl-4 text-white/70">
+                <span className="text-emerald-300/90">&quot;status&quot;</span>: &quot;accepted&quot;,
+              </div>
+              <div className="pl-4 text-white/70">
+                <span className="text-emerald-300/90">&quot;at&quot;</span>: &quot;2026-08-13T14:02:11Z&quot;
+              </div>
+              <div className="text-white/70">{"}"}</div>
+            </div>
+          </motion.div>
         </div>
       </SectionShell>
 

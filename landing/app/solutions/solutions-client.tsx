@@ -103,7 +103,7 @@ function PersonaCard({ persona, index }: { persona: Persona; index: number }) {
             thick gold left-rail accent (impeccable side-tab tell). */}
         <figure className="rounded-xl border border-border/60 bg-card/40 px-5 py-4 my-5">
           <blockquote className="text-sm italic text-foreground leading-relaxed">
-            "{persona.pullquote}"
+            “{persona.pullquote}”
           </blockquote>
           <figcaption className="mt-2.5 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
             {persona.badge}
@@ -122,20 +122,20 @@ function PersonaCard({ persona, index }: { persona: Persona; index: number }) {
         </div>
         <div className="rounded-2xl border border-border/60 bg-card p-6">
           <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-4">
-            What you'll actually use
+            What you’ll actually use
           </h3>
           <ul className="space-y-2.5">
             {persona.whatYouUse.map(({ icon: Icon, label, href }) => (
               <li key={label}>
                 <Link
                   href={href}
-                  className="group flex items-center gap-3 rounded-lg border border-border/50 bg-background/50 px-3 py-2.5 transition-all hover:-translate-y-0.5 hover:border-gold/40 hover:bg-gold/5"
+                  className="group flex items-center gap-3 rounded-lg border border-border/50 bg-background/50 px-3 py-2.5 transition-[transform,border-color,background-color] duration-200 ease-[var(--ease-out-quart)] hover:border-gold/40 hover:bg-gold/5 [@media(hover:hover)_and_(pointer:fine)]:hover:-translate-y-0.5"
                 >
                   <span className="grid size-8 place-items-center rounded-lg bg-gold/15 text-gold-dark dark:text-gold">
                     <Icon size={14} />
                   </span>
                   <span className="flex-1 text-[13px] font-medium text-foreground">{label}</span>
-                  <ArrowRight size={14} className="text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-gold-dark dark:group-hover:text-gold" />
+                  <ArrowRight size={14} className="text-muted-foreground transition-[transform,color] duration-200 ease-[var(--ease-out-quart)] group-hover:translate-x-0.5 group-hover:text-gold-dark dark:group-hover:text-gold" />
                 </Link>
               </li>
             ))}

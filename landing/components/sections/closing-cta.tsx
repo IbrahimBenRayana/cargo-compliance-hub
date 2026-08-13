@@ -30,7 +30,7 @@ export function ClosingCta() {
           <motion.p
             initial={{ opacity: 0 }}
             animate={inView ? { opacity: 1 } : undefined}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.5, ease: EASE_OUT_QUART }}
             className="mb-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
           >
             Ready when you are
@@ -61,7 +61,7 @@ export function ClosingCta() {
                   }}
                   className={
                     word.highlight
-                      ? "mr-[0.22em] inline-block text-gradient-gold"
+                      ? "mr-[0.22em] inline-block text-gold-word"
                       : "mr-[0.22em] inline-block"
                   }
                 >
@@ -74,7 +74,7 @@ export function ClosingCta() {
           <motion.p
             initial={{ opacity: 0 }}
             animate={inView ? { opacity: 1 } : undefined}
-            transition={{ duration: 0.5, delay: 0.4 }}
+            transition={{ duration: 0.5, delay: 0.4, ease: EASE_OUT_QUART }}
             className="mb-10 text-base text-muted-foreground md:text-lg"
           >
             A 20-minute walkthrough. Card added when you&apos;re provisioned. Billed only when we file.

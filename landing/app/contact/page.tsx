@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { motion } from "framer-motion";
 import { Mail, Clock, Building2, CheckCircle2 } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,8 @@ const initialForm: FormState = {
 // dev server in development.
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:3001";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 const infoCards: Array<{
   icon: typeof Mail;
@@ -186,15 +189,39 @@ export default function ContactPage() {
           {/* Right — Form */}
           <div className="glass rounded-2xl border border-border/60 p-6 sm:p-8 shadow-card">
             {submitted ? (
-              <div className="flex flex-col items-center justify-center text-center py-10 gap-4">
-                <CheckCircle2
-                  className="h-12 w-12 text-green-500"
+              /* Success is a rare, earned moment — the one place a little
+                 spring is allowed. Check settles in first, copy follows. */
+              <motion.div
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.35, ease: EASE }}
+                className="flex flex-col items-center justify-center text-center py-10 gap-4"
+              >
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: "spring", duration: 0.5, bounce: 0.25, delay: 0.05 }}
+                  className="inline-flex"
                   aria-hidden="true"
-                />
-                <h2 className="text-xl font-semibold">Message sent!</h2>
-                <p className="text-muted-foreground text-sm max-w-xs">
+                >
+                  <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+                </motion.span>
+                <motion.h2
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.12, ease: EASE }}
+                  className="text-xl font-semibold tracking-tight"
+                >
+                  Message sent!
+                </motion.h2>
+                <motion.p
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.18, ease: EASE }}
+                  className="text-muted-foreground text-sm max-w-xs"
+                >
                   We&apos;ll get back to you within one business day.
-                </p>
+                </motion.p>
                 <Button
                   variant="outline"
                   size="sm"
@@ -207,7 +234,7 @@ export default function ContactPage() {
                 >
                   Send another message
                 </Button>
-              </div>
+              </motion.div>
             ) : (
               <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
                 <div className="flex flex-col gap-1.5">
@@ -222,7 +249,7 @@ export default function ContactPage() {
                     value={form.name}
                     onChange={handleChange}
                     placeholder="Jane Smith"
-                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-[box-shadow,border-color] duration-200 hover:border-foreground/25"
                   />
                 </div>
 
@@ -239,7 +266,7 @@ export default function ContactPage() {
                     value={form.email}
                     onChange={handleChange}
                     placeholder="jane@company.com"
-                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-[box-shadow,border-color] duration-200 hover:border-foreground/25"
                   />
                 </div>
 
@@ -252,7 +279,7 @@ export default function ContactPage() {
                     name="subject"
                     value={form.subject}
                     onChange={handleChange}
-                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-[box-shadow,border-color] duration-200 hover:border-foreground/25"
                   >
                     <option value="">Select a topic…</option>
                     <option value="general">General inquiry</option>
@@ -275,7 +302,7 @@ export default function ContactPage() {
                     value={form.message}
                     onChange={handleChange}
                     placeholder="Tell us how we can help…"
-                    className="w-full resize-none rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                    className="w-full resize-none rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-[box-shadow,border-color] duration-200 hover:border-foreground/25"
                   />
                 </div>
 
@@ -295,9 +322,15 @@ export default function ContactPage() {
                 </div>
 
                 {error && (
-                  <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                  <motion.p
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, ease: EASE }}
+                    className="text-sm text-red-600 dark:text-red-400"
+                    role="alert"
+                  >
                     {error}
-                  </p>
+                  </motion.p>
                 )}
 
                 <Button
