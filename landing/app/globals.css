@@ -119,8 +119,12 @@
   * {
     border-color: hsl(var(--border));
   }
-  html {
-    scroll-behavior: smooth;
+  /* Smooth anchor scrolling is a motion effect — gate it so users who
+     asked for reduced motion get instant jumps instead of a long glide. */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
   body {
     background-color: hsl(var(--background));
@@ -131,6 +135,14 @@
     -moz-osx-font-smoothing: grayscale;
     font-size: 15px;
     line-height: 1.6;
+  }
+  /* Ragged-edge control: balanced headings, no orphan words in body copy.
+     Cheap, invisible details that read as "typeset" rather than "rendered". */
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
   ::selection {
     background: hsl(43 96% 56% / 0.2);

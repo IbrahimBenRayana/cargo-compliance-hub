@@ -187,15 +187,16 @@ export function ActTrack() {
                   <div className="col-span-12 md:col-span-5 relative">
                     <div className="relative h-1.5 rounded-full bg-secondary/60 overflow-hidden">
                       <motion.div
-                        initial={{ width: 0 }}
-                        animate={inView ? { width: `${pct}%` } : undefined}
+                        initial={{ scaleX: 0 }}
+                        animate={inView ? { scaleX: 1 } : undefined}
                         transition={{
                           duration: 0.9,
                           delay: 0.3 + i * 0.06,
                           ease: EASE_OUT_QUART,
                         }}
+                        style={{ width: `${pct}%` }}
                         className={cn(
-                          "absolute inset-y-0 left-0 rounded-full",
+                          "absolute inset-y-0 left-0 origin-left rounded-full",
                           tone === "rose" && "bg-rose-500",
                           tone === "amber" && "bg-amber-500",
                           tone === "emerald" && "bg-emerald-500",
@@ -238,7 +239,7 @@ export function ActTrack() {
         <div>
           <Link
             href="/platform/lifecycle"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-gold transition-colors group"
+            className="group inline-flex items-center gap-1.5 text-sm font-semibold text-foreground transition-colors hover:text-gold-dark dark:hover:text-gold"
           >
             See lifecycle visibility
             <ArrowRight

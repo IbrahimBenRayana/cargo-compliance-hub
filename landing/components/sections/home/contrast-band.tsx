@@ -43,7 +43,7 @@ export function ContrastBand() {
           transition={{ duration: 0.6, ease: EASE_OUT_QUART }}
           className="mx-auto mb-12 max-w-3xl text-center md:mb-16"
         >
-          <h2 className="mb-4 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl md:text-5xl">
+          <h2 className="mb-4 text-3xl font-semibold leading-[1.08] tracking-tight sm:text-4xl md:text-5xl">
             You know these screens.
           </h2>
           <p className="text-base leading-relaxed opacity-75 sm:text-lg">

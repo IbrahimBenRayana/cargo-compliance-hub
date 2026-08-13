@@ -4,7 +4,6 @@ import Link from "next/link";
 import * as React from "react";
 import { motion, useInView } from "framer-motion";
 import {
-  ArrowRight,
   Building2,
   Users,
   Ship,
@@ -54,6 +53,11 @@ const FILE_TYPES = [
     title: "Transportation In-Bond",
     body: "Across-port moves with hand-off tracking and arrival notices.",
   },
+  {
+    code: "T86",
+    title: "Type 86 · Section 321",
+    body: "De-minimis (≤ $800) low-value e-commerce entries. Filed from the same workspace — or in bulk through the API.",
+  },
 ];
 
 const STEPS = [
@@ -92,14 +96,36 @@ const RULE_CHECKS: { rule: string; tone: "rose" | "amber" | "emerald"; pill: str
   { rule: "ISF filed at least 24h before vessel loading", tone: "emerald", pill: "OK" },
 ];
 
+const API_FLOW = [
+  {
+    call: "POST /shipments",
+    title: "Create the draft",
+    body: "Your system sends the shipment JSON — or uploads the filing XML it already generates. The same rule-based gate runs before anything moves.",
+  },
+  {
+    call: "POST /shipments/:id/submit",
+    title: "Submit to CBP",
+    body: "One call queues the filing. Scoped API keys decide which systems can read and which can write.",
+  },
+  {
+    call: "→ filing.accepted",
+    title: "Webhook fires",
+    body: "Accepted, rejected, on-hold: every status change lands on your endpoint the moment we see it. No polling on your side.",
+  },
+];
+
 const FAQ = [
   {
     q: "Which filing types do you support?",
-    a: "ISF-10, ISF-5, ABI 7501 Entry Summary, ABI 3461 Entry, and In-Bond. Manifest queries by Master BOL are also included.",
+    a: "ISF-10, ISF-5, ABI 7501 Entry Summary, ABI 3461 Entry, In-Bond, and Type 86 (Section 321 de-minimis). Manifest queries by Master BOL are also included.",
   },
   {
     q: "Are filings actually submitted to CBP or to a sandbox?",
-    a: "Real CBP via the CustomsCity ABI gateway. Sandbox mode is available for onboarding.",
+    a: "Real CBP via the CustomsCity ABI gateway. Sandbox mode is available for onboarding. A native CBP ABI engine is currently in CBP certification.",
+  },
+  {
+    q: "Can we file from our own system instead of the UI?",
+    a: "Yes. The public REST API at /api/public/v1 covers ISF and customs-entry read/write, XML document upload, and webhooks for filing-status events, with scoped API keys.",
   },
   {
     q: "How long does an ISF take in the wizard?",
@@ -124,7 +150,7 @@ export function FilingsClient() {
       <PageHero
         label="Platform"
         title="One wizard. Every shipment type."
-        description="ISF-10, ISF-5, Entry Summary, Entry, and In-bond, all in the same flow. Save reusable templates. Duplicate any filing as a new draft. Bulk-submit dozens at once. Every draft gets a rule-based validation gate plus an optional AI pre-flight review."
+        description="ISF-10, ISF-5, Entry Summary, Entry, In-bond, and Type 86, all in the same flow. Save reusable templates. Duplicate any filing as a new draft. Bulk-submit dozens at once. Every draft gets a rule-based validation gate plus an optional AI pre-flight review."
         breadcrumbs={[
           { label: "Platform", href: "/features" },
           { label: "Filings", href: "/platform/filings" },
@@ -136,21 +162,25 @@ export function FilingsClient() {
       <SectionShell
         tone="default"
         eyebrow="Filing types"
-        title="Five filings, one workflow."
+        title="Six filings, one workflow."
         intro="Every CBP filing surface we support lives in the same wizard. Switch types without learning a new screen."
       >
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FILE_TYPES.map((ft) => (
-            <li
+          {FILE_TYPES.map((ft, i) => (
+            <motion.li
               key={ft.code}
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.5, ease: EASE_OUT_QUART, delay: i * 0.05 }}
               className="rounded-2xl border border-border/60 bg-card p-5 shadow-card transition-shadow hover:shadow-card-hover"
             >
               <span className="inline-flex items-center rounded-md border border-border/70 bg-secondary/50 px-2 py-0.5 text-[11px] font-mono font-semibold tabular-nums text-foreground">
                 {ft.code}
               </span>
-              <h3 className="mt-3 text-base font-semibold text-foreground">{ft.title}</h3>
+              <h3 className="mt-3 text-base font-semibold tracking-tight text-foreground">{ft.title}</h3>
               <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{ft.body}</p>
-            </li>
+            </motion.li>
           ))}
         </ul>
       </SectionShell>
@@ -304,7 +334,7 @@ export function FilingsClient() {
           <div className="rounded-2xl border border-border/60 bg-card p-5">
             <h3 className="text-sm font-semibold text-foreground mb-1">AI pre-flight (optional)</h3>
             <p className="text-xs text-muted-foreground mb-4">
-              Reviews the whole draft for things the rules can't catch. Streams its findings.
+              Reviews the whole draft for things the rules can’t catch. Streams its findings.
             </p>
             <CodeStream
               variant="chat"
@@ -321,6 +351,38 @@ could trigger an additional duty deposit.`}
             />
           </div>
         </div>
+      </SectionShell>
+
+      {/* (e2) Programmatic filing via the public API */}
+      <SectionShell
+        tone="default"
+        eyebrow="Public API"
+        title="No wizard required."
+        intro="Brokers and 3PLs file straight from their own stack. A REST API at /api/public/v1: scoped keys, ISF + entry read/write, XML upload, webhooks on every status change."
+      >
+        <ol className="grid gap-4 md:grid-cols-3">
+          {API_FLOW.map((s, i) => (
+            <motion.li
+              key={s.call}
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.5, ease: EASE_OUT_QUART, delay: i * 0.07 }}
+              className="relative rounded-2xl border border-border/60 bg-card p-5"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <span className="inline-flex items-center rounded-md border border-gold/30 bg-gold/10 px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-gold-dark dark:text-gold">
+                  {s.call}
+                </span>
+                <span className="font-mono text-[11px] tabular-nums text-muted-foreground/70">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+              </div>
+              <h3 className="text-base font-semibold tracking-tight text-foreground mb-1.5">{s.title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{s.body}</p>
+            </motion.li>
+          ))}
+        </ol>
       </SectionShell>
 
       {/* (f) FAQ */}

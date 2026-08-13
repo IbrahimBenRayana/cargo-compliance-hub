@@ -4,7 +4,7 @@ import { SecurityClient } from "./security-client";
 export const metadata: Metadata = {
   title: "Security & trust",
   description:
-    "How MyCargoLens keeps your customs data safe. Authentication, RBAC, encryption, data residency, audit trail, and the third-party vendors we use.",
+    "How MyCargoLens keeps your customs data safe. Multi-factor authentication, scoped API keys, RBAC, encryption, data residency, audit trail, and the third-party vendors we use.",
   alternates: { canonical: "/security" },
 };
 

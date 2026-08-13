@@ -50,7 +50,7 @@ const STEPS: Step[] = [
     number: "01",
     short: "File",
     title: "File it once.",
-    body: "ISF-10, ISF-5, Entry Summary, Entry, In-bond — one wizard for all of them. Templates, one-click duplication, bulk submit, and an AI pre-flight before anything leaves your hands.",
+    body: "ISF-10, ISF-5, Entry, Entry Summary, Type 86 — one wizard for all of them. Templates, one-click duplication, bulk submit, and an AI pre-flight before anything leaves your hands. Brokers and 3PLs can drive the same pipeline through the REST API.",
     href: "/platform/filings",
     linkLabel: "See the filing pipeline",
     urlBar: "app.mycargolens.com/filings/new",
@@ -132,7 +132,7 @@ export function Workflow() {
                     onClick={() => select(s.key)}
                     aria-current={isActive ? "step" : undefined}
                     className={cn(
-                      "group relative w-full cursor-pointer overflow-hidden rounded-2xl border p-5 text-left transition-all duration-200",
+                      "group relative w-full cursor-pointer overflow-hidden rounded-2xl border p-5 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 ease-[var(--ease-out-quart)]",
                       isActive
                         ? "border-border bg-card shadow-card-hover"
                         : "border-border/60 bg-secondary/50 hover:-translate-y-px hover:border-border hover:bg-secondary/70",
@@ -248,9 +248,14 @@ export function Workflow() {
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={step.key}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
+                initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{
+                  opacity: 0,
+                  y: -8,
+                  filter: "blur(4px)",
+                  transition: { duration: 0.2, ease: EASE_OUT_QUART },
+                }}
                 transition={{ duration: 0.35, ease: EASE_OUT_QUART }}
                 className="p-4 sm:p-6"
               >

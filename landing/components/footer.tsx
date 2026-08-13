@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ChevronDown, Globe, Sun } from "lucide-react";
+import { ChevronDown, Globe, Moon, Sun } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useTheme } from "next-themes";
 import { Wordmark } from "@/components/wordmark";
 import { Container } from "@/components/ui/container";
 import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
@@ -39,6 +41,8 @@ const resourcesLinks = [
 
 type LinkItem = { label: string; href: string };
 
+const EASE = [0.22, 1, 0.36, 1] as const;
+
 // ──────────────────────────────────────────────────────────────────────────
 // Desktop column — title + flat list of links.
 // ──────────────────────────────────────────────────────────────────────────
@@ -62,7 +66,7 @@ function FooterColumn({
           <li key={link.label}>
             <Link
               href={link.href}
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              className="text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
             >
               {link.label}
             </Link>
@@ -98,26 +102,37 @@ function MobileAccordion({
         </span>
         <ChevronDown
           className={cn(
-            "size-4 text-muted-foreground transition-transform duration-200",
+            "size-4 text-muted-foreground transition-transform duration-200 ease-[var(--ease-out-quart)]",
             open && "rotate-180",
           )}
           aria-hidden
         />
       </button>
-      {open && (
-        <ul className="space-y-3 pb-5">
-          {links.map((link) => (
-            <li key={link.label}>
-              <Link
-                href={link.href}
-                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* Height + opacity so the group unfolds instead of popping — same
+          pattern as the nav's mobile groups. (Height is the sanctioned
+          exception for accordions.) */}
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.ul
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: EASE }}
+            className="overflow-hidden"
+          >
+            {links.map((link) => (
+              <li key={link.label} className="pb-3 last:pb-5">
+                <Link
+                  href={link.href}
+                  className="text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -210,6 +225,36 @@ function SystemStatusBadge() {
       </span>
       {label}
     </SeverityPill>
+  );
+}
+
+/**
+ * Working theme switch for the footer's bottom row. Previously a static
+ * <button> hard-coded to "Light" that did nothing. Renders the light-mode
+ * shape until mounted (next-themes hydration rule), then reflects and
+ * toggles the real theme.
+ */
+function FooterThemeButton() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted && resolvedTheme === "dark";
+  const Icon = isDark ? Moon : Sun;
+
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      aria-label={`Switch to ${isDark ? "light" : "dark"} theme`}
+      className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/50 px-2 py-1 transition-colors duration-200 hover:border-border hover:text-foreground"
+    >
+      <Icon className="size-3.5" aria-hidden />
+      <span>{isDark ? "Dark" : "Light"}</span>
+    </button>
   );
 }
 
@@ -309,22 +354,13 @@ export function Footer() {
             &copy; 2026 MyCargoLens. All rights reserved.
           </p>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <button
-              type="button"
-              aria-label="Change language"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/50 px-2 py-1 transition-colors hover:text-foreground"
-            >
+            {/* One locale exists, so this is a label, not a control. A
+                <button> that does nothing erodes trust in every real one. */}
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/50 px-2 py-1">
               <Globe className="size-3.5" aria-hidden />
               <span>English (US)</span>
-            </button>
-            <button
-              type="button"
-              aria-label="Toggle theme"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/50 px-2 py-1 transition-colors hover:text-foreground"
-            >
-              <Sun className="size-3.5" aria-hidden />
-              <span>Light</span>
-            </button>
+            </span>
+            <FooterThemeButton />
           </div>
         </div>
       </Container>

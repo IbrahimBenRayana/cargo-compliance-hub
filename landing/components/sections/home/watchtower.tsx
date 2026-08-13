@@ -132,7 +132,7 @@ function AutomationStrip() {
               key={item.label}
               aria-current={i === index ? "true" : undefined}
               className={cn(
-                "h-1 rounded-full transition-all duration-500 ease-out",
+                "h-1 rounded-full transition-[width,background-color] duration-300 ease-[var(--ease-out-quart)]",
                 i === index ? "w-4 bg-gold" : "w-1 bg-muted-foreground/30",
               )}
             />

@@ -130,7 +130,7 @@ export function Hero() {
                 visible: {
                   opacity: 1,
                   y: 0,
-                  transition: { duration: 0.6, delay: 0.55, ease: EASE_OUT_QUART },
+                  transition: { duration: 0.6, delay: 0.45, ease: EASE_OUT_QUART },
                 },
               }}
               className="mb-8 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg"
@@ -147,7 +147,7 @@ export function Hero() {
                 visible: {
                   opacity: 1,
                   y: 0,
-                  transition: { duration: 0.55, delay: 0.75, ease: EASE_OUT_QUART },
+                  transition: { duration: 0.55, delay: 0.6, ease: EASE_OUT_QUART },
                 },
               }}
               className="mb-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center"
@@ -167,7 +167,7 @@ export function Hero() {
                 hidden: { opacity: 0 },
                 visible: {
                   opacity: 1,
-                  transition: { duration: 0.5, delay: 0.95 },
+                  transition: { duration: 0.5, delay: 0.8, ease: EASE_OUT_QUART },
                 },
               }}
               className="flex flex-wrap items-center gap-x-6 gap-y-2"
@@ -188,7 +188,7 @@ export function Hero() {
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.35, ease: EASE_OUT_EXPO }}
+            transition={{ duration: 0.8, delay: 0.25, ease: EASE_OUT_EXPO }}
             className="relative min-w-0 lg:col-span-7 lg:pl-6"
           >
             {/* Soft gold halo behind the window */}
@@ -246,7 +246,7 @@ export function Hero() {
                 variants={{
                   hidden: {},
                   visible: {
-                    transition: { staggerChildren: 0.09, delayChildren: 0.9 },
+                    transition: { staggerChildren: 0.07, delayChildren: 0.75 },
                   },
                 }}
                 className="flex flex-col gap-2"

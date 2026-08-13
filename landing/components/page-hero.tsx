@@ -84,6 +84,92 @@ const squareConfigs = [
   },
 ];
 
+/**
+ * The hero copy stack — eyebrow → title → intro → CTA — staggered at
+ * ~70–80ms intervals with the strong ease-out token. Shared by both the
+ * single-column and illustration layouts (they were duplicated before).
+ */
+function HeroCopy({
+  label,
+  title,
+  description,
+  breadcrumbs,
+  children,
+}: Omit<PageHeroProps, "illustration">) {
+  return (
+    <>
+      {breadcrumbs && breadcrumbs.length > 0 && (
+        <motion.nav
+          aria-label="Breadcrumb"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: EASE }}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground mb-5 justify-center md:justify-start flex-wrap"
+        >
+          <Link href="/" className="hover:text-foreground transition-colors duration-200">
+            Home
+          </Link>
+          {breadcrumbs.map((crumb) => (
+            <React.Fragment key={crumb.href}>
+              <span aria-hidden="true" className="opacity-40">
+                /
+              </span>
+              <Link
+                href={crumb.href}
+                className="hover:text-foreground transition-colors duration-200"
+              >
+                {crumb.label}
+              </Link>
+            </React.Fragment>
+          ))}
+        </motion.nav>
+      )}
+
+      <motion.p
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: EASE }}
+        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-eyebrow mb-4"
+      >
+        {label}
+      </motion.p>
+
+      {/* Display type: tight leading (~1.08) + negative tracking — large
+          text reads too loose at body metrics. */}
+      <motion.h1
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.55, delay: 0.07, ease: EASE }}
+        className="text-3xl md:text-5xl font-semibold tracking-tight leading-[1.08] text-foreground"
+      >
+        {title}
+      </motion.h1>
+
+      {description && (
+        <motion.p
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.14, ease: EASE }}
+          className="mt-5 text-lg text-muted-foreground leading-relaxed max-w-2xl"
+        >
+          {description}
+        </motion.p>
+      )}
+
+      {children && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.22, ease: EASE }}
+          className="mt-7"
+        >
+          {children}
+        </motion.div>
+      )}
+    </>
+  );
+}
+
 export function PageHero({
   label,
   title,
@@ -160,67 +246,14 @@ export function PageHero({
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-6 items-center">
               {/* Left: text content */}
               <div className="lg:col-span-7 text-center md:text-left">
-                {breadcrumbs && breadcrumbs.length > 0 && (
-                  <motion.nav
-                    aria-label="Breadcrumb"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, ease: EASE }}
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground mb-5 justify-center md:justify-start flex-wrap"
-                  >
-                    <Link href="/" className="hover:text-foreground transition-colors">
-                      Home
-                    </Link>
-                    {breadcrumbs.map((crumb) => (
-                      <React.Fragment key={crumb.href}>
-                        <span aria-hidden="true" className="opacity-40">/</span>
-                        <Link href={crumb.href} className="hover:text-foreground transition-colors">
-                          {crumb.label}
-                        </Link>
-                      </React.Fragment>
-                    ))}
-                  </motion.nav>
-                )}
-
-                <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.45, ease: EASE }}
-                  className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-eyebrow mb-4"
+                <HeroCopy
+                  label={label}
+                  title={title}
+                  description={description}
+                  breadcrumbs={breadcrumbs}
                 >
-                  {label}
-                </motion.p>
-
-                <motion.h1
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.55, delay: 0.07, ease: EASE }}
-                  className="text-3xl md:text-5xl font-semibold tracking-tight text-foreground"
-                >
-                  {title}
-                </motion.h1>
-
-                {description && (
-                  <motion.p
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.55, delay: 0.14, ease: EASE }}
-                    className="mt-5 text-lg text-muted-foreground leading-relaxed max-w-2xl"
-                  >
-                    {description}
-                  </motion.p>
-                )}
-
-                {children && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.22, ease: EASE }}
-                    className="mt-7"
-                  >
-                    {children}
-                  </motion.div>
-                )}
+                  {children}
+                </HeroCopy>
               </div>
 
               {/* Right: illustration */}
@@ -236,75 +269,14 @@ export function PageHero({
           ) : (
             /* Single-column layout (original) */
             <div className="text-center md:text-left max-w-3xl">
-              {breadcrumbs && breadcrumbs.length > 0 && (
-                <motion.nav
-                  aria-label="Breadcrumb"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, ease: EASE }}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground mb-5 justify-center md:justify-start flex-wrap"
-                >
-                  <Link
-                    href="/"
-                    className="hover:text-foreground transition-colors"
-                  >
-                    Home
-                  </Link>
-                  {breadcrumbs.map((crumb) => (
-                    <React.Fragment key={crumb.href}>
-                      <span aria-hidden="true" className="opacity-40">
-                        /
-                      </span>
-                      <Link
-                        href={crumb.href}
-                        className="hover:text-foreground transition-colors"
-                      >
-                        {crumb.label}
-                      </Link>
-                    </React.Fragment>
-                  ))}
-                </motion.nav>
-              )}
-
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, ease: EASE }}
-                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-eyebrow mb-4"
+              <HeroCopy
+                label={label}
+                title={title}
+                description={description}
+                breadcrumbs={breadcrumbs}
               >
-                {label}
-              </motion.p>
-
-              <motion.h1
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.07, ease: EASE }}
-                className="text-3xl md:text-5xl font-semibold tracking-tight text-foreground"
-              >
-                {title}
-              </motion.h1>
-
-              {description && (
-                <motion.p
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.55, delay: 0.14, ease: EASE }}
-                  className="mt-5 text-lg text-muted-foreground leading-relaxed max-w-2xl"
-                >
-                  {description}
-                </motion.p>
-              )}
-
-              {children && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.22, ease: EASE }}
-                  className="mt-7"
-                >
-                  {children}
-                </motion.div>
-              )}
+                {children}
+              </HeroCopy>
             </div>
           )}
         </Container>
