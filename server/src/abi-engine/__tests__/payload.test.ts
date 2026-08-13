@@ -150,7 +150,10 @@ describe('migrateV1ToV2', () => {
     });
     expect(line.tariffs[0].dutyCents).toBeUndefined(); // duty engine's job
     expect(line.grossWeightKg).toBe(1200); // 2646 lb → 1200 kg
-    expect(line.parties).toEqual([{ type: 'S', identifier: '26-164751100' }]); // buyer taxId only
+    expect(line.parties).toEqual([
+      { type: 'S', identifier: '26-164751100' },
+      { type: 'M', identifier: 'CNSHEBATSHE' }, // derived MID (Directive 3500-13)
+    ]);
     expect(v2.commercial?.invoices?.[0]).toMatchObject({ invoiceNumber: 'INV-1', itemSkus: ['BAT-01'] });
     expect(v2.commercial?.consignee?.name).toBe('SIGMA TECHNOLOGY PARTNERS LLC');
   });
@@ -166,12 +169,8 @@ describe('migrateV1ToV2', () => {
       { applicabilityDate: '20260820' }
     );
     const input = toAeEntrySummaryInput(priced, 'A');
-    // Known gap the shadow note reports on real captures: CC documents carry
-    // manufacturers as name+address, not the IRS-format identifier the
-    // 47-record needs \u2014 MID derivation (CBP 3500-13) is future enrichment.
-    const issues = validateEntrySummary(input);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].field).toBe('lines[0].parties[M]');
+    // MID derivation closes the manufacturer-party gap: clean validation.
+    expect(validateEntrySummary(input)).toEqual([]);
     const lines = buildEntrySummary(input);
     expect(lines[0].startsWith('10')).toBe(true);
     expect(lines[lines.length - 1].startsWith('90')).toBe(true);
@@ -183,6 +182,39 @@ describe('migrateV1ToV2', () => {
     expect(() =>
       migrateV1ToV2({ ...V1, manifest: [{ ...V1.manifest[0], quantity: 'lots' }] })
     ).toThrow(/manifested quantity/);
+  });
+});
+
+describe('deriveMid (Directive 3500-13)', () => {
+  it('constructs country + 3+3 name + street number + city', async () => {
+    const { deriveMid } = await import('../payload/mid.js');
+    expect(
+      deriveMid({ name: 'NICSAN APPLIANCE WORKS', address: '435 INDUSTRIAL RD', city: 'TAICHUNG', countryCode: 'TW' })
+    ).toBe('TWNICAPP435TAI');
+    // Ignored articles + hyphenated words merge (AMF/Directive rules).
+    expect(deriveMid({ name: 'THE FRITZ-WERNER GROUP', address: '12345 MAIN ST', city: 'BERLIN', countryCode: 'DE' })).toBe(
+      'DEFRIGRO1234BER' // street number capped at 4 digits
+    );
+    // Initials run counts as one word.
+    expect(deriveMid({ name: 'A B C COMPANY', city: 'OSAKA', countryCode: 'JP' })).toBe('JPABCCOMOSA');
+    // Single-word firm: first six characters (cert package: TWNICSAN435TAI).
+    expect(deriveMid({ name: 'NICSAN', address: '435 INDUSTRIAL RD', city: 'TAICHUNG', countryCode: 'TW' })).toBe(
+      'TWNICSAN435TAI'
+    );
+  });
+
+  it('applies the Canadian province rule and refuses CA without a province', async () => {
+    const { deriveMid } = await import('../payload/mid.js');
+    expect(
+      deriveMid({ name: 'MAPLE AUTO PARTS', address: '77 KING ST', city: 'TORONTO', countryCode: 'CA', stateOrProvince: 'ON' })
+    ).toBe('XOMAPAUT77TOR');
+    expect(() => deriveMid({ name: 'MAPLE AUTO', city: 'TORONTO', countryCode: 'CA' })).toThrow(RecordCodecError);
+  });
+
+  it('requires a usable name and country', async () => {
+    const { deriveMid } = await import('../payload/mid.js');
+    expect(() => deriveMid({ name: '', city: 'PARIS', countryCode: 'FR' })).toThrow(RecordCodecError);
+    expect(() => deriveMid({ name: 'ACME', city: 'PARIS', countryCode: '' })).toThrow(RecordCodecError);
   });
 });
 

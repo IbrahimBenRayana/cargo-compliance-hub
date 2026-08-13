@@ -12,6 +12,7 @@
 import { RecordCodecError, type CodecIssue } from '../records/codec.js';
 import type { AbiDocumentBody, AbiItem, AbiInvoice } from '../../services/abi/types.js';
 import { parseAbiPayloadV2, type AbiPayloadV2, type EntrySummaryV2, type LineV2 } from './schemaV2.js';
+import { deriveMid } from './mid.js';
 
 function fail(field: string, message: string): never {
   const issue: CodecIssue = { record: 'PayloadV1', field, message };
@@ -55,10 +56,23 @@ function migrateItem(item: AbiItem, invoice: AbiInvoice): LineV2 {
   const quantity = parseQuantity(item.quantity1);
   const parties: LineV2['parties'] = [];
   for (const party of item.parties) {
-    // Only IRS-format identifiers ride on the 47-record; manufacturer/seller
-    // name+address parties need MID derivation (CBP 3500-13) in enrichment.
     if (party.type === 'buyer' && party.taxId) parties.push({ type: 'S', identifier: party.taxId });
     if (party.type === 'shipTo' && party.taxId) parties.push({ type: 'C', identifier: party.taxId });
+    // Manufacturer: derive the MID (Directive 3500-13) from name+address.
+    // ACE remains the authority — the $I application verifies/corrects a
+    // derived MID once connected.
+    if (party.type === 'manufacturer' && party.name) {
+      parties.push({
+        type: 'M',
+        identifier: deriveMid({
+          name: party.name,
+          address: party.address,
+          city: party.city,
+          countryCode: (party.country || item.origin.country || '').toUpperCase(),
+          stateOrProvince: party.state,
+        }),
+      });
+    }
   }
   return {
     sku: item.sku || undefined,
