@@ -24,7 +24,7 @@ export const INPUT_A: RecordDef = {
     { name: 'password', start: 9, end: 14, class: 'AN', designation: 'M' },
     { name: 'transmissionDate', start: 15, end: 20, class: 'D', designation: 'O' },
     { name: 'filler', start: 21, end: 25, class: 'S', designation: 'M' },
-    { name: 'appId', start: 26, end: 27, class: 'AN', designation: 'M' }, // M for ESAR
+    { name: 'appId', start: 26, end: 27, class: 'X', designation: 'M' }, // M for ESAR; X: $I/$R app ids exist (AMF-6)
     { name: 'filler2', start: 28, end: 37, class: 'S', designation: 'M' },
     { name: 'officeCode', start: 38, end: 39, class: 'AN', designation: 'C' },
     { name: 'filler3', start: 40, end: 59, class: 'S', designation: 'M' },
@@ -41,7 +41,7 @@ export const INPUT_B: RecordDef = {
     { name: 'filler', start: 2, end: 3, class: 'S', designation: 'M' },
     { name: 'port', start: 4, end: 7, class: 'AN', designation: 'M' },
     { name: 'filerCode', start: 8, end: 10, class: 'AN', designation: 'M' },
-    { name: 'appId', start: 11, end: 12, class: 'AN', designation: 'M' },
+    { name: 'appId', start: 11, end: 12, class: 'X', designation: 'M' }, // X: $I/$R app ids exist (AMF-6)
     { name: 'filler2', start: 13, end: 44, class: 'S', designation: 'M' },
     { name: 'officeCode', start: 45, end: 46, class: 'AN', designation: 'C' },
     { name: 'preparerPort', start: 47, end: 50, class: 'AN', designation: 'C' },
@@ -62,7 +62,7 @@ export const INPUT_Y: RecordDef = {
     { name: 'filler', start: 2, end: 3, class: 'S', designation: 'M' },
     { name: 'port', start: 4, end: 7, class: 'AN', designation: 'M' },
     { name: 'filerCode', start: 8, end: 10, class: 'AN', designation: 'M' },
-    { name: 'appId', start: 11, end: 12, class: 'AN', designation: 'M' },
+    { name: 'appId', start: 11, end: 12, class: 'X', designation: 'M' }, // X: $I/$R app ids exist (AMF-6)
     { name: 'filler2', start: 13, end: 44, class: 'S', designation: 'M' },
     { name: 'officeCode', start: 45, end: 46, class: 'AN', designation: 'C' },
     { name: 'filler3', start: 47, end: 80, class: 'S', designation: 'C' },
@@ -129,7 +129,7 @@ export const OUTPUT_B: RecordDef = {
     { name: 'filler', start: 2, end: 3, class: 'S', designation: 'M' },
     { name: 'port', start: 4, end: 7, class: 'AN', designation: 'M' },
     { name: 'filerCode', start: 8, end: 10, class: 'AN', designation: 'M' },
-    { name: 'appId', start: 11, end: 12, class: 'AN', designation: 'M' },
+    { name: 'appId', start: 11, end: 12, class: 'X', designation: 'M' }, // X: $I/$R app ids exist (AMF-6)
     { name: 'statementStatus', start: 13, end: 13, class: 'AN', designation: 'C' }, // P | F
     { name: 'statementNumber', start: 14, end: 23, class: 'AN', designation: 'C' },
     { name: 'preliminaryStatementPrintDate', start: 24, end: 29, class: 'D', designation: 'C' },
@@ -155,7 +155,7 @@ export const OUTPUT_Y: RecordDef = {
     { name: 'filler', start: 2, end: 3, class: 'S', designation: 'M' },
     { name: 'port', start: 4, end: 7, class: 'AN', designation: 'M' },
     { name: 'filerCode', start: 8, end: 10, class: 'AN', designation: 'M' },
-    { name: 'appId', start: 11, end: 12, class: 'AN', designation: 'M' },
+    { name: 'appId', start: 11, end: 12, class: 'X', designation: 'M' }, // X: $I/$R app ids exist (AMF-6)
     { name: 'imageCount', start: 13, end: 17, class: 'N', designation: 'M' },
     { name: 'filler2', start: 18, end: 44, class: 'S', designation: 'M' },
     { name: 'officeCode', start: 45, end: 46, class: 'AN', designation: 'C' },

@@ -64,6 +64,7 @@ export const APPLICATION_CODES = {
   quotaQuery: { input: 'QA', response: 'QB' },
   tibExtension: { input: 'TE', response: 'TX' },
   importerBondQuery: { input: 'KI', response: 'KR' },
+  addManufacturer: { input: '$I', response: '$R' },
   manufacturerQuery: { input: 'MA', response: 'MY' },
   cargoManifestEntryReleaseQuery: { input: 'CQ', response: 'C1' },
   currencyExchangeRatesQuery: { input: 'FI', response: 'FR' },

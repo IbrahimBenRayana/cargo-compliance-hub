@@ -217,6 +217,13 @@ export type {
 } from './apps/tib/responseParser.js';
 export * as tibRecordDefs from './apps/tib/recordDefs.js';
 
+// ── Add Manufacturer ($I/$R) — ACE-authoritative MID derivation ──
+export { buildAddManufacturers } from './apps/addManufacturer/builder.js';
+export type { AmfRequest, AddManufacturerRequest, UpdatePostalCodeRequest } from './apps/addManufacturer/builder.js';
+export { parseAmfResponse, parseAmfResponseBatch } from './apps/addManufacturer/responseParser.js';
+export type { AmfResult } from './apps/addManufacturer/responseParser.js';
+export * as amfRecordDefs from './apps/addManufacturer/recordDefs.js';
+
 // ── Companion query applications (workstream E) ────────────
 export { buildAdCvdCaseQuery } from './apps/adcvd/builder.js';
 export type {
