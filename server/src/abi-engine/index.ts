@@ -185,6 +185,84 @@ export {
 } from './inbond/recordDefs.js';
 export * as inbondRecordDefs from './inbond/recordDefs.js';
 
+// ── ACE Cargo Release (SE/SX + SO status notifications) ────
+export { buildCargoRelease } from './cargoRelease/builder.js';
+export type {
+  CargoReleaseInput,
+  CargoReleaseAddReplaceInput,
+  CargoReleaseUpdateInput,
+  CargoReleaseCancelInput,
+  SeEntryType,
+  SeBillType,
+  SeReferenceQualifier,
+  SeCancellationReasonCode,
+  SeEntityCode,
+  SeContact,
+  SeBill,
+  SeConveyance,
+  SeBillGrouping,
+  SeReference,
+  SeGbiIdentifier,
+  SeAddressComponent,
+  SeEntityGeography,
+  SeEntity,
+  SeTariff,
+  SeFtzStatus,
+  SeLine,
+  SeAdditionalHeader,
+  UnifiedIsfInput,
+  UnifiedIsfEntity,
+} from './cargoRelease/builder.js';
+export {
+  parseCargoReleaseResponse,
+  parseCargoReleaseResponseBatch,
+  parseCargoReleaseStatus,
+  parseCargoReleaseStatusBatch,
+} from './cargoRelease/responseParser.js';
+export type {
+  CargoReleaseResponse,
+  CargoReleaseResponseBatch,
+  SeEchoedRecord,
+  SeRecordError,
+  SeDisposition,
+  CargoReleaseStatusNotification,
+  CargoReleaseStatusBatch,
+  SoReference,
+  SoLine,
+  SoBill,
+  SoInBondLeg,
+  SoBillMatch,
+  SoBillGroupingStatus,
+  SoReleaseDisposition,
+  SoPgaStatus,
+  SoPgaDetail,
+} from './cargoRelease/responseParser.js';
+export {
+  SE_ACTION_CODES,
+  SE_ENTRY_TYPES,
+  SE_IMPORTER_OF_RECORD_TYPES,
+  SE_MOT_CODES,
+  SPLIT_SHIPMENT_RELEASE_CODES,
+  CANCELLATION_REASON_CODES,
+  BILL_TYPE_INDICATORS,
+  SE20_REFERENCE_QUALIFIERS,
+  SE_ENTITY_CODES,
+  SE_ENTITY_IDENTIFIER_QUALIFIERS,
+  GBI_IDENTIFIER_QUALIFIERS,
+  SE_ADDRESS_COMPONENT_QUALIFIERS,
+  FTZ_ZONE_STATUS_CODES,
+  UNIFIED_ISF_SHIPMENT_TYPES,
+  UNIFIED_SF20_REFERENCE_QUALIFIERS,
+  SE90_MESSAGE_TYPES,
+  SO20_REFERENCE_QUALIFIERS,
+  SO20_RSN_REASON_CODES,
+  SO50_DISPOSITION_CODES,
+  SO60_DISPOSITION_CODES,
+  RELEASE_ORIGIN_CODES,
+  PGA_ENTRY_HOLD_TYPES,
+} from './cargoRelease/recordDefs.js';
+export * as cargoReleaseRecordDefs from './cargoRelease/recordDefs.js';
+
 // ── Census Warning Override (CW/CO) + Query (CJ/CL) ────────
 export { buildCensusOverride } from './apps/census/cwBuilder.js';
 export type { CwCensusOverrideInput, CwEntryOverrides, CwLineOverrides, CwOverride } from './apps/census/cwBuilder.js';
