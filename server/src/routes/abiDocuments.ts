@@ -28,6 +28,8 @@ import { notify } from '../services/notifications.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import logger from '../config/logger.js';
 import { runSinglePoll, pollABIDocumentStatus } from '../services/abiPolling.js';
+import { estimateDutyForBody } from '../services/dutyEstimate.js';
+import { DbHtsRateSource } from '../abi-engine/refdata/dbRateSource.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -191,6 +193,33 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 });
 
 // ── POST /:id/send — Transmit to CC ────────────────────
+
+// ── POST /:id/estimate-duty — Transmit-time duty & fee preview ──
+//
+// Prices the CURRENT draft payload on the native pipeline (migrate →
+// duty engine over ingested USITC rates). No external call, no state
+// change, no billing. Incomplete drafts return 200 with
+// `{ estimable: false, issues }` — the wizard renders what's missing;
+// only a missing document is an error.
+
+router.post('/:id/estimate-duty', async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+  const doc = await prisma.abiDocument.findFirst({
+    where: { id, orgId: req.user!.orgId },
+    select: { id: true, payload: true },
+  });
+  if (!doc) {
+    res.status(404).json({ error: 'ABI document not found' });
+    return;
+  }
+
+  const result = await estimateDutyForBody(
+    doc.payload,
+    new DbHtsRateSource(prisma.htsRateLine)
+  );
+  res.json({ data: result });
+});
 
 router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;

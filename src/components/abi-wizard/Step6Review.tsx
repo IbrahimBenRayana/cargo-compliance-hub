@@ -6,10 +6,16 @@
  * full Zod schema at transmit time). The parent wizard reads validation via
  * the exported `validateAbiDraft` helper to gate the Transmit button.
  */
-import { CheckCircle2, AlertCircle, FileCheck, Package, Receipt, Scale } from 'lucide-react';
-import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
+import {
+  CheckCircle2, AlertCircle, FileCheck, Package, Receipt, Scale,
+  Landmark, Loader2, RefreshCw,
+} from 'lucide-react';
+import type { ABIDocumentDraft, AbiDocument, DutyEstimateResult } from '@/api/client';
+import { useDutyEstimate } from '@/hooks/useAbiDocument';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { SectionHeader } from './shared';
 
 export interface ValidationResult {
@@ -228,6 +234,9 @@ export default function Step6Review({ value, doc }: Props) {
         </Card>
       </div>
 
+      {/* Estimated duties & fees — the number a filer signs for */}
+      <DutyEstimateCard docId={doc?.id} />
+
       {/* Validation block */}
       {validation.valid ? (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-start gap-3">
@@ -375,6 +384,156 @@ export default function Step6Review({ value, doc }: Props) {
           Draft ID {doc.id.slice(0, 8)}…
         </p>
       )}
+    </div>
+  );
+}
+
+// ─── Estimated duties & fees ─────────────────────────────────────────
+//
+// Priced server-side on the native engine (same math a native transmit
+// would carry) from the last SAVED payload. Autosave invalidation keeps
+// it current; the refresh button covers "I don't trust it" moments.
+
+const fmtCents = (cents: number) =>
+  (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+
+/** Humanize a dot-path issue field ("manifest.0.invoices.0.items.1.htsNumber"). */
+function humanizeIssueField(field: string): string {
+  if (!field) return 'Draft';
+  return field
+    .split('.')
+    .map((seg) => (/^\d+$/.test(seg) ? `#${Number(seg) + 1}` : seg
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/^./, (c) => c.toUpperCase())))
+    .join(' › ');
+}
+
+function DutyEstimateCard({ docId }: { docId?: string }) {
+  const estimate = useDutyEstimate(docId);
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Landmark className="h-4 w-4 text-primary" />
+            <h4 className="text-sm font-semibold">Estimated duties &amp; fees</h4>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => estimate.refetch()}
+            disabled={!docId || estimate.isFetching}
+          >
+            {estimate.isFetching ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            <span className="ml-1.5">Recalculate</span>
+          </Button>
+        </div>
+
+        {!docId || estimate.isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-8 w-40" />
+          </div>
+        ) : estimate.isError ? (
+          <p className="text-xs text-muted-foreground">
+            Couldn&apos;t reach the duty engine. Use Recalculate to retry.
+          </p>
+        ) : estimate.data ? (
+          <DutyEstimateBody result={estimate.data} />
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DutyEstimateBody({ result }: { result: DutyEstimateResult }) {
+  // Explicit comparison: the app tsconfig runs non-strict, where truthiness
+  // checks don't narrow boolean-literal discriminants.
+  if (result.estimable === false) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">
+          Not enough of the filing is complete to price it yet. Duties and fees
+          will appear once these are resolved:
+        </p>
+        <ul className="flex flex-wrap gap-1.5">
+          {result.issues.slice(0, 12).map((issue, i) => (
+            <li key={`${issue.field}-${i}`}>
+              <Badge
+                variant="outline"
+                className="text-xs font-normal"
+                title={issue.message}
+              >
+                {humanizeIssueField(issue.field)}
+              </Badge>
+            </li>
+          ))}
+          {result.issues.length > 12 && (
+            <Badge variant="outline" className="text-xs font-normal">
+              +{result.issues.length - 12} more
+            </Badge>
+          )}
+        </ul>
+      </div>
+    );
+  }
+
+  const { totals } = result;
+  // Fee classes beyond MPF/HMF (informal 311, mail 496…) shown by label.
+  const otherFees = totals.fees.filter(
+    (f) => f.classCode !== '499' && f.classCode !== '501',
+  );
+
+  return (
+    <div className="space-y-3">
+      <dl className="space-y-1.5 text-sm">
+        <div className="flex items-center justify-between">
+          <dt className="text-muted-foreground">Duty</dt>
+          <dd className="font-medium tabular-nums">{fmtCents(totals.dutyCents)}</dd>
+        </div>
+        {totals.mpfCents > 0 && (
+          <div className="flex items-center justify-between">
+            <dt className="text-muted-foreground">Merchandise Processing Fee</dt>
+            <dd className="font-medium tabular-nums">{fmtCents(totals.mpfCents)}</dd>
+          </div>
+        )}
+        {totals.hmfCents > 0 && (
+          <div className="flex items-center justify-between">
+            <dt className="text-muted-foreground">Harbor Maintenance Fee</dt>
+            <dd className="font-medium tabular-nums">{fmtCents(totals.hmfCents)}</dd>
+          </div>
+        )}
+        {otherFees.map((fee) => (
+          <div key={fee.classCode} className="flex items-center justify-between">
+            <dt className="text-muted-foreground">{fee.label}</dt>
+            <dd className="font-medium tabular-nums">{fmtCents(fee.amountCents)}</dd>
+          </div>
+        ))}
+        {totals.adCvdCents > 0 && (
+          <div className="flex items-center justify-between">
+            <dt className="text-muted-foreground">AD/CVD deposits</dt>
+            <dd className="font-medium tabular-nums">{fmtCents(totals.adCvdCents)}</dd>
+          </div>
+        )}
+      </dl>
+      <div className="flex items-baseline justify-between border-t pt-2">
+        <span className="text-sm font-semibold">Estimated total</span>
+        <span className="text-2xl font-bold tabular-nums">
+          {fmtCents(totals.totalCents)}
+        </span>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Estimate priced by the MyCargoLens duty engine from current USITC rates
+        (CBP assesses the final amounts at liquidation). Rate date:{' '}
+        {fmtDate(result.applicabilityDate)}.
+      </p>
     </div>
   );
 }

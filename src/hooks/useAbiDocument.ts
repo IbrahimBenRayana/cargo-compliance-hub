@@ -100,6 +100,26 @@ export function useDeleteAbiDocument() {
   });
 }
 
+/**
+ * Transmit-time duty & fee estimate for a draft.
+ *
+ * Keyed UNDER the document key on purpose: the autosave mutation's
+ * `invalidateQueries({ queryKey: ['abi-documents', id] })` prefix-matches
+ * this key, so every saved edit automatically re-prices the estimate —
+ * no manual wiring between the wizard steps and this hook.
+ */
+export function useDutyEstimate(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['abi-documents', id, 'estimate-duty'],
+    queryFn: () => abiDocumentsApi.estimateDuty(id!),
+    enabled: Boolean(id) && enabled,
+    // The estimate must always reflect the latest save, never a 30s-old
+    // snapshot (the app-wide default staleTime).
+    staleTime: 0,
+    select: (res) => res.data,
+  });
+}
+
 export function usePollAbiDocument() {
   const queryClient = useQueryClient();
   return useMutation({

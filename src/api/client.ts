@@ -1792,6 +1792,50 @@ export interface AbiDocumentEnvelope {
   note?: string;
 }
 
+// ─── Duty estimate (POST /:id/estimate-duty) ──────────────
+// Mirrors server/src/services/dutyEstimate.ts. The server prices the
+// CURRENT saved payload on the native engine; incomplete drafts come back
+// as `{ estimable: false, issues }` with HTTP 200.
+
+export interface DutyEstimateIssue {
+  field: string;
+  message: string;
+}
+
+export interface DutyEstimateFee {
+  classCode: string;
+  label: string;
+  amountCents: number;
+}
+
+export interface DutyEstimateLine {
+  lineNumber: number;
+  htsNumbers: string[];
+  valueDollars: number;
+  dutyCents: number;
+  mpfCents: number;
+  hmfCents: number;
+  adCvdCents: number;
+}
+
+export interface DutyEstimateTotals {
+  dutyCents: number;
+  mpfCents: number;
+  hmfCents: number;
+  fees: DutyEstimateFee[];
+  adCvdCents: number;
+  totalCents: number;
+}
+
+export type DutyEstimateResult =
+  | {
+      estimable: true;
+      applicabilityDate: string;
+      totals: DutyEstimateTotals;
+      lines: DutyEstimateLine[];
+    }
+  | { estimable: false; issues: DutyEstimateIssue[] };
+
 export const abiDocumentsApi = {
   list(params?: AbiDocumentListParams) {
     const query = new URLSearchParams();
@@ -1842,6 +1886,13 @@ export const abiDocumentsApi = {
     return apiFetch<AbiDocumentEnvelope>(`/api/v1/abi-documents/${id}/poll`, {
       method: 'POST',
     });
+  },
+
+  estimateDuty(id: string) {
+    return apiFetch<{ data: DutyEstimateResult }>(
+      `/api/v1/abi-documents/${id}/estimate-duty`,
+      { method: 'POST' },
+    );
   },
 };
 

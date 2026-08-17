@@ -45,6 +45,7 @@ import {
   useAbiDocument,
   useAbiDocumentAutosave,
   useCreateAbiDocument,
+  useDutyEstimate,
   useSendAbiDocument,
 } from '@/hooks/useAbiDocument';
 
@@ -142,6 +143,11 @@ export default function ABIDocumentWizard() {
   const doc = query.data?.data;
   const createMut = useCreateAbiDocument();
   const sendMut = useSendAbiDocument();
+  // Shares the Review card's query cache — no extra fetch; only enabled on
+  // the terminal step so earlier steps never trigger pricing.
+  const dutyEstimate = useDutyEstimate(docId, step === STEPS.length - 1);
+  const estimatedTotalCents =
+    dutyEstimate.data?.estimable === true ? dutyEstimate.data.totals.totalCents : null;
   const autosave = useAbiDocumentAutosave(docId);
 
   // ── Seed local draft once the document loads
@@ -249,7 +255,11 @@ export default function ABIDocumentWizard() {
   // left them staring at a greyed-out button with no guidance.
   const goNext = () => {
     if (canAdvance) {
-      setStep((s) => Math.min(s + 1, STEPS.length - 1));
+      const next = Math.min(step + 1, STEPS.length - 1);
+      // Entering Review: flush pending edits so the duty estimate (which
+      // prices the SAVED payload) reflects what the user just typed.
+      if (next === STEPS.length - 1) autosave.flush();
+      setStep(next);
     } else {
       setErrorsShownForStep((prev) => ({ ...prev, [step]: true }));
     }
@@ -466,10 +476,21 @@ export default function ABIDocumentWizard() {
                       Transmit Entry Summary to CBP?
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                      This filing will be submitted to U.S. Customs and Border Protection
-                      via CustomsCity. Once transmitted, the document cannot be deleted —
-                      only amended via a replacement filing. Confirm the summary before
-                      continuing.
+                      This filing will be submitted to U.S. Customs and Border Protection.
+                      {estimatedTotalCents !== null && (
+                        <>
+                          {' '}Estimated duties &amp; fees:{' '}
+                          <strong>
+                            {(estimatedTotalCents / 100).toLocaleString('en-US', {
+                              style: 'currency',
+                              currency: 'USD',
+                            })}
+                          </strong>
+                          .
+                        </>
+                      )}{' '}
+                      Once transmitted, the document cannot be deleted — only amended via
+                      a replacement filing. Confirm the summary before continuing.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
