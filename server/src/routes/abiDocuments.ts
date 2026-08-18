@@ -30,6 +30,11 @@ import logger from '../config/logger.js';
 import { runSinglePoll, pollABIDocumentStatus } from '../services/abiPolling.js';
 import { estimateDutyForBody } from '../services/dutyEstimate.js';
 import { DbHtsRateSource } from '../abi-engine/refdata/dbRateSource.js';
+import {
+  drawEntryNumber,
+  validateEntryNumber,
+  EntryNumberDrawError,
+} from '../services/entryNumberBlocks.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -193,6 +198,47 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 });
 
 // ── POST /:id/send — Transmit to CC ────────────────────
+
+// ── POST /draw-entry-number — Assign the next number from the org's block ──
+//
+// Atomic: the service's UPDATE…RETURNING serialises concurrent draws, so
+// two operators filing at once can never receive the same entry number.
+// Drawn numbers are consumed even if the draft is later abandoned —
+// burning a number is correct filer behaviour; re-issuing one never is.
+
+router.post('/draw-entry-number', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const drawn = await drawEntryNumber(req.user!.orgId);
+    await writeAuditLog({
+      orgId: req.user!.orgId,
+      userId: req.user!.id,
+      action: 'entry_number.draw',
+      entityType: 'entry_number_block',
+      entityId: drawn.blockId,
+      newValue: { entryNumber: drawn.entryNumber, remaining: drawn.remaining },
+      ...getRequestMeta(req),
+    });
+    res.json({ data: drawn });
+  } catch (err) {
+    if (err instanceof EntryNumberDrawError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    logger.error({ err }, '[AbiDocuments] entry number draw failed');
+    res.status(500).json({ error: 'Failed to draw an entry number' });
+  }
+});
+
+// ── POST /validate-entry-number — Check-digit validation for typed numbers ──
+
+router.post('/validate-entry-number', (req: AuthRequest, res: Response): void => {
+  const raw = typeof req.body?.entryNumber === 'string' ? req.body.entryNumber : '';
+  if (!raw || raw.length > 20) {
+    res.status(400).json({ error: 'entryNumber (string, ≤20 chars) is required' });
+    return;
+  }
+  res.json({ data: validateEntryNumber(raw) });
+});
 
 // ── POST /:id/estimate-duty — Transmit-time duty & fee preview ──
 //

@@ -710,7 +710,41 @@ export const settingsApi = {
       body: JSON.stringify({ password }),
     });
   },
+
+  // ── Entry number blocks (filer-assigned ranges) ──
+  listEntryBlocks() {
+    return apiFetch<{ data: EntryNumberBlock[] }>('/api/v1/settings/entry-blocks');
+  },
+
+  createEntryBlock(data: { filerCode: string; rangeStart: number; rangeEnd: number; label?: string }) {
+    return apiFetch<{ data: EntryNumberBlock }>('/api/v1/settings/entry-blocks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateEntryBlock(id: string, data: { active?: boolean; label?: string | null; rangeEnd?: number }) {
+    return apiFetch<{ data: EntryNumberBlock }>(`/api/v1/settings/entry-blocks/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
 };
+
+/** A filer's pre-issued entry-number range (settings/entry-blocks). */
+export interface EntryNumberBlock {
+  id: string;
+  filerCode: string;
+  rangeStart: number;
+  rangeEnd: number;
+  nextSequence: number;
+  active: boolean;
+  label: string | null;
+  createdAt: string;
+  used: number;
+  remaining: number;
+  exhausted: boolean;
+}
 
 // ─── Bulk Operations API ──────────────────────────────────
 export const bulkApi = {
@@ -1894,7 +1928,27 @@ export const abiDocumentsApi = {
       { method: 'POST' },
     );
   },
+
+  /** Atomically draw the next entry number from the org's active block. */
+  drawEntryNumber() {
+    return apiFetch<{ data: DrawnEntryNumber }>(
+      '/api/v1/abi-documents/draw-entry-number',
+      { method: 'POST' },
+    );
+  },
 };
+
+/** Result of POST /abi-documents/draw-entry-number. */
+export interface DrawnEntryNumber {
+  /** Canonical hyphenated form, e.g. 'SP7-0000001-4'. */
+  entryNumber: string;
+  filerCode: string;
+  sequence: string;
+  checkDigit: number;
+  blockId: string;
+  /** Numbers left in the block after this draw. */
+  remaining: number;
+}
 
 // ─── In-Bond (7512) API ───────────────────────────────────
 //

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
+import { EntryNumberBlocksCard } from '@/components/settings/EntryNumberBlocksCard';
 import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
 import { ChangePasswordCard } from '@/components/settings/ChangePasswordCard';
 import { BillingSettings } from '@/components/billing/BillingSettings';
@@ -298,6 +299,10 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              <EntryNumberBlocksCard
+                canEdit={profile?.role === 'owner' || profile?.role === 'admin'}
+              />
 
               {org && (
                 <Card>

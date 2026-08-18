@@ -18,8 +18,8 @@
 ## Phase 1 — Filer quick wins (internal only)
 - [x] 1.1 Duty estimate endpoint (`POST /abi-documents/:id/estimate-duty`, reuses abi-engine/duty) — DONE 2026-08-17, 10 unit tests, live-verified
 - [x] 1.2 Duty statement card on entry Review step (+ total in transmit confirm) — DONE 2026-08-17, browser-verified ($387.14 fixture entry)
-- [ ] 1.3 Org filer settings: entry-number block (schema + settings UI + atomic draw)
-- [ ] 1.4 Entry-number auto-draw + check-digit validation in wizard Step 1
+- [x] 1.3 Org filer settings: entry-number block (schema + settings UI + atomic draw) — DONE 2026-08-18; 15 parallel draws → 15 unique numbers, overlap/exhaustion/no-blocks all live-verified
+- [x] 1.4 Entry-number auto-draw + check-digit validation in wizard Step 1 — DONE 2026-08-18; engine-vector-pinned frontend port, browser-verified
 - [ ] 1.5 7501-format PDF (`GET /abi-documents/:id/pdf`, DRAFT watermark, org-scoped)
 - [ ] 1.6 Bulk line import — parser + endpoint (CSV/XLSX, per-row errors, caps, injection-safe)
 - [ ] 1.7 Bulk line import — wizard UI (template, preview, import-valid, export-errors)

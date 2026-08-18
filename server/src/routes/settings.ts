@@ -310,4 +310,174 @@ router.get('/audit-log', async (req: AuthRequest, res: Response): Promise<void> 
   }
 });
 
+// ─── Entry number blocks — the filer's pre-issued ranges ─────────────
+//
+// Reads are open to every org member (the wizard shows remaining counts);
+// writes are owner/admin only — a wrong range corrupts every entry number
+// drawn from it. Sequences are the 7-digit filer-assigned part; check
+// digits are computed at draw time (services/entryNumberBlocks.ts).
+
+const entryBlockCreateSchema = z.object({
+  filerCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}$/, 'Filer code must be 3 letters/digits'),
+  rangeStart: z.number().int().min(1).max(9_999_999),
+  rangeEnd: z.number().int().min(1).max(9_999_999),
+  label: z.string().trim().max(100).optional(),
+}).strict().refine((b) => b.rangeEnd >= b.rangeStart, {
+  path: ['rangeEnd'],
+  message: 'Range end must be ≥ range start',
+});
+
+const entryBlockUpdateSchema = z.object({
+  active: z.boolean().optional(),
+  label: z.string().trim().max(100).nullable().optional(),
+  rangeEnd: z.number().int().min(1).max(9_999_999).optional(),
+}).strict();
+
+/** Shape a block row for the API: usage counters included. */
+function serializeEntryBlock(b: {
+  id: string; filerCode: string; rangeStart: number; rangeEnd: number;
+  nextSequence: number; active: boolean; label: string | null; createdAt: Date;
+}) {
+  return {
+    id: b.id,
+    filerCode: b.filerCode,
+    rangeStart: b.rangeStart,
+    rangeEnd: b.rangeEnd,
+    nextSequence: b.nextSequence,
+    active: b.active,
+    label: b.label,
+    createdAt: b.createdAt,
+    used: Math.min(b.nextSequence, b.rangeEnd + 1) - b.rangeStart,
+    remaining: Math.max(0, b.rangeEnd - b.nextSequence + 1),
+    exhausted: b.nextSequence > b.rangeEnd,
+  };
+}
+
+// GET /api/v1/settings/entry-blocks — list the org's blocks
+router.get('/entry-blocks', async (req: AuthRequest, res: Response): Promise<void> => {
+  const blocks = await prisma.entryNumberBlock.findMany({
+    where: { orgId: req.user!.orgId },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json({ data: blocks.map(serializeEntryBlock) });
+});
+
+// POST /api/v1/settings/entry-blocks — register a new block
+router.post('/entry-blocks', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = entryBlockCreateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed', issues: parsed.error.issues });
+    return;
+  }
+  const { filerCode, rangeStart, rangeEnd, label } = parsed.data;
+
+  // Overlapping ranges for the same filer code would double-issue numbers.
+  const overlap = await prisma.entryNumberBlock.findFirst({
+    where: {
+      orgId: req.user!.orgId,
+      filerCode,
+      rangeStart: { lte: rangeEnd },
+      rangeEnd: { gte: rangeStart },
+    },
+    select: { id: true, rangeStart: true, rangeEnd: true },
+  });
+  if (overlap) {
+    res.status(409).json({
+      error: `Range overlaps an existing ${filerCode} block (${overlap.rangeStart}–${overlap.rangeEnd}). Entry numbers must never be issued twice.`,
+    });
+    return;
+  }
+
+  const block = await prisma.entryNumberBlock.create({
+    data: {
+      orgId: req.user!.orgId,
+      filerCode,
+      rangeStart,
+      rangeEnd,
+      nextSequence: rangeStart,
+      label: label ?? null,
+    },
+  });
+
+  await writeAuditLog({
+    orgId: req.user!.orgId,
+    userId: req.user!.id,
+    action: 'entry_block.create',
+    entityType: 'entry_number_block',
+    entityId: block.id,
+    newValue: { filerCode, rangeStart, rangeEnd },
+    ...getRequestMeta(req),
+  });
+
+  res.status(201).json({ data: serializeEntryBlock(block) });
+});
+
+// PATCH /api/v1/settings/entry-blocks/:id — activate/deactivate, relabel, extend
+router.patch('/entry-blocks/:id', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const parsed = entryBlockUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed', issues: parsed.error.issues });
+    return;
+  }
+
+  const block = await prisma.entryNumberBlock.findFirst({
+    where: { id, orgId: req.user!.orgId },
+  });
+  if (!block) {
+    res.status(404).json({ error: 'Entry number block not found' });
+    return;
+  }
+
+  // A shrunk range must never un-issue numbers already drawn.
+  if (parsed.data.rangeEnd !== undefined) {
+    const floor = Math.max(block.rangeStart, block.nextSequence - 1);
+    if (parsed.data.rangeEnd < floor) {
+      res.status(400).json({
+        error: `Range end cannot go below ${floor} — numbers up to ${block.nextSequence - 1} are already drawn.`,
+      });
+      return;
+    }
+    // Extending must not collide with a neighbouring block either.
+    const overlap = await prisma.entryNumberBlock.findFirst({
+      where: {
+        orgId: req.user!.orgId,
+        filerCode: block.filerCode,
+        id: { not: block.id },
+        rangeStart: { lte: parsed.data.rangeEnd },
+        rangeEnd: { gte: block.rangeStart },
+      },
+      select: { id: true, rangeStart: true, rangeEnd: true },
+    });
+    if (overlap) {
+      res.status(409).json({
+        error: `Extended range would overlap the ${block.filerCode} block ${overlap.rangeStart}–${overlap.rangeEnd}.`,
+      });
+      return;
+    }
+  }
+
+  const updated = await prisma.entryNumberBlock.update({
+    where: { id: block.id },
+    data: {
+      ...(parsed.data.active !== undefined && { active: parsed.data.active }),
+      ...(parsed.data.label !== undefined && { label: parsed.data.label }),
+      ...(parsed.data.rangeEnd !== undefined && { rangeEnd: parsed.data.rangeEnd }),
+    },
+  });
+
+  await writeAuditLog({
+    orgId: req.user!.orgId,
+    userId: req.user!.id,
+    action: 'entry_block.update',
+    entityType: 'entry_number_block',
+    entityId: block.id,
+    oldValue: { active: block.active, label: block.label, rangeEnd: block.rangeEnd },
+    newValue: parsed.data,
+    ...getRequestMeta(req),
+  });
+
+  res.json({ data: serializeEntryBlock(updated) });
+});
+
 export default router;

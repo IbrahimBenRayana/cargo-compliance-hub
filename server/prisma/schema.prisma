@@ -41,8 +41,35 @@ model Organization {
   webhookEndpoints  WebhookEndpoint[]
   chatConversations ChatConversation[]
   inbondFilings     InbondFiling[]
+  entryNumberBlocks EntryNumberBlock[]
 
   @@map("organizations")
+}
+
+// ─── Entry number blocks ───────────────────────────────────
+// A filer's pre-issued entry-number ranges. Sequences are the 7-digit
+// filer-assigned part (check digit computed at draw time, AE Table 1).
+// Draws happen via a single UPDATE … RETURNING (services/entryNumberBlocks.ts)
+// so concurrent filings can never receive the same number.
+model EntryNumberBlock {
+  id           String   @id @default(uuid()) @db.Uuid
+  orgId        String   @map("org_id") @db.Uuid
+  filerCode    String   @map("filer_code") @db.VarChar(3)
+  /** First 7-digit sequence in the range (inclusive). */
+  rangeStart   Int      @map("range_start")
+  /** Last 7-digit sequence in the range (inclusive). */
+  rangeEnd     Int      @map("range_end")
+  /** Next sequence to hand out; > rangeEnd means exhausted. */
+  nextSequence Int      @map("next_sequence")
+  active       Boolean  @default(true)
+  label        String?  @db.VarChar(100)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, active])
+  @@map("entry_number_blocks")
 }
 
 // ─── Users ─────────────────────────────────────────────────
