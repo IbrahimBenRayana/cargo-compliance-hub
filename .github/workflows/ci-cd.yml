@@ -33,6 +33,42 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # ── Supply-chain guard ──────────────────────────────
+      # A malware loader hid in postcss.config.js for four months
+      # (docs/security/incident-2026-08-18-postcss-malware.md): ~7 KB of
+      # obfuscated code appended after the config object behind a long
+      # whitespace run, so it diffed as "4 +-" and sat off-screen in an
+      # editor. Config files are tiny and hand-written — anything long or
+      # obfuscated in one is an intrusion, so fail the build on sight.
+      # Runs BEFORE `npm ci` so a compromised repo can't install first.
+      - name: Scan config files for injected code
+        run: |
+          set -euo pipefail
+          fail=0
+
+          # 1. Known obfuscator signatures, anywhere in tracked source.
+          if git grep -nIE 'var _\$_[0-9a-f]+ *= *\(function|eth_getTransactionByHash|api\.trongrid\.io|fullnode\.mainnet\.aptoslabs\.com|bsc-dataseed' \
+               -- '*.js' '*.cjs' '*.mjs' '*.ts' '*.tsx' '*.json' ; then
+            echo "::error::Obfuscator / blockchain-C2 signature found in tracked source."
+            fail=1
+          fi
+
+          # 2. Config files must stay small and un-minified. Real configs are
+          #    a few hundred bytes; 2000+ chars on one line means packed code.
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            if awk 'length($0) > 2000 { exit 0 } END { exit 1 }' "$f"; then
+              echo "::error file=$f::Config file contains a >2000-char line — suspected packed/obfuscated code."
+              fail=1
+            fi
+          done < <(git ls-files -- '*.config.js' '*.config.mjs' '*.config.cjs' '*.config.ts' 'postcss.config.*' 'vite.config.*' 'tailwind.config.*')
+
+          if [ "$fail" -ne 0 ]; then
+            echo "See docs/security/incident-2026-08-18-postcss-malware.md"
+            exit 1
+          fi
+          echo "Config scan clean."
+
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
