@@ -35,6 +35,8 @@ import {
   validateEntryNumber,
   EntryNumberDrawError,
 } from '../services/entryNumberBlocks.js';
+import { renderEntry7501Pdf } from '../services/entryPdf.js';
+import { contentDispositionAttachment } from '../utils/httpHeaders.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -265,6 +267,59 @@ router.post('/:id/estimate-duty', async (req: AuthRequest, res: Response): Promi
     new DbHtsRateSource(prisma.htsRateLine)
   );
   res.json({ data: result });
+});
+
+// ── GET /:id/pdf — CBP Form 7501-format PDF ────────────────────────
+//
+// The record document (banks, auditors, drawback, 19 CFR 163 retention).
+// Non-accepted statuses render with a diagonal watermark; CANCELLED is
+// refused — a PDF of a cancelled entry is a document waiting to mislead.
+
+router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+  const doc = await prisma.abiDocument.findFirst({
+    where: { id, orgId: req.user!.orgId },
+    include: { organization: { select: { name: true } } },
+  });
+  if (!doc) {
+    res.status(404).json({ error: 'ABI document not found' });
+    return;
+  }
+  if (doc.status === 'CANCELLED') {
+    res.status(409).json({ error: 'This entry was cancelled — no 7501 can be produced for it.' });
+    return;
+  }
+
+  try {
+    const estimate = await estimateDutyForBody(doc.payload, new DbHtsRateSource(prisma.htsRateLine));
+    // Column 33 rate text: exact 10-digit rate line, falling back to the
+    // 8-digit parent — same resolution DbHtsRateSource uses.
+    const rateText = async (hts: string): Promise<string | null> => {
+      const flat = hts.replace(/\D/g, '');
+      let row = await prisma.htsRateLine.findUnique({ where: { htsNumber: flat }, select: { generalRate: true } });
+      if (!row && flat.length === 10) {
+        row = await prisma.htsRateLine.findUnique({ where: { htsNumber: flat.slice(0, 8) }, select: { generalRate: true } });
+      }
+      return row?.generalRate || null;
+    };
+
+    const buffer = await renderEntry7501Pdf({
+      doc: { id: doc.id, status: doc.status, entryNumber: doc.entryNumber, sentAt: doc.sentAt },
+      body: doc.payload,
+      estimate,
+      rateText,
+      orgName: doc.organization.name,
+    });
+
+    const filename = `7501-${(doc.entryNumber ?? doc.id.slice(0, 8)).replace(/[^A-Za-z0-9-]/g, '')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', contentDispositionAttachment(filename));
+    res.send(buffer);
+  } catch (err) {
+    logger.error({ err, docId: id }, '[AbiDocuments] 7501 PDF render failed');
+    res.status(500).json({ error: 'Failed to generate the 7501 PDF' });
+  }
 });
 
 router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {

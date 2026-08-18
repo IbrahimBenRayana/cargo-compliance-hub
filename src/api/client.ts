@@ -1936,6 +1936,11 @@ export const abiDocumentsApi = {
       { method: 'POST' },
     );
   },
+
+  /** Download the CBP Form 7501-format PDF (watermarked unless ACCEPTED). */
+  downloadPdf(id: string) {
+    return apiDownload(`/api/v1/abi-documents/${id}/pdf`);
+  },
 };
 
 /** Result of POST /abi-documents/draw-entry-number. */

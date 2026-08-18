@@ -29,6 +29,7 @@ import {
   usePollAbiDocument,
   useSendAbiDocument,
 } from '@/hooks/useAbiDocument';
+import { abiDocumentsApi } from '@/api/client';
 import type {
   AbiDocument,
   AbiDocumentStatus,
@@ -235,6 +236,7 @@ export default function ABIDocumentDetailPage() {
 
   const [showTransmitConfirm, setShowTransmitConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   if (isLoading) return <DetailSkeleton />;
 
@@ -296,6 +298,25 @@ export default function ABIDocumentDetailPage() {
       } else {
         toast.error(err?.body?.error || err?.message || 'Refresh failed');
       }
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const { blob, filename } = await abiDocumentsApi.downloadPdf(doc.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to download the 7501 PDF');
+    } finally {
+      setDownloadingPdf(false);
     }
   };
 
@@ -429,6 +450,24 @@ export default function ABIDocumentDetailPage() {
             <span className="text-xs text-muted-foreground italic">
               This entry has been cancelled.
             </span>
+          )}
+
+          {/* 7501 PDF — available for every status except cancelled;
+              non-accepted copies come out watermarked. */}
+          {!isCancelled && (
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+            >
+              {downloadingPdf ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              7501 PDF
+            </Button>
           )}
         </div>
       </div>
