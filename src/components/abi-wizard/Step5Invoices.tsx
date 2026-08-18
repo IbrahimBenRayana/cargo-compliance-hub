@@ -280,13 +280,16 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                 <SelectField
                   label="Related Parties"
                   required
-                  value="N"
-                  onChange={() => {
-                    /* Phase 1: locked to N */
-                  }}
-                  options={[{ value: 'N', label: 'No' }]}
-                  disabled
-                  hint="Phase 1 supports unrelated-party transactions only. Related-party (Y) reporting will unlock in a later phase."
+                  value={inv.relatedParties || 'N'}
+                  onChange={(v) =>
+                    updateInvoice(invIdx, { relatedParties: v as 'Y' | 'N' })
+                  }
+                  options={[
+                    { value: 'N', label: 'No — unrelated buyer and seller' },
+                    { value: 'Y', label: 'Yes — related parties' },
+                  ]}
+                  hint="Declare 'Yes' when buyer and seller are related under 19 CFR 152.102(g) (e.g. an intercompany purchase from a parent or affiliate). This flags the entry for CBP valuation review; transaction value must still be arm's-length."
+                  error={errors[`invoices.${invIdx}.relatedParties`]}
                 />
                 <ComboboxField
                   label="Country of Export"

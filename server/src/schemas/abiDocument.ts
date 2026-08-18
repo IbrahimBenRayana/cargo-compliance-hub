@@ -139,9 +139,16 @@ const abiInvoiceSchema = z.object({
   purchaseOrder: z.string().min(1).max(100),
   invoiceNumber: z.string().min(1).max(100),
   exportDate: YYYYMMDD,
-  // Phase 1: only "N" accepted. Y (related-party transactions) opens up
-  // additional CBP fields we haven't modelled — defer to phase 2.
-  relatedParties: z.literal('N').default('N'),
+  // 19 CFR 152.102(g): 'Y' when buyer and seller are related. Intercompany
+  // imports are a very large share of US import value, so 'N'-only excluded
+  // most mid-market importers outright.
+  //
+  // The indicator is declarative — it flags the transaction for CBP's
+  // valuation review and does NOT require extra fields on the entry summary
+  // (the native engine writes it to AE 40-record column 56 and nothing else
+  // changes). Transaction value must still be arm's-length-defensible, which
+  // is the filer's determination to make, not ours to block.
+  relatedParties: z.enum(['Y', 'N']).default('N'),
   countryOfExport: CountryCode,
   currency: z.string().length(3),
   exchangeRate: z.number().positive().max(8), // CC max 8 (see item.values)

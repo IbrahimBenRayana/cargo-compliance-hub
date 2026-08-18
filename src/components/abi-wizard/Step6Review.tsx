@@ -7,7 +7,7 @@
  * the exported `validateAbiDraft` helper to gate the Transmit button.
  */
 import {
-  CheckCircle2, AlertCircle, FileCheck, Package, Receipt, Scale,
+  CheckCircle2, AlertCircle, FileCheck, Package, Receipt, Scale, Users,
   Landmark, Loader2, RefreshCw,
 } from 'lucide-react';
 import type { ABIDocumentDraft, AbiDocument, DutyEstimateResult } from '@/api/client';
@@ -167,6 +167,10 @@ export default function Step6Review({ value, doc }: Props) {
 
   const invoiceCount = invoices.length;
   const itemCount = invoices.reduce((sum, inv) => sum + (inv?.items?.length ?? 0), 0);
+  // Declared related-party transactions get called out below — CBP treats
+  // this as a valuation-review flag, so a filer should see it before
+  // transmitting rather than discover it in a CF28.
+  const relatedInvoices = invoices.filter((inv) => inv?.relatedParties === 'Y');
 
   // Total declared value in USD (exchange rate applied per invoice).
   const totalValueUSD = invoices.reduce((sum, inv) => {
@@ -233,6 +237,24 @@ export default function Step6Review({ value, doc }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Related-party declaration — a valuation-review flag worth seeing */}
+      {relatedInvoices.length > 0 && (
+        <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-4 flex items-start gap-3">
+          <Users className="h-5 w-5 text-sky-600 dark:text-sky-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">
+              Related-party transaction declared
+              {invoiceCount > 1 && ` on ${relatedInvoices.length} of ${invoiceCount} invoices`}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              You&apos;ve declared that buyer and seller are related under 19 CFR
+              152.102(g). CBP may review whether the transaction value is
+              acceptable — keep your transfer-pricing support on file.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Estimated duties & fees — the number a filer signs for */}
       <DutyEstimateCard docId={doc?.id} />

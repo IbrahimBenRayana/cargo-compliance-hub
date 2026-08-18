@@ -1705,7 +1705,8 @@ export interface ABIInvoice {
   purchaseOrder: string;
   invoiceNumber: string;
   exportDate: string;    // YYYYMMDD
-  relatedParties: 'N';   // Phase 1: only "N" accepted by CC
+  /** 19 CFR 152.102(g) — 'Y' when buyer and seller are related. */
+  relatedParties: 'Y' | 'N';
   countryOfExport: string;
   currency: string;
   exchangeRate: number;

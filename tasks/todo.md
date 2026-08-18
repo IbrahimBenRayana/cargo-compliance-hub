@@ -30,8 +30,8 @@
 - [x] Staging deploy verified 2026-08-18 — pipeline green, `entry_number_blocks` migration applied, hts_rate_lines already populated (26,791 rows)
 
 ## Phase 2 — Filing correctness (routes per 0.1 matrix; CC-blocked items → native Phase-5 scope)
-- [ ] 2.1 Related-party Y — schema + mapper (+ regression: N unchanged)
-- [ ] 2.2 Related-party — wizard UI (conditional fields, Review flag)
+- [x] 2.1 Related-party Y — schema + native path — DONE 2026-08-18; engine already modelled it (AE 40-record col 56), only the draft schema's z.literal('N') blocked it. Regression guard proves col 56 is the ONLY wire difference
+- [x] 2.2 Related-party — wizard UI + Review-step valuation-review callout — DONE 2026-08-18. No conditional fields needed: the indicator is declarative, not a gateway to extra CBP fields
 - [ ] 2.3 Multi-HTS lines (ch.99 overlays) — schema + mapper + duty-estimate consumption
 - [ ] 2.4 Multi-HTS — wizard UI + overlay suggestion (301/232/reciprocal from rateExpression)
 - [ ] 2.5 Entry type 03 — schema + AD/CVD case block + "should be type 03" warning on 01
