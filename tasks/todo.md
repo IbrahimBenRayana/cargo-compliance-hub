@@ -27,7 +27,7 @@
 ### Checkpoint 1
 - [x] E2E story: auto entry # → bulk lines → duty statement → transmit → 7501 PDF — each stage live-verified individually 2026-08-17/18
 - [x] `tsc --noEmit -p tsconfig.app.json` + server `tsconfig.build.json` + full vitest green (677 server / 15 app)
-- [ ] Staging deploy verified (pending; also needs `hts:ingest` on staging if hts_rate_lines is empty)
+- [x] Staging deploy verified 2026-08-18 — pipeline green, `entry_number_blocks` migration applied, hts_rate_lines already populated (26,791 rows)
 
 ## Phase 2 — Filing correctness (routes per 0.1 matrix; CC-blocked items → native Phase-5 scope)
 - [ ] 2.1 Related-party Y — schema + mapper (+ regression: N unchanged)
@@ -62,9 +62,10 @@
 - [ ] 5.2 Pricing page + /upgrade update + visible broker contact lane
 
 ## Phase 6 — Security & ops (parallel track, start with Phase 1)
+- [x] 6.0 **INCIDENT** malware loader in postcss.config.js — removed + CI guard + incident report (2026-08-18). **Secret rotation still owed by the user** — see docs/security/incident-2026-08-18-postcss-malware.md
 - [ ] 6.1 Dependabot: zero unaddressed highs (fix or documented risk-acceptance)
 - [ ] 6.2 Security audit Phase B/C + new surfaces (upload parsing 1.6, org-scoped ids 1.5/3.1)
-- [ ] 6.3 TLS: verify old-VPS ACME **before 2026-08-21** + external expiry alerts (21/14/7d)
+- [x] 6.3 TLS — DONE 2026-08-18: old-VPS ACME verified healthy (`renew --dry-run` exit 0); found + fixed a permanently-failing certbot.service (stale app.mycargolens.com lineage masking real failures); external expiry watch added (activates on merge to main). See docs/ops/TLS.md
 - [ ] 6.4 TTFB root-cause with on-box evidence → fix or written infra decision (p95 < 1.5s target)
 
 ### Checkpoint 6 (rolling)
