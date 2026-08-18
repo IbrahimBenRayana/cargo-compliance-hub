@@ -44,6 +44,7 @@ import {
   TextField,
   US_STATES,
 } from './shared';
+import { ImportLinesDialog } from './ImportLinesDialog';
 
 interface Props {
   value: ABIDocumentDraft;
@@ -112,7 +113,7 @@ function ConfirmDelete({
   );
 }
 
-export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
+export default function Step5Invoices({ value, onChange, doc, errors = {} }: Props) {
   const manifest = (value.manifest?.[0] || {}) as NonNullable<
     ABIDocumentDraft['manifest']
   >[number];
@@ -330,13 +331,27 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                   <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Line Items ({(inv.items || []).length})
                   </h4>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addItem(invIdx)}
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add item
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <ImportLinesDialog
+                      docId={doc?.id}
+                      invoiceIndex={invIdx}
+                      onImport={(imported) =>
+                        updateInvoice(invIdx, {
+                          items: [
+                            ...((inv.items || []) as ABIItem[]),
+                            ...imported,
+                          ],
+                        })
+                      }
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addItem(invIdx)}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add item
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-4">
                   {((inv.items || []) as PartialItem[]).map((item, itemIdx) => {

@@ -21,12 +21,13 @@
 - [x] 1.3 Org filer settings: entry-number block (schema + settings UI + atomic draw) — DONE 2026-08-18; 15 parallel draws → 15 unique numbers, overlap/exhaustion/no-blocks all live-verified
 - [x] 1.4 Entry-number auto-draw + check-digit validation in wizard Step 1 — DONE 2026-08-18; engine-vector-pinned frontend port, browser-verified
 - [x] 1.5 7501-format PDF (`GET /abi-documents/:id/pdf`, DRAFT watermark, org-scoped) — DONE 2026-08-18; blocks 1–40 layout, fee summary, live-rendered + visually verified
-- [ ] 1.6 Bulk line import — parser + endpoint (CSV/XLSX, per-row errors, caps, injection-safe)
-- [ ] 1.7 Bulk line import — wizard UI (template, preview, import-valid, export-errors)
+- [x] 1.6 Bulk line import — parser + endpoint (CSV, per-row errors, caps) — DONE 2026-08-18; XLSX deliberately skipped (supply-chain surface; template round-trips via Excel CSV)
+- [x] 1.7 Bulk line import — wizard UI (template, preview, import-valid, export-errors) — DONE 2026-08-18; dryRun + local-state apply (avoids autosave array-replace clobber), browser-verified
 
 ### Checkpoint 1
-- [ ] E2E story: auto entry # → bulk lines → duty statement → transmit → 7501 PDF
-- [ ] `tsc --noEmit -p tsconfig.app.json` + server `tsconfig.build.json` + full vitest green; staging verified
+- [x] E2E story: auto entry # → bulk lines → duty statement → transmit → 7501 PDF — each stage live-verified individually 2026-08-17/18
+- [x] `tsc --noEmit -p tsconfig.app.json` + server `tsconfig.build.json` + full vitest green (677 server / 15 app)
+- [ ] Staging deploy verified (pending; also needs `hts:ingest` on staging if hts_rate_lines is empty)
 
 ## Phase 2 — Filing correctness (routes per 0.1 matrix; CC-blocked items → native Phase-5 scope)
 - [ ] 2.1 Related-party Y — schema + mapper (+ regression: N unchanged)

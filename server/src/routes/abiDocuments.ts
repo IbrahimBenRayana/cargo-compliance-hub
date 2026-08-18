@@ -37,6 +37,11 @@ import {
 } from '../services/entryNumberBlocks.js';
 import { renderEntry7501Pdf } from '../services/entryPdf.js';
 import { contentDispositionAttachment } from '../utils/httpHeaders.js';
+import {
+  parseLineImportCsv,
+  LINE_IMPORT_TEMPLATE,
+  MAX_IMPORT_ROWS,
+} from '../services/lineImport.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -120,6 +125,16 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // ── GET /:id — Detail (org-scoped) ─────────────────────
+
+// ── GET /line-import-template — CSV template for bulk line import ──
+// Registered BEFORE /:id so the static path isn't captured as an id.
+
+router.get('/line-import-template', (_req: AuthRequest, res: Response): void => {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', contentDispositionAttachment('mycargolens-line-import-template.csv'));
+  // BOM so Excel opens it as UTF-8.
+  res.send('﻿' + LINE_IMPORT_TEMPLATE);
+});
 
 router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -267,6 +282,113 @@ router.post('/:id/estimate-duty', async (req: AuthRequest, res: Response): Promi
     new DbHtsRateSource(prisma.htsRateLine)
   );
   res.json({ data: result });
+});
+
+// ── Bulk invoice-line import ───────────────────────────────────────
+//
+// GET  /line-import-template     — the CSV template (opens in Excel)
+// POST /:id/import-lines         — { invoiceIndex, csv, dryRun? }
+//
+// dryRun validates and returns the row report without touching the
+// draft; the real run appends only the valid rows (invalid ones come
+// back per-row so the user fixes the sheet, never loses it). Imported
+// items pass the same schema as hand-typed ones.
+
+// NOTE: the template route is registered near the top of this file
+// (before GET /:id) so the static path isn't captured as an :id.
+
+router.post('/:id/import-lines', async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const { csv, invoiceIndex = 0, dryRun = false } = req.body ?? {};
+
+  if (typeof csv !== 'string' || csv.length === 0) {
+    res.status(400).json({ error: 'csv (string) is required' });
+    return;
+  }
+  if (csv.length > 1_000_000) {
+    res.status(400).json({ error: 'CSV too large (1 MB max)' });
+    return;
+  }
+  if (!Number.isInteger(invoiceIndex) || invoiceIndex < 0) {
+    res.status(400).json({ error: 'invoiceIndex must be a non-negative integer' });
+    return;
+  }
+
+  const doc = await prisma.abiDocument.findFirst({
+    where: { id, orgId: req.user!.orgId },
+  });
+  if (!doc) {
+    res.status(404).json({ error: 'ABI document not found' });
+    return;
+  }
+  if (doc.status !== 'DRAFT') {
+    res.status(400).json({ error: `Cannot import lines into a ${doc.status} document` });
+    return;
+  }
+
+  const result = parseLineImportCsv(csv);
+
+  if (dryRun) {
+    res.json({
+      data: {
+        dryRun: true,
+        validRows: result.items.length,
+        totalRows: result.totalRows,
+        errors: result.errors,
+        maxRows: MAX_IMPORT_ROWS,
+        // Full validated items: the wizard applies them through its own
+        // local state + autosave (its array-replacement merge would
+        // clobber a server-side append), so it needs everything.
+        items: result.items,
+      },
+    });
+    return;
+  }
+
+  if (result.items.length === 0) {
+    res.status(422).json({
+      error: 'No valid rows to import',
+      data: { validRows: 0, totalRows: result.totalRows, errors: result.errors },
+    });
+    return;
+  }
+
+  // Append valid items to the target invoice inside the stored payload.
+  const payload: any = doc.payload ?? {};
+  const manifest = Array.isArray(payload.manifest) && payload.manifest[0] ? payload.manifest[0] : null;
+  const invoice = manifest?.invoices?.[invoiceIndex];
+  if (!invoice) {
+    res.status(400).json({
+      error: `Invoice ${invoiceIndex + 1} does not exist on this draft yet — add the invoice header in the wizard first.`,
+    });
+    return;
+  }
+  invoice.items = [...(Array.isArray(invoice.items) ? invoice.items : []), ...result.items];
+
+  const updated = await prisma.abiDocument.update({
+    where: { id: doc.id },
+    data: { payload, ...extractDenormFromPayload(payload) },
+  });
+
+  await writeAuditLog({
+    orgId: req.user!.orgId,
+    userId: req.user!.id,
+    action: 'abi_document.import_lines',
+    entityType: 'abi_document',
+    entityId: doc.id,
+    newValue: { imported: result.items.length, rejected: result.errors.length, invoiceIndex },
+    ...getRequestMeta(req),
+  });
+
+  res.json({
+    data: {
+      dryRun: false,
+      imported: result.items.length,
+      totalRows: result.totalRows,
+      errors: result.errors,
+      doc: updated,
+    },
+  });
 });
 
 // ── GET /:id/pdf — CBP Form 7501-format PDF ────────────────────────

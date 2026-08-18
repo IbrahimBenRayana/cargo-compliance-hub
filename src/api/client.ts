@@ -1941,7 +1941,42 @@ export const abiDocumentsApi = {
   downloadPdf(id: string) {
     return apiDownload(`/api/v1/abi-documents/${id}/pdf`);
   },
+
+  /** CSV template for bulk line import. */
+  downloadLineImportTemplate() {
+    return apiDownload('/api/v1/abi-documents/line-import-template');
+  },
+
+  /**
+   * Validate a bulk line-import CSV (dryRun) or append server-side.
+   * The wizard always uses dryRun and applies items via local state —
+   * its autosave replaces arrays wholesale, which would clobber a
+   * server-side append.
+   */
+  importLines(id: string, body: { csv: string; invoiceIndex?: number; dryRun?: boolean }) {
+    return apiFetch<{ data: LineImportResponse }>(
+      `/api/v1/abi-documents/${id}/import-lines`,
+      { method: 'POST', body: JSON.stringify(body) },
+    );
+  },
 };
+
+export interface LineImportError {
+  /** Spreadsheet row (header = 1). */
+  row: number;
+  field: string;
+  message: string;
+}
+
+export interface LineImportResponse {
+  dryRun: boolean;
+  validRows?: number;
+  imported?: number;
+  totalRows: number;
+  errors: LineImportError[];
+  /** Present on dryRun: the full validated items, wizard-shaped. */
+  items?: ABIItem[];
+}
 
 /** Result of POST /abi-documents/draw-entry-number. */
 export interface DrawnEntryNumber {
