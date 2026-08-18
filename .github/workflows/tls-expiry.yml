@@ -1,0 +1,61 @@
+name: TLS Expiry Watch
+
+# Why this exists: on 2026-08-04 mycargolens.com served an expired certificate
+# because certbot had no usable ACME account and nothing was watching from the
+# outside. The deploy health gate only probes localhost HTTP, so it cannot see
+# a public TLS problem at all.
+#
+# This job checks the live certificate on every public host from OUTSIDE the
+# VPSes and fails loudly while there is still time to fix it (21/14/7 days).
+# A failed run emails the repo owner via GitHub's default notifications.
+
+on:
+  schedule:
+    # 07:15 UTC daily — after the VPS certbot timers (~05:26/07:26 CEST) have
+    # had their chance, so a failed renewal shows up the same morning.
+    - cron: '15 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check public certificate expiry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check certificate expiry on all public hosts
+        run: |
+          set -uo pipefail
+          WARN_DAYS=21
+          FAIL_DAYS=7
+          status=0
+
+          for host in mycargolens.com www.mycargolens.com staging.mycargolens.com app.mycargolens.com; do
+            end=$(echo | openssl s_client -servername "$host" -connect "$host:443" 2>/dev/null \
+                  | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+
+            if [ -z "$end" ]; then
+              echo "::error::$host — could not read a certificate (host down, or TLS broken)"
+              status=1
+              continue
+            fi
+
+            days=$(( ( $(date -d "$end" +%s) - $(date +%s) ) / 86400 ))
+
+            if   [ "$days" -lt 0 ]; then
+              echo "::error::$host — certificate EXPIRED $(( -days )) day(s) ago ($end)"
+              status=1
+            elif [ "$days" -le "$FAIL_DAYS" ]; then
+              echo "::error::$host — expires in $days day(s) ($end). Renewal has not run; fix now."
+              status=1
+            elif [ "$days" -le "$WARN_DAYS" ]; then
+              echo "::warning::$host — expires in $days day(s) ($end). Renewal should fire soon; verify it does."
+              echo "$host: $days days"
+            else
+              echo "$host: OK — $days days ($end)"
+            fi
+          done
+
+          exit $status
