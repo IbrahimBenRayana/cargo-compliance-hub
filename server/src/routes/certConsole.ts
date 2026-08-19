@@ -22,7 +22,7 @@ import { parseQuotaResponseBatch } from '../abi-engine/apps/quota/responseParser
 import { parseTibResponseBatch } from '../abi-engine/apps/tib/responseParser.js';
 import { parseEsQueryResponseBatch } from '../abi-engine/apps/esQuery/responseParser.js';
 import { parseUcNotificationBatch } from '../abi-engine/apps/uc/parser.js';
-import { createTransport } from '../abi-engine/transport/index.js';
+import { createTransport, MqiptTransport } from '../abi-engine/transport/index.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -270,6 +270,18 @@ router.post('/transmissions/:id/transmit', async (req: AuthRequest, res: Respons
 router.get('/transport', async (_req: AuthRequest, res: Response): Promise<void> => {
   const health = await transport.healthcheck();
   res.json({ transport: transport.kind, ...health });
+});
+
+// ─── POST /transport/verify ───────────────────────────────
+// CBP's own connectivity proof: put a probe on TRADE.VERIFY.QR and wait for
+// the queue manager's echo on TRADE.VERIFY.QL. Only meaningful on mqipt.
+router.post('/transport/verify', async (_req: AuthRequest, res: Response): Promise<void> => {
+  if (!(transport instanceof MqiptTransport)) {
+    res.json({ transport: transport.kind, ok: false, detail: 'verify is only available on the mqipt transport' });
+    return;
+  }
+  const result = await transport.verify();
+  res.json({ transport: transport.kind, ...result });
 });
 
 export default router;

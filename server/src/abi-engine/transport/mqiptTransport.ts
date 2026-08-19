@@ -1,65 +1,102 @@
 /**
- * MQIPT transport — IBM MQ over MQ Internet Pass-Thru (CBP connection
- * Option #1, confirmed with the CBP client rep Aug 2026).
+ * MQIPT transport — HTTP client to the mq-bridge sidecar.
  *
- * SCAFFOLD: the connection parameters come from CBP when the eISA is
- * processed (queue manager, host/port, channel, send/receive queue names,
- * TLS certificates, cipher spec). They are configuration, not code — this
- * class validates config shape now and grows the actual IBM MQ client
- * binding (the `ibmmq` package) once CBP issues the parameters. Until
- * then every network method fails loudly and predictably.
+ * The IBM MQ client libraries are glibc-only and cannot run in the Alpine
+ * app image, so the actual MQ binding lives in a Debian sidecar container
+ * (server/mq-bridge/) that owns the CBP trade-package credentials (CCDT
+ * channel table, CMS keystore) and exposes a minimal internal HTTP API.
+ * This class is a thin, dependency-free client for that API — it never
+ * sees MQ specifics beyond the receipt/batch shapes of the contract.
+ *
+ * Config: MQIPT_BRIDGE_URL (internal Docker DNS, e.g. http://mq-bridge:8080)
+ * and optional MQIPT_BRIDGE_TOKEN (shared-secret header, defense in depth
+ * on top of network isolation).
  */
 import type { AbiTransport, SendReceipt } from './contract.js';
 
 export interface MqiptConfig {
-  queueManager: string;
-  host: string;
-  port: number;
-  channel: string;
-  /** CBP queue we PUT outbound batches to. */
-  sendQueue: string;
-  /** Our queue CBP delivers responses to. */
-  receiveQueue: string;
-  /** Path to the TLS key repository (client cert issued per the eISA). */
-  tlsKeyRepository?: string;
-  cipherSpec?: string;
+  /** Base URL of the mq-bridge sidecar (internal network only). */
+  bridgeUrl: string;
+  /** Shared secret sent as X-Bridge-Token when set. */
+  token?: string;
 }
-
-const REQUIRED: (keyof MqiptConfig)[] = ['queueManager', 'host', 'port', 'channel', 'sendQueue', 'receiveQueue'];
 
 export class MqiptTransport implements AbiTransport {
   readonly kind = 'mqipt' as const;
+  private readonly bridgeUrl: string;
+  private readonly token?: string;
 
-  constructor(private readonly config: MqiptConfig) {
-    const missing = REQUIRED.filter((k) => config[k] === undefined || config[k] === '');
-    if (missing.length > 0) {
+  constructor(config: MqiptConfig) {
+    if (!config.bridgeUrl) {
       throw new Error(
-        `MQIPT transport is not configured (missing: ${missing.join(', ')}). ` +
-          'The connection parameters are issued by CBP once the eISA is processed.'
+        'MQIPT transport is not configured: MQIPT_BRIDGE_URL is required ' +
+          '(the internal URL of the mq-bridge sidecar, e.g. http://mq-bridge:8080).'
       );
     }
+    this.bridgeUrl = config.bridgeUrl.replace(/\/+$/, '');
+    this.token = config.token;
   }
 
-  private notImplemented(): never {
-    throw new Error(
-      'MQIPT binding pending: CBP connection parameters are configured but the MQ client ' +
-        'binding ships once CBP opens the connection (install `ibmmq` and implement send/receive here).'
-    );
+  private async call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (this.token) headers['x-bridge-token'] = this.token;
+    let res: Response;
+    try {
+      res = await fetch(`${this.bridgeUrl}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    } catch (err) {
+      throw new Error(`mq-bridge unreachable at ${this.bridgeUrl}: ${(err as Error).message}`);
+    }
+    const payload = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      throw new Error(
+        typeof payload.error === 'string' ? payload.error : `mq-bridge ${path} failed with HTTP ${res.status}`
+      );
+    }
+    return payload as T;
   }
 
-  async send(_lines: string[], _opts?: { correlationId?: string }): Promise<SendReceipt> {
-    this.notImplemented();
+  async send(lines: string[], opts?: { correlationId?: string }): Promise<SendReceipt> {
+    const result = await this.call<{ messageId: string }>('POST', '/send', {
+      lines,
+      correlationId: opts?.correlationId,
+    });
+    return { messageId: result.messageId };
   }
 
-  async receive(_opts?: { timeoutMs?: number; max?: number }): Promise<string[][]> {
-    this.notImplemented();
+  async receive(opts?: { timeoutMs?: number; max?: number }): Promise<string[][]> {
+    const result = await this.call<{ batches: string[][] }>('POST', '/receive', {
+      timeoutMs: opts?.timeoutMs,
+      max: opts?.max,
+    });
+    return result.batches;
   }
 
   async healthcheck(): Promise<{ ok: boolean; detail?: string }> {
-    return { ok: false, detail: `MQIPT binding pending (queue manager ${this.config.queueManager})` };
+    try {
+      return await this.call<{ ok: boolean; detail?: string }>('GET', '/health');
+    } catch (err) {
+      return { ok: false, detail: (err as Error).message };
+    }
+  }
+
+  /**
+   * CBP's own connectivity proof: the bridge puts a probe on TRADE.VERIFY.QR
+   * and waits for the queue manager to echo it back on TRADE.VERIFY.QL.
+   * Success means TLS, channel, and queue access are all working.
+   */
+  async verify(): Promise<{ ok: boolean; detail?: string; echoed?: string }> {
+    try {
+      return await this.call<{ ok: boolean; detail?: string; echoed?: string }>('POST', '/verify');
+    } catch (err) {
+      return { ok: false, detail: (err as Error).message };
+    }
   }
 
   async close(): Promise<void> {
-    /* nothing to close yet */
+    /* stateless HTTP client — nothing to close */
   }
 }

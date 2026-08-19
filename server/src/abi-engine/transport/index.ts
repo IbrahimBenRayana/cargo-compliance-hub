@@ -2,8 +2,8 @@
  * Transport factory — binding chosen by configuration.
  *
  *   ABI_TRANSPORT=mock   (default) in-memory loopback
- *   ABI_TRANSPORT=mqipt  IBM MQ over MQIPT; requires the MQIPT_* variables
- *                        issued by CBP after eISA processing.
+ *   ABI_TRANSPORT=mqipt  IBM MQ over MQIPT via the mq-bridge sidecar;
+ *                        requires MQIPT_BRIDGE_URL (+ optional token).
  */
 import type { AbiTransport } from './contract.js';
 import { MockTransport } from './mockTransport.js';
@@ -15,28 +15,18 @@ export { MqiptTransport, type MqiptConfig } from './mqiptTransport.js';
 
 export interface TransportEnv {
   ABI_TRANSPORT?: string;
-  MQIPT_QUEUE_MANAGER?: string;
-  MQIPT_HOST?: string;
-  MQIPT_PORT?: string;
-  MQIPT_CHANNEL?: string;
-  MQIPT_SEND_QUEUE?: string;
-  MQIPT_RECEIVE_QUEUE?: string;
-  MQIPT_TLS_KEY_REPOSITORY?: string;
-  MQIPT_CIPHER_SPEC?: string;
+  /** Internal URL of the mq-bridge sidecar (e.g. http://mq-bridge:8080). */
+  MQIPT_BRIDGE_URL?: string;
+  /** Optional shared secret sent as X-Bridge-Token. */
+  MQIPT_BRIDGE_TOKEN?: string;
 }
 
 export function createTransport(env: TransportEnv): AbiTransport {
   const kind = (env.ABI_TRANSPORT ?? 'mock').toLowerCase();
   if (kind === 'mqipt') {
     return new MqiptTransport({
-      queueManager: env.MQIPT_QUEUE_MANAGER ?? '',
-      host: env.MQIPT_HOST ?? '',
-      port: Number(env.MQIPT_PORT ?? 0),
-      channel: env.MQIPT_CHANNEL ?? '',
-      sendQueue: env.MQIPT_SEND_QUEUE ?? '',
-      receiveQueue: env.MQIPT_RECEIVE_QUEUE ?? '',
-      tlsKeyRepository: env.MQIPT_TLS_KEY_REPOSITORY,
-      cipherSpec: env.MQIPT_CIPHER_SPEC,
+      bridgeUrl: env.MQIPT_BRIDGE_URL ?? '',
+      token: env.MQIPT_BRIDGE_TOKEN,
     });
   }
   if (kind !== 'mock') {

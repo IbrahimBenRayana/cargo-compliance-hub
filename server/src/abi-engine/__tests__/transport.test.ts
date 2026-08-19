@@ -1,10 +1,10 @@
 /**
- * Transport seam tests — mock loopback behavior, factory selection, and
- * the MQIPT scaffold's fail-loudly contract while CBP parameters are
- * pending.
+ * Transport seam tests — mock loopback behavior and factory selection.
+ * The mqipt bridge client has its own suite in
+ * transport/__tests__/mqiptTransport.test.ts (fake-bridge HTTP tests).
  */
 import { describe, it, expect } from 'vitest';
-import { createTransport, MockTransport, MqiptTransport } from '../transport/index.js';
+import { createTransport, MockTransport } from '../transport/index.js';
 
 describe('MockTransport', () => {
   it('records sends and returns primed responses in order', async () => {
@@ -41,29 +41,7 @@ describe('createTransport', () => {
     expect(() => createTransport({ ABI_TRANSPORT: 'carrier-pigeon' })).toThrow(/Unknown ABI_TRANSPORT/);
   });
 
-  it('mqipt without CBP parameters fails loudly at construction', () => {
+  it('mqipt without a bridge URL fails loudly at construction', () => {
     expect(() => createTransport({ ABI_TRANSPORT: 'mqipt' })).toThrow(/not configured/);
-  });
-});
-
-describe('MqiptTransport scaffold', () => {
-  const config = {
-    queueManager: 'CBPQM01',
-    host: 'mqipt.cbp.dhs.gov',
-    port: 1414,
-    channel: 'CBP.TRADE.CH',
-    sendQueue: 'CBP.ABI.IN',
-    receiveQueue: 'SP7.ABI.OUT',
-  };
-
-  it('accepts complete config but refuses network calls until the binding ships', async () => {
-    const t = new MqiptTransport(config);
-    expect((await t.healthcheck()).ok).toBe(false);
-    await expect(t.send(['A'])).rejects.toThrow(/binding pending/);
-    await expect(t.receive()).rejects.toThrow(/binding pending/);
-  });
-
-  it('names the missing parameters', () => {
-    expect(() => new MqiptTransport({ ...config, sendQueue: '' })).toThrow(/sendQueue/);
   });
 });
