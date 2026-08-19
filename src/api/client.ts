@@ -1981,7 +1981,7 @@ export interface LineImportResponse {
 
 /** Result of POST /abi-documents/draw-entry-number. */
 export interface DrawnEntryNumber {
-  /** Canonical hyphenated form, e.g. 'SP7-0000001-4'. */
+  /** Canonical hyphenated form, e.g. 'S7P-0000001-4'. */
   entryNumber: string;
   filerCode: string;
   sequence: string;

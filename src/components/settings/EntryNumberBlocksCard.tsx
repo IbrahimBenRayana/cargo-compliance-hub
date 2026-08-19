@@ -124,7 +124,7 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
                   id="blk-filer"
                   value={filerCode}
                   onChange={(e) => setFilerCode(e.target.value.toUpperCase())}
-                  placeholder="SP7"
+                  placeholder="S7P"
                   maxLength={3}
                   className="font-mono"
                 />
