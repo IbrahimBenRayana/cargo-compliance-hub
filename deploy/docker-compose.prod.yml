@@ -152,6 +152,13 @@ services:
       SENTRY_DSN:         ${SENTRY_DSN:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
       SENTRY_RELEASE:     ${SENTRY_RELEASE:-}
+
+      # Native ABI transport (CBP MQIPT). Default 'mock' everywhere; staging
+      # flips to 'mqipt' via .env once the mq-bridge sidecar is running
+      # (COMPOSE_PROFILES=mqipt). Prod stays on mock until CBP certification.
+      ABI_TRANSPORT:      ${ABI_TRANSPORT:-mock}
+      MQIPT_BRIDGE_URL:   ${MQIPT_BRIDGE_URL:-http://mq-bridge:8080}
+      MQIPT_BRIDGE_TOKEN: ${MQIPT_BRIDGE_TOKEN:-}
     volumes:
       - uploads_data:/app/uploads
     healthcheck:
@@ -196,6 +203,37 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+
+  # ── CBP MQIPT bridge (staging-only via profile) ──────────
+  # The one process with IBM MQ client libs (glibc; can't live in the Alpine
+  # app image). Starts ONLY where COMPOSE_PROFILES=mqipt is set in .env —
+  # staging today; prod after CBP certification. No published ports: the
+  # server reaches it on the internal compose network. The CBP trade package
+  # (CCDT .TAB, CMS keystore, mqclient.ini) is DHS-restricted, lives at
+  # /opt/mycargolens/mqipt on the VM (scp'd, never in git), mounted read-only.
+  mq-bridge:
+    image: ghcr.io/ibrahimbenrayana/cargo-compliance-hub-mq-bridge:${MQ_BRIDGE_IMAGE_TAG:-latest}
+    container_name: mycargolens-mq-bridge
+    restart: unless-stopped
+    profiles: ["mqipt"]
+    environment:
+      PORT: 8080
+      MQ_BRIDGE_TOKEN: ${MQIPT_BRIDGE_TOKEN:-}
+      # CERT by default; PROD values (QGP2 / QGP2_SIGMATP.TAB) after certification.
+      MQ_QMGR:          ${MQ_QMGR:-QGC1}
+      MQ_SEND_QUEUE:    ${MQ_SEND_QUEUE:-ACS.BRK.INBOUND}
+      MQ_RECEIVE_QUEUE: ${MQ_RECEIVE_QUEUE:-ACS.BRK.1303S7P.OUTBOUND}
+      MQ_RECORD_DELIMITER: ${MQ_RECORD_DELIMITER:-lf}
+      # CMS keystore path WITHOUT the .kdb extension (GSKit convention).
+      MQ_KEY_REPOSITORY: /opt/mqipt/sigmatp
+      # Standard IBM MQ client env: CCDT location + client ini (OCSP bypass).
+      MQCHLLIB: /opt/mqipt
+      MQCHLTAB: ${MQCHLTAB:-QGC1_SIGMATP.TAB}
+      MQCLNTCF: /opt/mqipt/mqclient.ini
+    volumes:
+      - /opt/mycargolens/mqipt:/opt/mqipt:ro
+    cpus: '0.5'
+    mem_limit: 512m
 
 volumes:
   postgres_data:
