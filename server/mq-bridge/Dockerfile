@@ -9,6 +9,8 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+# WORKDIR creates /app root-owned; npm runs as node below and needs to write.
+RUN chown node:node /app
 
 # Exact-pinned dependency (no lockfile: the dev machines are macOS, where the
 # MQ redist postinstall cannot run). ibmmq's postinstall downloads the IBM MQ
