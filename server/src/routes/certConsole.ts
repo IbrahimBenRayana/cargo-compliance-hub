@@ -272,6 +272,34 @@ router.get('/transport', async (_req: AuthRequest, res: Response): Promise<void>
   res.json({ transport: transport.kind, ...health });
 });
 
+// ─── POST /transport/receive ──────────────────────────────
+// Drain available response batches from the live queue. Each batch is
+// audit-logged verbatim (nothing off the queue is ever lost) and returned
+// for the operator to attach to its transmission via PATCH /transmissions/:id
+// — auto-matching waits until real CERT traffic shows us how CBP correlates
+// replies.
+router.post('/transport/receive', async (req: AuthRequest, res: Response): Promise<void> => {
+  const timeoutMs = Math.min(Math.max(Number(req.body?.timeoutMs) || 5000, 0), 30000);
+  try {
+    const batches = await transport.receive({ timeoutMs, max: 25 });
+    for (const batch of batches) {
+      await writeAuditLog({
+        orgId: req.user!.orgId, userId: req.user!.id,
+        action: 'cert.received', entityType: 'cert_transmission', entityId: 'queue',
+        newValue: { transport: transport.kind, lines: batch },
+        ...getRequestMeta(req),
+      });
+    }
+    res.json({ transport: transport.kind, batches });
+  } catch (err) {
+    res.status(502).json({
+      error: 'Transport receive failed',
+      detail: err instanceof Error ? err.message : String(err),
+      transport: transport.kind,
+    });
+  }
+});
+
 // ─── POST /transport/verify ───────────────────────────────
 // CBP's own connectivity proof: put a probe on TRADE.VERIFY.QR and wait for
 // the queue manager's echo on TRADE.VERIFY.QL. Only meaningful on mqipt.
