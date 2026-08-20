@@ -133,6 +133,13 @@ export interface AeScenarioOptions {
   postMap?: (input: import('../ae/builder.js').AeEntrySummaryInput, params: CertParams) => void;
   /** Builder action; scenarios 015/017 use D/R. */
   action?: 'A' | 'R' | 'D';
+  /**
+   * Block-control (B-record, mirrored on the Y-record) overrides.
+   * Scenario 052 transmits a deliberately-wrong B-record filer/port while
+   * the enclosed 10–90 records stay valid — the reject must come from
+   * ACE's B-record authentication, not from our client-side validation.
+   */
+  block?: { port?: string; filerCode?: string };
   notes?: string;
 }
 
@@ -217,8 +224,8 @@ async function buildAeWire(
     appId: 'AE',
     blocks: [
       {
-        port: params.districtPortOfEntry,
-        filerCode: params.filerCode,
+        port: options.block?.port ?? params.districtPortOfEntry,
+        filerCode: options.block?.filerCode ?? params.filerCode,
         userData: scenarioTag(id),
         transactionLines,
       },

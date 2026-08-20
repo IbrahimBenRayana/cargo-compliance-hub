@@ -751,6 +751,37 @@ export const SCENARIOS: Scenario[] = [
     },
   }),
 
+  aeScenario('037', 'Watches', {
+    // 9101.11.80 (USITC 2026-aug-06): 87¢ each + 6.25% on the case and
+    // strap, band or bracelet + 5.3% on the battery. One line, one
+    // 50-record per constituent tariff; the package's complete-watch
+    // quantity (59,600) is reported on EVERY tariff number, values as
+    // given. Compound constituent rates are outside the parser (cf. 041/
+    // 089), so the duties are pinned per constituent:
+    //   .8010 movements: 87¢ × 59,600      = $51,852.00
+    //   .8020 cases:     6.25% × $601,690  = $37,605.63
+    //   .8030 straps:    6.25% × $790,840  = $49,427.50
+    //   .8040 batteries: 5.3%  × $500,612  = $26,532.44
+    rates: {},
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CH';
+      line.countryOfExport = 'CH';
+      line.descriptions = ['WRIST WATCHES, PRECIOUS METAL CASE, MECHANICAL DISPLAY'];
+      line.parties = [
+        { type: 'M', identifier: 'CHGENWAT552GEN' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '9101118010', valueDollars: 1490200, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 5185200 },
+        { htsNumber: '9101118020', valueDollars: 601690, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 3760563 },
+        { htsNumber: '9101118030', valueDollars: 790840, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 4942750 },
+        { htsNumber: '9101118040', valueDollars: 500612, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 2653244 },
+      ];
+    },
+    notes: 'Constituent duties pinned from the 9101.11.80 compound rate (USITC 2026-aug-06); suffix↔constituent mapping per CSMS #50019756 — confirm with rep. Origin CH assumed (package silent).',
+  }),
+
   aeScenario('038', 'Morocco Free Trade Agreement', {
     rates: {
       '4203300000': { general: '2.7%', special: 'Free (A,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
@@ -769,6 +800,33 @@ export const SCENARIOS: Scenario[] = [
         { htsNumber: '4203300000', valueDollars: 10000, uomCode1: 'DOZ', quantity1Hundredths: 5000 },
       ];
     },
+  }),
+
+  aeScenario('039', 'Quantity and Unit of Measure Reporting on GRI (1) Sets', {
+    // 8206.00.00 (GRI 1 set heading): 'The rate of duty applicable to that
+    // article in the set subject to the highest rate of duty' — here the
+    // only listed component, slip joint pliers 8203.20.40 (12%, USITC
+    // 2026-aug-06). One line, set provision + component on separate
+    // 50-records. The title's point is the quantity/UOM pairing: the set
+    // provision reports the number of SETS (PCS, its USITC stat unit),
+    // the component its own unit (DOZ). Package gives no values —
+    // standing $10,000 rides the dutiable component; 600 one-pliers sets
+    // = 50 dozen pliers. Component duty engine-computed (12% × $10,000 =
+    // $1,200.00); set-provision line pinned $0.
+    rates: { '8203204000': '12%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['HAND TOOL SETS, PLIERS COMPONENT HIGHEST-RATE'];
+      line.parties = [
+        { type: 'M', identifier: 'CNSHETOO654SHA' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '8206000000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 60000, dutyCents: 0 },
+        { htsNumber: '8203204000', valueDollars: 10000, uomCode1: 'DOZ', quantity1Hundredths: 5000 },
+      ];
+    },
+    notes: 'Set duty at the highest-rate component (8203.20.40, 12%) — the only component the package lists. Value on the component line, set quantity in PCS — confirm value placement with rep.',
   }),
 
   aeScenario('040', 'U.S. Insular Possession', {
@@ -935,6 +993,38 @@ export const SCENARIOS: Scenario[] = [
     },
   }),
 
+  aeScenario('048', 'Watch Assemblies', {
+    // 9802.00.40 'Repairs or alterations made pursuant to a warranty':
+    // 'A duty upon the value of the repairs or alterations (see U.S. note
+    // 3 of this subchapter)' (USITC 2026-aug-06). The dutiable value is
+    // the $3,406 repair value, reported on the 9802.00.4040 50-record;
+    // the 9102.11.10 constituent values ($1,852/$2,619/$1,345/$204) ride
+    // duty-free, quantity 1,000 on ALL tariff numbers per the package.
+    // Article rate (9102.11.10): 44¢ each + 6% on the case + 14% on the
+    // strap, band or bracelet + 5.3% on the battery. Repairs touched only
+    // the movements, whose constituent piece is the specific 44¢ each:
+    //   44¢ × 1,000 watches = $440.00 (pinned).
+    rates: {},
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CH';
+      line.countryOfExport = 'GL';
+      line.descriptions = ['WRIST WATCHES REPAIRED IN GREENLAND, MOVEMENTS ONLY'];
+      line.parties = [
+        { type: 'M', identifier: 'GLGOHWAT219GOH' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '9802004040', valueDollars: 3406, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 44000 },
+        { htsNumber: '9102111010', valueDollars: 1852, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
+        { htsNumber: '9102111020', valueDollars: 2619, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
+        { htsNumber: '9102111030', valueDollars: 1345, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
+        { htsNumber: '9102111040', valueDollars: 204, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
+      ];
+    },
+    notes: 'Repair-provision duty pinned: 44¢ each × 1,000 on the $3,406 repair value (movements constituent of 9102.11.10) — treatment of the specific piece under 9802 needs rep confirmation. Origin CH assumed (package silent); export country GL.',
+  }),
+
   aeScenario('049', 'Ruling Details', {
     rates: { '8536490055': '2.7%' },
     mutate: (p) => {
@@ -987,6 +1077,28 @@ export const SCENARIOS: Scenario[] = [
         { htsNumber: '4113903000', valueDollars: 10000, uomCode1: 'M2', quantity1Hundredths: 50000 },
       ];
     },
+  }),
+
+  aeScenario('052', 'B-Record Filer Authentication', {
+    rates: { '8507600020': '3.41%' },
+    // The package overrides ONLY the block-control fields; the enclosed
+    // 10–90 records stay a fully valid summary. The entry number therefore
+    // keeps our REAL filer code (params.filerCode → 10-record) — the
+    // reject ACE returns must come from B-record filer/port
+    // authentication, not from the entry data. The Y-record mirrors the
+    // B-record per the batch spec, so it carries 888/8888 too.
+    block: { port: '8888', filerCode: '888' },
+    mutate: () => {},
+    notes: 'CBP-side reject test: ACE must refuse the block on B-record authentication (filer 888, port 8888); the transmission itself goes out intact with valid 10–90 records.',
+  }),
+
+  aeScenario('053', 'B-Record Application Type/Filer Authentication', {
+    rates: { '8507600020': '3.41%' },
+    // Fully valid block: B-record carries our own filer code and
+    // application identifier AE (what buildBatch always emits) — the
+    // scenario verifies the positive half of B-record authentication.
+    mutate: () => {},
+    notes: 'Package instruction: contact the assigned client rep IMMEDIATELY PRIOR to transmitting this scenario. Standard envelope — B-record filer = our filer code, application identifier AE.',
   }),
 
   aeScenario('054', 'Korea Free Trade Agreement', {
