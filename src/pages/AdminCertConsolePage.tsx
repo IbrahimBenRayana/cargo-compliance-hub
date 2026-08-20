@@ -233,6 +233,89 @@ function WireTextBlock({ text, label }: { text: string; label: string }) {
   );
 }
 
+// ─── Transport status + live response drain ────────────────
+// The transport is mock (loopback rehearsal) or mqipt (live CBP CERT via
+// the mq-bridge sidecar). Transmissions are real filings on mqipt, so the
+// kind is surfaced prominently; the drain button pulls waiting response
+// batches off the queue for pasting into their transmission.
+function TransportCard() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['cert', 'transport'],
+    queryFn: () => certApi.transport(),
+    refetchInterval: 60_000,
+  });
+  const [batches, setBatches] = useState<string[][] | null>(null);
+  const receive = useMutation({
+    mutationFn: () => certApi.receiveResponses(8000),
+    onSuccess: (result) => {
+      setBatches(result.batches);
+      if (result.batches.length === 0) {
+        toast.info('No responses waiting on the queue');
+      } else {
+        toast.success(`${result.batches.length} response batch${result.batches.length === 1 ? '' : 'es'} received`);
+      }
+    },
+    onError: (err: any) => toast.error(apiErrorMessage(err, 'Failed to check the response queue')),
+  });
+
+  const live = data?.transport === 'mqipt';
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-lg">Transport</CardTitle>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : data ? (
+              <>
+                <Badge
+                  className={
+                    live
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                  }
+                >
+                  {live ? 'MQIPT — live CBP CERT' : 'Mock loopback'}
+                </Badge>
+                <Badge variant={data.ok ? 'secondary' : 'destructive'} className="text-[10px]">
+                  {data.ok ? (data.detail ?? 'healthy') : (data.detail ?? 'unhealthy')}
+                </Badge>
+              </>
+            ) : null}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => receive.mutate()}
+            disabled={receive.isPending || !data?.ok}
+          >
+            {receive.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Radio className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            Check for responses
+          </Button>
+        </div>
+        {live && (
+          <CardDescription>
+            Transmissions go to CBP for real. Responses pulled here are audit-logged — copy each
+            batch into its transmission's CBP response box below.
+          </CardDescription>
+        )}
+      </CardHeader>
+      {batches !== null && batches.length > 0 && (
+        <CardContent className="space-y-3">
+          {batches.map((batch, i) => (
+            <WireTextBlock key={i} text={batch.join('\n')} label={`Response batch ${i + 1}`} />
+          ))}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 // ─── Single transmission card (detail sheet) ───────────────
 function TransmissionCard({
   transmission,
@@ -258,6 +341,31 @@ function TransmissionCard({
     mutationFn: (body: { status?: CertTransmissionStatus; responseText?: string; notes?: string }) =>
       certApi.updateTransmission(transmission.id, body),
   });
+
+  const { data: transportInfo } = useQuery({
+    queryKey: ['cert', 'transport'],
+    queryFn: () => certApi.transport(),
+    refetchInterval: 60_000,
+  });
+
+  const transmit = useMutation({
+    mutationFn: () => certApi.transmit(transmission.id),
+    onSuccess: (result) => {
+      toast.success(`Transmitted via ${result.transport} — MQ message ${result.messageId.slice(0, 16)}…`);
+      refresh();
+    },
+    onError: (err: any) => toast.error(apiErrorMessage(err, 'Transmit failed')),
+  });
+
+  const handleTransmit = () => {
+    const live = transportInfo?.transport === 'mqipt';
+    const ok = window.confirm(
+      live
+        ? 'Send this batch to CBP CERT for real (transport: mqipt)?'
+        : 'Send this batch through the mock loopback transport?'
+    );
+    if (ok) transmit.mutate();
+  };
 
   const handleStatusChange = async (status: CertTransmissionStatus) => {
     try {
@@ -309,6 +417,16 @@ function TransmissionCard({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {transmission.status === 'generated' && transmission.wireText && (
+            <Button size="sm" onClick={handleTransmit} disabled={transmit.isPending}>
+              {transmit.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Zap className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Transmit to CBP
+            </Button>
+          )}
           <Label className="text-xs text-muted-foreground">Status</Label>
           <Select
             value={transmission.status}
@@ -590,6 +708,9 @@ export function AdminCertConsolePage() {
           ))}
         </div>
       )}
+
+      {/* Transport status + response drain */}
+      <TransportCard />
 
       {/* Parameters */}
       <ParamsCard />

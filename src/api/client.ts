@@ -1190,6 +1190,29 @@ export const certApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     );
   },
+
+  /** Send a generated transmission to CBP over the configured transport. */
+  transmit(id: string) {
+    return apiFetch<{ transmission: CertTransmission; transport: string; messageId: string }>(
+      `/api/v1/admin/cert/transmissions/${id}/transmit`,
+      { method: 'POST' },
+    );
+  },
+
+  /** Transport kind + health (mock, or mqipt → live CBP connection). */
+  transport() {
+    return apiFetch<{ transport: 'mock' | 'mqipt'; ok: boolean; detail?: string }>(
+      '/api/v1/admin/cert/transport',
+    );
+  },
+
+  /** Drain waiting CBP response batches off the live queue (audit-logged server-side). */
+  receiveResponses(timeoutMs = 5000) {
+    return apiFetch<{ transport: string; batches: string[][] }>(
+      '/api/v1/admin/cert/transport/receive',
+      { method: 'POST', body: JSON.stringify({ timeoutMs }) },
+    );
+  },
 };
 
 // ─── Manifest Query API ───────────────────────────────────
