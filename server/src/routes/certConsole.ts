@@ -389,7 +389,8 @@ router.post('/transport/amf', async (req: AuthRequest, res: Response): Promise<v
 // currently-valid numbers) — filings must match what CERT accepts, so we
 // query, wait for the HY batch, and parse it in one round-trip.
 const htsQuerySchema = z.object({
-  htsNumbers: z.array(z.string().regex(/^\d{8,10}$/)).min(1).max(100),
+  /** Single numbers ('99990084') or ranges ('99100000-99109999'). */
+  htsNumbers: z.array(z.string().regex(/^\d{8,10}(-\d{8,10})?$/)).min(1).max(100),
   /** YYYYMMDD or MMDDYY; defaults to the params applicability date. */
   asOfDate: z.string().optional(),
 });
@@ -402,7 +403,10 @@ router.post('/transport/hts-query', async (req: AuthRequest, res: Response): Pro
   try {
     const params = await loadParams();
     const asOfDate = parsed.data.asOfDate ?? params.applicabilityDate;
-    const records = buildHtsQuery(parsed.data.htsNumbers.map((htsNumber) => ({ htsNumber, asOfDate })));
+    const records = buildHtsQuery(parsed.data.htsNumbers.map((token) => {
+      const [from, to] = token.split('-');
+      return { htsNumber: from, toHtsNumber: to, asOfDate };
+    }));
     const lines = buildBatch({
       sender: params.sender,
       appId: 'HA',

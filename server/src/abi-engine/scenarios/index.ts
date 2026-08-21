@@ -43,13 +43,13 @@ export const SCENARIOS: Scenario[] = [
         { type: 'M', identifier: 'SGSIGPRI123SIN' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
-      // Substantive classification FIRST, 9999 provision marker second:
-      // with marker-first (package listing order) ACE fires F771 at line
-      // level; CERT's own W2 for 9999.00.84 carries the additional-tariff
-      // 'R' flag, i.e. the marker supplements a preceding classification.
+      // Tariff order per ACE's live verdicts: 9999 marker FIRST (marker-
+      // second draws F852 HTS OUT OF SEQUENCE + F613 RELATIONSHIP MISMATCH),
+      // substantive last. The F771 adjustment slot sits between them once
+      // CERT tells us which 9903 number its table carries for this pairing.
       line.tariffs = [
-        { htsNumber: '8443992050', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 10000 },
         { htsNumber: '99990084', valueDollars: 0 },
+        { htsNumber: '8443992050', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 10000 },
       ];
     },
   }),

@@ -387,7 +387,7 @@ function HtsQueryCard() {
   const query = useMutation({
     mutationFn: () =>
       certApi.htsQuery(
-        numbers.split(/[\s,]+/).map((n) => n.trim()).filter((n) => /^\d{8,10}$/.test(n)),
+        numbers.split(/[\s,]+/).map((n) => n.trim()).filter((n) => /^\d{8,10}(-\d{8,10})?$/.test(n)),
       ),
     onSuccess: (r) => {
       setResult(r);
@@ -396,14 +396,14 @@ function HtsQueryCard() {
     },
     onError: (err: any) => toast.error(apiErrorMessage(err, 'HTS query failed')),
   });
-  const valid = numbers.split(/[\s,]+/).some((n) => /^\d{8,10}$/.test(n.trim()));
+  const valid = numbers.split(/[\s,]+/).some((n) => /^\d{8,10}(-\d{8,10})?$/.test(n.trim()));
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg">Background data — query CERT's HTS table (HA)</CardTitle>
         <CardDescription>
           Asks ACE's own tariff file which numbers it accepts, their validity dates, and required
-          units. Space- or comma-separated 8–10 digit numbers.
+          units. Space- or comma-separated 8–10 digit numbers; ranges as from-to (99100000-99109999).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
