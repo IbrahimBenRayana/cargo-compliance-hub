@@ -1214,6 +1214,32 @@ export const certApi = {
     );
   },
 
+  /** Background data: query ACE's own HTS table (HA/HY) — send + parse in one round-trip. */
+  htsQuery(htsNumbers: string[], asOfDate?: string) {
+    return apiFetch<{
+      transport: string;
+      messageId: string;
+      raw: string[][];
+      parsed: {
+        queries: Array<{
+          fromTariffNumber: string;
+          narrativeMessage: string;
+          tariffs: Array<{
+            tariffNumber: string;
+            beginEffectiveDate?: string;
+            endEffectiveDate?: string;
+            unitsOfMeasure: string[];
+            commodityDescription?: string;
+          }>;
+        }>;
+      } | null;
+      note?: string;
+    }>('/api/v1/admin/cert/transport/hts-query', {
+      method: 'POST',
+      body: JSON.stringify({ htsNumbers, asOfDate }),
+    });
+  },
+
   /** Background data: add a manufacturer (MID) to CERT via the $I application. */
   addManufacturer(body: {
     name: string;

@@ -335,6 +335,22 @@ export type {
 } from './apps/quota/responseParser.js';
 export * as quotaRecordDefs from './apps/quota/recordDefs.js';
 
+// ── Harmonized Tariff Schedule Query (HA/HY) ───────────────
+export { buildHtsQuery } from './apps/htsQuery/builder.js';
+export type { HtsQueryRequest } from './apps/htsQuery/builder.js';
+export { parseHtsQueryResponse, parseHtsQueryResponseBatch } from './apps/htsQuery/responseParser.js';
+export type {
+  HtsQueryResponse,
+  HtsQueryResponseBatch,
+  HtsQueryResult,
+  HtsTariffResult,
+  HtsSpecialRate,
+  HtsValueEdit,
+  HtsDateRestriction,
+  HtsQuantityEdit,
+} from './apps/htsQuery/responseParser.js';
+export * as htsQueryRecordDefs from './apps/htsQuery/recordDefs.js';
+
 // ── Entry Summary Query (EQ/ER) ────────────────────────────
 export { buildEntrySummaryQuery } from './apps/esQuery/builder.js';
 export type { EsQueryInput, EsQueryEntry, EsQueryCriteria } from './apps/esQuery/builder.js';

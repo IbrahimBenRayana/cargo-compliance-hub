@@ -377,6 +377,91 @@ function AmfCard() {
   );
 }
 
+// ─── Background data: HTS query (HA/HY) ────────────────────
+// CERT's HTS table can diverge from the published tariff (live F642/F434
+// evidence). This asks ACE's own table what it considers valid — validity
+// window + required units per number — so filings match CERT's reality.
+function HtsQueryCard() {
+  const [numbers, setNumbers] = useState('');
+  const [result, setResult] = useState<Awaited<ReturnType<typeof certApi.htsQuery>> | null>(null);
+  const query = useMutation({
+    mutationFn: () =>
+      certApi.htsQuery(
+        numbers.split(/[\s,]+/).map((n) => n.trim()).filter((n) => /^\d{8,10}$/.test(n)),
+      ),
+    onSuccess: (r) => {
+      setResult(r);
+      if (r.note) toast.info(r.note);
+      else toast.success('CERT HTS answers received');
+    },
+    onError: (err: any) => toast.error(apiErrorMessage(err, 'HTS query failed')),
+  });
+  const valid = numbers.split(/[\s,]+/).some((n) => /^\d{8,10}$/.test(n.trim()));
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg">Background data — query CERT's HTS table (HA)</CardTitle>
+        <CardDescription>
+          Asks ACE's own tariff file which numbers it accepts, their validity dates, and required
+          units. Space- or comma-separated 8–10 digit numbers.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex gap-3">
+          <Input
+            value={numbers}
+            onChange={(e) => setNumbers(e.target.value)}
+            placeholder="8443992050 99990084 99030125"
+            className="font-mono"
+          />
+          <Button size="sm" onClick={() => query.mutate()} disabled={!valid || query.isPending}>
+            {query.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 mr-1.5" />}
+            Query CERT
+          </Button>
+        </div>
+        {result?.parsed && (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Queried</TableHead>
+                <TableHead>CERT says</TableHead>
+                <TableHead>Valid from</TableHead>
+                <TableHead>Valid to</TableHead>
+                <TableHead>Units</TableHead>
+                <TableHead>Description</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {result.parsed.queries.flatMap((q) =>
+                q.tariffs.length === 0 ? (
+                  <TableRow key={q.fromTariffNumber}>
+                    <TableCell className="font-mono text-xs">{q.fromTariffNumber}</TableCell>
+                    <TableCell colSpan={5} className="text-xs text-destructive">{q.narrativeMessage || 'no data returned'}</TableCell>
+                  </TableRow>
+                ) : (
+                  q.tariffs.map((t) => (
+                    <TableRow key={`${q.fromTariffNumber}-${t.tariffNumber}`}>
+                      <TableCell className="font-mono text-xs">{q.fromTariffNumber}</TableCell>
+                      <TableCell className="font-mono text-xs">{t.tariffNumber}</TableCell>
+                      <TableCell className="text-xs">{t.beginEffectiveDate ?? '—'}</TableCell>
+                      <TableCell className="text-xs">{t.endEffectiveDate ?? '—'}</TableCell>
+                      <TableCell className="font-mono text-xs">{t.unitsOfMeasure.join(' ') || '—'}</TableCell>
+                      <TableCell className="text-xs max-w-xs truncate">{t.commodityDescription ?? ''}</TableCell>
+                    </TableRow>
+                  ))
+                ),
+              )}
+            </TableBody>
+          </Table>
+        )}
+        {result && !result.parsed && result.raw.length > 0 && (
+          <WireTextBlock text={result.raw.map((b) => b.join('\n')).join('\n\n')} label="Raw response" />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Single transmission card (detail sheet) ───────────────
 function TransmissionCard({
   transmission,
@@ -773,7 +858,8 @@ export function AdminCertConsolePage() {
       {/* Transport status + response drain */}
       <TransportCard />
 
-      {/* Background data (manufacturer adds) */}
+      {/* Background data (HTS queries + manufacturer adds) */}
+      <HtsQueryCard />
       <AmfCard />
 
       {/* Parameters */}

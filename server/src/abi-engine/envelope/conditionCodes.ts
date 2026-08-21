@@ -62,6 +62,7 @@ export const APPLICATION_CODES = {
   censusWarningQuery: { input: 'CJ', response: 'CL' },
   adCvdCaseQuery: { input: 'AD', response: 'AC' },
   quotaQuery: { input: 'QA', response: 'QB' },
+  htsQuery: { input: 'HA', response: 'HY' },
   tibExtension: { input: 'TE', response: 'TX' },
   importerBondQuery: { input: 'KI', response: 'KR' },
   addManufacturer: { input: '$I', response: '$R' },

@@ -24,6 +24,8 @@ import { parseEsQueryResponseBatch } from '../abi-engine/apps/esQuery/responsePa
 import { parseUcNotificationBatch } from '../abi-engine/apps/uc/parser.js';
 import { createTransport, MqiptTransport } from '../abi-engine/transport/index.js';
 import { buildAddManufacturers } from '../abi-engine/apps/addManufacturer/builder.js';
+import { buildHtsQuery } from '../abi-engine/apps/htsQuery/builder.js';
+import { parseHtsQueryResponseBatch } from '../abi-engine/apps/htsQuery/responseParser.js';
 import { buildBatch } from '../abi-engine/envelope/batch.js';
 import { deriveMid } from '../abi-engine/payload/mid.js';
 
@@ -371,6 +373,67 @@ router.post('/transport/amf', async (req: AuthRequest, res: Response): Promise<v
     }
     res.status(502).json({
       error: 'AMF transmit failed',
+      detail: err instanceof Error ? err.message : String(err),
+      transport: transport.kind,
+    });
+  }
+});
+
+// ─── POST /transport/hts-query ────────────────────────────
+// Background data: interrogate ACE's OWN HTS table (HA/HY). CERT's table
+// can differ from the published USITC tariff (live evidence: F642/F434 on
+// currently-valid numbers) — filings must match what CERT accepts, so we
+// query, wait for the HY batch, and parse it in one round-trip.
+const htsQuerySchema = z.object({
+  htsNumbers: z.array(z.string().regex(/^\d{8,10}$/)).min(1).max(100),
+  /** YYYYMMDD or MMDDYY; defaults to the params applicability date. */
+  asOfDate: z.string().optional(),
+});
+router.post('/transport/hts-query', async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = htsQuerySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+    return;
+  }
+  try {
+    const params = await loadParams();
+    const asOfDate = parsed.data.asOfDate ?? params.applicabilityDate;
+    const records = buildHtsQuery(parsed.data.htsNumbers.map((htsNumber) => ({ htsNumber, asOfDate })));
+    const lines = buildBatch({
+      sender: params.sender,
+      appId: 'HA',
+      blocks: [{
+        port: params.districtPortOfEntry,
+        filerCode: params.filerCode,
+        userData: 'HTS BACKGROUND',
+        transactionLines: records,
+      }],
+    });
+    const receipt = await transport.send(lines, { correlationId: 'HTS-QUERY' });
+    // Query responses are fast — wait for the HY batch and parse inline.
+    const batches = await transport.receive({ timeoutMs: 25000, max: 10 });
+    const hyBatch = batches.find((b) => b.some((l) => l.startsWith('W')));
+    const parsedResponse = hyBatch ? parseHtsQueryResponseBatch(hyBatch) : null;
+    await writeAuditLog({
+      orgId: req.user!.orgId, userId: req.user!.id,
+      action: 'cert.hts_query', entityType: 'cert_transmission', entityId: 'hts-query',
+      newValue: { htsNumbers: parsed.data.htsNumbers, asOfDate, messageId: receipt.messageId, batches },
+      ...getRequestMeta(req),
+    });
+    res.json({
+      transport: transport.kind,
+      messageId: receipt.messageId,
+      raw: batches,
+      parsed: parsedResponse,
+      note: hyBatch ? undefined : 'No HY batch arrived within 25s — use Check for responses to drain it later.',
+    });
+  } catch (err) {
+    if (err instanceof RecordCodecError) {
+      res.status(422).json({ error: 'HTS query failed to build', issues: err.issues });
+      return;
+    }
+    res.status(502).json({
+      error: 'HTS query transmit failed',
       detail: err instanceof Error ? err.message : String(err),
       transport: transport.kind,
     });
