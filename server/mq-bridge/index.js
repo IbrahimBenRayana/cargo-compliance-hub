@@ -179,8 +179,18 @@ const describeMqError = (err) =>
 // ── batch ↔ message codec ────────────────────────────────────────────────
 const linesToMessage = (lines) => lines.join(DELIMITER);
 // Keep records byte-for-byte (trailing pad spaces are significant in
-// fixed-width CATAIR); only drop lines that are entirely blank.
-const messageToLines = (text) => text.split(/\r?\n/).filter((l) => l.trim() !== '');
+// fixed-width CATAIR); only drop lines that are entirely blank. Mainframe
+// batches often arrive as a pure 80-byte stream with NO delimiters (the
+// B&B spec forbids control characters), so when a message has no newlines
+// we chunk it into fixed 80-char records instead.
+const messageToLines = (text) => {
+  if (/\r|\n/.test(text)) {
+    return text.split(/\r?\n/).filter((l) => l.trim() !== '');
+  }
+  const lines = [];
+  for (let i = 0; i < text.length; i += 80) lines.push(text.slice(i, i + 80));
+  return lines.filter((l) => l.trim() !== '');
+};
 
 // ── HTTP layer ───────────────────────────────────────────────────────────
 const json = (res, status, body) => {
