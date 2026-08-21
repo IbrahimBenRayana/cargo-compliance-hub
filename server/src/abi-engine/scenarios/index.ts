@@ -24,19 +24,33 @@ export const SCENARIOS: Scenario[] = [
   aeScenario('001', 'Singapore Free Trade Agreement', {
     // 9999.00.84 is the Singapore FTA provision marker the package pairs
     // with the substantive classification; both rates are Free (USITC).
-    rates: { '99990084': 'Free', '8443992050': 'Free' },
+    // 9903.01.25 (+10% reciprocal baseline) added per CERT's live reject
+    // F771 TRFF ADJSTMNT HTS OR EXCLSN MISSING — the 2025-26 IEEPA regime
+    // postdates the test package, and Annex II (9903.01.32) coverage of
+    // 8443.99.20.50 could not be substantiated, so the conservative
+    // baseline is claimed. FTA kills column-1 duty + MPF, not reciprocal.
+    rates: {
+      '99990084': 'Free',
+      '99030125': 'The duty provided in the applicable subheading + 10%',
+      '8443992050': 'Free',
+    },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'SG';
       line.countryOfExport = 'SG';
       line.spiClaimCode = 'SG';
       line.descriptions = ['PRINTER PARTS'];
+      // F429: MOT 11 requires the foreign port of lading (Schedule K).
+      line.foreignPortOfLading = '55976'; // Singapore
       line.parties = [
         { type: 'M', identifier: 'SGSIGPRI123SIN' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '99990084', valueDollars: 0, uomCode1: 'X' },
+        // F441: CERT wants the goods quantity mirrored on the 9999 marker,
+        // not the zero-quantity 'X' convention used for ch.99 overlays.
+        { htsNumber: '99990084', valueDollars: 0, uomCode1: 'NO', quantity1Hundredths: 10000 },
+        { htsNumber: '99030125', valueDollars: 0, uomCode1: 'X' },
         { htsNumber: '8443992050', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 10000 },
       ];
     },

@@ -163,6 +163,30 @@ describe('enrichWithDuty', () => {
     expect(priced.entrySummary.grandTotals?.cvDutyCents).toBe(100000);
   });
 
+  it('suppresses line MPF when the SPI program is MPF-exempt (CBP MPF/preference table)', async () => {
+    // CERT floor enforces this: F632 FORMAL MPF NOT ALLOWED - ARTICLE EXEMPT
+    // came back on scenario 001 (Singapore FTA) when we reported the 499 fee.
+    const rates = new StaticRateSource({
+      '8507600020': { general: '3.41%', special: 'Free (AU,BH,CL,CO,IL,JO,KS,OM,P,PA,PE,S,SG)' },
+    });
+    const sg = unpriced();
+    sg.entrySummary.lines[0].spiClaimCode = 'SG';
+    const priced = await enrichWithDuty(sg, rates, { applicabilityDate: '20260820' });
+    expect(priced.entrySummary.lines[0].tariffs[0].dutyCents).toBe(0);
+    expect(priced.entrySummary.lines[0].fees).toEqual([
+      { classCode: '501', amountCents: 1250 }, // HMF still due — only MPF is program-exempt
+    ]);
+
+    // Israel FTA (IL) is NOT on the MPF-exemption table — the fee stays.
+    const il = unpriced();
+    il.entrySummary.lines[0].spiClaimCode = 'IL';
+    const pricedIl = await enrichWithDuty(il, rates, { applicabilityDate: '20260820' });
+    expect(pricedIl.entrySummary.lines[0].fees).toEqual([
+      { classCode: '499', amountCents: 3464 },
+      { classCode: '501', amountCents: 1250 },
+    ]);
+  });
+
   it('refuses unlisted SPI claims and unknown HTS numbers instead of guessing', async () => {
     const spi = unpriced();
     spi.entrySummary.lines[0].spiClaimCode = 'A';
@@ -197,9 +221,11 @@ describe('SPI preference rates (Special column)', () => {
     const priced = await enrichWithDuty(p, rates, { applicabilityDate: '20260820' });
     expect(priced.entrySummary.lines[0].tariffs[0].dutyCents).toBe(0);
     expect(priced.entrySummary.grandTotals?.dutyCents).toBe(0);
-    // MPF is NOT dropped by the claim alone — that takes an explicit
-    // fee-exemption code (next test).
-    expect(priced.entrySummary.lines[0].fees).toContainEqual({ classCode: '499', amountCents: 3464 });
+    // AU is on CBP's MPF-exemption table, so the claim itself drops the
+    // 499 fee (CERT F632 rejects it otherwise); HMF is unaffected.
+    expect(priced.entrySummary.lines[0].fees).not.toContainEqual(
+      expect.objectContaining({ classCode: '499' })
+    );
   });
 
   it('suppresses line MPF only via the explicit fee-exemption code', async () => {

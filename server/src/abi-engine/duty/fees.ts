@@ -63,6 +63,17 @@ export const HMF_RATE_PER_MILLION = 1250;
 /** HMF de minimis threshold: ≤ $3.00 for the entire summary (note o). */
 export const HMF_DE_MINIMIS_CENTS = 300;
 
+/**
+ * SPI programs whose goods are exempt from MPF per CBP's "Merchandise
+ * Processing Fee and Preferential Trade Programs" table (19 CFR 24.23(c)):
+ * Australia, Bahrain, CAFTA-DR, Chile, Colombia, Korea, USMCA, Oman,
+ * Panama, Peru, Singapore. Notably NOT exempt: Israel (IL), Jordan (JO),
+ * Morocco (MA), plain GSP (A). CERT enforces this as F632.
+ */
+export const MPF_EXEMPT_SPI = new Set([
+  'AU', 'BH', 'P', 'P+', 'CL', 'CO', 'KS', 'S', 'S+', 'OM', 'PA', 'PE', 'SG',
+]);
+
 const HMF_MOTS = new Set(['10', '11', '12']);
 const HMF_EXEMPT_ENTRY_TYPES = new Set(['11', '12', '06', '22', '31', '32', '34', '38']);
 

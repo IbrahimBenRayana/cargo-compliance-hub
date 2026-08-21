@@ -21,6 +21,7 @@ import {
   HMF_DE_MINIMIS_CENTS,
   informalEntryFeeCents,
   dutiableMailFeeCents,
+  MPF_EXEMPT_SPI,
 } from './fees.js';
 import type { AbiPayloadV2, LineV2 } from '../payload/schemaV2.js';
 
@@ -168,10 +169,11 @@ export async function enrichWithDuty(
     const fees = [...keptFees];
     const value = lineValueDollars(line);
 
-    // The filer's explicit fee-exemption code (e.g. an MPF-exempt FTA
-    // program) suppresses the line MPF; the engine never infers exemption
-    // from the SPI claim alone.
-    if (!mpfExempt && !line.feeExemptionCode) {
+    // Line MPF is suppressed by the filer's explicit fee-exemption code OR
+    // by an SPI claim on CBP's MPF-exemption table (ACE enforces the latter
+    // itself — F632 FORMAL MPF NOT ALLOWED when the fee is reported anyway).
+    const spiMpfExempt = line.spiClaimCode !== undefined && MPF_EXEMPT_SPI.has(line.spiClaimCode);
+    if (!mpfExempt && !line.feeExemptionCode && !spiMpfExempt) {
       const mpf = computeLineMpfCents(value);
       totalLineMpfCents += mpf;
       fees.push({ classCode: '499', amountCents: mpf });
