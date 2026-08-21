@@ -23,6 +23,9 @@ import { parseTibResponseBatch } from '../abi-engine/apps/tib/responseParser.js'
 import { parseEsQueryResponseBatch } from '../abi-engine/apps/esQuery/responseParser.js';
 import { parseUcNotificationBatch } from '../abi-engine/apps/uc/parser.js';
 import { createTransport, MqiptTransport } from '../abi-engine/transport/index.js';
+import { buildAddManufacturers } from '../abi-engine/apps/addManufacturer/builder.js';
+import { buildBatch } from '../abi-engine/envelope/batch.js';
+import { deriveMid } from '../abi-engine/payload/mid.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -294,6 +297,80 @@ router.post('/transport/receive', async (req: AuthRequest, res: Response): Promi
   } catch (err) {
     res.status(502).json({
       error: 'Transport receive failed',
+      detail: err instanceof Error ? err.message : String(err),
+      transport: transport.kind,
+    });
+  }
+});
+
+// ─── POST /transport/amf ──────────────────────────────────
+// Background data for CERT: add a manufacturer (MID) to ACE's reference
+// file via the $I application. Scenario manufacturers don't exist in CERT
+// until added — AE filings bounce with F523 MFGR CODE UNKNOWN otherwise.
+const amfSchema = z.object({
+  name: z.string().min(1).max(100),
+  street: z.string().max(94).optional(),
+  city: z.string().min(1).max(67),
+  countryCode: z.string().length(2),
+  stateOrProvince: z.string().optional(),
+  zipOrPostalCode: z.string().optional(),
+  /** Expected MID — the batch is refused if the details derive differently. */
+  expectedMid: z.string().min(6).max(15).optional(),
+});
+router.post('/transport/amf', async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = amfSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+    return;
+  }
+  const d = parsed.data;
+  try {
+    const derivedMid = deriveMid({
+      name: d.name, address: d.street, city: d.city,
+      countryCode: d.countryCode, stateOrProvince: d.stateOrProvince,
+    });
+    if (d.expectedMid && derivedMid !== d.expectedMid.toUpperCase()) {
+      res.status(422).json({
+        error: `These details derive MID ${derivedMid}, not ${d.expectedMid.toUpperCase()} — fix the firm details or the expected MID`,
+      });
+      return;
+    }
+    const params = await loadParams();
+    const records = buildAddManufacturers([{
+      action: 'add',
+      countryCode: d.countryCode.toUpperCase(),
+      stateOrProvince: d.stateOrProvince,
+      name: d.name.toUpperCase(),
+      street: d.street?.toUpperCase(),
+      city: d.city.toUpperCase(),
+      zipOrPostalCode: d.zipOrPostalCode,
+      manufacturerId: derivedMid,
+    }]);
+    const lines = buildBatch({
+      sender: params.sender,
+      appId: '$I',
+      blocks: [{
+        port: params.districtPortOfEntry,
+        filerCode: params.filerCode,
+        userData: 'AMF BACKGROUND',
+        transactionLines: records,
+      }],
+    });
+    const receipt = await transport.send(lines, { correlationId: `AMF-${derivedMid.slice(0, 20)}` });
+    await writeAuditLog({
+      orgId: req.user!.orgId, userId: req.user!.id,
+      action: 'cert.amf_sent', entityType: 'cert_transmission', entityId: derivedMid,
+      newValue: { mid: derivedMid, transport: transport.kind, messageId: receipt.messageId, lines },
+      ...getRequestMeta(req),
+    });
+    res.json({ mid: derivedMid, transport: transport.kind, messageId: receipt.messageId, lines });
+  } catch (err) {
+    if (err instanceof RecordCodecError) {
+      res.status(422).json({ error: 'AMF batch failed to build', issues: err.issues });
+      return;
+    }
+    res.status(502).json({
+      error: 'AMF transmit failed',
       detail: err instanceof Error ? err.message : String(err),
       transport: transport.kind,
     });

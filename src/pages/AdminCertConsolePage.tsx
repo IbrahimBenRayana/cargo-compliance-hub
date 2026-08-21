@@ -316,6 +316,67 @@ function TransportCard() {
   );
 }
 
+// ─── Background data: manufacturer add ($I) ────────────────
+// Scenario manufacturers don't exist in CERT until added — AE filings
+// bounce with F523 MFGR CODE UNKNOWN. The server refuses the batch if the
+// firm details don't derive the expected MID (Directive 3500-13 check).
+function AmfCard() {
+  const [form, setForm] = useState({
+    name: '', street: '', city: '', countryCode: '', expectedMid: '',
+  });
+  const [lastResult, setLastResult] = useState<string | null>(null);
+  const send = useMutation({
+    mutationFn: () =>
+      certApi.addManufacturer({
+        name: form.name,
+        street: form.street || undefined,
+        city: form.city,
+        countryCode: form.countryCode,
+        expectedMid: form.expectedMid || undefined,
+      }),
+    onSuccess: (r) => {
+      setLastResult(`MID ${r.mid} transmitted via ${r.transport} — MQ message ${r.messageId.slice(0, 16)}…  Check for responses for the $R confirmation.`);
+      toast.success(`Manufacturer batch sent (${r.mid})`);
+    },
+    onError: (err: any) => toast.error(apiErrorMessage(err, 'Manufacturer add failed')),
+  });
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const complete = form.name && form.city && form.countryCode.length === 2;
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg">Background data — add manufacturer (MID)</CardTitle>
+        <CardDescription>
+          Adds the firm to ACE CERT's manufacturer file via a $I batch. Fill the firm details;
+          the expected MID (from the scenario) guards against derivation mismatches.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="space-y-1"><Label className="text-xs">Firm name</Label>
+            <Input value={form.name} onChange={set('name')} placeholder="SIGMA PRINTERS PTE LTD" /></div>
+          <div className="space-y-1"><Label className="text-xs">Street</Label>
+            <Input value={form.street} onChange={set('street')} placeholder="123 ORCHARD ROAD" /></div>
+          <div className="space-y-1"><Label className="text-xs">City</Label>
+            <Input value={form.city} onChange={set('city')} placeholder="SINGAPORE" /></div>
+          <div className="space-y-1"><Label className="text-xs">Country (ISO-2)</Label>
+            <Input value={form.countryCode} onChange={set('countryCode')} placeholder="SG" maxLength={2} /></div>
+          <div className="space-y-1"><Label className="text-xs">Expected MID</Label>
+            <Input value={form.expectedMid} onChange={set('expectedMid')} placeholder="SGSIGPRI123SIN" className="font-mono" /></div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button size="sm" onClick={() => send.mutate()} disabled={!complete || send.isPending}>
+            {send.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 mr-1.5" />}
+            Send $I batch to CBP
+          </Button>
+          {lastResult && <span className="text-xs text-muted-foreground">{lastResult}</span>}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Single transmission card (detail sheet) ───────────────
 function TransmissionCard({
   transmission,
@@ -711,6 +772,9 @@ export function AdminCertConsolePage() {
 
       {/* Transport status + response drain */}
       <TransportCard />
+
+      {/* Background data (manufacturer adds) */}
+      <AmfCard />
 
       {/* Parameters */}
       <ParamsCard />

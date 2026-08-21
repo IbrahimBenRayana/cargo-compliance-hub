@@ -1213,6 +1213,22 @@ export const certApi = {
       { method: 'POST', body: JSON.stringify({ timeoutMs }) },
     );
   },
+
+  /** Background data: add a manufacturer (MID) to CERT via the $I application. */
+  addManufacturer(body: {
+    name: string;
+    street?: string;
+    city: string;
+    countryCode: string;
+    stateOrProvince?: string;
+    zipOrPostalCode?: string;
+    expectedMid?: string;
+  }) {
+    return apiFetch<{ mid: string; transport: string; messageId: string; lines: string[] }>(
+      '/api/v1/admin/cert/transport/amf',
+      { method: 'POST', body: JSON.stringify(body) },
+    );
+  },
 };
 
 // ─── Manifest Query API ───────────────────────────────────
