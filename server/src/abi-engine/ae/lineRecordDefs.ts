@@ -203,7 +203,11 @@ export const INPUT_50: RecordDef = {
     { name: 'valueOfGoodsAmount', start: 25, end: 34, class: 'SN', designation: 'M' }, // whole U.S. dollars
     { name: 'filler3', start: 35, end: 35, class: 'S', designation: 'M' },
     { name: 'quantity1', start: 36, end: 47, class: 'SN', designation: 'C' }, // 2 implied decimals
-    { name: 'uomCode1', start: 48, end: 50, class: 'AN', designation: 'M' },
+    // Printed designation M, relaxed to C: CERT's floor rejects ANY UOM on a
+    // zero-reporting-unit tariff (9999.00.84 live evidence, Aug 21 2026 —
+    // 'X' → F441, 'NO' → F442; CERT's own HA query returns 0 units for it).
+    // Same printed-vs-wire family as the '*F'/'A+'/$-appId relaxations.
+    { name: 'uomCode1', start: 48, end: 50, class: 'AN', designation: 'C' },
     { name: 'quantity2', start: 51, end: 62, class: 'SN', designation: 'C' }, // 2 implied decimals
     { name: 'uomCode2', start: 63, end: 65, class: 'AN', designation: 'C' },
     { name: 'quantity3', start: 66, end: 77, class: 'SN', designation: 'C' }, // 2 implied decimals

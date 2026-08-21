@@ -37,7 +37,9 @@ export const zTariffV2 = z.object({
   /** Estimated duty in cents. Absent = not yet computed (duty engine fills it). */
   dutyCents: zMoneyCents.optional(),
   valueDollars: zMoneyDollars,
-  uomCode1: z.string().min(1).max(3),
+  // Optional since Aug 2026: zero-reporting-unit tariffs (e.g. 9999.00.84)
+  // must omit UOM entirely — CERT rejects any code on them (F441/F442).
+  uomCode1: z.string().min(1).max(3).optional(),
   quantity1Hundredths: z.number().int().nonnegative().optional(),
   uomCode2: z.string().max(3).optional(),
   quantity2Hundredths: z.number().int().nonnegative().optional(),

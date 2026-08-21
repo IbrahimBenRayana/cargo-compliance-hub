@@ -24,16 +24,13 @@ export const SCENARIOS: Scenario[] = [
   aeScenario('001', 'Singapore Free Trade Agreement', {
     // 9999.00.84 is the Singapore FTA provision marker the package pairs
     // with the substantive classification; both rates are Free (USITC).
-    // 9903.01.25 (+10% reciprocal baseline) added per CERT's live reject
-    // F771 TRFF ADJSTMNT HTS OR EXCLSN MISSING — the 2025-26 IEEPA regime
-    // postdates the test package, and Annex II (9903.01.32) coverage of
-    // 8443.99.20.50 could not be substantiated, so the conservative
-    // baseline is claimed. FTA kills column-1 duty + MPF, not reciprocal.
-    rates: {
-      '99990084': 'Free',
-      '99030125': 'The duty provided in the applicable subheading + 10%',
-      '8443992050': 'Free',
-    },
+    // CERT-floor findings (live, Aug 21 2026, via the HA query of CERT's
+    // own HTS table): 9903.01.25 is NOT ON FILE there (their table predates
+    // the IEEPA reciprocal regime — omitted; one not-on-file tariff cascades
+    // F642 onto every tariff of the line), and 9999.00.84 carries ZERO
+    // reporting units — any UOM is rejected ('X' → F441, 'NO' → F442), so
+    // quantity AND uom are omitted entirely.
+    rates: { '99990084': 'Free', '8443992050': 'Free' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'SG';
@@ -47,10 +44,7 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        // F441: CERT wants the goods quantity mirrored on the 9999 marker,
-        // not the zero-quantity 'X' convention used for ch.99 overlays.
-        { htsNumber: '99990084', valueDollars: 0, uomCode1: 'NO', quantity1Hundredths: 10000 },
-        { htsNumber: '99030125', valueDollars: 0, uomCode1: 'X' },
+        { htsNumber: '99990084', valueDollars: 0 },
         { htsNumber: '8443992050', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 10000 },
       ];
     },

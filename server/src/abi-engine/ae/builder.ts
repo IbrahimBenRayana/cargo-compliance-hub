@@ -86,7 +86,8 @@ export interface AeTariff {
   /** Article value, whole U.S. dollars. */
   valueDollars: number;
   /** UOM code 1 is mandatory per the HTS even when quantity 1 is not. */
-  uomCode1: string;
+  /** Omit entirely for zero-reporting-unit tariffs (CERT F441/F442). */
+  uomCode1?: string;
   /** Quantity 1 in hundredths (two implied decimals). */
   quantity1Hundredths?: number;
   uomCode2?: string;
