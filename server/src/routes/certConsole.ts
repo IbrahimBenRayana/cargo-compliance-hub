@@ -91,7 +91,11 @@ router.put('/params', async (req: AuthRequest, res: Response): Promise<void> => 
   });
   await writeAuditLog({
     orgId: req.user!.orgId, userId: req.user!.id,
-    action: 'cert.params_updated', entityType: 'cert_params', entityId: PARAMS_ID,
+    // entityId is a UUID column — cert_params_config's 'default' id is not
+    // one, so it stays in newValue (a bad id makes the audit write fail
+    // silently — live finding, Aug 21).
+    action: 'cert.params_updated', entityType: 'cert_params',
+    newValue: { paramsId: PARAMS_ID },
     ...getRequestMeta(req),
   });
   res.json({ params: row });
@@ -290,7 +294,7 @@ router.post('/transport/receive', async (req: AuthRequest, res: Response): Promi
     for (const batch of batches) {
       await writeAuditLog({
         orgId: req.user!.orgId, userId: req.user!.id,
-        action: 'cert.received', entityType: 'cert_transmission', entityId: 'queue',
+        action: 'cert.received', entityType: 'cert_transmission',
         newValue: { transport: transport.kind, lines: batch },
         ...getRequestMeta(req),
       });
@@ -361,7 +365,7 @@ router.post('/transport/amf', async (req: AuthRequest, res: Response): Promise<v
     const receipt = await transport.send(lines, { correlationId: `AMF-${derivedMid.slice(0, 20)}` });
     await writeAuditLog({
       orgId: req.user!.orgId, userId: req.user!.id,
-      action: 'cert.amf_sent', entityType: 'cert_transmission', entityId: derivedMid,
+      action: 'cert.amf_sent', entityType: 'cert_transmission',
       newValue: { mid: derivedMid, transport: transport.kind, messageId: receipt.messageId, lines },
       ...getRequestMeta(req),
     });
@@ -416,7 +420,7 @@ router.post('/transport/hts-query', async (req: AuthRequest, res: Response): Pro
     const parsedResponse = hyBatch ? parseHtsQueryResponseBatch(hyBatch) : null;
     await writeAuditLog({
       orgId: req.user!.orgId, userId: req.user!.id,
-      action: 'cert.hts_query', entityType: 'cert_transmission', entityId: 'hts-query',
+      action: 'cert.hts_query', entityType: 'cert_transmission',
       newValue: { htsNumbers: parsed.data.htsNumbers, asOfDate, messageId: receipt.messageId, batches },
       ...getRequestMeta(req),
     });

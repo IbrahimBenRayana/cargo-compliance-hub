@@ -1221,17 +1221,21 @@ export const certApi = {
       messageId: string;
       raw: string[][];
       parsed: {
-        queries: Array<{
-          fromTariffNumber: string;
-          narrativeMessage: string;
-          tariffs: Array<{
-            tariffNumber: string;
-            beginEffectiveDate?: string;
-            endEffectiveDate?: string;
-            unitsOfMeasure: string[];
-            commodityDescription?: string;
+        batchRejected: boolean;
+        envelopeConditions: Array<{ conditionCode: string; narrative: string }>;
+        response: {
+          queries: Array<{
+            fromTariffNumber: string;
+            narrativeMessage: string;
+            tariffs: Array<{
+              tariffNumber: string;
+              beginEffectiveDate?: string;
+              endEffectiveDate?: string;
+              unitsOfMeasure: string[];
+              commodityDescription?: string;
+            }>;
           }>;
-        }>;
+        };
       } | null;
       note?: string;
     }>('/api/v1/admin/cert/transport/hts-query', {

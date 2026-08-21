@@ -419,6 +419,11 @@ function HtsQueryCard() {
             Query CERT
           </Button>
         </div>
+        {result?.parsed?.batchRejected && (
+          <p className="text-xs text-destructive">
+            Batch rejected by ACE: {result.parsed.envelopeConditions.map((c) => `${c.conditionCode} ${c.narrative}`).join(' · ')}
+          </p>
+        )}
         {result?.parsed && (
           <Table>
             <TableHeader>
@@ -432,7 +437,7 @@ function HtsQueryCard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {result.parsed.queries.flatMap((q) =>
+              {result.parsed.response.queries.flatMap((q) =>
                 q.tariffs.length === 0 ? (
                   <TableRow key={q.fromTariffNumber}>
                     <TableCell className="font-mono text-xs">{q.fromTariffNumber}</TableCell>
