@@ -6,7 +6,7 @@ B  2704ZZZAE                                               SCENARIO 002
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-40  001 EGEG080126      N        500           1200646 N                        
+40  001 EGEG080126      N        50072901      1200646 N                        
 44KNIT SWEATERS, MAN-MADE FIBERS                                                
 47MEGCAIKNI456CAI                                                               
 47S26-164751100                                                                 

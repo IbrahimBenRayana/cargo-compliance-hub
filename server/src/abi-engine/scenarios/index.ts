@@ -77,6 +77,9 @@ export const SCENARIOS: Scenario[] = [
       // here rather than derived: eligible per the scenario ⇒ Free.
       line.spiClaimCode = 'N';
       line.descriptions = ['KNIT SWEATERS, MAN-MADE FIBERS'];
+      // F429 (vessel MOT): foreign port of lading — Alexandria, Egypt
+      // (Schedule K 72901), matching the QIZ/Egypt export.
+      line.foreignPortOfLading = '72901';
       line.parties = [
         { type: 'M', identifier: 'EGCAIKNI456CAI' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
