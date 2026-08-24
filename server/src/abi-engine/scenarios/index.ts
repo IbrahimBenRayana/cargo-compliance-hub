@@ -30,15 +30,14 @@ export const SCENARIOS: Scenario[] = [
     // F642 onto every tariff of the line), and 9999.00.84 carries ZERO
     // reporting units — any UOM is rejected ('X' → F441, 'NO' → F442), so
     // quantity AND uom are omitted entirely.
-    // 9903.88.15 fills the F771 adjustment slot: CERT's own table (swept
-    // via HA ranges, Aug 21) carries NO SG-applicable 9903 — the 9910
-    // subchapter is empty and the only on-file remedy family is 301-era
-    // China lists. The edit checks presence of a 9903-prefix number
-    // (round-2 evidence); .15 is the on-file candidate with the lowest
-    // distortion (7.5%). Karl consulted in parallel — swap when he answers.
+    // 9903.05.68 fills the F771 adjustment slot — per Karl Fischer
+    // (client rep, 8/24/2026): Singapore country-specific reciprocal rate,
+    // 12.5%, effective 7/24/2026, CSMS #69326983. The Jul-2026 9903.05.xx
+    // country-rate family IS loaded in CERT (unlike the Apr-2025 9903.01.xx
+    // family, NOT ON FILE per our HA sweeps).
     rates: {
       '99990084': 'Free',
-      '99038815': 'The duty provided in the applicable subheading + 7.5%',
+      '99030568': 'The duty provided in the applicable subheading + 12.5%',
       '8443992050': 'Free',
     },
     mutate: (p) => {
@@ -59,7 +58,7 @@ export const SCENARIOS: Scenario[] = [
       // CERT tells us which 9903 number its table carries for this pairing.
       line.tariffs = [
         { htsNumber: '99990084', valueDollars: 0 },
-        { htsNumber: '99038815', valueDollars: 0 },
+        { htsNumber: '99030568', valueDollars: 0 },
         { htsNumber: '8443992050', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 10000 },
       ];
     },
