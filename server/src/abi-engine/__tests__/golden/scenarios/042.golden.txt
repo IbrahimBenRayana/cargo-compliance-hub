@@ -10,10 +10,11 @@ B  2704ZZZAE                                               SCENARIO 042
 44WIGS OF SYNTHETIC TEXTILE MATERIALS                                           
 47MKRSELWIG217SEL                                                               
 47S26-164751100                                                                 
+5099030571       125000          0                                              
 506704190000          0      10000       100000NO                               
 62499    3464                                                                   
 62501    1250                                                                   
 89499       3464501       1250                                                  
-90          0        4714           0           0           0           0       
+90     125000        4714           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        

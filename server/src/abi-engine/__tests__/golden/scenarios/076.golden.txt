@@ -8,15 +8,16 @@ B  2704ZZZAE                                               SCENARIO 076
 318B 123                                                                        
 35H99                                                                           
 36LINE COUNTRY OF ORIGIN AND MANUFACTURER CORRECTED.                            
-40  001 CNCN080126               500           1200    N                        
+40  001 CNCN080126               50057035      1200    N                        
 44LITHIUM ION BATTERY PACKS                                                     
 47MCNCAWBAT7057SHE                                                              
 47S26-164751100                                                                 
+5099030531       125000          0                                              
 508507600020      34100      10000        50000NO                               
 62499    3464                                                                   
 62501    1250                                                                   
 63L07L19                                                                        
 89499       3464501       1250                                                  
-90      34100        4714           0           0           0           0       
+90     159100        4714           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        

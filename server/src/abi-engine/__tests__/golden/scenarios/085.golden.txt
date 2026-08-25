@@ -6,10 +6,11 @@ B  2704ZZZAE                                               SCENARIO 085
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-40  001 DEDE080126               500           1200    N                        
+40  001 DEDE080126               50042876      1200    N                        
 44SNOWMOBILE                                                                    
 47MDEMUNSNO347MUN                                                               
 47S26-164751100                                                                 
+5099030539       100000          0                                              
 508703210130      25000      10000          100NO                               
 OI        SNOWMOBILE, NOT FOR ON-ROAD USE                                       
 PG01001NHTOFF                                                                   
@@ -27,6 +28,6 @@ PG22Y871         CI NH1 Y08202026
 62499    3464                                                                   
 62501    1250                                                                   
 89499       3464501       1250                                                  
-90      25000        4714           0           0           0           0       
+90     125000        4714           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        

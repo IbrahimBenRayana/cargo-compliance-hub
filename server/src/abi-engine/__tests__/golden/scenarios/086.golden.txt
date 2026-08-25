@@ -6,10 +6,11 @@ B  2704ZZZAE                                               SCENARIO 086
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-40  001 HKHK080126               500           1200    N                        
+40  001 HKHK080126               50058201      1200    N                        
 44RADIO BROADCAST RECEIVERS                                                     
 47MHKHKGRAD529HKG                                                               
 47S26-164751100                                                                 
+5099030543       125000          0                                              
 508527910500          0      10000        50000NO                               
 OI        RADIO BROADCAST RECEIVERS, HOUSEHOLD                                  
 PG01001FCCRAD                                                                  A
@@ -17,6 +18,6 @@ PG01001FDAFDAFDA                                                               A
 62499    3464                                                                   
 62501    1250                                                                   
 89499       3464501       1250                                                  
-90          0        4714           0           0           0           0       
+90     125000        4714           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        

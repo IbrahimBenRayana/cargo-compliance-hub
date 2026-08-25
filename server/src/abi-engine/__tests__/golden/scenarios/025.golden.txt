@@ -10,9 +10,10 @@ B  2704ZZZAE                                               SCENARIO 025
 44LITHIUM ION BATTERY PACKS                                                     
 47MCNSHEBAT123SHA                                                               
 47S26-164751100                                                                 
+5099030531       125000          0                                              
 508507600020      34100      10000        50000NO                               
 62499    3464                                                                   
 89499       3464                                                                
-90      34100        3464           0           0           0           0       
+90     159100        3464           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        

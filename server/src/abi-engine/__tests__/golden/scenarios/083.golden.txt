@@ -6,10 +6,11 @@ B  2704ZZZAE                                               SCENARIO 083
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-40  001 CNCN080126               500           1200    N                        
+40  001 CNCN080126               50057035      1200    N                        
 44ELECTRIC COFFEE MAKERS                                                        
 47MTWNICSAN435TAI                                                               
 47S26-164751100                                                                 
+5099030531      9224413          0                                              
 508516710020    2730426     737953      5546800NO                               
 OI        ELECTRIC DRIP COFFEE MAKERS, HOUSEHOLD                                
 PG01001FDAFOOCCW                         130.029                                
@@ -31,6 +32,6 @@ PG30A082020260900
 62499  255627                                                                   
 62501   92244                                                                   
 89499      65150501      92244                                                  
-90    2730426      157394           0           0           0           0       
+90   11954839      157394           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        

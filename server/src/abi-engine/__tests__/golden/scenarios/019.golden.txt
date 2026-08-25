@@ -10,6 +10,7 @@ B  2704ZZZAE                                               SCENARIO 019
 44SPAGHETTI MEAL SET - PASTA                                                    
 47MCHZURPAS135ZUR                                                               
 47S26-164751100                                                                 
+5099030574        30000          0                                              
 501902194000      15360       2400       120000KG                               
 62499     831                                                                   
 62501     300                                                                   
@@ -17,6 +18,7 @@ B  2704ZZZAE                                               SCENARIO 019
 44SPAGHETTI MEAL SET - DRIED MUSHROOMS                                          
 47MFRPARMUS791PAR                                                               
 47S26-164751100                                                                 
+5099030539        13000          0                                              
 500712311000       8320       1300        20000KG                               
 62499     450                                                                   
 62501     163                                                                   
@@ -24,10 +26,11 @@ B  2704ZZZAE                                               SCENARIO 019
 44SPAGHETTI MEAL SET - TOMATO PASTE                                             
 47MITMILTOM468MIL                                                               
 47S26-164751100                                                                 
+5099030539        13000          0                                              
 502002908020       8320       1300        30000KG                               
 62499     450                                                                   
 62501     163                                                                   
 89499       3358501        626                                                  
-90      32000        3984           0           0           0           0       
+90      88000        3984           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        

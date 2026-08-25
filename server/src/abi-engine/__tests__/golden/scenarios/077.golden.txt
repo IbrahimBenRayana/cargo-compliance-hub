@@ -8,10 +8,11 @@ B  2704ZZZAE                                               SCENARIO 077
 318B 123                                                                        
 35H01                                                                           
 36ENTRY TYPE CORRECTED TO 03: MERCHANDISE SUBJECT TO AD/CVD CASES.              
-40  001 ITIT080126               500           1200    N                        
+40  001 ITIT080126               50047527      1200    N                        
 44DRIED PASTA                                                                   
 47MITROMPAS284ROM                                                               
 47S26-164751100                                                                 
+5099030539       173670          0                                              
 501902192020          0      17367       436600KG                               
 53A475818001C       0A           0           0         0                        
 53C475819000C       0A           0           0         0                        
@@ -20,6 +21,6 @@ B  2704ZZZAE                                               SCENARIO 077
 63L03L04L07L29                                                                  
 88          0           0           0           0                               
 89499       6016501       2171                                                  
-90          0        8187           0           0           0           0       
+90     173670        8187           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        
