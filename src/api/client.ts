@@ -1244,6 +1244,14 @@ export const certApi = {
     });
   },
 
+  /** Background data: add ALL pending scenario manufacturers to CERT in chunked $I batches. */
+  addAllManufacturers() {
+    return apiFetch<{ transport: string; sent: number; batches?: number; messageIds?: string[]; note?: string }>(
+      '/api/v1/admin/cert/transport/amf-bulk',
+      { method: 'POST' },
+    );
+  },
+
   /** Background data: add a manufacturer (MID) to CERT via the $I application. */
   addManufacturer(body: {
     name: string;

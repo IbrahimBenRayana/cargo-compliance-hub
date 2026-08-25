@@ -24,6 +24,7 @@ import { parseEsQueryResponseBatch } from '../abi-engine/apps/esQuery/responsePa
 import { parseUcNotificationBatch } from '../abi-engine/apps/uc/parser.js';
 import { createTransport, MqiptTransport } from '../abi-engine/transport/index.js';
 import { buildAddManufacturers } from '../abi-engine/apps/addManufacturer/builder.js';
+import { CERT_MANUFACTURERS } from '../abi-engine/scenarios/certManufacturers.js';
 import { buildHtsQuery } from '../abi-engine/apps/htsQuery/builder.js';
 import { parseHtsQueryResponseBatch } from '../abi-engine/apps/htsQuery/responseParser.js';
 import { buildBatch } from '../abi-engine/envelope/batch.js';
@@ -377,6 +378,70 @@ router.post('/transport/amf', async (req: AuthRequest, res: Response): Promise<v
     }
     res.status(502).json({
       error: 'AMF transmit failed',
+      detail: err instanceof Error ? err.message : String(err),
+      transport: transport.kind,
+    });
+  }
+});
+
+// ─── POST /transport/amf-bulk ─────────────────────────────
+// Add every pending scenario manufacturer to CERT in chunked $I batches.
+// Firm details ship in certManufacturers.ts, each verified to derive its
+// MID byte-exact; the send re-checks derivation and refuses on mismatch.
+router.post('/transport/amf-bulk', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const pending = CERT_MANUFACTURERS.filter((m) => !m.added);
+    if (pending.length === 0) {
+      res.json({ transport: transport.kind, sent: 0, note: 'All scenario manufacturers are marked added.' });
+      return;
+    }
+    for (const m of pending) {
+      const derived = deriveMid({ name: m.name, address: m.street, city: m.city, countryCode: m.countryCode });
+      if (derived !== m.mid) {
+        res.status(422).json({ error: `certManufacturers.ts drift: ${m.mid} derives ${derived}` });
+        return;
+      }
+    }
+    const params = await loadParams();
+    const CHUNK = 25;
+    const receipts: string[] = [];
+    for (let i = 0; i < pending.length; i += CHUNK) {
+      const chunk = pending.slice(i, i + CHUNK);
+      const records = buildAddManufacturers(chunk.map((m) => ({
+        action: 'add' as const,
+        countryCode: m.countryCode,
+        name: m.name,
+        street: m.street,
+        city: m.city,
+        manufacturerId: m.mid,
+      })));
+      const lines = buildBatch({
+        sender: params.sender,
+        appId: '$I',
+        blocks: [{
+          port: params.districtPortOfEntry,
+          filerCode: params.filerCode,
+          userData: 'AMF BULK',
+          transactionLines: records,
+        }],
+      });
+      const receipt = await transport.send(lines, { correlationId: `AMF-BULK-${i / CHUNK + 1}` });
+      receipts.push(receipt.messageId);
+    }
+    await writeAuditLog({
+      orgId: req.user!.orgId, userId: req.user!.id,
+      action: 'cert.amf_bulk', entityType: 'cert_transmission',
+      newValue: { count: pending.length, mids: pending.map((m) => m.mid), messageIds: receipts, transport: transport.kind },
+      ...getRequestMeta(req),
+    });
+    res.json({ transport: transport.kind, sent: pending.length, batches: receipts.length, messageIds: receipts });
+  } catch (err) {
+    if (err instanceof RecordCodecError) {
+      res.status(422).json({ error: 'AMF bulk batch failed to build', issues: err.issues });
+      return;
+    }
+    res.status(502).json({
+      error: 'AMF bulk transmit failed',
       detail: err instanceof Error ? err.message : String(err),
       transport: transport.kind,
     });

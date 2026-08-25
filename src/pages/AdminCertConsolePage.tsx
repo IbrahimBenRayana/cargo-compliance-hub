@@ -340,6 +340,14 @@ function AmfCard() {
     },
     onError: (err: any) => toast.error(apiErrorMessage(err, 'Manufacturer add failed')),
   });
+  const bulk = useMutation({
+    mutationFn: () => certApi.addAllManufacturers(),
+    onSuccess: (r) => {
+      setLastResult(r.note ?? `${r.sent} manufacturers sent in ${r.batches} $I batch${r.batches === 1 ? '' : 'es'} — Check for responses for the $R acks.`);
+      toast.success(r.note ?? `${r.sent} manufacturer adds transmitted`);
+    },
+    onError: (err: any) => toast.error(apiErrorMessage(err, 'Bulk manufacturer add failed')),
+  });
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
   const complete = form.name && form.city && form.countryCode.length === 2;
@@ -369,6 +377,10 @@ function AmfCard() {
           <Button size="sm" onClick={() => send.mutate()} disabled={!complete || send.isPending}>
             {send.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 mr-1.5" />}
             Send $I batch to CBP
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => bulk.mutate()} disabled={bulk.isPending}>
+            {bulk.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 mr-1.5" />}
+            Add all scenario manufacturers
           </Button>
           {lastResult && <span className="text-xs text-muted-foreground">{lastResult}</span>}
         </div>
