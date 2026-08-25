@@ -131,21 +131,21 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('003', 'Live Entry Indicator', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039101': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       p.entrySummary.indicators = { ...p.entrySummary.indicators, liveEntry: true };
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039101', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
     },
   }),
 
   aeScenario('004', 'Single Entry Bond with Surety and Bond Information', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039111': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039111', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       // Karl (8/25): use the $50k-bond test importer for the STB scenario —
       // and per CBP internal notes, F752 NO STB FOUND is a PASS for software
       // vendors when the 31-record data is otherwise correct.
@@ -240,11 +240,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('007', 'MOT/Port of Unlading', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K; export country CN)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       p.entrySummary.motCode = '11';
       // Package says 3205 — that's Honolulu INTL AIRPORT (Schedule D), and ACE
       // refuses it for MOT 11 (F169, live 8/25). 3201 = Honolulu seaport:
