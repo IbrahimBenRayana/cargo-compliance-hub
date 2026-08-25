@@ -65,12 +65,14 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('002', 'US – Israel Free Trade Area Agreement', {
-    // 9903.05.95 = NT52 textiles/apparel carve-out, 0% (CERT HA sweep
-    // 8/25: country rows carry 12.5%, TEXT OR APPAREL row carries 0%).
-    // F771 fires on every line without an NT52 adjustment — knit sweaters
-    // take the apparel carve-out, preserving QIZ duty-free treatment.
+    // NT52 adjustment = the ORIGIN COUNTRY number: Egypt 9903.05.36 at
+    // 12.5% (CERT HA sweep 8/25). The textiles row 9903.05.95 alone does
+    // NOT satisfy F771 (live-tested: accepted as valid but adjustment
+    // still 'missing') — the edit wants the country number, mirroring
+    // 001's accepted shape. QIZ preference kills the 32% column-1 duty
+    // only; the NT52 12.5% ($1,250) is paid.
     rates: {
-      '99030595': 'Free',
+      '99030536': 'The duty provided in the applicable subheading + 12.5%',
       '6110303059': { general: '32%', special: 'Free (AU,BH, CL,CO,IL,JO,KR, MA,OM,P, PA,PE,S,SG)' },
     },
     mutate: (p) => {
@@ -90,7 +92,7 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '99030595', valueDollars: 0 },
+        { htsNumber: '99030536', valueDollars: 0 },
         {
           htsNumber: '6110303059',
           valueDollars: 10000,
