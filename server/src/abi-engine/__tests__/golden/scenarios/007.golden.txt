@@ -2,7 +2,7 @@ ALA  MCLPASSWD           AE
 B  2704ZZZAE                                               SCENARIO 007         
 10AZZZ  00000078 2704007         0111 X           2090126                       
 1126-16475110026-164751100               082026081526       CA                  
-20HLCU3205081426    EVER GIVEN                     081626                       
+20HLCU3201081426    EVER GIVEN                     081626                       
 22     100CTNS                                                                  
 23I    615310393                                                                
 23MHLCUHAM190603443                                                             
@@ -12,7 +12,7 @@ B  2704ZZZAE                                               SCENARIO 007
 44LITHIUM ION BATTERY PACKS                                                     
 47MCNSHEBAT123SHA                                                               
 47S26-164751100                                                                 
-5099038803       250000          0                                              
+5099039106       250000          0                                              
 5099030531       125000          0                                              
 508507600030      34100      10000        50000NO       125000KG                
 62499    3464                                                                   
