@@ -114,7 +114,10 @@ export function baseAePayload(params: CertParams, scenarioId: string): AbiPayloa
             { type: 'S', identifier: params.importerOfRecordNumber },
           ],
           // Package default: $10,000 line value.
-          tariffs: [{ htsNumber: '8507600020', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000 }],
+          // 8507.60.00.30 per CERT's own HTS file (8/25 HA query: 0020 does not
+          // exist there; 0010=EV, 0030=storage li-ion, 0090=other; units NO KG —
+          // TWO reporting units required).
+          tariffs: [{ htsNumber: '8507600030', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000, uomCode2: 'KG', quantity2Hundredths: 125000 }],
         },
       ],
     },

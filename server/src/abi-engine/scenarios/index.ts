@@ -121,7 +121,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('003', 'Live Entry Indicator', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       p.entrySummary.indicators = { ...p.entrySummary.indicators, liveEntry: true };
       const line = p.entrySummary.lines[0];
@@ -131,7 +131,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('004', 'Single Entry Bond with Surety and Bond Information', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
@@ -150,21 +150,29 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('005', 'Census Warning Override within AE', {
-    rates: { '99030531': NT52_125, '2711120010': 'Free' },
+    // 9903.88.15 added: F771 persisted with NT52 alone (live 8/25) — CN
+    // propane is 301 List 4A, and the remedy edit wants the 301 number
+    // specifically (chapter note ii). Same 301→NT52→substantive stack as 089.
+    rates: {
+      '99038815': 'The duty provided in the applicable subheading + 7.5%',
+      '99030531': NT52_125,
+      '2711120010': 'Free',
+    },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.descriptions = ['PROPANE, LIQUEFIED'];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
       line.tariffs = [
+        { htsNumber: '99038815', valueDollars: 0 }, // 301 List 4A 7.5%
         { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
         { htsNumber: '2711120010', valueDollars: 30323, uomCode1: 'M3', quantity1Hundredths: 5078 },
       ];
       // Override code 49 = parameter change requested (package bonus info).
       // The condition code being overridden arrives on the AX census warning
       // at cert time; the dry-run pins a placeholder.
-      line.censusOverrides = [{ conditionCode: '13Q', overrideCode: '49' }];
+      line.censusOverrides = [{ conditionCode: '27D', overrideCode: '49' }];
     },
-    notes: 'Census condition code comes from the live AX warning during cert; 13Q is a dry-run placeholder.',
+    notes: 'Census condition code comes from the live AX warning during cert; 27D = live CERT warning for this line (W27D OR-HI VAL/QTY, seen 8/25).',
   }),
 
   appScenario('006', 'Census Warning Override \u2014 standalone transmission', 'CW', (params) =>
@@ -177,11 +185,11 @@ export const SCENARIOS: Scenario[] = [
           // CW resolves it. Warning code is a dry-run placeholder \u2014 the
           // cert run copies it from the live AX response.
           entryNumber: '0000006',
-          lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: '13Q', overrideCode: '49' }] }],
+          lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: '27D', overrideCode: '49' }] }],
         },
       ],
     })
-  , 'AE half filed separately at cert; warning code from the live AX response (13Q is a dry-run placeholder).'),
+  , 'AE half filed separately at cert; warning code from the live AX response (27D = live CERT warning for this line (W27D OR-HI VAL/QTY, seen 8/25)).'),
 
   aeScenario('009', 'Quota Informal', {
     rates: {
@@ -215,7 +223,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('007', 'MOT/Port of Unlading', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K; export country CN)
@@ -264,7 +272,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeRejectScenario('010', 'In-Transit Date Validation', {
-    rates: { '8507600020': '3.41%' },
+    rates: { '8507600030': '3.41%' },
     mutate: (p, params) => {
       const cy = params.currentYear;
       // Package dates: importation 02/01, exportation 01/21, in-transit
@@ -293,7 +301,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeRejectScenario('016', 'Invalid Entry Type for AE', {
-    rates: { '8507600020': '3.41%' },
+    rates: { '8507600030': '3.41%' },
     mutate: (p) => {
       // Type 86 (Section 321) is not a valid AE entry type — AE Table 2.
       p.entrySummary.entryTypeCode = '86';
@@ -325,7 +333,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('011', 'Estimated Date of Arrival Validation', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
@@ -398,7 +406,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('014', 'Airline Carrier Code', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       // Air MOT: no foreign port of lading (F429 is vessel-only).
       const line = p.entrySummary.lines[0];
@@ -542,11 +550,11 @@ export const SCENARIOS: Scenario[] = [
       entries: [
         {
           entryNumber: '0000020',
-          lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: '13Q', overrideCode: '49' }] }],
+          lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: '27D', overrideCode: '49' }] }],
         },
       ],
     })
-  , 'Overrides the warning surfaced by 020/021; warning code from the CL response (13Q dry-run placeholder).'),
+  , 'Overrides the warning surfaced by 020/021; warning code comes from the live CL response (27D placeholder pending that query).'),
 
   aeScenario('023', 'Steel License', {
     rates: { '99030571': NT52_125, '7222110006': 'Free' },
@@ -595,7 +603,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('025', 'Full Bill Data for Rail AMS Shipment', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       // Rail MOT: no foreign port of lading (F429 is vessel-only).
       const line = p.entrySummary.lines[0];
@@ -798,7 +806,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('033', 'Multiple Bonds', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
@@ -1241,7 +1249,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('052', 'B-Record Filer Authentication', {
-    rates: { '8507600020': '3.41%' },
+    rates: { '8507600030': '3.41%' },
     // The package overrides ONLY the block-control fields; the enclosed
     // 10–90 records stay a fully valid summary. The entry number therefore
     // keeps our REAL filer code (params.filerCode → 10-record) — the
@@ -1254,7 +1262,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('053', 'B-Record Application Type/Filer Authentication', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     // Fully valid block: B-record carries our own filer code and
     // application identifier AE (what buildBatch always emits) — the
     // scenario verifies the positive half of B-record authentication.
@@ -1665,7 +1673,7 @@ export const SCENARIOS: Scenario[] = [
   // \u2500\u2500 PSC scenarios (075\u2013078): Replace of an accepted summary; statement
   // fields are banned in a PSC (ESF-184) so the baseline payment is removed.
   aeScenario('075', 'PSC with ES Header Change', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
@@ -1683,7 +1691,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('076', 'PSC with ES Line Change', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       p.entrySummary.payment = undefined;
@@ -1737,7 +1745,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('078', "PSC for Another Filer's ES", {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       p.entrySummary.payment = undefined;
@@ -1799,7 +1807,7 @@ export const SCENARIOS: Scenario[] = [
   , 'Extends the scenario-079 TIB summary (same entry sequence).'),
 
   aeScenario('081', 'In-Bond', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
@@ -1821,7 +1829,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('082', 'PMS Statement Designation', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
@@ -2068,7 +2076,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('087', 'Multiple Bills of Lading', {
-    rates: { '99030531': NT52_125, '8507600020': '3.41%' },
+    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)

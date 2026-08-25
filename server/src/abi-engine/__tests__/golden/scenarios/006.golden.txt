@@ -1,6 +1,6 @@
 ALA  MCLPASSWD           CW                                                     
 B  2704ZZZCW                                               SCENARIO 006         
 CW01ZZZ  00000060                                                               
-CW02  00113Q49                                                                  
+CW02  00127D49                                                                  
 Y  2704ZZZCW                                                                    
 ZLA  MCL                                                                        
