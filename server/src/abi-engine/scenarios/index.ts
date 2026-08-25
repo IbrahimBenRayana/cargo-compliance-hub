@@ -140,6 +140,13 @@ export const SCENARIOS: Scenario[] = [
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
       line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
+      // Karl (8/25): use the $50k-bond test importer for the STB scenario —
+      // and per CBP internal notes, F752 NO STB FOUND is a PASS for software
+      // vendors when the 31-record data is otherwise correct.
+      p.entrySummary.importerOfRecord.number = '58-123456789';
+      p.entrySummary.consigneeNumber = '58-123456789';
+      const seller = line.parties?.find((pt) => pt.type === 'S');
+      if (seller) seller.identifier = '58-123456789';
       p.entrySummary.bonds = [
         {
           bondTypeCode: '9',
@@ -150,7 +157,7 @@ export const SCENARIOS: Scenario[] = [
         },
       ];
     },
-    notes: 'Importer of Record Number: client rep will supply (flows from CertParams).',
+    notes: 'IOR 58-123456789 per Karl (STB test importer, $50k bond). Expected outcome: F752 NO STB FOUND = vendor PASS when the 31-record is correct.',
   }),
 
   aeScenario('005', 'Census Warning Override within AE', {
