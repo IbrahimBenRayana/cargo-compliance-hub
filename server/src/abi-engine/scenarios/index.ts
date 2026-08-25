@@ -131,12 +131,12 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('003', 'Live Entry Indicator', {
-    rates: { '99039101': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030532': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       p.entrySummary.indicators = { ...p.entrySummary.indicators, liveEntry: true };
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039101', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030532', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
     },
   }),
 
