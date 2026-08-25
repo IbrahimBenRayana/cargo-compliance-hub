@@ -413,6 +413,7 @@ router.post('/transport/amf-bulk', async (req: AuthRequest, res: Response): Prom
         name: m.name,
         street: m.street,
         city: m.city,
+        zipOrPostalCode: m.zipOrPostalCode,
         manufacturerId: m.mid,
       })));
       const lines = buildBatch({

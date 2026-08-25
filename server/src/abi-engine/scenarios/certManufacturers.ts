@@ -12,6 +12,8 @@ export interface CertManufacturer {
   street: string;
   city: string;
   countryCode: string;
+  /** Required for US/CA/CN firms (AMF-17); not part of MID derivation. */
+  zipOrPostalCode?: string;
   /** Already acknowledged by CERT ($5U/$6). */
   added?: boolean;
 }
@@ -19,7 +21,7 @@ export interface CertManufacturer {
 export const CERT_MANUFACTURERS: CertManufacturer[] = [
   { mid: 'SGSIGPRI123SIN', name: 'SIGMA PRINTERS PTE', street: '123 JURONG RD', city: 'SINGAPORE', countryCode: 'SG', added: true },
   { mid: 'EGCAIKNI456CAI', name: 'CAIRO KNITTING MILLS', street: '456 NILE CORNICHE', city: 'CAIRO', countryCode: 'EG', added: true },
-  { mid: 'CNSHEBAT123SHA', name: 'SHENZHEN BATTERY CO', street: '123 PUDONG AVE', city: 'SHANGHAI', countryCode: 'CN' },
+  { mid: 'CNSHEBAT123SHA', name: 'SHENZHEN BATTERY CO', street: '123 PUDONG AVE', city: 'SHANGHAI', countryCode: 'CN', zipOrPostalCode: '200001' },
   { mid: 'PHMANCAR789MNL', name: 'MANILA CARBON WORKS', street: '789 QUIRINO AVE', city: 'MNL', countryCode: 'PH' },
   { mid: 'GBLONNAV321LON', name: 'LONDON NAVIGATION INSTRUMENTS', street: '321 THAMES RD', city: 'LONDON', countryCode: 'GB' },
   { mid: 'CLSCLBER246SCL', name: 'S.C.L. BERRIES', street: '246 AVENIDA COSTANERA', city: 'SCL', countryCode: 'CL' },
@@ -31,16 +33,16 @@ export const CERT_MANUFACTURERS: CertManufacturer[] = [
   { mid: 'JPTYOSHO913TYO', name: 'T.Y.O. SHOE CO', street: '913 GINZA', city: 'TYO', countryCode: 'JP' },
   { mid: 'FMPNIBAS753PNI', name: 'P.N.I. BASKETS', street: '753 KASELEHLIE ST', city: 'PNI', countryCode: 'FM' },
   { mid: 'MXMEXAPP159MEX', name: 'MEXICO APPAREL SA', street: '159 REFORMA', city: 'MEXICO CITY', countryCode: 'MX' },
-  { mid: 'CNSHERAP321SHA', name: 'SHENZHEN RAPESEED CO', street: '321 NANSHAN RD', city: 'SHANGHAI', countryCode: 'CN' },
-  { mid: 'CNSHEORA654SHA', name: 'SHENZHEN ORALCARE LTD', street: '654 FUTIAN BLVD', city: 'SHANGHAI', countryCode: 'CN' },
-  { mid: 'CNSHEFLM987SHA', name: 'SHENZHEN FLM IMAGING', street: '987 LUOHU RD', city: 'SHANGHAI', countryCode: 'CN' },
+  { mid: 'CNSHERAP321SHA', name: 'SHENZHEN RAPESEED CO', street: '321 NANSHAN RD', city: 'SHANGHAI', countryCode: 'CN', zipOrPostalCode: '200001' },
+  { mid: 'CNSHEORA654SHA', name: 'SHENZHEN ORALCARE LTD', street: '654 FUTIAN BLVD', city: 'SHANGHAI', countryCode: 'CN', zipOrPostalCode: '200001' },
+  { mid: 'CNSHEFLM987SHA', name: 'SHENZHEN FLM IMAGING', street: '987 LUOHU RD', city: 'SHANGHAI', countryCode: 'CN', zipOrPostalCode: '200001' },
   { mid: 'GBLONHEP531LON', name: 'LONDON HEPARIN LTD', street: '531 KING EDWARD ST', city: 'LONDON', countryCode: 'GB' },
   { mid: 'CLSCLAPR864SCL', name: 'S.C.L. APRICOTS', street: '864 VALLE CENTRAL', city: 'SCL', countryCode: 'CL' },
   { mid: 'DESOLKNI275SOL', name: 'SOLINGEN KNIVES GMBH', street: '275 KLINGENSTRASSE', city: 'SOLINGEN', countryCode: 'DE' },
   { mid: 'GLGOHAIR428GOH', name: 'G.O.H. AIRCRAFT PARTS', street: '428 AQQUSINERSUAQ', city: 'GOH', countryCode: 'GL' },
   { mid: 'CHGENWAT552GEN', name: 'GENEVA WATCH SA', street: '552 RUE DU RHONE', city: 'GENEVA', countryCode: 'CH' },
   { mid: 'MACASBEL713CAS', name: 'CASABLANCA BELTS', street: '713 BLVD MOHAMMED V', city: 'CASABLANCA', countryCode: 'MA' },
-  { mid: 'CNSHETOO654SHA', name: 'SHENZHEN TOOLS CO', street: '654 BAO AN RD', city: 'SHANGHAI', countryCode: 'CN' },
+  { mid: 'CNSHETOO654SHA', name: 'SHENZHEN TOOLS CO', street: '654 BAO AN RD', city: 'SHANGHAI', countryCode: 'CN', zipOrPostalCode: '200001' },
   { mid: 'GUHAGPEA842HAG', name: 'HAGATNA PEARLS', street: '842 MARINE CORPS DR', city: 'HAGATNA', countryCode: 'GU' },
   { mid: 'MXMTYSTL654MTY', name: 'M.T.Y. STL METALS', street: '654 AV CONSTITUCION', city: 'MTY', countryCode: 'MX' },
   { mid: 'AUPERDIA987PER', name: 'PERTH DIAMONDS', street: '987 HAY ST', city: 'PERTH', countryCode: 'AU' },
@@ -59,8 +61,8 @@ export const CERT_MANUFACTURERS: CertManufacturer[] = [
   { mid: 'GBLONFAN204LON', name: 'LONDON FANS LTD', street: '204 BRICK LANE', city: 'LONDON', countryCode: 'GB' },
   { mid: 'KRSELTIM682SEL', name: 'S.E.L. TIMERS', street: '682 EULJIRO', city: 'SEL', countryCode: 'KR' },
   { mid: 'ITROMPAS284ROM', name: 'ROMA PASTA SRL', street: '284 VIA APPIA', city: 'ROMA', countryCode: 'IT' },
-  { mid: 'CNSHEREL491SHA', name: 'SHENZHEN RELAYS', street: '491 LONGGANG AVE', city: 'SHANGHAI', countryCode: 'CN' },
-  { mid: 'CNCAWBAT7057SHE', name: 'CAW BATTERIES', street: '7057 BAOAN BLVD', city: 'SHENZHEN', countryCode: 'CN' },
+  { mid: 'CNSHEREL491SHA', name: 'SHENZHEN RELAYS', street: '491 LONGGANG AVE', city: 'SHANGHAI', countryCode: 'CN', zipOrPostalCode: '200001' },
+  { mid: 'CNCAWBAT7057SHE', name: 'CAW BATTERIES', street: '7057 BAOAN BLVD', city: 'SHENZHEN', countryCode: 'CN', zipOrPostalCode: '518000' },
   { mid: 'FRCOGBRA759COG', name: 'COGNAC BRANDY SA', street: '759 QUAI DES CHAIS', city: 'COGNAC', countryCode: 'FR' },
   { mid: 'HKHKGJEW368HKG', name: 'H.K.G. JEWELLERY', street: '368 NATHAN RD', city: 'HKG', countryCode: 'HK' },
   { mid: 'DEMUNSNO347MUN', name: 'MUNICH SNOWMOBILES', street: '347 LEOPOLDSTRASSE', city: 'MUNICH', countryCode: 'DE' },
