@@ -39,6 +39,11 @@ const S301_LIST3 = 'The duty provided in the applicable subheading + 25%';
 // commodities moved to review actions (live: F771 with .88.03 on batteries,
 // while propane accepted with it).
 const S301_REVIEW_BATT = 'The duty provided in the applicable subheading + 25%';
+// 9903.94.06 = Section 232 autos/auto-parts note 33(g)/(h) special-treatment
+// subdivision, 0% (CERT-confirmed). Li-ion batteries are 232 auto parts —
+// the battery line's THIRD required program, per Karl 8/25 (order:
+// 9903.91.06 / 9903.05.31 / 9903.94.06 / substantive).
+const S232_AUTO_PARTS_SPECIAL = 'Free';
 const NT52_125 = 'The duty provided in the applicable subheading + 12.5%';
 const NT52_100 = 'The duty provided in the applicable subheading + 10%';
 
@@ -131,21 +136,21 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('003', 'Live Entry Indicator', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     mutate: (p) => {
       p.entrySummary.indicators = { ...p.entrySummary.indicators, liveEntry: true };
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
     },
   }),
 
   aeScenario('004', 'Single Entry Bond with Surety and Bond Information', {
-    rates: { '99039111': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039111', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       // Karl (8/25): use the $50k-bond test importer for the STB scenario —
       // and per CBP internal notes, F752 NO STB FOUND is a PASS for software
       // vendors when the 31-record data is otherwise correct.
@@ -240,11 +245,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('007', 'MOT/Port of Unlading', {
-    rates: { '99038803': S301_LIST3, '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K; export country CN)
-      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       p.entrySummary.motCode = '11';
       // Package says 3205 — that's Honolulu INTL AIRPORT (Schedule D), and ACE
       // refuses it for MOT 11 (F169, live 8/25). 3201 = Honolulu seaport:
@@ -353,11 +358,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('011', 'Estimated Date of Arrival Validation', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       const cy = params.currentYear;
       p.entrySummary.dates = {
         estimatedEntry: `${cy}0820`,
@@ -426,11 +431,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('014', 'Airline Carrier Code', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     mutate: (p) => {
       // Air MOT: no foreign port of lading (F429 is vessel-only).
       const line = p.entrySummary.lines[0];
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       p.entrySummary.motCode = '40';
       // Package value: the '*F' generic air-carrier convention.
       p.entrySummary.cargo = { carrierCode: '*F', conveyanceName: 'FLIGHT 100' };
@@ -623,11 +628,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('025', 'Full Bill Data for Rail AMS Shipment', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     mutate: (p) => {
       // Rail MOT: no foreign port of lading (F429 is vessel-only).
       const line = p.entrySummary.lines[0];
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       p.entrySummary.motCode = '21';
       p.entrySummary.cargo = { carrierCode: 'CNRU', districtPortOfUnlading: '3802' };
       p.entrySummary.manifests = [
@@ -826,11 +831,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('033', 'Multiple Bonds', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       // Continuous basic + additional STB (allowable configuration 3,
       // ESF-157), surety 054 per the package.
       p.entrySummary.bonds = [
@@ -1282,14 +1287,14 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('053', 'B-Record Application Type/Filer Authentication', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     // Fully valid block: B-record carries our own filer code and
     // application identifier AE (what buildBatch always emits) — the
     // scenario verifies the positive half of B-record authentication.
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
     },
     notes: 'Package instruction: contact the assigned client rep IMMEDIATELY PRIOR to transmitting this scenario. Standard envelope — B-record filer = our filer code, application identifier AE.',
   }),
@@ -1693,12 +1698,12 @@ export const SCENARIOS: Scenario[] = [
   // \u2500\u2500 PSC scenarios (075\u2013078): Replace of an accepted summary; statement
   // fields are banned in a PSC (ESF-184) so the baseline payment is removed.
   aeScenario('075', 'PSC with ES Header Change', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       p.entrySummary.payment = undefined;
       p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
       p.entrySummary.psc = {
@@ -1711,7 +1716,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('076', 'PSC with ES Line Change', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       p.entrySummary.payment = undefined;
@@ -1724,7 +1729,7 @@ export const SCENARIOS: Scenario[] = [
       line.pscReasonCodes = ['L07', 'L19'];
       line.countryOfOrigin = 'CN';
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       line.parties = [
         { type: 'M', identifier: 'CNCAWBAT7057SHE' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
@@ -1765,7 +1770,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('078', "PSC for Another Filer's ES", {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       p.entrySummary.payment = undefined;
@@ -1778,7 +1783,7 @@ export const SCENARIOS: Scenario[] = [
       line.pscReasonCodes = ['L07', 'L19'];
       line.countryOfOrigin = 'CN';
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       line.parties = [
         { type: 'M', identifier: 'CNCAWBAT7057SHE' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
@@ -1827,11 +1832,11 @@ export const SCENARIOS: Scenario[] = [
   , 'Extends the scenario-079 TIB summary (same entry sequence).'),
 
   aeScenario('081', 'In-Bond', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       p.entrySummary.dates = { ...p.entrySummary.dates, inBond: `${params.currentYear}0816` };
       // Paperless in-bond (VXXNNNNNNNN) \u21d2 the bill of lading is required.
       p.entrySummary.manifests = [
@@ -1849,11 +1854,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('082', 'PMS Statement Designation', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       const cy = params.currentYear;
       // Package: print date ~10 days out, statement month = next month.
       // Dry-run pins Sep 1 (a Tuesday \u2014 weekends are barred by note y).
@@ -2096,11 +2101,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('087', 'Multiple Bills of Lading', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       p.entrySummary.dates = { ...p.entrySummary.dates, inBond: `${params.currentYear}0816` };
       p.entrySummary.cargo = { ...p.entrySummary.cargo, districtPortOfUnlading: '3001' };
       // Two manifest groupings share the movement/master/house; each carries
