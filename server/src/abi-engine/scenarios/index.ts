@@ -29,6 +29,10 @@ import { buildCensusWarningQuery } from '../apps/census/cjBuilder.js';
 // KR/CH/TW/CN) the duty-bearing row is used. Vessel scenarios (MOT
 // 10/11/12) additionally carry the EXPORT country's Schedule K foreign
 // port of lading, verified against CBP ACE Appendix F (April 2, 2026).
+// Section 301 List 3 (technology-transfer action) — Chinese goods stack
+// this ON TOP of the NT52 forced-labor row (chapter note ii wants the
+// commodity's exact remedy number; batteries confirmed List 3 25%).
+const S301_LIST3 = 'The duty provided in the applicable subheading + 25%';
 const NT52_125 = 'The duty provided in the applicable subheading + 12.5%';
 const NT52_100 = 'The duty provided in the applicable subheading + 10%';
 
@@ -121,21 +125,21 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('003', 'Live Entry Indicator', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       p.entrySummary.indicators = { ...p.entrySummary.indicators, liveEntry: true };
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
     },
   }),
 
   aeScenario('004', 'Single Entry Bond with Surety and Bond Information', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       p.entrySummary.bonds = [
         {
           bondTypeCode: '9',
@@ -154,7 +158,7 @@ export const SCENARIOS: Scenario[] = [
     // propane is 301 List 4A, and the remedy edit wants the 301 number
     // specifically (chapter note ii). Same 301→NT52→substantive stack as 089.
     rates: {
-      '99038815': 'The duty provided in the applicable subheading + 7.5%',
+      '99038803': S301_LIST3, // List 3 (petroleum gases), not 4A — live F771 with .15
       '99030531': NT52_125,
       '2711120010': 'Free',
     },
@@ -163,7 +167,7 @@ export const SCENARIOS: Scenario[] = [
       line.descriptions = ['PROPANE, LIQUEFIED'];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
       line.tariffs = [
-        { htsNumber: '99038815', valueDollars: 0 }, // 301 List 4A 7.5%
+        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3 25%
         { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
         { htsNumber: '2711120010', valueDollars: 30323, uomCode1: 'M3', quantity1Hundredths: 5078 },
       ];
@@ -223,11 +227,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('007', 'MOT/Port of Unlading', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K; export country CN)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       p.entrySummary.motCode = '11';
       p.entrySummary.cargo = { ...p.entrySummary.cargo, carrierCode: 'HLCU', districtPortOfUnlading: '3205' };
       // In-bond movement claimed ⇒ the in-bond date is required (ESF-40)
@@ -333,11 +337,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('011', 'Estimated Date of Arrival Validation', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       const cy = params.currentYear;
       p.entrySummary.dates = {
         estimatedEntry: `${cy}0820`,
@@ -406,11 +410,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('014', 'Airline Carrier Code', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       // Air MOT: no foreign port of lading (F429 is vessel-only).
       const line = p.entrySummary.lines[0];
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       p.entrySummary.motCode = '40';
       // Package value: the '*F' generic air-carrier convention.
       p.entrySummary.cargo = { carrierCode: '*F', conveyanceName: 'FLIGHT 100' };
@@ -603,11 +607,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('025', 'Full Bill Data for Rail AMS Shipment', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       // Rail MOT: no foreign port of lading (F429 is vessel-only).
       const line = p.entrySummary.lines[0];
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       p.entrySummary.motCode = '21';
       p.entrySummary.cargo = { carrierCode: 'CNRU', districtPortOfUnlading: '3802' };
       p.entrySummary.manifests = [
@@ -806,11 +810,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('033', 'Multiple Bonds', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       // Continuous basic + additional STB (allowable configuration 3,
       // ESF-157), surety 054 per the package.
       p.entrySummary.bonds = [
@@ -1262,14 +1266,14 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('053', 'B-Record Application Type/Filer Authentication', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     // Fully valid block: B-record carries our own filer code and
     // application identifier AE (what buildBatch always emits) — the
     // scenario verifies the positive half of B-record authentication.
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
     },
     notes: 'Package instruction: contact the assigned client rep IMMEDIATELY PRIOR to transmitting this scenario. Standard envelope — B-record filer = our filer code, application identifier AE.',
   }),
@@ -1673,12 +1677,12 @@ export const SCENARIOS: Scenario[] = [
   // \u2500\u2500 PSC scenarios (075\u2013078): Replace of an accepted summary; statement
   // fields are banned in a PSC (ESF-184) so the baseline payment is removed.
   aeScenario('075', 'PSC with ES Header Change', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       p.entrySummary.payment = undefined;
       p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
       p.entrySummary.psc = {
@@ -1691,7 +1695,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('076', 'PSC with ES Line Change', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       p.entrySummary.payment = undefined;
@@ -1704,7 +1708,7 @@ export const SCENARIOS: Scenario[] = [
       line.pscReasonCodes = ['L07', 'L19'];
       line.countryOfOrigin = 'CN';
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       line.parties = [
         { type: 'M', identifier: 'CNCAWBAT7057SHE' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
@@ -1745,7 +1749,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('078', "PSC for Another Filer's ES", {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       p.entrySummary.payment = undefined;
@@ -1758,7 +1762,7 @@ export const SCENARIOS: Scenario[] = [
       line.pscReasonCodes = ['L07', 'L19'];
       line.countryOfOrigin = 'CN';
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       line.parties = [
         { type: 'M', identifier: 'CNCAWBAT7057SHE' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
@@ -1807,11 +1811,11 @@ export const SCENARIOS: Scenario[] = [
   , 'Extends the scenario-079 TIB summary (same entry sequence).'),
 
   aeScenario('081', 'In-Bond', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       p.entrySummary.dates = { ...p.entrySummary.dates, inBond: `${params.currentYear}0816` };
       // Paperless in-bond (VXXNNNNNNNN) \u21d2 the bill of lading is required.
       p.entrySummary.manifests = [
@@ -1829,11 +1833,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('082', 'PMS Statement Designation', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       const cy = params.currentYear;
       // Package: print date ~10 days out, statement month = next month.
       // Dry-run pins Sep 1 (a Tuesday \u2014 weekends are barred by note y).
@@ -2076,11 +2080,11 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('087', 'Multiple Bills of Lading', {
-    rates: { '99030531': NT52_125, '8507600030': '3.41%' },
+    rates: { '99038803': S301_LIST3, '99030531': NT52_125, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // NT52 CN 12.5%
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, ...line.tariffs]; // 301 List 3 + NT52 CN
       p.entrySummary.dates = { ...p.entrySummary.dates, inBond: `${params.currentYear}0816` };
       p.entrySummary.cargo = { ...p.entrySummary.cargo, districtPortOfUnlading: '3001' };
       // Two manifest groupings share the movement/master/house; each carries
