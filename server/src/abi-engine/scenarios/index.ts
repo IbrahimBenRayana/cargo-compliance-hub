@@ -65,7 +65,12 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('002', 'US – Israel Free Trade Area Agreement', {
+    // 9903.05.95 = NT52 textiles/apparel carve-out, 0% (CERT HA sweep
+    // 8/25: country rows carry 12.5%, TEXT OR APPAREL row carries 0%).
+    // F771 fires on every line without an NT52 adjustment — knit sweaters
+    // take the apparel carve-out, preserving QIZ duty-free treatment.
     rates: {
+      '99030595': 'Free',
       '6110303059': { general: '32%', special: 'Free (AU,BH, CL,CO,IL,JO,KR, MA,OM,P, PA,PE,S,SG)' },
     },
     mutate: (p) => {
@@ -85,6 +90,7 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
+        { htsNumber: '99030595', valueDollars: 0 },
         {
           htsNumber: '6110303059',
           valueDollars: 10000,
