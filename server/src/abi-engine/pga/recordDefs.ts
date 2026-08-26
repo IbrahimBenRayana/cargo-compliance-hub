@@ -7,8 +7,8 @@
  * The message set is submitted as part of another transmission (AE Entry
  * Summary after the 50-record, SE after the 60-record — p.13). Records
  * covered here: OI, PG01, PG02, PG06, PG07, PG08, PG10, PG19, PG20, PG21,
- * PG22, PG23, PG25, PG26, PG30, PG35, PG50, PG51, PG55, PG60, PG00.
- * (PG04/PG05/PG13/PG14/PG17/PG18/PG24/PG27–PG29/PG31–PG34 are not yet
+ * PG22, PG23, PG25, PG26, PG27, PG30, PG35, PG50, PG51, PG55, PG60, PG00.
+ * (PG04/PG05/PG13/PG14/PG17/PG18/PG24/PG28/PG29/PG31–PG34 are not yet
  * transcribed — none are needed for the FDA minimal sets.)
  *
  * Data element classes (chapter p.14): the PGA chapter defines only A, AN,
@@ -398,6 +398,38 @@ export const INPUT_PG26: RecordDef = {
   ],
 };
 
+// ── PG27: shipping container information ───────────────────
+
+/**
+ * Shipping container numbers — input PG27-Record (p.43). Conditional;
+ * carries up to THREE container (equipment ID) numbers per record and may
+ * be repeated when there are more than three containers. Each container
+ * number may be followed by a container type code (1 = refrigerated,
+ * 2 = not refrigerated) and total container length in feet.
+ *
+ * FDA note (Supplemental Guide v2.6, Tables 9-28/10-27): container
+ * number(s) matching the bill are required for prior notice when food
+ * arrives as containerized cargo by water, air, rail, or land.
+ */
+export const INPUT_PG27: RecordDef = {
+  id: 'PG27',
+  name: 'PgaShippingContainers',
+  fields: [
+    { name: 'controlIdentifier', start: 1, end: 2, class: 'A', designation: 'M', constant: 'PG' },
+    { name: 'recordType', start: 3, end: 4, class: 'N', designation: 'M', constant: '27' },
+    { name: 'containerNumber1', start: 5, end: 24, class: 'AN', designation: 'M' },
+    { name: 'containerTypeCode1', start: 25, end: 25, class: 'N', designation: 'C' }, // 1=reefer 2=dry
+    { name: 'containerLength1', start: 26, end: 27, class: 'N', designation: 'C' }, // feet
+    { name: 'containerNumber2', start: 28, end: 47, class: 'AN', designation: 'C' },
+    { name: 'containerTypeCode2', start: 48, end: 48, class: 'N', designation: 'C' },
+    { name: 'containerLength2', start: 49, end: 50, class: 'N', designation: 'C' },
+    { name: 'containerNumber3', start: 51, end: 70, class: 'AN', designation: 'C' },
+    { name: 'containerTypeCode3', start: 71, end: 71, class: 'N', designation: 'C' },
+    { name: 'containerLength3', start: 72, end: 73, class: 'N', designation: 'C' },
+    { name: 'filler', start: 74, end: 80, class: 'S', designation: 'M' },
+  ],
+};
+
 // ── PG30: inspection / anticipated arrival ─────────────────
 
 /**
@@ -559,6 +591,7 @@ for (const def of [
   INPUT_PG23,
   INPUT_PG25,
   INPUT_PG26,
+  INPUT_PG27,
   INPUT_PG30,
   INPUT_PG35,
   INPUT_PG50,

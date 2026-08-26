@@ -13,8 +13,9 @@
  * - Each PgaSet is one PGA line: a PG01 followed by its child records in
  *   the parent-child order of the relationship model (p.61-64) — product
  *   detail (PG02, PG06, PG07/PG08, PG10), then entity trios PG19→PG20→PG21
- *   repeated per entity (never grouped by record id, p.63-64), then PG22,
- *   then line-level PG26 and PG30.
+ *   (+ entity-scoped PG23 affirmations) repeated per entity (never grouped
+ *   by record id, p.63-64), then PG22, then shipment-level PG23
+ *   affirmations, then line-level PG26, PG27 and PG30.
  * - PGA Line Number starts at 001 for a given Agency Code, increments on
  *   each subsequent PG01 for that same agency, and restarts at 001 when
  *   the agency code changes (p.13, p.65). AMBIGUITY: the chapter does not
@@ -50,7 +51,9 @@ import {
   INPUT_PG20,
   INPUT_PG21,
   INPUT_PG22,
+  INPUT_PG23,
   INPUT_PG26,
+  INPUT_PG27,
   INPUT_PG30,
 } from './recordDefs.js';
 
@@ -91,6 +94,18 @@ export interface PgaContact {
   emailOrFax?: string;
 }
 
+/**
+ * One PG23 FDA affirmation of compliance (or another agency's AoC). For
+ * 'indicator only' AoC codes leave the qualifier undefined (FDA guide
+ * Table 9-20).
+ */
+export interface PgaAffirmation {
+  /** AoC code, e.g. PFR, VES, VFT, CAN (Appendix PGA FDA AoC codes). */
+  code: string;
+  /** AoC qualifier — the affirmed value (registration number, vessel name…). */
+  qualifier?: string;
+}
+
 /** One PG19→PG20→PG21… entity trio. */
 export interface PgaEntity {
   /** e.g. MF, DEQ, FD1, DP (Appendix PGA entity role codes). */
@@ -110,6 +125,12 @@ export interface PgaEntity {
   zip?: string;
   /** PG21 individuals for this entity, emitted after its PG19/PG20. */
   contacts?: PgaContact[];
+  /**
+   * PG23 affirmations of compliance tied to this entity (e.g. PFR on the
+   * MF — FDA guide Table 9-21 note: entity-role AoC codes ride with the
+   * PG19 entity they affirm), emitted after the entity's PG19/PG20/PG21.
+   */
+  affirmations?: PgaAffirmation[];
 }
 
 /** PG06 source (origin) / processing data. */
@@ -231,8 +252,19 @@ export interface PgaDataSet {
   entities: PgaEntity[];
   /** PG22 conformance/substantiating-document declarations. */
   conformance?: PgaConformance[];
+  /**
+   * Shipment-level PG23 affirmations of compliance (e.g. FDA VES vessel
+   * name, VFT voyage number for a prior-notice combined entry), emitted
+   * after the entities/PG22 and before the PG26 packaging levels.
+   */
+  affirmations?: PgaAffirmation[];
   /** PG26 packaging levels, outermost first, max 6; last is the base quantity (p.42). */
   quantities?: PgaQuantity[];
+  /**
+   * PG27 shipping container numbers, three per record (p.43); emitted
+   * after PG26 and before PG30. Required for FDA PN containerized cargo.
+   */
+  containers?: string[];
   /** PG30 inspection / anticipated arrival. */
   arrival?: PgaArrival;
 }
@@ -439,6 +471,16 @@ export function buildPgaLine(input: PgaLineInput): string[] {
           })
         );
       }
+      // Entity-scoped PG23 affirmations (e.g. PFR with the MF) — association
+      // is positional, so they must ride inside the entity's record group.
+      for (const aoc of entity.affirmations ?? []) {
+        lines.push(
+          writeRecord(INPUT_PG23, {
+            affirmationOfComplianceCode: aoc.code,
+            affirmationOfComplianceDescription: aoc.qualifier,
+          })
+        );
+      }
     });
 
     // PG22 conformance declarations (after the entities they reference, p.70 example).
@@ -454,6 +496,16 @@ export function buildPgaLine(input: PgaLineInput): string[] {
           dateOfSignature: conf.dateOfSignature,
           invoiceNumber: conf.invoiceNumber,
           complianceDescription: conf.complianceDescription,
+        })
+      );
+    }
+
+    // Shipment-level PG23 affirmations (VES/VFT/CAN…, FDA guide Table 9-21).
+    for (const aoc of set.affirmations ?? []) {
+      lines.push(
+        writeRecord(INPUT_PG23, {
+          affirmationOfComplianceCode: aoc.code,
+          affirmationOfComplianceDescription: aoc.qualifier,
         })
       );
     }
@@ -483,6 +535,17 @@ export function buildPgaLine(input: PgaLineInput): string[] {
         })
       );
     });
+
+    // PG27 shipping containers — three container numbers per record (p.43).
+    const containers = set.containers ?? [];
+    for (let i = 0; i < containers.length; i += 3) {
+      const chunk = containers.slice(i, i + 3);
+      const pg27: Record<string, string | undefined> = {};
+      chunk.forEach((c, j) => {
+        pg27[`containerNumber${j + 1}`] = c;
+      });
+      lines.push(writeRecord(INPUT_PG27, pg27));
+    }
 
     // PG30 inspection / anticipated arrival.
     if (set.arrival) {

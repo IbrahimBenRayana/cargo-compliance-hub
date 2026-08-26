@@ -15,21 +15,34 @@ OI        CHOCOLATE CONFECTIONERY, RETAIL PACKS
 PG01001FDAFOOPRO                                                                
 PG02PFDP 33LGT07                                                                
 PG0639 GB                                                                       
+PG06CSHGB                                                                       
 PG10                   CHOCOLATE CANDY, RETAIL PACKS                            
 PG19MF                   ALBION CONFECTIONS LTD          12 QUAY ROAD           
 PG20                                     FELIXSTOWE              GB             
+PG23PFR  12345678901                                                            
 PG19DEQ                  ALBION CONFECTIONS LTD          12 QUAY ROAD           
 PG20                                     FELIXSTOWE              GB             
 PG19FD1                  SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
 PG20                                     LOS ANGELES          CA US90001        
 PG21FD1IMRAN SIDDIQUE         2135550100     ISIDDIQUE@SIGMATECHLLC.COM         
-PG19DP                   SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG19DFP                  SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
 PG20                                     LOS ANGELES          CA US90001        
+PG19UC                   SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG19PNS                  SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG21PNSIMRAN SIDDIQUE         2135550100     ISIDDIQUE@SIGMATECHLLC.COM         
+PG19PNT                  SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG21PNTIMRAN SIDDIQUE         2135550100     ISIDDIQUE@SIGMATECHLLC.COM         
 PG19FSV16 123456789      SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
 PG20                                     LOS ANGELES          CA US90001        
 PG21FSVIMRAN SIDDIQUE                        ISIDDIQUE@SIGMATECHLLC.COM         
+PG23VES  EVER GIVEN                                                             
+PG23VFT  0823E                                                                  
 PG261000000000500KG                                                             
-PG30A082020260900                                                               
+PG27MAEU1234567                                                                 
+PG30A0820202609002   3001                                                       
 62110       7                                                                   
 89110          7311        269                                                  
 90        405         276           0           0           0           0       

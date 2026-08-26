@@ -14,6 +14,7 @@ import {
   INPUT_PG22,
   INPUT_PG23,
   INPUT_PG25,
+  INPUT_PG27,
   INPUT_PG35,
   INPUT_PG50,
   INPUT_PG51,
@@ -201,6 +202,51 @@ describe('buildPgaLine — PG07/PG08 item identity', () => {
 
 // ── PGA line numbering ─────────────────────────────────────
 
+describe('buildPgaLine — PG23 affirmations and PG27 containers (FDA PN combined set)', () => {
+  it('emits entity AoCs inside the entity group, set AoCs before PG26, and chunks PG27 three per record', () => {
+    const lines = buildPgaLine({
+      commercialDescription: 'CHOCOLATE',
+      sets: [
+        {
+          kind: 'data',
+          agencyCode: 'FDA',
+          programCode: 'FOO',
+          processingCode: 'PRO',
+          product: { codes: [{ qualifier: 'FDP', number: '33LGT07' }] },
+          entities: [
+            {
+              roleCode: 'MF',
+              name: 'MAKER LTD',
+              address1: '1 QUAY RD',
+              // PFR rides with the MF entity (FDA guide Table 9-21 §).
+              affirmations: [{ code: 'PFR', qualifier: '12345678901' }],
+            },
+          ],
+          affirmations: [{ code: 'VES', qualifier: 'EVER GIVEN' }],
+          quantities: [{ qualifier: 1, quantityHundredths: 500, uom: 'KG' }],
+          containers: ['AAAU1111111', 'BBBU2222222', 'CCCU3333333', 'DDDU4444444'],
+          arrival: { status: 'A', dateMMDDCCYY: '08202026', timeHHMM: '0900', locationCode: '2', location: '3001' },
+        },
+      ],
+    });
+    expect(lines.map((l) => l.slice(0, 4))).toEqual([
+      'OI  ', 'PG01', 'PG02', 'PG19', 'PG23', 'PG23', 'PG26', 'PG27', 'PG27', 'PG30',
+    ]);
+    const pg23 = lines.filter((l) => l.startsWith('PG23'));
+    expect(pg23[0]).toBe('PG23PFR  ' + '12345678901'.padEnd(70) + ' ');
+    expect(pg23[1]).toBe('PG23VES  ' + 'EVER GIVEN'.padEnd(70) + ' ');
+    const pg27 = lines.filter((l) => l.startsWith('PG27'));
+    // Three containers on the first record, the fourth overflows to a second.
+    expect(pg27[0].slice(4, 24)).toBe('AAAU1111111'.padEnd(20));
+    expect(pg27[0].slice(50, 70)).toBe('CCCU3333333'.padEnd(20));
+    expect(pg27[1].slice(4, 24)).toBe('DDDU4444444'.padEnd(20));
+    // PG30 arrival location code '2' (Schedule D) + port in 22-71.
+    const pg30 = lines.find((l) => l.startsWith('PG30'))!;
+    expect(pg30.slice(17, 21)).toBe('2   ');
+    expect(pg30.slice(21, 71)).toBe('3001'.padEnd(50));
+  });
+});
+
 describe('buildPgaLine — PGA line numbering', () => {
   it('starts at 001 per agency and restarts on agency change (p.13, p.65)', () => {
     const lines = buildPgaLine({
@@ -316,6 +362,20 @@ describe('PGA record layouts', () => {
       affirmationOfComplianceDescription: '12345678901',
     });
     expect(line).toBe('PG23FCE  ' + '12345678901'.padEnd(70) + ' ');
+  });
+
+  it('PG27 shipping container numbers, three per record (p.43)', () => {
+    const line = writeRecord(INPUT_PG27, {
+      containerNumber1: 'MAEU1234567',
+      containerNumber2: 'MAEU7654321',
+      containerNumber3: 'MSKU0001112',
+    });
+    // container1(5-24) type1(25) length1(26-27) container2(28-47) type2(48)
+    // length2(49-50) container3(51-70) type3(71) length3(72-73) filler(74-80)
+    expect(line).toBe(
+      'PG27' + 'MAEU1234567'.padEnd(20) + '   ' + 'MAEU7654321'.padEnd(20) + '   ' + 'MSKU0001112'.padEnd(20) + '   ' + ' '.repeat(7)
+    );
+    expect(line).toHaveLength(80);
   });
 
   it('PG25 temperature, lot and value (p.41)', () => {

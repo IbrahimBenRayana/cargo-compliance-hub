@@ -247,17 +247,40 @@ export const SCENARIOS: Scenario[] = [
     postMap: (input, params) => {
       // 1806901500 carries PGA flag FD4 (FDA data REQUIRED, not
       // disclaimable) \u2014 live CERT reject FP00 'PGA DATA MISSING PER PGA
-      // FLAG FD4'. Minimal complete food set per SG v2.6 ch.10 (Non-PN
-      // Food / PN previously met, FOO): PG01 FOO/PRO (processed food,
-      // Table 10-1; IUC optional for PRO per Note 5) + PG02 FDP 7-char
-      // product code + PG06 type 39 country of production (processed, not
-      // natural-state \u2014 p.174) + PG10 common/usual name + mandatory
-      // entity trios MF/DEQ/FD1/DP (Table 10-12) + FSV (FSVP importer \u2014
-      // mandatory for FOO/PRO unless AoC FSX/RNE or industry 16/32, Table
-      // 10-13: DUNS + full US address + PG21 FSV w/ email) + PG26 (5 KG
-      // net; KG is a base unit, Table 10-26) + PG30 'A' arrival date/time
-      // (p.194). Not LACF/AF (no PIC F/E/I) \u21d2 no FCE/SID/VOL AoCs; PG14
-      // PNC omitted \u2014 see notes.
+      // FLAG FD4'. First pass filed the SG v2.6 ch.10 (Non-PN) set; CERT
+      // answered FPS1 'PN DATA REQUIRED', so this is now the ch.9 Food
+      // Commodity COMBINED Entry set (801(a)+801(m) in one message):
+      // - PG01 FOO/PRO (processed food, Table 9-1; IUC optional per 9.3
+      //   Note 3) + PG02 FDP 7-char product code (industry 33 \u21d2 subject
+      //   to PN per the 9.4 industry-code test).
+      // - PG06 twice (9.5 Note 1): 39 country of production (processed
+      //   food) AND CSH country of shipment \u2014 CSH is required for PN;
+      //   its absence drew FPE5 'MSNG OR INVLD SOURCE TYPE CODE'.
+      // - PG10 common/usual name.
+      // - Mandatory entity trios per Table 9-14: MF (39-country match),
+      //   DEQ shipper, FD1 importer, DFP owner, UC ultimate consignee,
+      //   PNS submitter + PNT transmitter (PG21 with name/phone/email
+      //   REQUIRED for both, 9.12) \u2014 missing roles drew FPDL 'MANDATORY
+      //   ENTITIES ARE MISSING'. DP is NOT in the ch.9 table and drew
+      //   FPDM 'ONLY MANDATORY ENTITIES ALLOWED' \u2014 dropped. FSV stays:
+      //   Table 9-15 keeps FSVP mandatory for all FOO lines unless
+      //   industry 16/32 or AoC FSX/RNE (chocolate is industry 33).
+      // - PG23 AoCs (Table 9-21) \u2014 FPN9 'MISSING AFFIRMATION OF COMP
+      //   CODE': PFR (manufacturer food facility registration, 11N) with
+      //   the MF entity ('Either FME or PFR is required when the
+      //   Manufacturer is transmitted'); shipment-level VES vessel name
+      //   (required, MOT ocean) + VFT voyage number. CAN omitted \u2014 only
+      //   needed when no SCAC is filed (carrier MAEU is on the bill).
+      // - PG26 (5 KG net; KG base unit).
+      // - PG27 container number (Table 9-28: required for PN when food
+      //   arrives as containerized cargo by water) \u2014 was FPW5 'MISSING
+      //   PG27'.
+      // - PG30 'A' arrival with location code '2' (= Schedule D port,
+      //   the ONLY value ch.9 Table 9-30 allows) + port 3001 (unlading
+      //   port \u2014 21 CFR 1.276(b)(11): arrival by water \u21d2 port of
+      //   unloading) \u2014 blank location drew FPT7 'MSNG OR INVLD INSP
+      //   ARVL LOC CD'.
+      // Not LACF/AF (no PIC F/E/I) \u21d2 no FCE/SID/VOL AoCs.
       input.lines![0].pga = {
         commercialDescription: 'CHOCOLATE CONFECTIONERY, RETAIL PACKS',
         sets: [
@@ -271,7 +294,10 @@ export const SCENARIOS: Scenario[] = [
             // chocolate/cocoa code (industry 34) must come from FDA's
             // Product Code Builder before cert transmission.
             product: { codes: [{ qualifier: 'FDP', number: '33LGT07' }] },
-            sources: [{ typeCode: '39', countryCode: 'GB' }],
+            sources: [
+              { typeCode: '39', countryCode: 'GB' }, // country of production (processed food)
+              { typeCode: 'CSH', countryCode: 'GB' }, // country of shipment \u2014 required for PN (9.5 Note 1)
+            ],
             productName: 'CHOCOLATE CANDY, RETAIL PACKS',
             entities: [
               {
@@ -282,6 +308,10 @@ export const SCENARIOS: Scenario[] = [
                 address1: '12 QUAY ROAD',
                 city: 'FELIXSTOWE',
                 country: 'GB',
+                // Table 9-21: PFR or FME is required with the MF. 11N FFR
+                // PLACEHOLDER \u2014 the maker's real FDA food facility
+                // registration number must come from the rep before cert.
+                affirmations: [{ code: 'PFR', qualifier: '12345678901' }],
               },
               {
                 roleCode: 'DEQ',
@@ -308,13 +338,61 @@ export const SCENARIOS: Scenario[] = [
                 ],
               },
               {
-                roleCode: 'DP',
+                // Owner (Table 9-14) \u2014 importer owns the goods.
+                roleCode: 'DFP',
                 name: params.importerName,
                 address1: '100 MARKET ST',
                 city: 'LOS ANGELES',
                 stateProvince: 'CA',
                 country: 'US',
                 zip: '90001',
+              },
+              {
+                // Ultimate consignee = deliver-to party (Table 9-14 note 1).
+                roleCode: 'UC',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+              },
+              {
+                // PN Submitter \u2014 self-filer, so the importer (9.12: PG21
+                // with name, phone AND email is mandatory for PNS).
+                roleCode: 'PNS',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [
+                  {
+                    qualifier: 'PNS',
+                    name: 'IMRAN SIDDIQUE',
+                    telephone: '2135550100',
+                    emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM',
+                  },
+                ],
+              },
+              {
+                // PN Transmitter \u2014 the ABI filer (us). PG21 mandatory (9.12).
+                roleCode: 'PNT',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [
+                  {
+                    qualifier: 'PNT',
+                    name: 'IMRAN SIDDIQUE',
+                    telephone: '2135550100',
+                    emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM',
+                  },
+                ],
               },
               {
                 // FSVP importer (Table 10-13): DUNS placeholder \u2014 the
@@ -333,14 +411,35 @@ export const SCENARIOS: Scenario[] = [
                 ],
               },
             ],
+            // Shipment-level AoCs (Table 9-21, MOT ocean): VES vessel name
+            // (base cargo conveyance) + VFT voyage. Voyage number is a
+            // PLACEHOLDER — no voyage exists in the package; confirm or
+            // drop at cert time. CAN omitted (SCAC MAEU is on the bill).
+            affirmations: [
+              { code: 'VES', qualifier: 'EVER GIVEN' },
+              { code: 'VFT', qualifier: '0823E' },
+            ],
             quantities: [{ qualifier: 1, quantityHundredths: 500, uom: 'KG' }],
-            arrival: { status: 'A', dateMMDDCCYY: `0820${params.currentYear}`, timeHHMM: '0900' },
+            // PG27 (Table 9-28): container number matching the bill.
+            // PLACEHOLDER — dry-run container pending the rep's cert data.
+            containers: ['MAEU1234567'],
+            // PG30 (Table 9-30): location code '2' = Schedule D port (the
+            // only allowed value) + port of arrival 3001 (port of
+            // unlading — arrival by water ⇒ port of unloading, 21 CFR
+            // 1.276(b)(11)).
+            arrival: {
+              status: 'A',
+              dateMMDDCCYY: `0820${params.currentYear}`,
+              timeHHMM: '0900',
+              locationCode: '2',
+              location: '3001',
+            },
           },
         ],
       };
     },
     notes:
-      'FD4 satisfied with the SG ch.10 FOO/PRO food set. Rep to confirm: FDA product code (placeholder 33LGT07 from SG Appendix A \u2014 chocolate is industry 34 via the Product Code Builder), FSVP DUNS (placeholder 123456789), GB manufacturer/shipper identity. PG14 PNC deliberately omitted (ch.10: "not always required") \u2014 if CERT wants prior notice on the certified-release AE, add PG14 PNC or file the ch.9 combined PN set.',
+      'FD4 satisfied with the SG ch.9 Food Combined Entry (801a+801m) FOO/PRO set \u2014 CERT demanded PN inclusion (FPS1). Rep to confirm before cert: FDA product code (placeholder 33LGT07 from SG Appendix A \u2014 chocolate is industry 34 via the Product Code Builder), FSVP DUNS (placeholder 123456789), MF food facility registration (PFR placeholder 12345678901), voyage number (VFT placeholder 0823E), container number (PG27 placeholder MAEU1234567), GB manufacturer/shipper identity.',
   }),
 
   aeScenario('007', 'MOT/Port of Unlading', {
