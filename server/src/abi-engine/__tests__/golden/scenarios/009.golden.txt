@@ -30,7 +30,8 @@ PG20                                     LOS ANGELES          CA US90001
 PG21FSVIMRAN SIDDIQUE                        ISIDDIQUE@SIGMATECHLLC.COM         
 PG261000000000500KG                                                             
 PG30A082020260900                                                               
-89311        269                                                                
-90        405         269           0           0           0           0       
+62110       7                                                                   
+89110          7311        269                                                  
+90        405         276           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        

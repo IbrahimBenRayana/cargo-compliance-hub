@@ -227,6 +227,9 @@ export const SCENARIOS: Scenario[] = [
       line.countryOfExport = 'GB';
       line.relatedPartyIndicator = undefined;
       line.descriptions = ['CHOCOLATE CONFECTIONERY, QUOTA'];
+      // F657: CERT's own HTS record for 1806.90.15 carries fee class 110
+      // (sugar assessment) at \$0.01327/kg, computation code 2 — 5 kg ⇒ \$0.07.
+      line.fees = [{ classCode: '110', amountCents: 7 }];
       line.foreignPortOfLading = '41323'; // Felixstowe (Schedule K)
       line.parties = [];
       line.tariffs = [
