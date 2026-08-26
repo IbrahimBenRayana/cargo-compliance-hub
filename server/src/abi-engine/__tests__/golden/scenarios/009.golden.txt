@@ -11,6 +11,25 @@ B  2704ZZZAE                                               SCENARIO 009
 44CHOCOLATE CONFECTIONERY, QUOTA                                                
 5099030581          300          0                                              
 501806901500        105         30          500KG          131CKG               
+OI        CHOCOLATE CONFECTIONERY, RETAIL PACKS                                 
+PG01001FDAFOOPRO                                                                
+PG02PFDP 33LGT07                                                                
+PG0639 GB                                                                       
+PG10                   CHOCOLATE CANDY, RETAIL PACKS                            
+PG19MF                   ALBION CONFECTIONS LTD          12 QUAY ROAD           
+PG20                                     FELIXSTOWE              GB             
+PG19DEQ                  ALBION CONFECTIONS LTD          12 QUAY ROAD           
+PG20                                     FELIXSTOWE              GB             
+PG19FD1                  SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG21FD1IMRAN SIDDIQUE         2135550100     ISIDDIQUE@SIGMATECHLLC.COM         
+PG19DP                   SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG19FSV16 123456789      SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG21FSVIMRAN SIDDIQUE                        ISIDDIQUE@SIGMATECHLLC.COM         
+PG261000000000500KG                                                             
+PG30A082020260900                                                               
 89311        269                                                                
 90        405         269           0           0           0           0       
 Y  2704ZZZAE                                                                    

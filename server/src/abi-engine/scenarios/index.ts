@@ -241,7 +241,103 @@ export const SCENARIOS: Scenario[] = [
         },
       ];
     },
-    notes: 'FDA data for this HTS rides the PG-record message set (workstream D pending) \u2014 note for the rep.',
+    postMap: (input, params) => {
+      // 1806901500 carries PGA flag FD4 (FDA data REQUIRED, not
+      // disclaimable) \u2014 live CERT reject FP00 'PGA DATA MISSING PER PGA
+      // FLAG FD4'. Minimal complete food set per SG v2.6 ch.10 (Non-PN
+      // Food / PN previously met, FOO): PG01 FOO/PRO (processed food,
+      // Table 10-1; IUC optional for PRO per Note 5) + PG02 FDP 7-char
+      // product code + PG06 type 39 country of production (processed, not
+      // natural-state \u2014 p.174) + PG10 common/usual name + mandatory
+      // entity trios MF/DEQ/FD1/DP (Table 10-12) + FSV (FSVP importer \u2014
+      // mandatory for FOO/PRO unless AoC FSX/RNE or industry 16/32, Table
+      // 10-13: DUNS + full US address + PG21 FSV w/ email) + PG26 (5 KG
+      // net; KG is a base unit, Table 10-26) + PG30 'A' arrival date/time
+      // (p.194). Not LACF/AF (no PIC F/E/I) \u21d2 no FCE/SID/VOL AoCs; PG14
+      // PNC omitted \u2014 see notes.
+      input.lines![0].pga = {
+        commercialDescription: 'CHOCOLATE CONFECTIONERY, RETAIL PACKS',
+        sets: [
+          {
+            kind: 'data',
+            agencyCode: 'FDA',
+            programCode: 'FOO',
+            processingCode: 'PRO',
+            // Product code borrowed from the guide's own candy example
+            // (Appendix A, p.306: '33LGT07' soft candy) \u2014 the true
+            // chocolate/cocoa code (industry 34) must come from FDA's
+            // Product Code Builder before cert transmission.
+            product: { codes: [{ qualifier: 'FDP', number: '33LGT07' }] },
+            sources: [{ typeCode: '39', countryCode: 'GB' }],
+            productName: 'CHOCOLATE CANDY, RETAIL PACKS',
+            entities: [
+              {
+                // Line has no MID party (informal entry) \u2014 GB maker is a
+                // dry-run placeholder pending the rep's cert data.
+                roleCode: 'MF',
+                name: 'ALBION CONFECTIONS LTD',
+                address1: '12 QUAY ROAD',
+                city: 'FELIXSTOWE',
+                country: 'GB',
+              },
+              {
+                roleCode: 'DEQ',
+                name: 'ALBION CONFECTIONS LTD',
+                address1: '12 QUAY ROAD',
+                city: 'FELIXSTOWE',
+                country: 'GB',
+              },
+              {
+                roleCode: 'FD1',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [
+                  {
+                    qualifier: 'FD1',
+                    name: 'IMRAN SIDDIQUE',
+                    telephone: '2135550100',
+                    emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM',
+                  },
+                ],
+              },
+              {
+                roleCode: 'DP',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+              },
+              {
+                // FSVP importer (Table 10-13): DUNS placeholder \u2014 the
+                // importer's real D-U-N-S goes here at cert time.
+                roleCode: 'FSV',
+                identificationCode: '16',
+                number: '123456789',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [
+                  { qualifier: 'FSV', name: 'IMRAN SIDDIQUE', emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM' },
+                ],
+              },
+            ],
+            quantities: [{ qualifier: 1, quantityHundredths: 500, uom: 'KG' }],
+            arrival: { status: 'A', dateMMDDCCYY: `0820${params.currentYear}`, timeHHMM: '0900' },
+          },
+        ],
+      };
+    },
+    notes:
+      'FD4 satisfied with the SG ch.10 FOO/PRO food set. Rep to confirm: FDA product code (placeholder 33LGT07 from SG Appendix A \u2014 chocolate is industry 34 via the Product Code Builder), FSVP DUNS (placeholder 123456789), GB manufacturer/shipper identity. PG14 PNC deliberately omitted (ch.10: "not always required") \u2014 if CERT wants prior notice on the certified-release AE, add PG14 PNC or file the ch.9 combined PN set.',
   }),
 
   aeScenario('007', 'MOT/Port of Unlading', {
@@ -291,7 +387,11 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '99030564', valueDollars: 0 }, // NT52 PH 12.5%
-        { htsNumber: '3802100020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 20000 },
+        // GSP is lapsed: per CBP's lapse procedure the SPI A claim stays on
+        // the line but estimated duty deposits at the column-1 general rate
+        // (4.8% × $10,000). Filing Free drew F624 EST/CALC'D DUTY MISMATCH
+        // (live 8/26) — ACE computes the general-rate deposit.
+        { htsNumber: '3802100020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 20000, dutyCents: 48000 },
       ];
     },
   }),
