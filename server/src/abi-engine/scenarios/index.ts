@@ -358,11 +358,15 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('011', 'Estimated Date of Arrival Validation', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    // DATE-AWARE stack: this scenario's import date is Jan 25 of the current
+    // year — before NT52 (07/24/26) and the battery review action (02/01/26)
+    // existed (live F642/F434 evidence, 8/25). In force on that date: the
+    // 2018 List 3 and the 232 auto-parts action (11/01/25).
+    rates: { '99038803': S301_LIST3, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // date-correct: List 3 + 232 only
       const cy = params.currentYear;
       p.entrySummary.dates = {
         estimatedEntry: `${cy}0820`,
@@ -371,6 +375,8 @@ export const SCENARIOS: Scenario[] = [
         inBond: `${cy}0201`,
       };
       p.entrySummary.lines[0].dateOfExportation = `${cy}0110`;
+      // Exactly the package's two components (IT number + component I) —
+      // the inherited master bill made a third and ACE F187'd the group.
       p.entrySummary.manifests = [
         {
           manifestedQuantity: 100,
@@ -378,7 +384,6 @@ export const SCENARIOS: Scenario[] = [
           bills: [
             { type: 'I', identifier: '115581395' },
             { type: 'I', identifier: '012345684978' },
-            { type: 'M', issuerCode: 'MAEU', identifier: '123456789012' },
           ],
         },
       ];
