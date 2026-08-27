@@ -234,7 +234,11 @@ export const SCENARIOS: Scenario[] = [
           // the .05.55 row deposits zero (F624 when we charged both, 8/27).
           { htsNumber: '99030555', valueDollars: 0, dutyCents: 0 },
           { htsNumber: '99030590', valueDollars: 0 },
-          { htsNumber: '99038210', valueDollars: 0 },
+          // Top-up semantics (Rosetta: the .94 sweep's 'COL 1 < 15%=15'
+          // wording): the 232 charge brings TOTAL duty to 15% ⇒ 15% − 2.2%
+          // = 12.8% of $145,682 = $18,647.30 (F624 with 15%-flat and with
+          // zero, live 8/27).
+          { htsNumber: '99038210', valueDollars: 0, dutyCents: 1864730 },
           { htsNumber: '8415820120', valueDollars: 145682, uomCode1: 'NO', quantity1Hundredths: 100 },
         ];
         // Live F794 ADDTNL DEC TYPE RQRD FOR ARTICLE: A/C machines are 232
@@ -712,11 +716,12 @@ export const SCENARIOS: Scenario[] = [
         {
           manifestedQuantity: 100,
           uomCode: 'CTNS',
-          // F187 permutation test: ascending identifier order (out-of-seq
-          // reading) — 012345684978 before 115581395.
+          // Bills-first hypothesis: master bill leads, the two in-bond
+          // references trail (builder order flipped M/H/S→I).
           bills: [
-            { type: 'I', identifier: '012345684978' },
+            { type: 'M', issuerCode: 'MAEU', identifier: '123456789012' },
             { type: 'I', identifier: '115581395' },
+            { type: 'I', identifier: '012345684978' },
           ],
         },
       ];

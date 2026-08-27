@@ -4,15 +4,15 @@ B  2704ZZZAE                                               SCENARIO 087
 1126-16475110026-164751100               082026081526       CA                  
 20MAEU3001081426    EVER GIVEN                     081626                       
 22       5CTNS                                                                  
-23I    111271845                                                                
 23MMAEU9786543                                                                  
 23HDMAL15075                                                                    
 23S    H273                                                                     
-22      10CTNS                                                                  
 23I    111271845                                                                
+22      10CTNS                                                                  
 23MMAEU9786543                                                                  
 23HDMAL15075                                                                    
 23S    J878                                                                     
+23I    111271845                                                                
 318B 123                                                                        
 40  001 CNCN080126               50057035      1200    N                        
 44LITHIUM ION BATTERY PACKS                                                     

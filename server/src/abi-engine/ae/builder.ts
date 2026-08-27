@@ -336,7 +336,9 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-const BILL_ORDER: Record<AeManifestBill['type'], number> = { I: 0, M: 1, H: 2, S: 3 };
+// Bills lead, in-bond references trail — three live F187s (8/27) ruled out
+// the printed I-first reading; M/H/S then I is the wire truth being tested.
+const BILL_ORDER: Record<AeManifestBill['type'], number> = { M: 0, H: 1, S: 2, I: 3 };
 
 // ── Builder ────────────────────────────────────────────────
 
