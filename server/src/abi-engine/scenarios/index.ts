@@ -18,6 +18,7 @@ import { buildAdCvdCaseQuery } from '../apps/adcvd/builder.js';
 import { buildQuotaQuery } from '../apps/quota/builder.js';
 import { buildTibExtension } from '../apps/tib/builder.js';
 import { buildCensusOverride } from '../apps/census/cwBuilder.js';
+import { buildBatch, scenarioTag } from '../envelope/batch.js';
 import { buildCensusWarningQuery } from '../apps/census/cjBuilder.js';
 
 // ── NT52 reciprocal adjustment (F771) + F429 foreign port of lading ──
@@ -197,21 +198,66 @@ export const SCENARIOS: Scenario[] = [
     notes: 'Census condition code comes from the live AX warning during cert; 27D = live CERT warning for this line (W27D OR-HI VAL/QTY, seen 8/25).',
   }),
 
-  appScenario('006', 'Census Warning Override \u2014 standalone transmission', 'CW', (params) =>
-    buildCensusOverride({
-      filerCode: params.filerCode,
-      entries: [
-        {
-          // The scenario-006 AE entry (8415.82.01.20, \$145,682, qty 1 NO) is
-          // filed first; once the AX census warning returns, this standalone
-          // CW resolves it. Warning code is a dry-run placeholder \u2014 the
-          // cert run copies it from the live AX response.
-          entryNumber: '0000006',
-          lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: '27D', overrideCode: '49' }] }],
-        },
-      ],
-    })
-  , 'AE half filed separately at cert; warning code from the live AX response (27D = live CERT warning for this line (W27D OR-HI VAL/QTY, seen 8/25)).'),
+  // 006 is TWO-PHASE: first generate/transmit the AE half (the census
+  // warning bait: \$145,682 for qty 1); once its AX (with the census
+  // warning) is attached, the next generate builds the standalone CW
+  // carrying the LIVE warning code — the scenario's whole point is
+  // overriding without retransmitting the summary.
+  (() => {
+    const aeHalf = aeScenario('006', 'Census Warning Override — standalone transmission', {
+      rates: {
+        '99030555': NT52_100,
+        '8415820120': { general: '2.2%', special: 'Free (A,AU,B,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+      },
+      mutate: (p) => {
+        const line = p.entrySummary.lines[0];
+        // Origin unspecified by the package — MX avoids the China 301
+        // stack; NT52 MX 10% + 2.2% general.
+        line.countryOfOrigin = 'MX';
+        line.countryOfExport = 'MX';
+        line.descriptions = ['AIR CONDITIONING MACHINES'];
+        line.foreignPortOfLading = '20199'; // Veracruz (Schedule K)
+        line.parties = [
+          { type: 'M', identifier: 'MXMEXAPP159MEX' },
+          { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+        ];
+        line.tariffs = [
+          { htsNumber: '99030555', valueDollars: 0 },
+          { htsNumber: '8415820120', valueDollars: 145682, uomCode1: 'NO', quantity1Hundredths: 100 },
+        ];
+      },
+    });
+    const scenario: Scenario = {
+      id: '006',
+      title: 'Census Warning Override — standalone transmission',
+      application: 'CW',
+      kind: 'transmit',
+      notes:
+        'Two-phase: generate #1 = the AE half; after its AX census warning auto-attaches, generate #2 = the standalone CW with the live warning code.',
+      run: async (params, ctx) => {
+        const prior = ctx?.priorResponseText ?? '';
+        const warning = prior.match(/E1\s+(W[A-Z0-9]{2,3})\s/);
+        if (!warning) return aeHalf.run(params, ctx);
+        return buildBatch({
+          sender: params.sender,
+          appId: 'CW',
+          blocks: [{
+            port: params.districtPortOfEntry,
+            filerCode: params.filerCode,
+            userData: scenarioTag('006'),
+            transactionLines: buildCensusOverride({
+              filerCode: params.filerCode,
+              entries: [{
+                entryNumber: '0000006',
+                lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: warning[1].slice(1), overrideCode: '49' }] }],
+              }],
+            }),
+          }],
+        });
+      },
+    };
+    return scenario;
+  })(),
 
   aeScenario('009', 'Quota Informal', {
     rates: {

@@ -245,6 +245,15 @@ function TransportCard() {
     refetchInterval: 60_000,
   });
   const [batches, setBatches] = useState<string[][] | null>(null);
+  const queryClient = useQueryClient();
+  const backfill = useMutation({
+    mutationFn: () => certApi.attachLoggedResponses(),
+    onSuccess: (r) => {
+      toast.success(`${r.attached.length} responses attached from ${r.replayed} logged batches`);
+      queryClient.invalidateQueries({ queryKey: ['cert', 'scenarios'] });
+    },
+    onError: (err: any) => toast.error(apiErrorMessage(err, 'Backfill failed')),
+  });
   const receive = useMutation({
     mutationFn: () => certApi.receiveResponses(8000),
     onSuccess: (result) => {
@@ -284,6 +293,15 @@ function TransportCard() {
               </>
             ) : null}
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => backfill.mutate()}
+            disabled={backfill.isPending}
+          >
+            {backfill.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+            Attach logged responses
+          </Button>
           <Button
             size="sm"
             variant="outline"

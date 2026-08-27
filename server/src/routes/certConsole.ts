@@ -134,8 +134,14 @@ router.post('/scenarios/:id/generate', async (req: AuthRequest, res: Response): 
     return;
   }
   const params = await loadParams();
+  // Multi-phase scenarios (006) branch on their latest attached response.
+  const prior = await prisma.certTransmission.findFirst({
+    where: { scenarioId: id, responseText: { not: null } },
+    orderBy: { createdAt: 'desc' },
+    select: { responseText: true },
+  });
   try {
-    const result = await scenario.run(params);
+    const result = await scenario.run(params, { priorResponseText: prior?.responseText ?? undefined });
     const isWire = Array.isArray(result) && typeof result[0] === 'string';
     const transmission = await prisma.certTransmission.create({
       data: isWire
@@ -282,16 +288,66 @@ router.get('/transport', async (_req: AuthRequest, res: Response): Promise<void>
   res.json({ transport: transport.kind, ...health });
 });
 
+// ─── response auto-attach ─────────────────────────────────
+// Every scenario response batch echoes "SCENARIO nnn" in its B-record
+// user-data — CBP's own correlation mechanism (the test doc offers it for
+// exactly this). Attach the batch to that scenario's newest transmitted
+// transmission, run the application parser, and set the lifecycle status
+// from the verdict codes.
+function scenarioTagOf(batch: string[]): string | null {
+  for (const line of batch) {
+    if (line.startsWith('B')) {
+      const m = line.slice(59, 80).match(/SCENARIO\s+(\d{3})/);
+      if (m) return m[1];
+    }
+  }
+  return null;
+}
+
+function verdictStatusOf(batch: string[]): 'accepted' | 'rejected' | 'conditional' {
+  const text = batch.join('\n');
+  if (/E1A[I ]?995|SUMMARY HAS BEEN ADDED|SUMMARY HAS BEEN REPLACED/.test(text)) return 'accepted';
+  if (/TRANSACTION DATA REJECTED|BATCH REJECTED/.test(text)) return 'rejected';
+  return 'conditional';
+}
+
+async function attachBatch(batch: string[]): Promise<{ scenarioId: string; transmissionId: string; status: string } | null> {
+  const scenarioId = scenarioTagOf(batch);
+  if (!scenarioId) return null;
+  const transmission = await prisma.certTransmission.findFirst({
+    where: { scenarioId, status: { in: ['transmitted', 'rejected', 'conditional'] } },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (!transmission) return null;
+  const scenario = SCENARIO_INDEX.get(scenarioId);
+  const parser = scenario ? RESPONSE_PARSERS[scenario.application] : undefined;
+  let responseParsed: unknown;
+  try {
+    responseParsed = parser ? parser(batch) : undefined;
+  } catch {
+    responseParsed = undefined; // raw text still attaches; parse failure is visible in the console
+  }
+  const status = verdictStatusOf(batch);
+  await prisma.certTransmission.update({
+    where: { id: transmission.id },
+    data: {
+      responseText: batch.join('\n'),
+      responseParsed: responseParsed === undefined ? undefined : JSON.parse(JSON.stringify(responseParsed)),
+      status,
+    },
+  });
+  return { scenarioId, transmissionId: transmission.id, status };
+}
+
 // ─── POST /transport/receive ──────────────────────────────
 // Drain available response batches from the live queue. Each batch is
-// audit-logged verbatim (nothing off the queue is ever lost) and returned
-// for the operator to attach to its transmission via PATCH /transmissions/:id
-// — auto-matching waits until real CERT traffic shows us how CBP correlates
-// replies.
+// audit-logged verbatim (nothing off the queue is ever lost) and scenario
+// batches auto-attach to their transmissions via the SCENARIO tag.
 router.post('/transport/receive', async (req: AuthRequest, res: Response): Promise<void> => {
   const timeoutMs = Math.min(Math.max(Number(req.body?.timeoutMs) || 5000, 0), 30000);
   try {
     const batches = await transport.receive({ timeoutMs, max: 25 });
+    const attached: Array<{ scenarioId: string; transmissionId: string; status: string }> = [];
     for (const batch of batches) {
       await writeAuditLog({
         orgId: req.user!.orgId, userId: req.user!.id,
@@ -299,8 +355,10 @@ router.post('/transport/receive', async (req: AuthRequest, res: Response): Promi
         newValue: { transport: transport.kind, lines: batch },
         ...getRequestMeta(req),
       });
+      const a = await attachBatch(batch);
+      if (a) attached.push(a);
     }
-    res.json({ transport: transport.kind, batches });
+    res.json({ transport: transport.kind, batches, attached });
   } catch (err) {
     res.status(502).json({
       error: 'Transport receive failed',
@@ -308,6 +366,32 @@ router.post('/transport/receive', async (req: AuthRequest, res: Response): Promi
       transport: transport.kind,
     });
   }
+});
+
+// ─── POST /transport/attach-logged ────────────────────────
+// One-click backfill: replay every audit-logged received batch through the
+// auto-attach so historical responses land on their transmissions. Newest
+// batch per scenario wins (rows replayed oldest-first).
+router.post('/transport/attach-logged', async (req: AuthRequest, res: Response): Promise<void> => {
+  const rows = await prisma.auditLog.findMany({
+    where: { action: 'cert.received' },
+    orderBy: { createdAt: 'asc' },
+    select: { newValue: true },
+  });
+  const attached: Array<{ scenarioId: string; transmissionId: string; status: string }> = [];
+  for (const row of rows) {
+    const lines = (row.newValue as { lines?: string[] } | null)?.lines;
+    if (!Array.isArray(lines)) continue;
+    const a = await attachBatch(lines);
+    if (a) attached.push(a);
+  }
+  await writeAuditLog({
+    orgId: req.user!.orgId, userId: req.user!.id,
+    action: 'cert.responses_backfilled', entityType: 'cert_transmission',
+    newValue: { replayed: rows.length, attached: attached.length },
+    ...getRequestMeta(req),
+  });
+  res.json({ replayed: rows.length, attached });
 });
 
 // ─── POST /transport/amf ──────────────────────────────────

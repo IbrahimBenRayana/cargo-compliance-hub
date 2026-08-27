@@ -1244,6 +1244,14 @@ export const certApi = {
     });
   },
 
+  /** Backfill: replay every audit-logged received batch through the response auto-attach. */
+  attachLoggedResponses() {
+    return apiFetch<{ replayed: number; attached: Array<{ scenarioId: string; transmissionId: string; status: string }> }>(
+      '/api/v1/admin/cert/transport/attach-logged',
+      { method: 'POST' },
+    );
+  },
+
   /** Background data: add ALL pending scenario manufacturers to CERT in chunked $I batches. */
   addAllManufacturers() {
     return apiFetch<{ transport: string; sent: number; batches?: number; messageIds?: string[]; note?: string }>(
@@ -2025,6 +2033,13 @@ export const abiDocumentsApi = {
     return apiDownload('/api/v1/abi-documents/line-import-template');
   },
 
+  /** Search ingested chapter-99 overlay subheadings by code or description. */
+  searchOverlayHts(q: string) {
+    return apiFetch<{ data: OverlayHts[] }>(
+      `/api/v1/abi-documents/overlay-hts?q=${encodeURIComponent(q)}`,
+    );
+  },
+
   /**
    * Validate a bulk line-import CSV (dryRun) or append server-side.
    * The wizard always uses dryRun and applies items via local state —
@@ -2038,6 +2053,14 @@ export const abiDocumentsApi = {
     );
   },
 };
+
+/** A chapter-99 overlay subheading from the ingested USITC table. */
+export interface OverlayHts {
+  htsNumber: string;
+  /** General-column rate expression, e.g. "The duty provided in the applicable subheading + 25%". */
+  rate: string;
+  description: string;
+}
 
 export interface LineImportError {
   /** Spreadsheet row (header = 1). */

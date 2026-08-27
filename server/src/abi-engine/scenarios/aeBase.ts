@@ -21,6 +21,11 @@ import { type CertParams, entrySequenceFor, brokerReferenceFor } from './params.
 
 export type ScenarioKind = 'transmit' | 'reject';
 
+export interface ScenarioRunContext {
+  /** responseText of this scenario's newest transmission carrying one. */
+  priorResponseText?: string;
+}
+
 export interface Scenario {
   id: string;
   title: string;
@@ -30,8 +35,10 @@ export interface Scenario {
   /**
    * transmit: resolves to the full wire lines (A/B … Y/Z). reject: resolves
    * to the client-side rejection issues — captured as evidence.
+   * ctx carries live-run state for multi-phase scenarios (006): the latest
+   * attached response text for this scenario, if any.
    */
-  run: (params: CertParams) => Promise<string[] | ValidationIssue[]>;
+  run: (params: CertParams, ctx?: ScenarioRunContext) => Promise<string[] | ValidationIssue[]>;
   /** Values the client rep must supply / open questions for the rep. */
   notes?: string;
 }
