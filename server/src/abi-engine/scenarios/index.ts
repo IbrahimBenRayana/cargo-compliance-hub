@@ -207,12 +207,11 @@ export const SCENARIOS: Scenario[] = [
     const aeHalf = aeScenario('006', 'Census Warning Override — standalone transmission', {
       rates: {
         '99030555': NT52_100,
-        // 9903.05.94 = MX USMCA subdivision (h), 0% — the last on-file
-        // candidate after exhaustive sweeps (9903.81 empty, 9903.85 RU-only,
-        // .05.90 live-rejected, 9903.92-.97 cranes/aircraft only). Rhymes
-        // with the accepted battery stack whose third member (.94.06) was
-        // also a USMCA-subdivision 0% row.
-        '99030594': 'Free',
+        // Karl's 8/27 answer: 9903.05.90 IS the NT52-side 232 exclusion
+        // (correct all along, just not alone) and 9903.82.10 is the steel
+        // 232 number (15% per CERT — 'DER ALU & STL, COL 1 < 15%, NT16').
+        '99030590': 'Free',
+        '99038210': 'The duty provided in the applicable subheading + 15%',
         '8415820120': { general: '2.2%', special: 'Free (A,AU,B,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
       },
       mutate: (p) => {
@@ -674,15 +673,28 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('011', 'Estimated Date of Arrival Validation', {
-    // DATE-AWARE stack: this scenario's import date is Jan 25 of the current
-    // year — before NT52 (07/24/26) and the battery review action (02/01/26)
-    // existed (live F642/F434 evidence, 8/25). In force on that date: the
-    // 2018 List 3 and the 232 auto-parts action (11/01/25).
-    rates: { '99038803': S301_LIST3, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    // Karl's answer key (8/27) for the Feb-dated entry, exact order:
+    // 9903.91.06 (301 review, 25%) / 9903.01.24 (IEEPA fentanyl-era, rate
+    // pinned 20% — not queryable in CERT's Aug view, era-scoped) /
+    // 9903.01.33 (reciprocal exclusion for 232-covered articles, pinned
+    // Free) / 9903.94.05 (232 auto parts, 25% CERT-confirmed) / substantive.
+    rates: {
+      '99039106': S301_REVIEW_BATT,
+      '99030124': 'The duty provided in the applicable subheading + 20%',
+      '99030133': 'Free',
+      '99039405': 'The duty provided in the applicable subheading + 25%',
+      '8507600030': '3.41%',
+    },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-      line.tariffs = [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // date-correct: List 3 + 232 only
+      line.tariffs = [
+        { htsNumber: '99039106', valueDollars: 0 },
+        { htsNumber: '99030124', valueDollars: 0 },
+        { htsNumber: '99030133', valueDollars: 0 },
+        { htsNumber: '99039405', valueDollars: 0 },
+        ...line.tariffs,
+      ]; // Karl's key, his order
       const cy = params.currentYear;
       p.entrySummary.dates = {
         estimatedEntry: `${cy}0820`,
