@@ -227,11 +227,11 @@ export const SCENARIOS: Scenario[] = [
           { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
         ];
         line.tariffs = [
-          // EXCLSN MISSING (8/26) — the 232 steel/aluminum DERIVATIVE
-          // chapter-99 number(s) for 8415.82.01.20 slot in HERE, before the
-          // NT52 99030555 row. Numbers come from the pending CERT HA sweep
-          // of 99038100-99038199 / 99038500-99038599 — do NOT guess them.
+          // Karl's 8/27 key: NT52 MX country row, the .05.90 232-forced-labor
+          // exclusion, and 9903.82.10 (232 steel derivative, 15%).
           { htsNumber: '99030555', valueDollars: 0 },
+          { htsNumber: '99030590', valueDollars: 0 },
+          { htsNumber: '99038210', valueDollars: 0 },
           { htsNumber: '8415820120', valueDollars: 145682, uomCode1: 'NO', quantity1Hundredths: 100 },
         ];
         // Live F794 ADDTNL DEC TYPE RQRD FOR ARTICLE: A/C machines are 232
