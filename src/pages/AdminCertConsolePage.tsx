@@ -413,11 +413,13 @@ function AmfCard() {
 // window + required units per number — so filings match CERT's reality.
 function HtsQueryCard() {
   const [numbers, setNumbers] = useState('');
+  const [asOf, setAsOf] = useState('');
   const [result, setResult] = useState<Awaited<ReturnType<typeof certApi.htsQuery>> | null>(null);
   const query = useMutation({
     mutationFn: () =>
       certApi.htsQuery(
         numbers.split(/[\s,]+/).map((n) => n.trim()).filter((n) => /^\d{8,10}(-\d{8,10})?$/.test(n)),
+        /^\d{6}(\d{2})?$/.test(asOf.trim()) ? asOf.trim() : undefined,
       ),
     onSuccess: (r) => {
       setResult(r);
@@ -443,6 +445,13 @@ function HtsQueryCard() {
             onChange={(e) => setNumbers(e.target.value)}
             placeholder="8443992050 99990084 99030125"
             className="font-mono"
+          />
+          <Input
+            value={asOf}
+            onChange={(e) => setAsOf(e.target.value)}
+            placeholder="as of (MMDDYY)"
+            className="font-mono w-36"
+            title="Optional validity date — CERT answers per this date (defaults to the params applicability date). Date-scenarios need era-correct numbers."
           />
           <Button size="sm" onClick={() => query.mutate()} disabled={!valid || query.isPending}>
             {query.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 mr-1.5" />}
