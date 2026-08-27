@@ -207,6 +207,13 @@ export const SCENARIOS: Scenario[] = [
     const aeHalf = aeScenario('006', 'Census Warning Override — standalone transmission', {
       rates: {
         '99030555': NT52_100,
+        // 9903.05.90 = NT52's 232-articles subdivision (alum/steel/copper/
+        // vehicles, 0%) — CERT holds NO generic 232 steel/alu numbers
+        // (99038100-99 range empty; 9903.85 only Russia rows, swept 8/27),
+        // so by the battery precedent (.94.06) this subdivision row is the
+        // F771 slot candidate for a 232-derivative article. Stack order per
+        // the accepted battery shape: NT52 country / 232 marker / substantive.
+        '99030590': 'Free',
         '8415820120': { general: '2.2%', special: 'Free (A,AU,B,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
       },
       mutate: (p) => {
@@ -222,7 +229,6 @@ export const SCENARIOS: Scenario[] = [
           { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
         ];
         line.tariffs = [
-          // TODO(232-derivative-number): live F771 TRFF ADJSTMNT HTS OR
           // EXCLSN MISSING (8/26) — the 232 steel/aluminum DERIVATIVE
           // chapter-99 number(s) for 8415.82.01.20 slot in HERE, before the
           // NT52 99030555 row. Numbers come from the pending CERT HA sweep
