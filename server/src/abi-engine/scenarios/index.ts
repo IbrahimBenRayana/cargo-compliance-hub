@@ -680,7 +680,7 @@ export const SCENARIOS: Scenario[] = [
     // Free) / 9903.94.05 (232 auto parts, 25% CERT-confirmed) / substantive.
     rates: {
       '99039106': S301_REVIEW_BATT,
-      '99030124': 'The duty provided in the applicable subheading + 20%',
+      '99030124': 'The duty provided in the applicable subheading + 10%', // CN/HK EO — 10% per CERT's own Feb view (as-of 020126 query, 8/27)
       '99030133': 'Free',
       '99039405': 'The duty provided in the applicable subheading + 25%',
       '8507600030': '3.41%',
