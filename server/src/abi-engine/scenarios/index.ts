@@ -263,8 +263,12 @@ export const SCENARIOS: Scenario[] = [
         'Two-phase: generate #1 = the AE half; after its AX census warning auto-attaches, generate #2 = the standalone CW with the live warning code. OPEN (F771): 232-derivative chapter-99 number(s) pending the CERT HA sweep of 99038100-99038199/99038500-99038599 — see TODO(232-derivative-number) at the tariffs. Rep to confirm the 54-record Type 07/08 countries (placeholders: aluminum primary smelt MX + cast MX; steel melt and pour MX).',
       run: async (params, ctx) => {
         const prior = ctx?.priorResponseText ?? '';
+        // Phase 2 only when the AE half was ACCEPTED with a census warning —
+        // a rejected AX can also carry W-codes (live lesson: the CW then
+        // references an entry ACE never added → C02 ENTRY SUMMARY NOT FOUND).
+        const accepted = /E1A[I ]?\s*99[56]/.test(prior);
         const warning = prior.match(/E1\s+(W[A-Z0-9]{2,3})\s/);
-        if (!warning) return aeHalf.run(params, ctx);
+        if (!accepted || !warning) return aeHalf.run(params, ctx);
         return buildBatch({
           sender: params.sender,
           appId: 'CW',
