@@ -222,8 +222,29 @@ export const SCENARIOS: Scenario[] = [
           { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
         ];
         line.tariffs = [
+          // TODO(232-derivative-number): live F771 TRFF ADJSTMNT HTS OR
+          // EXCLSN MISSING (8/26) — the 232 steel/aluminum DERIVATIVE
+          // chapter-99 number(s) for 8415.82.01.20 slot in HERE, before the
+          // NT52 99030555 row. Numbers come from the pending CERT HA sweep
+          // of 99038100-99038199 / 99038500-99038599 — do NOT guess them.
           { htsNumber: '99030555', valueDollars: 0 },
           { htsNumber: '8415820120', valueDollars: 145682, uomCode1: 'NO', quantity1Hundredths: 100 },
+        ];
+        // Live F794 ADDTNL DEC TYPE RQRD FOR ARTICLE: A/C machines are 232
+        // steel AND aluminum derivatives, so the line carries Importer's
+        // Additional Declaration 54-records Type 07 (Aluminum Smelt and
+        // Cast, ESF-111/112) and Type 08 (Steel Melt and Pour, ESF-113/114).
+        // information = record positions 5-80. PLACEHOLDER countries (rep to
+        // confirm): all-MX smelt/cast and melt/pour matching the MX origin.
+        line.declarations = [
+          // Type 07 sub-layout: pos 5 primary-smelt applicability 'Y' |
+          // 6-7 filler | 8-9 primary smelt country 'MX' | 10 secondary-smelt
+          // applicability 'N' | 11-12 filler | 13-14 secondary smelt country
+          // (blank — N) | 15-16 country of cast 'MX' | 17-80 filler.
+          { typeCode: '07', information: 'Y  MXN    MX' },
+          // Type 08 sub-layout: pos 5-6 country of melt and pour 'MX' |
+          // 7-9 applicability code (blank — ISO code given) | 10-80 filler.
+          { typeCode: '08', information: 'MX' },
         ];
       },
     });
@@ -233,7 +254,7 @@ export const SCENARIOS: Scenario[] = [
       application: 'CW',
       kind: 'transmit',
       notes:
-        'Two-phase: generate #1 = the AE half; after its AX census warning auto-attaches, generate #2 = the standalone CW with the live warning code.',
+        'Two-phase: generate #1 = the AE half; after its AX census warning auto-attaches, generate #2 = the standalone CW with the live warning code. OPEN (F771): 232-derivative chapter-99 number(s) pending the CERT HA sweep of 99038100-99038199/99038500-99038599 — see TODO(232-derivative-number) at the tariffs. Rep to confirm the 54-record Type 07/08 countries (placeholders: aluminum primary smelt MX + cast MX; steel melt and pour MX).',
       run: async (params, ctx) => {
         const prior = ctx?.priorResponseText ?? '';
         const warning = prior.match(/E1\s+(W[A-Z0-9]{2,3})\s/);
@@ -277,7 +298,16 @@ export const SCENARIOS: Scenario[] = [
       // (sugar assessment) at \$0.01327/kg, computation code 2 — 5 kg ⇒ \$0.07.
       line.fees = [{ classCode: '110', amountCents: 7 }];
       line.foreignPortOfLading = '41323'; // Felixstowe (Schedule K)
-      line.parties = [];
+      // Live SE90 (8/26): the requested cargo-release certification demands
+      // parties the informal AE itself may omit — 11038 MISSING MANUFACTURER
+      // rides the 47-record MID (GBALBCON12FEL = ALBION CONFECTIONS LTD,
+      // 12 QUAY ROAD, FELIXSTOWE — being added to CERT's manufacturer file
+      // via AMF), and the sold-to importer mirrors the accepted scenarios'
+      // 'S' party (the certify derivation's Buyer source at line level).
+      line.parties = [
+        { type: 'M', identifier: 'GBALBCON12FEL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
       line.tariffs = [
         { htsNumber: '99030581', valueDollars: 0 }, // NT52 GB 10%
         {
@@ -483,9 +513,40 @@ export const SCENARIOS: Scenario[] = [
           },
         ],
       };
+      // Live SE90 (8/26) — certify-only header data the AE otherwise never
+      // carries:
+      // - 11037 MISSING SELLER: the Seller must be reported by NAME AND
+      //   ADDRESS (SE30+SE35+SE36; the identifier route is BY/ST-only per
+      //   SE30 Note 2, ESF-60). Seller = the GB maker, matching the FDA MF
+      //   entity and the 47-record MID.
+      // - 11035 MISSING BUYER: BY may ride an EI-qualified identifier in
+      //   IOR-number format (SE30 Note 2) — the importer.
+      input.cargoEntities = [
+        {
+          code: 'SE',
+          name: 'ALBION CONFECTIONS LTD',
+          addressComponents: [
+            { qualifier: '01', information: '12' }, // street number
+            { qualifier: '02', information: 'QUAY ROAD' }, // street name
+          ],
+          geography: { city: 'FELIXSTOWE', countryCode: 'GB' },
+        },
+        { code: 'BY', identifier: { qualifier: 'EI', value: params.importerOfRecordNumber } },
+      ];
+      // - 11208 MISSING CONTACT INFO: the SE13 Correction Request Contact
+      //   Detail (ESF-41). The spec makes it mandatory on Replace+certify;
+      //   CERT's SX demands it on the Add certify too.
+      input.certifyContact = { name: 'IMRAN SIDDIQUE', phone: '2135550100' };
+      // - 11119 ENTRY VALUE LESS THAN ALL LINE ITEM VALUES + 11022 INVALID
+      //   SHIPMENT VALUE: the AE has NO entry-level value field — the
+      //   derived release's SE10 entry value and SE60 line values both come
+      //   from the 50-records, and the $30 already sits on the ch.1-97
+      //   commodity row exactly as SE60 Note 2 orders (ch.99 rows carry $0).
+      //   Read as a cascade of the failed entity/contact derivation; no
+      //   value change made (package-specified $30 stays).
     },
     notes:
-      'FD4 satisfied with the SG ch.9 Food Combined Entry (801a+801m) FOO/PRO set \u2014 CERT demanded PN inclusion (FPS1). Rep to confirm before cert: FDA product code (placeholder 33LGT07 from SG Appendix A \u2014 chocolate is industry 34 via the Product Code Builder), FSVP DUNS (placeholder 123456789), MF food facility registration (PFR placeholder 12345678901), voyage number (VFT placeholder 0823E), container number (PG27 placeholder MAEU1234567), GB manufacturer/shipper identity.',
+      'FD4 satisfied with the SG ch.9 Food Combined Entry (801a+801m) FOO/PRO set \u2014 CERT demanded PN inclusion (FPS1). Rep to confirm before cert: FDA product code (placeholder 33LGT07 from SG Appendix A \u2014 chocolate is industry 34 via the Product Code Builder), FSVP DUNS (placeholder 123456789), MF food facility registration (PFR placeholder 12345678901), voyage number (VFT placeholder 0823E), container number (PG27 placeholder MAEU1234567), GB manufacturer/shipper identity. SE90 certify data (8/26): MF MID GBALBCON12FEL (needs the AMF add on CERT first), Seller SE30 name+address = Albion Confections, Buyer BY = importer EI identifier, SE13 contact (placeholder Imran Siddique / 2135550100). 11119/11022 value conditions read as cascade of the missing entities \u2014 $30 line value untouched.',
   }),
 
   aeScenario('007', 'MOT/Port of Unlading', {

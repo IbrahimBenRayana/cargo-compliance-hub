@@ -3,12 +3,19 @@ B  2704ZZZAE                                               SCENARIO 009
 10AZZZ  00000094 2704009         1211 XA          2090126                       
 1126-16475110026-164751100               082026081526       CA                  
 20MAEU3001081426    EVER GIVEN                                                  
+SE13IMRAN SIDDIQUE                          2135550100                          
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
 34311     269                                                                   
+SE30SE ALBION CONFECTIONS LTD                                                   
+SE350112                                 02QUAY ROAD                            
+SE36FELIXSTOWE                                                 GB               
+SE30BY                                    EI 26-164751100                       
 40  001 GBGB080126               50041323      1200                             
 44CHOCOLATE CONFECTIONERY, QUOTA                                                
+47MGBALBCON12FEL                                                                
+47S26-164751100                                                                 
 5099030581          300          0                                              
 501806901500        105         30          500KG          131CKG               
 OI        CHOCOLATE CONFECTIONERY, RETAIL PACKS                                 
