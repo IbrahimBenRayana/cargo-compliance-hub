@@ -229,7 +229,10 @@ export const SCENARIOS: Scenario[] = [
         line.tariffs = [
           // Karl's 8/27 key: NT52 MX country row, the .05.90 232-forced-labor
           // exclusion, and 9903.82.10 (232 steel derivative, 15%).
-          { htsNumber: '99030555', valueDollars: 0 },
+          // .05.90 is "the exclusion for 232 for Forced Labor" (Karl): a
+          // 232-covered article is EXCLUDED from the NT52 country duty, so
+          // the .05.55 row deposits zero (F624 when we charged both, 8/27).
+          { htsNumber: '99030555', valueDollars: 0, dutyCents: 0 },
           { htsNumber: '99030590', valueDollars: 0 },
           { htsNumber: '99038210', valueDollars: 0 },
           { htsNumber: '8415820120', valueDollars: 145682, uomCode1: 'NO', quantity1Hundredths: 100 },
@@ -709,9 +712,11 @@ export const SCENARIOS: Scenario[] = [
         {
           manifestedQuantity: 100,
           uomCode: 'CTNS',
+          // F187 permutation test: ascending identifier order (out-of-seq
+          // reading) — 012345684978 before 115581395.
           bills: [
-            { type: 'I', identifier: '115581395' },
             { type: 'I', identifier: '012345684978' },
+            { type: 'I', identifier: '115581395' },
           ],
         },
       ];
