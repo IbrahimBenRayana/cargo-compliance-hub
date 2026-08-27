@@ -207,13 +207,12 @@ export const SCENARIOS: Scenario[] = [
     const aeHalf = aeScenario('006', 'Census Warning Override — standalone transmission', {
       rates: {
         '99030555': NT52_100,
-        // 9903.05.90 = NT52's 232-articles subdivision (alum/steel/copper/
-        // vehicles, 0%) — CERT holds NO generic 232 steel/alu numbers
-        // (99038100-99 range empty; 9903.85 only Russia rows, swept 8/27),
-        // so by the battery precedent (.94.06) this subdivision row is the
-        // F771 slot candidate for a 232-derivative article. Stack order per
-        // the accepted battery shape: NT52 country / 232 marker / substantive.
-        '99030590': 'Free',
+        // 9903.05.94 = MX USMCA subdivision (h), 0% — the last on-file
+        // candidate after exhaustive sweeps (9903.81 empty, 9903.85 RU-only,
+        // .05.90 live-rejected, 9903.92-.97 cranes/aircraft only). Rhymes
+        // with the accepted battery stack whose third member (.94.06) was
+        // also a USMCA-subdivision 0% row.
+        '99030594': 'Free',
         '8415820120': { general: '2.2%', special: 'Free (A,AU,B,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
       },
       mutate: (p) => {
