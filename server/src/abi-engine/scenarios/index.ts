@@ -243,11 +243,9 @@ export const SCENARIOS: Scenario[] = [
         // information = record positions 5-80. PLACEHOLDER countries (rep to
         // confirm): all-MX smelt/cast and melt/pour matching the MX origin.
         line.declarations = [
-          // Type 07 sub-layout: pos 5 primary-smelt applicability 'Y' |
-          // 6-7 filler | 8-9 primary smelt country 'MX' | 10 secondary-smelt
-          // applicability 'N' | 11-12 filler | 13-14 secondary smelt country
-          // (blank — N) | 15-16 country of cast 'MX' | 17-80 filler.
-          { typeCode: '07', information: 'Y  MXN    MX' },
+          // Type 07 (aluminum) REMOVED: live F773 ADDTNL DEC TYPE NOT ALLWD
+          // when both metals were declared — A/C units are on the STEEL
+          // derivative list only (8/27).
           // Type 08 sub-layout: pos 5-6 country of melt and pour 'MX' |
           // 7-9 applicability code (blank — ISO code given) | 10-80 filler.
           { typeCode: '08', information: 'MX' },
