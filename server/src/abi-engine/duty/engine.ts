@@ -173,12 +173,16 @@ export async function enrichWithDuty(
     // by an SPI claim on CBP's MPF-exemption table (ACE enforces the latter
     // itself — F632 FORMAL MPF NOT ALLOWED when the fee is reported anyway).
     const spiMpfExempt = line.spiClaimCode !== undefined && MPF_EXEMPT_SPI.has(line.spiClaimCode);
-    if (!mpfExempt && !line.feeExemptionCode && !spiMpfExempt) {
+    // GRI set components (V) carry no line fees — the set header does
+    // (live F629 FORMAL MPF NOT ALLOWED / F480 HMF NOT ALLOWED - SET
+    // COMPONENT, 8/28).
+    const setComponent = line.articleSetIndicator === 'V';
+    if (!mpfExempt && !line.feeExemptionCode && !spiMpfExempt && !setComponent) {
       const mpf = computeLineMpfCents(value);
       totalLineMpfCents += mpf;
       fees.push({ classCode: '499', amountCents: mpf });
     }
-    if (hmfOn) {
+    if (hmfOn && !setComponent) {
       const hmf = computeLineHmfCents(value);
       totalHmfCents += hmf;
       fees.push({ classCode: '501', amountCents: hmf });

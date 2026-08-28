@@ -821,8 +821,9 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('019', 'Sets under GRI 3(b)/(c) — X & V Article Set Indicators', {
-    // Export country CH is landlocked — no Schedule K seaport exists, so the
-    // foreign port of lading stays unset (flagged for the client rep).
+    // Export country CH is landlocked (no Schedule K entry) — the shipment
+    // routes via Hamburg 42876 (verified Apr-2026 Schedule K), satisfying
+    // F429 on every line (live 8/28).
     rates: {
       '99030574': NT52_125, // NT52 CH
       '99030539': NT52_100, // NT52 EU (FR/IT lines)
@@ -846,9 +847,14 @@ export const SCENARIOS: Scenario[] = [
             { type: 'M', identifier: 'CHZURPAS135ZUR' },
             { type: 'S', identifier: ior },
           ],
+          foreignPortOfLading: '42876', // Hamburg (CH routed)
           tariffs: [
+            // Set rules (live 8/28): the set-defining HTS leads the header
+            // (F406 with the ch.99 first) and the header carries the WHOLE
+            // set's duty at the essential-character rate — 6.4% × $5,000 =
+            // $320.00 (components' duty is F625-forbidden).
+            { htsNumber: '1902194000', valueDollars: 2400, uomCode1: 'KG', quantity1Hundredths: 120000, dutyCents: 32000 },
             { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH 12.5%
-            { htsNumber: '1902194000', valueDollars: 2400, uomCode1: 'KG', quantity1Hundredths: 120000, dutyCents: 15360 },
           ],
         },
         {
@@ -862,9 +868,10 @@ export const SCENARIOS: Scenario[] = [
             { type: 'M', identifier: 'FRPARMUS791PAR' },
             { type: 'S', identifier: ior },
           ],
+          foreignPortOfLading: '42876',
           tariffs: [
-            { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (FR origin)
-            { htsNumber: '0712311000', valueDollars: 1300, uomCode1: 'KG', quantity1Hundredths: 20000, dutyCents: 8320 },
+            { htsNumber: '99030539', valueDollars: 0, dutyCents: 0 }, // NT52 EU — duty rides the header
+            { htsNumber: '0712311000', valueDollars: 1300, uomCode1: 'KG', quantity1Hundredths: 20000, dutyCents: 0 },
           ],
         },
         {
@@ -878,9 +885,10 @@ export const SCENARIOS: Scenario[] = [
             { type: 'M', identifier: 'ITMILTOM468MIL' },
             { type: 'S', identifier: ior },
           ],
+          foreignPortOfLading: '42876',
           tariffs: [
-            { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (IT origin)
-            { htsNumber: '2002908020', valueDollars: 1300, uomCode1: 'KG', quantity1Hundredths: 30000, dutyCents: 8320 },
+            { htsNumber: '99030539', valueDollars: 0, dutyCents: 0 }, // NT52 EU — duty rides the header
+            { htsNumber: '2002908020', valueDollars: 1300, uomCode1: 'KG', quantity1Hundredths: 30000, dutyCents: 0 },
           ],
         },
       ];
