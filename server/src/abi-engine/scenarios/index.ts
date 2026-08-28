@@ -837,24 +837,42 @@ export const SCENARIOS: Scenario[] = [
       // X 2400×6.4%=153.60, V 1300×6.4%=83.20 each.
       p.entrySummary.lines = [
         {
+          // Usage note (k): header value = SUM of components ($5,000);
+          // header carries conventional duty/MPF/HMF for the whole set.
           articleSetIndicator: 'X',
           countryOfOrigin: 'CH',
           countryOfExport: 'CH',
           dateOfExportation: p.entrySummary.lines[0].dateOfExportation,
           relatedPartyIndicator: 'N',
-          descriptions: ['SPAGHETTI MEAL SET - PASTA'],
+          descriptions: ['SPAGHETTI MEAL SET - GRI 3(B)'],
+          foreignPortOfLading: '42876', // Hamburg (CH routed)
           parties: [
             { type: 'M', identifier: 'CHZURPAS135ZUR' },
             { type: 'S', identifier: ior },
           ],
-          foreignPortOfLading: '42876', // Hamburg (CH routed)
           tariffs: [
-            // Set rules (live 8/28): the set-defining HTS leads the header
-            // (F406 with the ch.99 first) and the header carries the WHOLE
-            // set's duty at the essential-character rate — 6.4% × $5,000 =
-            // $320.00 (components' duty is F625-forbidden).
-            { htsNumber: '1902194000', valueDollars: 2400, uomCode1: 'KG', quantity1Hundredths: 120000, dutyCents: 32000 },
-            { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH 12.5%
+            { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH on the set
+            { htsNumber: '1902194000', valueDollars: 5000, uomCode1: 'KG', quantity1Hundredths: 170000 },
+          ],
+        },
+        {
+          // Note (k): the FIRST component MUST repeat the header's
+          // classification (live F406 until it did) — spaghetti as its own
+          // component, at its own value, zero duty.
+          articleSetIndicator: 'V',
+          countryOfOrigin: 'CH',
+          countryOfExport: 'CH',
+          dateOfExportation: p.entrySummary.lines[0].dateOfExportation,
+          relatedPartyIndicator: 'N',
+          descriptions: ['SPAGHETTI MEAL SET - PASTA'],
+          foreignPortOfLading: '42876',
+          parties: [
+            { type: 'M', identifier: 'CHZURPAS135ZUR' },
+            { type: 'S', identifier: ior },
+          ],
+          tariffs: [
+            { htsNumber: '99030574', valueDollars: 0, dutyCents: 0 },
+            { htsNumber: '1902194000', valueDollars: 2400, uomCode1: 'KG', quantity1Hundredths: 120000, dutyCents: 0 },
           ],
         },
         {
@@ -864,13 +882,13 @@ export const SCENARIOS: Scenario[] = [
           dateOfExportation: p.entrySummary.lines[0].dateOfExportation,
           relatedPartyIndicator: 'N',
           descriptions: ['SPAGHETTI MEAL SET - DRIED MUSHROOMS'],
+          foreignPortOfLading: '42876',
           parties: [
             { type: 'M', identifier: 'FRPARMUS791PAR' },
             { type: 'S', identifier: ior },
           ],
-          foreignPortOfLading: '42876',
           tariffs: [
-            { htsNumber: '99030539', valueDollars: 0, dutyCents: 0 }, // NT52 EU — duty rides the header
+            { htsNumber: '99030539', valueDollars: 0, dutyCents: 0 },
             { htsNumber: '0712311000', valueDollars: 1300, uomCode1: 'KG', quantity1Hundredths: 20000, dutyCents: 0 },
           ],
         },
@@ -881,13 +899,13 @@ export const SCENARIOS: Scenario[] = [
           dateOfExportation: p.entrySummary.lines[0].dateOfExportation,
           relatedPartyIndicator: 'N',
           descriptions: ['SPAGHETTI MEAL SET - TOMATO PASTE'],
+          foreignPortOfLading: '42876',
           parties: [
             { type: 'M', identifier: 'ITMILTOM468MIL' },
             { type: 'S', identifier: ior },
           ],
-          foreignPortOfLading: '42876',
           tariffs: [
-            { htsNumber: '99030539', valueDollars: 0, dutyCents: 0 }, // NT52 EU — duty rides the header
+            { htsNumber: '99030539', valueDollars: 0, dutyCents: 0 },
             { htsNumber: '2002908020', valueDollars: 1300, uomCode1: 'KG', quantity1Hundredths: 30000, dutyCents: 0 },
           ],
         },
@@ -933,7 +951,7 @@ export const SCENARIOS: Scenario[] = [
       entries: [
         {
           entryNumber: '0000020',
-          lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: '27D', overrideCode: '49' }] }],
+          lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: '27C', overrideCode: '49' }] }],
         },
       ],
     })
