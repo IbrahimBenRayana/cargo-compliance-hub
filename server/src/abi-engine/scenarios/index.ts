@@ -644,7 +644,12 @@ export const SCENARIOS: Scenario[] = [
   aeScenario('015', 'Deletion of an Entry Summary', {
     rates: {},
     action: 'D',
-    mutate: () => {},
+    // Package: "Submit a delete action for the entry summary accepted in
+    // Scenario Number 014" — the target is 014's entry (0000014), not
+    // 015's own sequence (FB25 NOT FOUND when we used it, live 8/28).
+    mutate: (p) => {
+      p.entrySummary.entryNumber = '0000014';
+    },
   }),
 
   aeRejectScenario('016', 'Invalid Entry Type for AE', {
