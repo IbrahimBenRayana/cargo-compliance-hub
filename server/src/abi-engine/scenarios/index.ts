@@ -851,7 +851,11 @@ export const SCENARIOS: Scenario[] = [
             { type: 'S', identifier: ior },
           ],
           tariffs: [
-            { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH on the set
+            // ACE computes ZERO ch99 duty on article-set lines (live 8/28:
+            // components' zero-duty NT52s drew no F624 while the header's
+            // engine-computed 12.5%×$5,000 did) — the number satisfies the
+            // F771 edit, the duty is pinned to ACE's calc.
+            { htsNumber: '99030574', valueDollars: 0, dutyCents: 0 }, // NT52 CH on the set
             { htsNumber: '1902194000', valueDollars: 5000, uomCode1: 'KG', quantity1Hundredths: 170000 },
           ],
         },
