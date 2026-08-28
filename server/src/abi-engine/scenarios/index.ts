@@ -780,8 +780,10 @@ export const SCENARIOS: Scenario[] = [
       const line = p.entrySummary.lines[0];
       line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       p.entrySummary.motCode = '40';
-      // Package value: the '*F' generic air-carrier convention.
-      p.entrySummary.cargo = { carrierCode: '*F', conveyanceName: 'FLIGHT 100' };
+      // Package value: the '*F' generic air-carrier convention. F167 (live
+      // 8/28): air entries need the district/port of unlading too — BWI
+      // 1305 (Schedule D, entry port district 13).
+      p.entrySummary.cargo = { carrierCode: '*F', conveyanceName: 'FLIGHT 100', districtPortOfUnlading: '1305' };
       // Air rules (ESF-153): master bill identifier mandatory, issuer code
       // never allowed for air.
       p.entrySummary.manifests = [
