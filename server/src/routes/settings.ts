@@ -136,6 +136,11 @@ router.post('/change-password', async (req: AuthRequest, res: Response): Promise
       return;
     }
 
+    if (newPassword === currentPassword) {
+      res.status(400).json({ error: 'New password must be different from your current password' });
+      return;
+    }
+
     const passwordHash = await bcrypt.hash(newPassword, 12);
     // Null the refresh token in the same write. A stolen refresh token would
     // otherwise keep minting access tokens for the full 7-day window even

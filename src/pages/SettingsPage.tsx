@@ -7,17 +7,18 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  useProfile, useUpdateProfile, useChangePassword,
+  useProfile, useUpdateProfile,
   useOrganization, useUpdateOrganization, useAuditLog, useTestCCConnection,
 } from '@/hooks/useFilings';
 import {
   User, Building2, Shield, Key, Activity, CheckCircle2, XCircle,
-  Loader2, Clock, Users, FileText, Save, Eye, EyeOff, ChevronRight,
+  Loader2, Clock, Users, FileText, Save, ChevronRight,
   Mail, CalendarDays, BadgeCheck, Plus, Trash2, Copy, ShieldCheck, Bell, CreditCard,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
+import { ChangePasswordCard } from '@/components/settings/ChangePasswordCard';
 import { BillingSettings } from '@/components/billing/BillingSettings';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -38,7 +39,6 @@ export default function SettingsPage() {
   const { data: org, isLoading: orgLoading } = useOrganization();
   const { data: auditData, isLoading: auditLoading } = useAuditLog({ limit: 30 });
   const updateProfile = useUpdateProfile();
-  const changePassword = useChangePassword();
   const updateOrganization = useUpdateOrganization();
   const testConnection = useTestCCConnection();
 
@@ -52,12 +52,6 @@ export default function SettingsPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-
-  // Password form
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPasswords, setShowPasswords] = useState(false);
 
   // Org form
   const [orgName, setOrgName] = useState('');
@@ -91,26 +85,6 @@ export default function SettingsPage() {
       toast.success('Profile updated');
     } catch (err: any) {
       toast.error(err.message || 'Failed to update profile');
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      toast.error('New passwords do not match');
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
-      return;
-    }
-    try {
-      await changePassword.mutateAsync({ currentPassword, newPassword });
-      toast.success('Password changed');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to change password');
     }
   };
 
@@ -278,76 +252,7 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="border-b">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-amber-600" />
-                    Password & Security
-                  </CardTitle>
-                  <CardDescription>Use a strong password to protect your account</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6 space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="settings-current-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="settings-current-password"
-                        type={showPasswords ? 'text' : 'password'}
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="Enter current password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPasswords((p) => !p)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                        aria-label={showPasswords ? 'Hide password' : 'Show password'}
-                      >
-                        {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid gap-5 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="settings-new-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">New Password</Label>
-                      <Input
-                        id="settings-new-password"
-                        type={showPasswords ? 'text' : 'password'}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Min 8 characters"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="settings-confirm-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Confirm Password</Label>
-                      <Input
-                        id="settings-confirm-password"
-                        type={showPasswords ? 'text' : 'password'}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Re-enter new password"
-                      />
-                    </div>
-                  </div>
-                  {newPassword && confirmPassword && newPassword !== confirmPassword && (
-                    <p className="text-xs text-destructive">Passwords do not match</p>
-                  )}
-                  <div className="flex justify-end pt-2">
-                    <Button
-                      onClick={handleChangePassword}
-                      disabled={changePassword.isPending || !currentPassword || !newPassword || newPassword !== confirmPassword}
-                      className="cursor-pointer"
-                    >
-                      {changePassword.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Shield className="h-4 w-4 mr-2" />
-                      )}
-                      Update Password
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <ChangePasswordCard email={email} />
 
               <TwoFactorSettings />
             </>
