@@ -1000,7 +1000,9 @@ export const SCENARIOS: Scenario[] = [
       // 9903.41.10 additional duty rides first; the value/quantity report on
       // the ch.64 base line and the 40% computes on that base value.
       line.tariffs = [
-        { htsNumber: '99034110', valueDollars: 0, uomCode1: 'X' },
+        // CERT W1: 9903.41.10 has ZERO reporting units — omit uom/quantity
+        // entirely (the 9999.00.84 F441/F442 lesson).
+        { htsNumber: '99034110', valueDollars: 0 },
         { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
         { htsNumber: '6403599045', valueDollars: 12290, uomCode1: 'PRS', quantity1Hundredths: 260000 },
       ];
