@@ -12,7 +12,7 @@
  * land batch by batch; companion-app scenarios (006/021/022/050/062–066/
  * 080) reuse the apps/ builders.
  */
-import { type Scenario, aeScenario, aeRejectScenario, appScenario } from './aeBase.js';
+import { type Scenario, aeScenario, aeRejectScenario, appScenario, statementDateFrom } from './aeBase.js';
 import { buildEntrySummaryQuery } from '../apps/esQuery/builder.js';
 import { buildAdCvdCaseQuery } from '../apps/adcvd/builder.js';
 import { buildQuotaQuery } from '../apps/quota/builder.js';
@@ -982,6 +982,9 @@ export const SCENARIOS: Scenario[] = [
       // dry-run goldens stay stable.
       const d = params.applicabilityDate;
       line.license = { typeCode: '01', number: `S23${d.slice(4, 8)}${d.slice(2, 4)}` };
+      // Live F794 9/1: ch.72 steel mill product needs the Type 08 steel
+      // melt-and-pour 54-record (same layout as 006's, KR origin).
+      line.declarations = [{ typeCode: '08', information: 'KR' }];
     },
   }),
 
@@ -1004,7 +1007,10 @@ export const SCENARIOS: Scenario[] = [
         // entirely (the 9999.00.84 F441/F442 lesson).
         { htsNumber: '99034110', valueDollars: 0 },
         { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
-        { htsNumber: '6403599045', valueDollars: 12290, uomCode1: 'PRS', quantity1Hundredths: 260000 },
+        // 9903.41.10 (Proclamation 5601 JP footwear) is an IN-LIEU rate —
+        // the 40% REPLACES column 1, so the ch.64 line deposits zero
+        // (40% + 12.5% + 10% drew F624 live 9/1).
+        { htsNumber: '6403599045', valueDollars: 12290, uomCode1: 'PRS', quantity1Hundredths: 260000, dutyCents: 0 },
       ];
     },
   }),
@@ -2241,13 +2247,13 @@ export const SCENARIOS: Scenario[] = [
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
       line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
-      const cy = params.currentYear;
-      // Package: print date ~10 days out, statement month = next month.
-      // Dry-run pins Sep 1 (a Tuesday \u2014 weekends are barred by note y).
+      // Package: print date ~10 days out, statement month = that date's
+      // month. Derived, not pinned \u2014 a pinned Sep 1 expired live 9/1 (F205).
+      const printDate = statementDateFrom(params.applicabilityDate);
       p.entrySummary.payment = {
         typeCode: '6',
-        preliminaryStatementPrintDate: `${cy}0901`,
-        periodicStatementMonth: '09',
+        preliminaryStatementPrintDate: printDate,
+        periodicStatementMonth: printDate.slice(4, 6),
       };
     },
   }),

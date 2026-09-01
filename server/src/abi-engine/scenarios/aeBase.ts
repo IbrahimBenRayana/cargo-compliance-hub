@@ -78,6 +78,23 @@ export function appScenario(
 }
 
 /** Baseline type-01 consumption entry, parameterized per scenario. */
+/**
+ * Preliminary statement print date: applicability date + 10 days, rolled
+ * forward off weekends (usage note (y) bars them). Strictly future for any
+ * generate-day at or before the applicability date.
+ */
+export function statementDateFrom(applicabilityDate: string): string {
+  const dt = new Date(Date.UTC(
+    Number(applicabilityDate.slice(0, 4)),
+    Number(applicabilityDate.slice(4, 6)) - 1,
+    Number(applicabilityDate.slice(6, 8)) + 10
+  ));
+  const dow = dt.getUTCDay();
+  if (dow === 6) dt.setUTCDate(dt.getUTCDate() + 2);
+  else if (dow === 0) dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10).replace(/-/g, '');
+}
+
 export function baseAePayload(params: CertParams, scenarioId: string): AbiPayloadV2 {
   return {
     schemaVersion: 2,
@@ -98,7 +115,9 @@ export function baseAePayload(params: CertParams, scenarioId: string): AbiPayloa
       usStateOfDestination: 'CA',
       bonds: [{ bondTypeCode: '8', designationTypeCode: 'B', suretyCompanyCode: params.suretyCompanyCode }],
       // Standing instruction: summaries are scheduled for payment on a statement.
-      payment: { typeCode: '2', preliminaryStatementPrintDate: `${params.currentYear}0901` },
+      // The print date must be strictly in the future (live F205 9/1 — a
+      // hardcoded Sep 1 expired the day the calendar caught up with it).
+      payment: { typeCode: '2', preliminaryStatementPrintDate: statementDateFrom(params.applicabilityDate) },
       cargo: { carrierCode: 'MAEU', districtPortOfUnlading: '3001', conveyanceName: 'EVER GIVEN' },
       manifests: [
         {
