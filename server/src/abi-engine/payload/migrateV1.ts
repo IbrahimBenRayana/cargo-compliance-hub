@@ -83,43 +83,16 @@ function migrateItem(item: AbiItem, invoice: AbiInvoice): LineV2 {
     grossWeightKg: toKilograms(item.weight.gross, item.weight.uom),
     descriptions: item.description ? [item.description.slice(0, 70)] : undefined,
     parties: parties.length > 0 ? parties : undefined,
-    tariffs: buildTariffs(item, quantity),
+    tariffs: [
+      {
+        htsNumber: item.htsNumber.replace(/\./g, ''),
+        // dutyCents deliberately absent — the duty engine computes it.
+        valueDollars: Math.round(item.values.totalValueOfGoods),
+        uomCode1: quantity.uom ?? 'NO',
+        quantity1Hundredths: quantity.hundredths,
+      },
+    ],
   };
-}
-
-/**
- * Build a line's tariff list: ch.99 overlays first (CBP reporting order),
- * then the base ch.1–97 classification.
- *
- * Value and quantity belong to the base classification. Each overlay is
- * reported with value 0; the duty engine recognises that convention and
- * computes the overlay's ad valorem on the base value, so a Section 301
- * line yields base duty + overlay duty without double-counting value.
- * dutyCents is deliberately absent throughout — the duty engine fills it.
- */
-function buildTariffs(
-  item: AbiItem,
-  quantity: { hundredths?: number; uom?: string }
-): LineV2['tariffs'] {
-  const base = {
-    htsNumber: item.htsNumber.replace(/\./g, ''),
-    valueDollars: Math.round(item.values.totalValueOfGoods),
-    uomCode1: quantity.uom ?? 'NO',
-    quantity1Hundredths: quantity.hundredths,
-  };
-
-  const overlays = (item.additionalHtsNumbers ?? [])
-    .map((hts) => hts.replace(/\./g, ''))
-    .filter((hts) => hts.length > 0)
-    .map((htsNumber) => ({
-      htsNumber,
-      valueDollars: 0,
-      // UOM is mandatory on every 50-record even when no quantity is
-      // reported; the overlay inherits the base line's unit.
-      uomCode1: base.uomCode1,
-    }));
-
-  return [...overlays, base];
 }
 
 /** Migrate a v1 CustomsCity-shaped payload to schema v2. Throws on unmappable data. */
