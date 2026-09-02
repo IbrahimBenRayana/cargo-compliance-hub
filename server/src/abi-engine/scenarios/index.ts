@@ -206,7 +206,6 @@ export const SCENARIOS: Scenario[] = [
   (() => {
     const aeHalf = aeScenario('006', 'Census Warning Override — standalone transmission', {
       rates: {
-        '99030555': NT52_100,
         // Karl's 8/27 answer: 9903.05.90 IS the NT52-side 232 exclusion
         // (correct all along, just not alone) and 9903.82.10 is the steel
         // 232 number (15% per CERT — 'DER ALU & STL, COL 1 < 15%, NT16').
@@ -227,19 +226,15 @@ export const SCENARIOS: Scenario[] = [
           { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
         ];
         line.tariffs = [
-          // Karl's 8/27 key: NT52 MX country row, the .05.90 232-forced-labor
-          // exclusion, and 9903.82.10 (232 steel derivative, 15%).
-          // .05.90 is "the exclusion for 232 for Forced Labor" (Karl): a
-          // 232-covered article is EXCLUDED from the NT52 country duty, so
-          // the .05.55 row deposits zero (F624 when we charged both, 8/27).
-          { htsNumber: '99030555', valueDollars: 0, dutyCents: 0 },
+          // Karl's 9/2 key, verbatim: "You don't need 99030555 if you have
+          // the 90. 9903.82.10 is 15% 21852.30. 0% on the 1-97 line." The
+          // NT52 country number is DROPPED (its mere presence makes ACE
+          // compute duty against it), the 232 bucket deposits its flat
+          // rate, and the 232 rate REPLACES column 1 (the ch.1-97 line
+          // deposits zero) — the same 'replaced' semantics as 019/024.
           { htsNumber: '99030590', valueDollars: 0 },
-          // Top-up semantics (Rosetta: the .94 sweep's 'COL 1 < 15%=15'
-          // wording): the 232 charge brings TOTAL duty to 15% ⇒ 15% − 2.2%
-          // = 12.8% of $145,682 = $18,647.30 (F624 with 15%-flat and with
-          // zero, live 8/27).
-          { htsNumber: '99038210', valueDollars: 0, dutyCents: 1864730 },
-          { htsNumber: '8415820120', valueDollars: 145682, uomCode1: 'NO', quantity1Hundredths: 100 },
+          { htsNumber: '99038210', valueDollars: 0, dutyCents: 2185230 },
+          { htsNumber: '8415820120', valueDollars: 145682, uomCode1: 'NO', quantity1Hundredths: 100, dutyCents: 0 },
         ];
         // Live F794 ADDTNL DEC TYPE RQRD FOR ARTICLE: A/C machines are 232
         // steel AND aluminum derivatives, so the line carries Importer's
@@ -850,12 +845,12 @@ export const SCENARIOS: Scenario[] = [
             { type: 'S', identifier: ior },
           ],
           tariffs: [
-            // ACE computes ZERO ch99 duty on article-set lines (live 8/28:
-            // components' zero-duty NT52s drew no F624 while the header's
-            // engine-computed 12.5%×$5,000 did) — the number satisfies the
-            // F771 edit, the duty is pinned to ACE's calc.
-            { htsNumber: '99030574', valueDollars: 0, dutyCents: 0 }, // NT52 CH on the set
-            { htsNumber: '1902194000', valueDollars: 5000, uomCode1: 'KG', quantity1Hundredths: 170000 },
+            // Karl's ESV trace (9/2): value[5000] * p1[0.125] = 625.00 and
+            // '[1902194000] replaced' — the NT52 12.5% IS the header's whole
+            // duty; the conventional 6.4% is REPLACED, not added. "Its just
+            // 12.5% on 99030574."
+            { htsNumber: '99030574', valueDollars: 0, dutyCents: 62500 }, // NT52 CH on the set
+            { htsNumber: '1902194000', valueDollars: 5000, uomCode1: 'KG', quantity1Hundredths: 170000, dutyCents: 0 },
           ],
         },
         {
@@ -965,7 +960,7 @@ export const SCENARIOS: Scenario[] = [
     // .82.02 (ALU/STL/COP + derivatives) carries the 50% steel rate (GB
     // alone gets .82.04 at 25%); .05.90 excludes the 232-covered article
     // from the NT52 country duty, so the KR NT52 deposits zero.
-    rates: { '99030571': NT52_125, '99030590': 'Free', '99038202': '50%', '7222110006': 'Free' },
+    rates: { '99030590': 'Free', '99038202': '50%', '7222110006': 'Free' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'KR';
@@ -977,7 +972,9 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '99030571', valueDollars: 0, dutyCents: 0 }, // NT52 KR — excluded via .05.90
+        // Karl's 006 rule applied (9/2): the NT52 country number is DROPPED
+        // when .05.90 is present — its mere presence draws duty computation
+        // (the F624 despite a correct \$1,938 total). .05.90 + bucket only.
         { htsNumber: '99030590', valueDollars: 0, dutyCents: 0 }, // NT52-side 232 exclusion
         { htsNumber: '99038202', valueDollars: 0 }, // NT16(C) steel content bucket, 50%
         { htsNumber: '7222110006', valueDollars: 3876, uomCode1: 'KG', quantity1Hundredths: 150000 },

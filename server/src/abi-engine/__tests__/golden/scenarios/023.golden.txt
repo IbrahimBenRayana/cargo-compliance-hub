@@ -10,7 +10,6 @@ B  2704ZZZAE                                               SCENARIO 023
 44STAINLESS STEEL BARS                                                          
 47MKRSELSTE579SEL                                                               
 47S26-164751100                                                                 
-5099030571            0          0                                              
 5099030590            0          0                                              
 5099038202       193800          0                                              
 507222110006          0       3876       150000KG                               
