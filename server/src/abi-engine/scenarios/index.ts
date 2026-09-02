@@ -962,7 +962,11 @@ export const SCENARIOS: Scenario[] = [
   , 'Overrides the warning surfaced by 020/021; warning code comes from the live CL response (27D placeholder pending that query).'),
 
   aeScenario('023', 'Steel License', {
-    rates: { '99030571': NT52_125, '7222110006': 'Free' },
+    // 232 stack per the 9/2 sweep + Karl's 006 key: NT16(C) content bucket
+    // .82.02 (ALU/STL/COP + derivatives) carries the 50% steel rate (GB
+    // alone gets .82.04 at 25%); .05.90 excludes the 232-covered article
+    // from the NT52 country duty, so the KR NT52 deposits zero.
+    rates: { '99030571': NT52_125, '99030590': 'Free', '99038202': '50%', '7222110006': 'Free' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'KR';
@@ -974,7 +978,9 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '99030571', valueDollars: 0 }, // NT52 KR 12.5%
+        { htsNumber: '99030571', valueDollars: 0, dutyCents: 0 }, // NT52 KR — excluded via .05.90
+        { htsNumber: '99030590', valueDollars: 0, dutyCents: 0 }, // NT52-side 232 exclusion
+        { htsNumber: '99038202', valueDollars: 0 }, // NT16(C) steel content bucket, 50%
         { htsNumber: '7222110006', valueDollars: 3876, uomCode1: 'KG', quantity1Hundredths: 150000 },
       ];
       // 52-Record type 01 = Steel Import License (ESF-166). Package: replace
