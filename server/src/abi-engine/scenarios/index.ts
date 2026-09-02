@@ -1127,8 +1127,10 @@ export const SCENARIOS: Scenario[] = [
           ...base,
           descriptions: ['ORAL HYGIENE PREPARATIONS'],
           parties: [{ type: 'M', identifier: 'CNSHEORA654SHA' }, { type: 'S', identifier: ior }],
-          // CERT W1: KG, not NO (live F442 9/2).
-          tariffs: [{ htsNumber: '99038815', valueDollars: 0 }, { htsNumber: '3306900000', valueDollars: 5000, uomCode1: 'KG', quantity1Hundredths: 200000 }],
+          // CERT W1: KG, not NO (live F442 9/2). 301: .88.15 did NOT satisfy
+          // the F771 edit for 3306.90 while the .88.03 lines cleared it
+          // (live 9/2 second round) — List 3 covers it in CERT's table.
+          tariffs: [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '3306900000', valueDollars: 5000, uomCode1: 'KG', quantity1Hundredths: 200000 }],
         },
         {
           ...base,
