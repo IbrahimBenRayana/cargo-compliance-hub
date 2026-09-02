@@ -1079,11 +1079,18 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '98235202', valueDollars: 0, uomCode1: 'X' },
+        // CERT W1 (9/2): 9823.52.02 has ZERO reporting units — omit uom
+        // entirely (live F441 with 'X').
+        { htsNumber: '98235202', valueDollars: 0 },
         { htsNumber: '99030595', valueDollars: 0 }, // NT52 textile/apparel exclusion, 0%, no origin restriction
-        { htsNumber: '6203315020', valueDollars: 2500, uomCode1: 'DOZ', quantity1Hundredths: 2000, dutyCents: 0 },
+        // CERT W1: DOZ + KG — wool apparel reports both quantities (live
+        // F443 without the KG).
+        { htsNumber: '6203315020', valueDollars: 2500, uomCode1: 'DOZ', quantity1Hundredths: 2000, uomCode2: 'KG', quantity2Hundredths: 15000, dutyCents: 0 },
       ];
       line.textileCategoryCode = '447';
+      // Live F687: the TPL claim needs the certificate — spec license type
+      // 30 = Mexican USMCA TPL Certificate (29 = Canadian).
+      line.license = { typeCode: '30', number: 'MX26090201' };
     },
     notes: 'Package: UC response arrives only after end-of-day TRQ processing (~8pm). XQ = Canada/Mexico TPL origin convention.',
   }),
@@ -1091,6 +1098,11 @@ export const SCENARIOS: Scenario[] = [
   aeScenario('028', 'State of Destination with Multiple Lines', {
     rates: {
       '99030531': NT52_125,
+      // 301 numbers per CERT's table (9/2 query): List 3 .88.03 = 25%,
+      // List 4A .88.15 = 7.5% — both CN-restricted, both still on file;
+      // stacking with NT52 + column 1 is the accepted 013 pattern.
+      '99038803': 'The duty provided in the applicable subheading + 25%',
+      '99038815': 'The duty provided in the applicable subheading + 7.5%',
       '1205100090': { general: '0.58¢/kg', special: 'Free (A+,AU,BH,CL,CO,D,E, IL,JO,KR,MA,OM,P,PA,PE,S, SG)' },
       '3306900000': 'Free',
       '3702100060': { general: '3.7%', special: 'Free (A*,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
@@ -1107,24 +1119,29 @@ export const SCENARIOS: Scenario[] = [
           ...base,
           descriptions: ['RAPESEED, LOW ERUCIC ACID'],
           parties: [{ type: 'M', identifier: 'CNSHERAP321SHA' }, { type: 'S', identifier: ior }],
-          tariffs: [{ htsNumber: '1205100090', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 100000000 }],
+          // 20,000 kg ≈ market unit value for \$10k of rapeseed — the earlier
+          // 1,000,000 kg drew the OR-LO census warning (live W27C 9/2).
+          tariffs: [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '1205100090', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 2000000 }],
         },
         {
           ...base,
           descriptions: ['ORAL HYGIENE PREPARATIONS'],
           parties: [{ type: 'M', identifier: 'CNSHEORA654SHA' }, { type: 'S', identifier: ior }],
-          tariffs: [{ htsNumber: '3306900000', valueDollars: 5000, uomCode1: 'NO', quantity1Hundredths: 100000 }],
+          // CERT W1: KG, not NO (live F442 9/2).
+          tariffs: [{ htsNumber: '99038815', valueDollars: 0 }, { htsNumber: '3306900000', valueDollars: 5000, uomCode1: 'KG', quantity1Hundredths: 200000 }],
         },
         {
           ...base,
           descriptions: ['INSTANT PRINT FILM'],
           parties: [{ type: 'M', identifier: 'CNSHEFLM987SHA' }, { type: 'S', identifier: ior }],
-          tariffs: [{ htsNumber: '3702100060', valueDollars: 15000, uomCode1: 'NO', quantity1Hundredths: 200000 }],
+          // CERT W1: M2, not NO (live F442 9/2).
+          tariffs: [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '3702100060', valueDollars: 15000, uomCode1: 'M2', quantity1Hundredths: 500000 }],
         },
       ];
       for (const l of p.entrySummary.lines) {
         l.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
-        l.tariffs = [{ htsNumber: '99030531', valueDollars: 0 }, ...l.tariffs]; // NT52 CN 12.5%
+        // 301 leads, NT52 second, substantive last — the accepted 013 order.
+        l.tariffs = [l.tariffs[0], { htsNumber: '99030531', valueDollars: 0 }, ...l.tariffs.slice(1)];
       }
     },
     notes: 'Source data: line states MT/NY/WA — header reports WA (greatest aggregate value, 7501 block 5).',
