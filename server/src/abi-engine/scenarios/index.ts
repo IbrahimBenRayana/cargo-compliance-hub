@@ -264,7 +264,10 @@ export const SCENARIOS: Scenario[] = [
         // Phase 2 only when the AE half was ACCEPTED with a census warning —
         // a rejected AX can also carry W-codes (live lesson: the CW then
         // references an entry ACE never added → C02 ENTRY SUMMARY NOT FOUND).
-        const accepted = /E1A[I ]?\s*99[56]/.test(prior);
+        // Verdict letters: E1A 995 plain, E1AI (informationals), E1AW
+        // (warnings) — the census bait lands as E1AW995 (live 9/2), which
+        // the original [I ]? gate missed.
+        const accepted = /E1A[WI ]?\s*99[56]/.test(prior);
         const warning = prior.match(/E1\s+(W[A-Z0-9]{2,3})\s/);
         if (!accepted || !warning) return aeHalf.run(params, ctx);
         return buildBatch({
