@@ -1057,11 +1057,12 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('027', 'USMCA Apparel (TRQ)', {
-    // NT52: XQ = Mexico TPL origin ⇒ the USMCA-qualifying subdivision (H)
-    // row 9903.05.94 at 0% (mirrors the US-goods 9903.05.86 treatment) —
-    // NEEDS LIVE VERIFICATION: the duty-bearing MX row 9903.05.55 (10%)
-    // would apply if CERT refuses the subdivision claim.
-    rates: { '99030594': 'Free', '98235202': 'Free', '6203315020': '17.5%' },
+    // NT52: 9903.05.94 (USMCA-MX subdivision H) carries a W4 country
+    // restriction of MX — on an XQ-origin line that is an F603 waiting to
+    // happen (301 numbers are origin-enforced the same way). 9903.05.95
+    // 'TEXT OR APPAREL, NTE 52' at 0% has NO W4 restriction and matches the
+    // article exactly (9/2 CERT sweep).
+    rates: { '99030595': 'Free', '98235202': 'Free', '6203315020': '17.5%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '02';
       const line = p.entrySummary.lines[0];
@@ -1079,7 +1080,7 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '98235202', valueDollars: 0, uomCode1: 'X' },
-        { htsNumber: '99030594', valueDollars: 0 }, // NT52 USMCA-MX subdivision (H), 0%
+        { htsNumber: '99030595', valueDollars: 0 }, // NT52 textile/apparel exclusion, 0%, no origin restriction
         { htsNumber: '6203315020', valueDollars: 2500, uomCode1: 'DOZ', quantity1Hundredths: 2000, dutyCents: 0 },
       ];
       line.textileCategoryCode = '447';
