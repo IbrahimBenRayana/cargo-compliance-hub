@@ -6,7 +6,7 @@ B  2704ZZZAE                                               SCENARIO 026
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-40  001 FMFM080126      Z        500           1200    N                        
+40  001 FMFM080126      Z        50068207      1200    N                        
 44BASKETWORK OF VEGETABLE MATERIALS                                             
 47MFMPNIBAS753PNI                                                               
 47S26-164751100                                                                 

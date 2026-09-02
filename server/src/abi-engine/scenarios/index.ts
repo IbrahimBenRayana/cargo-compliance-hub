@@ -1044,6 +1044,7 @@ export const SCENARIOS: Scenario[] = [
       // not printed in the USITC Special column — preference pinned to Free.
       line.spiClaimCode = 'Z';
       line.descriptions = ['BASKETWORK OF VEGETABLE MATERIALS'];
+      line.foreignPortOfLading = '68207'; // Pohnpei (Schedule K, Jul-2026 CAMIR App F) — live F429 9/2
       line.parties = [
         { type: 'M', identifier: 'FMPNIBAS753PNI' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
