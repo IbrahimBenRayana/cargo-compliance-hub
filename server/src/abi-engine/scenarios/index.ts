@@ -715,18 +715,17 @@ export const SCENARIOS: Scenario[] = [
         inBond: `${cy}0201`,
       };
       p.entrySummary.lines[0].dateOfExportation = `${cy}0110`;
-      // Exactly the package's two components (IT number + component I) —
-      // the inherited master bill made a third and ACE F187'd the group.
+      // Karl's answer wire (9/2, "You had 2 inbonds / I got it through like
+      // this"): exactly ONE 23I carrying the IN-TRANSIT NUMBER itself, then
+      // the 23M master bill — the package's separate "manifest component
+      // identifier" 012345684978 does not appear anywhere.
       p.entrySummary.manifests = [
         {
           manifestedQuantity: 100,
           uomCode: 'CTNS',
-          // Bills-first hypothesis: master bill leads, the two in-bond
-          // references trail (builder order flipped M/H/S→I).
           bills: [
-            { type: 'M', issuerCode: 'MAEU', identifier: '123456789012' },
             { type: 'I', identifier: '115581395' },
-            { type: 'I', identifier: '012345684978' },
+            { type: 'M', issuerCode: 'MAEU', identifier: '123456789012' },
           ],
         },
       ];
