@@ -6,7 +6,7 @@ B  2704ZZZAE                                               SCENARIO 037
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-40  001 CHCH080126               500           1200    N                        
+40  001 CHCH080126               50042876      1200    N                        
 44WRIST WATCHES, PRECIOUS METAL CASE, MECHANICAL DISPLAY                        
 47MCHGENWAT552GEN                                                               
 47S26-164751100                                                                 

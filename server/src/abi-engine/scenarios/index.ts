@@ -1302,6 +1302,7 @@ export const SCENARIOS: Scenario[] = [
 
   aeScenario('035', 'Civil Aircraft', {
     rates: {
+      '99038210': 'The duty provided in the applicable subheading + 15%',
       '8302496055': { general: '5.7%', special: 'Free (A*,AU,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
     },
     mutate: (p) => {
@@ -1310,18 +1311,28 @@ export const SCENARIOS: Scenario[] = [
       line.countryOfExport = 'GL';
       line.spiClaimCode = 'C'; // Agreement on Trade in Civil Aircraft
       line.descriptions = ['CIVIL AIRCRAFT MOUNTINGS AND FITTINGS'];
+      line.foreignPortOfLading = '10125'; // Godthaab/Nuuk (Schedule K, Jul-2026 CAMIR App F)
       line.parties = [
         { type: 'M', identifier: 'GLGOHAIR428GOH' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
+      // Base-metal mountings = NT16 metal article: .82.10 (derivative,
+      // col1 5.7% < 15%) + Type 08. GL is not NT52-listed, so no country
+      // row and no .05.90. If F771 persists this joins Karl's open 032
+      // bucket question.
       line.tariffs = [
+        { htsNumber: '99038210', valueDollars: 0 },
         { htsNumber: '8302496055', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 10000 },
       ];
+      line.declarations = [{ typeCode: '08', information: 'GL' }];
     },
   }),
 
   aeScenario('036', 'Commercial Samples', {
-    rates: { '99030549': NT52_125, '6205202016': '19.7%' },
+    // Apparel takes the 0% NT52 textile exclusion .05.95 (the 027
+    // precedent), NOT the JP country row — an unneeded 12.5% row would
+    // draw duty computation (Karl's 006 rule).
+    rates: { '99030595': 'Free', '6205202016': '19.7%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '11';
       p.entrySummary.indicators = { ...p.entrySummary.indicators, shipmentUsageTypeCode: 'X' };
@@ -1333,7 +1344,7 @@ export const SCENARIOS: Scenario[] = [
       line.foreignPortOfLading = '58886'; // Tokyo (Schedule K)
       line.parties = [];
       line.tariffs = [
-        { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
+        { htsNumber: '99030595', valueDollars: 0 }, // NT52 textile/apparel exclusion, 0%
         { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200 },
       ];
       line.textileCategoryCode = '340';
@@ -1360,6 +1371,7 @@ export const SCENARIOS: Scenario[] = [
       line.countryOfOrigin = 'CH';
       line.countryOfExport = 'CH';
       line.descriptions = ['WRIST WATCHES, PRECIOUS METAL CASE, MECHANICAL DISPLAY'];
+      line.foreignPortOfLading = '42876'; // Hamburg — live-proven for landlocked CH (019 accepted)
       line.parties = [
         { type: 'M', identifier: 'CHGENWAT552GEN' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
