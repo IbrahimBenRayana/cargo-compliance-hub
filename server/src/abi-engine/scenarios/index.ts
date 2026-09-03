@@ -1437,7 +1437,7 @@ export const SCENARIOS: Scenario[] = [
     // standing $10,000 rides the dutiable component; 600 one-pliers sets
     // = 50 dozen pliers. Component duty engine-computed (12% × $10,000 =
     // $1,200.00); set-provision line pinned $0.
-    rates: { '99030531': NT52_125, '8203204000': '12%' },
+    rates: { '99038803': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '8203204000': '12%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.descriptions = ['HAND TOOL SETS, PLIERS COMPONENT HIGHEST-RATE'];
@@ -1446,8 +1446,11 @@ export const SCENARIOS: Scenario[] = [
         { type: 'M', identifier: 'CNSHETOO654SHA' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
-      // NT52 first: 8206 is the substantive set heading, not a 98/99 marker.
+      // 301 leads, NT52 second (the accepted 028 order); both STACK with
+      // col 1 (NT52-alongside rule). HOLD TRANSMIT: metal hand tools share
+      // 032's unresolved NT16 bucket question — await Karl.
       line.tariffs = [
+        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3, 25%
         { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
         { htsNumber: '8206000000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 60000, dutyCents: 0 },
         { htsNumber: '8203204000', valueDollars: 10000, uomCode1: 'DOZ', quantity1Hundredths: 5000 },
@@ -1465,6 +1468,7 @@ export const SCENARIOS: Scenario[] = [
       // SPI Y (insular possessions, general note 3(a)(iv)) — statutory.
       line.spiClaimCode = 'Y';
       line.descriptions = ['CULTURED PEARLS, WORKED'];
+      line.foreignPortOfLading = '93501'; // Guam Island (Schedule K)
       line.parties = [
         { type: 'M', identifier: 'GUHAGPEA842HAG' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
@@ -1476,7 +1480,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('041', 'Mail MOT', {
-    rates: { '99030531': NT52_125, '9106100000': '36\u00a2 each + 5.6% + 2\u00a2/jewel' },
+    rates: { '99038803': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '9106100000': '36\u00a2 each + 5.6% + 2\u00a2/jewel' },
     mutate: (p) => {
       p.entrySummary.motCode = '50';
       // Mail: no carrier/manifest data.
@@ -1489,7 +1493,10 @@ export const SCENARIOS: Scenario[] = [
       // 36\u00a2\u00d7120 = $43.20 + 5.6%\u00d7$1,189 = $66.584 \u2192 $109.78 total.
       // Mail MOT: no foreign port of lading (F429 is vessel-only).
       line.tariffs = [
-        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
+        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3, 25% — stacks
+        // NT52 alongside another action → STACKS; 12.5% x $1,189 = 148.625
+        // pinned half-up per tariff (the 036 trace's rounding).
+        { htsNumber: '99030531', valueDollars: 0, dutyCents: 14863 }, // NT52 CN 12.5%
         { htsNumber: '9106100000', valueDollars: 1189, uomCode1: 'NO', quantity1Hundredths: 12000, dutyCents: 10978 },
       ];
     },

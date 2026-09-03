@@ -6,7 +6,7 @@ B  2704ZZZAE                                               SCENARIO 040
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-40  001 GUGU080126      Y        500           1200    N                        
+40  001 GUGU080126      Y        50093501      1200    N                        
 44CULTURED PEARLS, WORKED                                                       
 47MGUHAGPEA842HAG                                                               
 47S26-164751100                                                                 
