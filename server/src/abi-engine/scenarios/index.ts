@@ -1216,7 +1216,7 @@ export const SCENARIOS: Scenario[] = [
       // Karl's 006 pattern for derivative steel, col1 < 15%: .05.90
       // excludes the NT52, .82.10 deposits flat 15%, ch.1-97 zeroes.
       '99030590': 'Free',
-      '99038210': 'The duty provided in the applicable subheading + 15%',
+      '99038202': '50%',
       '8211100000': 'Free',
       '8211929045': '0.4¢ each + 6.1%',
       '8211930035': '3¢ each + 5.4%',
@@ -1240,13 +1240,16 @@ export const SCENARIOS: Scenario[] = [
       // Live 9/3 F771/F794: knives are DERIVATIVE STEEL under NT16 — the
       // 232 stack replaces the highest-rate-article arithmetic entirely
       // (Karl's 006 semantics: bucket deposits flat 15%, ch.1-97 zeroes).
+      // .82.10 drew F771 twice (here + 035) while .82.02 passed 023/034 —
+      // .82.02 is the GENERAL content bucket. Its 034-proven semantics:
+      // STACKS on column 1, so the set-rule component pins come back.
       line.tariffs = [
         { htsNumber: '99030590', valueDollars: 0 }, // NT52-side 232 exclusion
-        { htsNumber: '99038210', valueDollars: 0 }, // DER ALU & STL, COL 1 < 15% — 15%
+        { htsNumber: '99038202', valueDollars: 0 }, // metal content bucket, 50%
         // CERT W1 (9/3): 8211.10 reports PCS — 4,000 five-piece sets.
         { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 2000000, dutyCents: 0 },
-        { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 0 },
-        { htsNumber: '8211930035', valueDollars: 8000, uomCode1: 'NO', quantity1Hundredths: 400000, dutyCents: 0 },
+        { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 134400 },
+        { htsNumber: '8211930035', valueDollars: 8000, uomCode1: 'NO', quantity1Hundredths: 400000, dutyCents: 55200 },
       ];
       // Live F794: steel melt-and-pour declaration, DE origin.
       line.declarations = [{ typeCode: '08', information: 'DE' }];
@@ -1302,7 +1305,7 @@ export const SCENARIOS: Scenario[] = [
 
   aeScenario('035', 'Civil Aircraft', {
     rates: {
-      '99038210': 'The duty provided in the applicable subheading + 15%',
+      '99038202': '50%',
       '8302496055': { general: '5.7%', special: 'Free (A*,AU,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
     },
     mutate: (p) => {
@@ -1321,18 +1324,25 @@ export const SCENARIOS: Scenario[] = [
       // row and no .05.90. If F771 persists this joins Karl's open 032
       // bucket question.
       line.tariffs = [
-        { htsNumber: '99038210', valueDollars: 0 },
+        { htsNumber: '99038202', valueDollars: 0 }, // general metal bucket (see 032 note)
         { htsNumber: '8302496055', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 10000 },
       ];
-      line.declarations = [{ typeCode: '08', information: 'GL' }];
+      // Live 9/3: F794 persisted WITH Type 08 → the missing type is 07 —
+      // 8302 mountings are on BOTH metal lists (F773 would flag a
+      // disallowed type; F794 flags a missing one).
+      line.declarations = [
+        { typeCode: '07', information: 'GLGL' },
+        { typeCode: '08', information: 'GL' },
+      ];
     },
   }),
 
   aeScenario('036', 'Commercial Samples', {
-    // Apparel takes the 0% NT52 textile exclusion .05.95 (the 027
-    // precedent), NOT the JP country row — an unneeded 12.5% row would
-    // draw duty computation (Karl's 006 rule).
-    rates: { '99030595': 'Free', '6205202016': '19.7%' },
+    // Live 9/3: the .05.95 textile exclusion did NOT satisfy F771 for a
+    // listed country — JP apparel wants the country row, 12.5% stacked
+    // (the accepted 024 JP-footwear treatment). .05.95 evidently belongs
+    // to the TRQ/9823 world (027), not general apparel.
+    rates: { '99030549': NT52_125, '6205202016': '19.7%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '11';
       p.entrySummary.indicators = { ...p.entrySummary.indicators, shipmentUsageTypeCode: 'X' };
@@ -1344,8 +1354,9 @@ export const SCENARIOS: Scenario[] = [
       line.foreignPortOfLading = '58886'; // Tokyo (Schedule K)
       line.parties = [];
       line.tariffs = [
-        { htsNumber: '99030595', valueDollars: 0 }, // NT52 textile/apparel exclusion, 0%
-        { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200 },
+        { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
+        // Live F443: apparel reports DOZ + KG (the 027 lesson).
+        { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200, uomCode2: 'KG', quantity2Hundredths: 600 },
       ];
       line.textileCategoryCode = '340';
     },
