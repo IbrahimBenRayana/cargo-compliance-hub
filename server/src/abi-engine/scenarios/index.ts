@@ -1216,7 +1216,7 @@ export const SCENARIOS: Scenario[] = [
       // Karl's 006 pattern for derivative steel, col1 < 15%: .05.90
       // excludes the NT52, .82.10 deposits flat 15%, ch.1-97 zeroes.
       '99030590': 'Free',
-      '99038202': '50%',
+      '99038223': '10%',
       '8211100000': 'Free',
       '8211929045': '0.4¢ each + 6.1%',
       '8211930035': '3¢ each + 5.4%',
@@ -1240,12 +1240,13 @@ export const SCENARIOS: Scenario[] = [
       // Live 9/3 F771/F794: knives are DERIVATIVE STEEL under NT16 — the
       // 232 stack replaces the highest-rate-article arithmetic entirely
       // (Karl's 006 semantics: bucket deposits flat 15%, ch.1-97 zeroes).
-      // .82.10 drew F771 twice (here + 035) while .82.02 passed 023/034 —
-      // .82.02 is the GENERAL content bucket. Its 034-proven semantics:
-      // STACKS on column 1, so the set-rule component pins come back.
+      // Bucket saga: .82.10 → F771 (not in family); .82.02 → F613 (in
+      // family, wrong pairing). Third candidate .82.23 'DER ALU & STL,
+      // COL 1 < 10%' matches the components' 6.1/5.4% col-1 rates. LAST
+      // permutation — F613/F771 again goes to Karl (question already out).
       line.tariffs = [
         { htsNumber: '99030590', valueDollars: 0 }, // NT52-side 232 exclusion
-        { htsNumber: '99038202', valueDollars: 0 }, // metal content bucket, 50%
+        { htsNumber: '99038223', valueDollars: 0 }, // DER ALU & STL, COL 1 < 10%
         // CERT W1 (9/3): 8211.10 reports PCS — 4,000 five-piece sets.
         { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 2000000, dutyCents: 0 },
         { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 134400 },
@@ -1305,7 +1306,7 @@ export const SCENARIOS: Scenario[] = [
 
   aeScenario('035', 'Civil Aircraft', {
     rates: {
-      '99038202': '50%',
+      '99038223': '10%',
       '8302496055': { general: '5.7%', special: 'Free (A*,AU,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
     },
     mutate: (p) => {
@@ -1324,14 +1325,15 @@ export const SCENARIOS: Scenario[] = [
       // row and no .05.90. If F771 persists this joins Karl's open 032
       // bucket question.
       line.tariffs = [
-        { htsNumber: '99038202', valueDollars: 0 }, // general metal bucket (see 032 note)
+        { htsNumber: '99038223', valueDollars: 0 }, // COL 1 < 10% (5.7%) — see 032 note
         { htsNumber: '8302496055', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 10000 },
       ];
-      // Live 9/3: F794 persisted WITH Type 08 → the missing type is 07 —
-      // 8302 mountings are on BOTH metal lists (F773 would flag a
-      // disallowed type; F794 flags a missing one).
+      // Type 07 layout per ESF-111/112 (decoded live 9/3 via F826/F829/
+      // F849/F834): pos 5 primary-smelt applicability 'Y', 6-7 filler,
+      // 8-9 primary smelt 'GL', 10 secondary applicability 'N', 11-12
+      // filler, 13-14 secondary (blank), 15-16 cast 'GL'.
       line.declarations = [
-        { typeCode: '07', information: 'GLGL' },
+        { typeCode: '07', information: 'Y  GLN    GL' },
         { typeCode: '08', information: 'GL' },
       ];
     },
@@ -1354,9 +1356,11 @@ export const SCENARIOS: Scenario[] = [
       line.foreignPortOfLading = '58886'; // Tokyo (Schedule K)
       line.parties = [];
       line.tariffs = [
-        { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
+        // Sub-cent rounding: ACE TRUNCATES (12.5% x $225 = $28.125 →
+        // 28.12; engine rounds up — live F624 9/3). Both duties pinned.
+        { htsNumber: '99030549', valueDollars: 0, dutyCents: 2812 }, // NT52 JP 12.5%
         // Live F443: apparel reports DOZ + KG (the 027 lesson).
-        { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200, uomCode2: 'KG', quantity2Hundredths: 600 },
+        { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200, uomCode2: 'KG', quantity2Hundredths: 600, dutyCents: 4432 },
       ];
       line.textileCategoryCode = '340';
     },
@@ -1390,9 +1394,9 @@ export const SCENARIOS: Scenario[] = [
       line.tariffs = [
         { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH 12.5%
         { htsNumber: '9101118010', valueDollars: 1490200, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 5185200 },
-        { htsNumber: '9101118020', valueDollars: 601690, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 3760563 },
+        { htsNumber: '9101118020', valueDollars: 601690, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 3760562 }, // 6.25% truncated (ACE drops sub-cents)
         { htsNumber: '9101118030', valueDollars: 790840, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 4942750 },
-        { htsNumber: '9101118040', valueDollars: 500612, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 2653244 },
+        { htsNumber: '9101118040', valueDollars: 500612, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 2653243 }, // 5.3% truncated
       ];
     },
     notes: 'Constituent duties pinned from the 9101.11.80 compound rate (USITC 2026-aug-06); suffix↔constituent mapping per CSMS #50019756 — confirm with rep. Origin CH assumed (package silent).',
@@ -1416,7 +1420,8 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '99030556', valueDollars: 0 }, // NT52 MA 12.5%
-        { htsNumber: '4203300000', valueDollars: 10000, uomCode1: 'DOZ', quantity1Hundredths: 5000 },
+        // CERT W1 (9/3): NO, not DOZ (live F442).
+        { htsNumber: '4203300000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 5000 },
       ];
     },
   }),
