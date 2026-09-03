@@ -1063,19 +1063,19 @@ export const SCENARIOS: Scenario[] = [
     // 'TEXT OR APPAREL, NTE 52' at 0% has NO W4 restriction and matches the
     // article exactly (9/2 CERT sweep).
     rates: { '99030595': 'Free', '98235202': 'Free', '6203315020': '17.5%' },
-    mutate: (p) => {
+    mutate: (p, params) => {
       p.entrySummary.entryTypeCode = '02';
       const line = p.entrySummary.lines[0];
-      line.countryOfOrigin = 'XQ';
-      line.countryOfExport = 'MX';
-      line.foreignPortOfLading = '20199'; // Veracruz (Schedule K)
+      line.countryOfOrigin = 'XQ'; // Karl 9/3: "XQ is a Canadian Province"
+      line.countryOfExport = 'CA';
+      line.foreignPortOfLading = '01520'; // Halifax NS (Schedule K)
       // S+ (USMCA textile TPL) is claimed against the 9823.52.02 TRQ
       // provision; in-quota preferential rate pinned to Free (the Special
       // column prints S, not S+).
       line.spiClaimCode = 'S+';
       line.descriptions = ['MENS WOOL TROUSERS'];
       line.parties = [
-        { type: 'M', identifier: 'MXMEXAPP159MEX' },
+        { type: 'M', identifier: 'CATORAPP159TOR' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
@@ -1088,9 +1088,10 @@ export const SCENARIOS: Scenario[] = [
         { htsNumber: '6203315020', valueDollars: 2500, uomCode1: 'DOZ', quantity1Hundredths: 2000, uomCode2: 'KG', quantity2Hundredths: 15000, dutyCents: 0 },
       ];
       line.textileCategoryCode = '447';
-      // Live F687: the TPL claim needs the certificate — spec license type
-      // 30 = Mexican USMCA TPL Certificate (29 = Canadian).
-      line.license = { typeCode: '30', number: 'MX26090201' };
+      // Karl 9/3: type 29 (CANADIAN USMCA TPL cert — XQ is a Canadian
+      // province); first char = presentation-year digit, only the first
+      // three characters are validated ("For 2024 ... 4CA123456").
+      line.license = { typeCode: '29', number: `${params.applicabilityDate.slice(3, 4)}CA123456` };
     },
     notes: 'Package: UC response arrives only after end-of-day TRQ processing (~8pm). XQ = Canada/Mexico TPL origin convention.',
   }),
@@ -1216,7 +1217,7 @@ export const SCENARIOS: Scenario[] = [
       // Karl's 006 pattern for derivative steel, col1 < 15%: .05.90
       // excludes the NT52, .82.10 deposits flat 15%, ch.1-97 zeroes.
       '99030590': 'Free',
-      '99038223': '10%',
+      '99038206': '10%',
       '8211100000': 'Free',
       '8211929045': '0.4¢ each + 6.1%',
       '8211930035': '3¢ each + 5.4%',
@@ -1240,13 +1241,12 @@ export const SCENARIOS: Scenario[] = [
       // Live 9/3 F771/F794: knives are DERIVATIVE STEEL under NT16 — the
       // 232 stack replaces the highest-rate-article arithmetic entirely
       // (Karl's 006 semantics: bucket deposits flat 15%, ch.1-97 zeroes).
-      // Bucket saga: .82.10 → F771 (not in family); .82.02 → F613 (in
-      // family, wrong pairing). Third candidate .82.23 'DER ALU & STL,
-      // COL 1 < 10%' matches the components' 6.1/5.4% col-1 rates. LAST
-      // permutation — F613/F771 again goes to Karl (question already out).
+      // Karl 9/3: eligible numbers are .82.01/.03/.05/.06/.09 — .82.06
+      // (DER ALU, DER STL, COP — 10%) is the content match (.82.05 is
+      // GB-restricted).
       line.tariffs = [
         { htsNumber: '99030590', valueDollars: 0 }, // NT52-side 232 exclusion
-        { htsNumber: '99038223', valueDollars: 0 }, // DER ALU & STL, COL 1 < 10%
+        { htsNumber: '99038206', valueDollars: 0 }, // DER ALU/DER STL/COP bucket, 10%
         // CERT W1 (9/3): 8211.10 reports PCS — 4,000 five-piece sets.
         { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 2000000, dutyCents: 0 },
         { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 134400 },
@@ -1306,7 +1306,7 @@ export const SCENARIOS: Scenario[] = [
 
   aeScenario('035', 'Civil Aircraft', {
     rates: {
-      '99038223': '10%',
+      '99038206': '10%',
       '8302496055': { general: '5.7%', special: 'Free (A*,AU,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
     },
     mutate: (p) => {
@@ -1325,7 +1325,7 @@ export const SCENARIOS: Scenario[] = [
       // row and no .05.90. If F771 persists this joins Karl's open 032
       // bucket question.
       line.tariffs = [
-        { htsNumber: '99038223', valueDollars: 0 }, // COL 1 < 10% (5.7%) — see 032 note
+        { htsNumber: '99038206', valueDollars: 0 }, // Karl's 9/3 eligible list — DER ALU/DER STL bucket, 10%
         { htsNumber: '8302496055', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 10000 },
       ];
       // Type 07 layout per ESF-111/112 (decoded live 9/3 via F826/F829/
@@ -1356,12 +1356,11 @@ export const SCENARIOS: Scenario[] = [
       line.foreignPortOfLading = '58886'; // Tokyo (Schedule K)
       line.parties = [];
       line.tariffs = [
-        // ACE rounds at LINE level (live 9/3: per-tariff round-up 7246 AND
-        // per-tariff truncation 7244 both F624'd; exact line total =
-        // 28.125 + 44.325 = $72.45). The 50-record split must sum to it.
+        // Karl's ESV trace 9/3: '[6205202016] replaced' — the NT52 12.5%
+        // IS the line duty (28.125 → 28.13, half-up), conventional zero.
         { htsNumber: '99030549', valueDollars: 0, dutyCents: 2813 }, // NT52 JP 12.5%
         // Live F443: apparel reports DOZ + KG (the 027 lesson).
-        { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200, uomCode2: 'KG', quantity2Hundredths: 600, dutyCents: 4432 },
+        { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200, uomCode2: 'KG', quantity2Hundredths: 600, dutyCents: 0 },
       ];
       line.textileCategoryCode = '340';
     },
@@ -1394,10 +1393,10 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH 12.5%
-        { htsNumber: '9101118010', valueDollars: 1490200, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 5185200 },
-        { htsNumber: '9101118020', valueDollars: 601690, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 3760563 }, // carries the line-rounding cent (largest remainder .625)
-        { htsNumber: '9101118030', valueDollars: 790840, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 4942750 },
-        { htsNumber: '9101118040', valueDollars: 500612, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 2653243 }, // 5.3% truncated
+        { htsNumber: '9101118010', valueDollars: 1490200, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 0 },
+        { htsNumber: '9101118020', valueDollars: 601690, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 0 },
+        { htsNumber: '9101118030', valueDollars: 790840, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 0 },
+        { htsNumber: '9101118040', valueDollars: 500612, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 0 },
       ];
     },
     notes: 'Constituent duties pinned from the 9101.11.80 compound rate (USITC 2026-aug-06); suffix↔constituent mapping per CSMS #50019756 — confirm with rep. Origin CH assumed (package silent).',

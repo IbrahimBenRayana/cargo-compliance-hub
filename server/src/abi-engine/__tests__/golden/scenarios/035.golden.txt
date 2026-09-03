@@ -10,7 +10,7 @@ B  2704ZZZAE                                               SCENARIO 035
 44CIVIL AIRCRAFT MOUNTINGS AND FITTINGS                                         
 47MGLGOHAIR428GOH                                                               
 47S26-164751100                                                                 
-5099038223       100000          0                                              
+5099038206       100000          0                                              
 508302496055          0      10000        10000KG                               
 5407Y  GLN    GL                                                                
 5408GL                                                                          
