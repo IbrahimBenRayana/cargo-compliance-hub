@@ -1075,7 +1075,7 @@ export const SCENARIOS: Scenario[] = [
       line.spiClaimCode = 'S+';
       line.descriptions = ['MENS WOOL TROUSERS'];
       line.parties = [
-        { type: 'M', identifier: 'CATORAPP159TOR' },
+        { type: 'M', identifier: 'XOTORAPP159TOR' }, // XO = Ontario (CA MIDs carry the province X-code)
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [

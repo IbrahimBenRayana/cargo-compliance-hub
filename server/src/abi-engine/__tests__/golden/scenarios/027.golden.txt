@@ -8,7 +8,7 @@ B  2704ZZZAE                                               SCENARIO 027
 318B 123                                                                        
 40  001 XQCA080126      S+       50001520      1200447 N                        
 44MENS WOOL TROUSERS                                                            
-47MCATORAPP159TOR                                                               
+47MXOTORAPP159TOR                                                               
 47S26-164751100                                                                 
 5098235202            0          0                                              
 5099030595            0          0                                              

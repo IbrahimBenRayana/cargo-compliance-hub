@@ -480,7 +480,7 @@ router.post('/transport/amf-bulk', async (req: AuthRequest, res: Response): Prom
       return;
     }
     for (const m of pending) {
-      const derived = deriveMid({ name: m.name, address: m.street, city: m.city, countryCode: m.countryCode });
+      const derived = deriveMid({ name: m.name, address: m.street, city: m.city, countryCode: m.countryCode, stateOrProvince: m.stateOrProvince });
       if (derived !== m.mid) {
         res.status(422).json({ error: `certManufacturers.ts drift: ${m.mid} derives ${derived}` });
         return;
@@ -494,6 +494,7 @@ router.post('/transport/amf-bulk', async (req: AuthRequest, res: Response): Prom
       const records = buildAddManufacturers(chunk.map((m) => ({
         action: 'add' as const,
         countryCode: m.countryCode,
+        stateOrProvince: m.stateOrProvince,
         name: m.name,
         street: m.street,
         city: m.city,

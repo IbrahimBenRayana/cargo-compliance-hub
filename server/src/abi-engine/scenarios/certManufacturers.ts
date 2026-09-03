@@ -12,6 +12,8 @@ export interface CertManufacturer {
   street: string;
   city: string;
   countryCode: string;
+  /** Canadian province — drives the MID's X-prefix (AMF-13 Note 1). */
+  stateOrProvince?: string;
   /** Required for US/CA/CN firms (AMF-17); not part of MID derivation. */
   zipOrPostalCode?: string;
   /** Already acknowledged by CERT ($5U/$6). */
@@ -43,7 +45,7 @@ export const CERT_MANUFACTURERS: CertManufacturer[] = [
   { mid: 'CHGENWAT552GEN', name: 'GENEVA WATCH SA', street: '552 RUE DU RHONE', city: 'GENEVA', countryCode: 'CH', added: true },
   { mid: 'MACASBEL713CAS', name: 'CASABLANCA BELTS', street: '713 BLVD MOHAMMED V', city: 'CASABLANCA', countryCode: 'MA', added: true },
   // 027 (Karl 9/3: XQ = Canadian province) — CA MIDs need postal codes (AMF-17).
-  { mid: 'CATORAPP159TOR', name: 'TORONTO APPAREL', street: '159 SPADINA AVE', city: 'TORONTO', countryCode: 'CA', zipOrPostalCode: 'M5V2T6', added: false },
+  { mid: 'XOTORAPP159TOR', name: 'TORONTO APPAREL', street: '159 SPADINA AVE', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M5V2T6', added: false },
   { mid: 'CNSHETOO654SHA', name: 'SHENZHEN TOOLS CO', street: '654 BAO AN RD', city: 'SHANGHAI', countryCode: 'CN', zipOrPostalCode: '200001', added: true },
   { mid: 'GUHAGPEA842HAG', name: 'HAGATNA PEARLS', street: '842 MARINE CORPS DR', city: 'HAGATNA', countryCode: 'GU', added: true },
   { mid: 'MXMTYSTL654MTY', name: 'M T Y STL METALS', street: '654 AV CONSTITUCION', city: 'MTY', countryCode: 'MX', added: true },
