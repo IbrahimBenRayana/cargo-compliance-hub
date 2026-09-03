@@ -1217,7 +1217,7 @@ export const SCENARIOS: Scenario[] = [
       // Karl's 006 pattern for derivative steel, col1 < 15%: .05.90
       // excludes the NT52, .82.10 deposits flat 15%, ch.1-97 zeroes.
       '99030590': 'Free',
-      '99038206': '10%',
+      '99038209': '25%',
       '8211100000': 'Free',
       '8211929045': '0.4¢ each + 6.1%',
       '8211930035': '3¢ each + 5.4%',
@@ -1241,12 +1241,12 @@ export const SCENARIOS: Scenario[] = [
       // Live 9/3 F771/F794: knives are DERIVATIVE STEEL under NT16 — the
       // 232 stack replaces the highest-rate-article arithmetic entirely
       // (Karl's 006 semantics: bucket deposits flat 15%, ch.1-97 zeroes).
-      // Karl 9/3: eligible numbers are .82.01/.03/.05/.06/.09 — .82.06
-      // (DER ALU, DER STL, COP — 10%) is the content match (.82.05 is
-      // GB-restricted).
+      // Karl 9/3 round 2: ".82.06 to 08 are cast/smelt US" — remaining
+      // eligible: .82.01/.03 (no/low-metal, 0%) and .82.09 (25%), .82.05
+      // being GB-only. Metal article ⇒ .82.09, stacked (034 semantics).
       line.tariffs = [
         { htsNumber: '99030590', valueDollars: 0 }, // NT52-side 232 exclusion
-        { htsNumber: '99038206', valueDollars: 0 }, // DER ALU/DER STL/COP bucket, 10%
+        { htsNumber: '99038209', valueDollars: 0 }, // COP/DER ALU & STL bucket, 25%
         // CERT W1 (9/3): 8211.10 reports PCS — 4,000 five-piece sets.
         { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 2000000, dutyCents: 0 },
         { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 134400 },
@@ -1306,7 +1306,7 @@ export const SCENARIOS: Scenario[] = [
 
   aeScenario('035', 'Civil Aircraft', {
     rates: {
-      '99038206': '10%',
+      '99038209': '25%',
       '8302496055': { general: '5.7%', special: 'Free (A*,AU,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
     },
     mutate: (p) => {
@@ -1325,7 +1325,7 @@ export const SCENARIOS: Scenario[] = [
       // row and no .05.90. If F771 persists this joins Karl's open 032
       // bucket question.
       line.tariffs = [
-        { htsNumber: '99038206', valueDollars: 0 }, // Karl's 9/3 eligible list — DER ALU/DER STL bucket, 10%
+        { htsNumber: '99038209', valueDollars: 0 }, // Karl 9/3 round 2: .82.06-.08 are smelt/cast-US — .82.09, 25%
         { htsNumber: '8302496055', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 10000 },
       ];
       // Type 07 layout per ESF-111/112 (decoded live 9/3 via F826/F829/
