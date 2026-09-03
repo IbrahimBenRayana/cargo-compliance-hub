@@ -1356,9 +1356,10 @@ export const SCENARIOS: Scenario[] = [
       line.foreignPortOfLading = '58886'; // Tokyo (Schedule K)
       line.parties = [];
       line.tariffs = [
-        // Sub-cent rounding: ACE TRUNCATES (12.5% x $225 = $28.125 →
-        // 28.12; engine rounds up — live F624 9/3). Both duties pinned.
-        { htsNumber: '99030549', valueDollars: 0, dutyCents: 2812 }, // NT52 JP 12.5%
+        // ACE rounds at LINE level (live 9/3: per-tariff round-up 7246 AND
+        // per-tariff truncation 7244 both F624'd; exact line total =
+        // 28.125 + 44.325 = $72.45). The 50-record split must sum to it.
+        { htsNumber: '99030549', valueDollars: 0, dutyCents: 2813 }, // NT52 JP 12.5%
         // Live F443: apparel reports DOZ + KG (the 027 lesson).
         { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200, uomCode2: 'KG', quantity2Hundredths: 600, dutyCents: 4432 },
       ];
@@ -1394,7 +1395,7 @@ export const SCENARIOS: Scenario[] = [
       line.tariffs = [
         { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH 12.5%
         { htsNumber: '9101118010', valueDollars: 1490200, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 5185200 },
-        { htsNumber: '9101118020', valueDollars: 601690, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 3760562 }, // 6.25% truncated (ACE drops sub-cents)
+        { htsNumber: '9101118020', valueDollars: 601690, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 3760563 }, // carries the line-rounding cent (largest remainder .625)
         { htsNumber: '9101118030', valueDollars: 790840, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 4942750 },
         { htsNumber: '9101118040', valueDollars: 500612, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 2653243 }, // 5.3% truncated
       ];
