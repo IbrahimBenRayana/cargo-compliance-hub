@@ -1292,8 +1292,10 @@ export const SCENARIOS: Scenario[] = [
       line.tariffs = [
         { htsNumber: '99030590', valueDollars: 0 },
         { htsNumber: '99038202', valueDollars: 0 },
-        // CERT W1 (9/3): KG, not NO.
-        { htsNumber: '7419803000', valueDollars: 3000, uomCode1: 'KG', quantity1Hundredths: 10000, dutyCents: 0 },
+        // CERT W1 (9/3): KG, not NO. Duty: .82.02 STACKS on column 1 —
+        // zero drew F624 (live 9/3); Karl's '0% on the 1-97 line' was
+        // .82.10-specific. 3% x $3,000 = $90 alongside the bucket's $1,500.
+        { htsNumber: '7419803000', valueDollars: 3000, uomCode1: 'KG', quantity1Hundredths: 10000 },
       ];
     },
   }),
