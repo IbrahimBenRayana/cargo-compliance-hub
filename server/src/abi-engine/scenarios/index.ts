@@ -1236,7 +1236,10 @@ export const SCENARIOS: Scenario[] = [
       //   8211.93: 5.4%×$8,000  + 3¢×4,000 pcs  = $432.00+$120.00 =   $552.00
       line.tariffs = [
         { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10%
-        { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'X', dutyCents: 0 },
+        // CERT W1 (9/3): 8211.10 reports PCS — total pieces across the set
+        // (4,000 five-piece sets = 20,000). Formula code 9 = duty by the
+        // highest-rate article, confirming the component pins below.
+        { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 2000000, dutyCents: 0 },
         { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 134400 },
         { htsNumber: '8211930035', valueDollars: 8000, uomCode1: 'NO', quantity1Hundredths: 400000, dutyCents: 55200 },
       ];
@@ -1273,7 +1276,8 @@ export const SCENARIOS: Scenario[] = [
       line.parties = [];
       line.tariffs = [
         { htsNumber: '99030543', valueDollars: 0 }, // NT52 HK 12.5%
-        { htsNumber: '7419803000', valueDollars: 3000, uomCode1: 'NO', quantity1Hundredths: 5000 },
+        // CERT W1 (9/3): KG, not NO.
+        { htsNumber: '7419803000', valueDollars: 3000, uomCode1: 'KG', quantity1Hundredths: 10000 },
       ];
     },
   }),
