@@ -1213,8 +1213,11 @@ export const SCENARIOS: Scenario[] = [
 
   aeScenario('032', 'Knife Sets', {
     rates: {
-      '99030539': NT52_100, // NT52 EU (DE)
-      '8211100000': 'Free', // set provision: rate is the highest-rate article's — components pinned below
+      // Karl's 006 pattern for derivative steel, col1 < 15%: .05.90
+      // excludes the NT52, .82.10 deposits flat 15%, ch.1-97 zeroes.
+      '99030590': 'Free',
+      '99038210': 'The duty provided in the applicable subheading + 15%',
+      '8211100000': 'Free',
       '8211929045': '0.4¢ each + 6.1%',
       '8211930035': '3¢ each + 5.4%',
     },
@@ -1234,36 +1237,44 @@ export const SCENARIOS: Scenario[] = [
       // beats 8211.92's ≈ 6.5%). That rate applied per component:
       //   8211.92: 5.4%×$16,000 + 3¢×16,000 pcs = $864.00+$480.00 = $1,344.00
       //   8211.93: 5.4%×$8,000  + 3¢×4,000 pcs  = $432.00+$120.00 =   $552.00
+      // Live 9/3 F771/F794: knives are DERIVATIVE STEEL under NT16 — the
+      // 232 stack replaces the highest-rate-article arithmetic entirely
+      // (Karl's 006 semantics: bucket deposits flat 15%, ch.1-97 zeroes).
       line.tariffs = [
-        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10%
-        // CERT W1 (9/3): 8211.10 reports PCS — total pieces across the set
-        // (4,000 five-piece sets = 20,000). Formula code 9 = duty by the
-        // highest-rate article, confirming the component pins below.
+        { htsNumber: '99030590', valueDollars: 0 }, // NT52-side 232 exclusion
+        { htsNumber: '99038210', valueDollars: 0 }, // DER ALU & STL, COL 1 < 15% — 15%
+        // CERT W1 (9/3): 8211.10 reports PCS — 4,000 five-piece sets.
         { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 2000000, dutyCents: 0 },
-        { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 134400 },
-        { htsNumber: '8211930035', valueDollars: 8000, uomCode1: 'NO', quantity1Hundredths: 400000, dutyCents: 55200 },
+        { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 0 },
+        { htsNumber: '8211930035', valueDollars: 8000, uomCode1: 'NO', quantity1Hundredths: 400000, dutyCents: 0 },
       ];
+      // Live F794: steel melt-and-pour declaration, DE origin.
+      line.declarations = [{ typeCode: '08', information: 'DE' }];
     },
     notes: 'Set duty pinned at the highest-rate article (8211.93.00: 3¢ each + 5.4%) applied to each component — confirm interpretation with client rep.',
   }),
 
   aeScenario('033', 'Multiple Bonds', {
     rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
-    mutate: (p) => {
+    mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
       line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
       // Continuous basic + additional STB (allowable configuration 3,
       // ESF-157), surety 054 per the package.
+      // Live 9/3 F145: the continuous bond must match CERT's bond file —
+      // our IOR's on-file surety is the params one (891), not the
+      // package's 054. The STB keeps 054 (nothing on file to mismatch;
+      // its F752 NO STB FOUND is the expected vendor evidence).
       p.entrySummary.bonds = [
-        { bondTypeCode: '8', designationTypeCode: 'B', suretyCompanyCode: '054' },
+        { bondTypeCode: '8', designationTypeCode: 'B', suretyCompanyCode: params.suretyCompanyCode },
         { bondTypeCode: '9', designationTypeCode: 'A', suretyCompanyCode: '054', stbAmountDollars: 25000 },
       ];
     },
   }),
 
   aeScenario('034', 'Personal Shipment', {
-    rates: { '99030543': NT52_125, '7419803000': '3%' },
+    rates: { '99030590': 'Free', '99038202': '50%', '7419803000': '3%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '11';
       p.entrySummary.indicators = { ...p.entrySummary.indicators, shipmentUsageTypeCode: 'P' };
@@ -1274,10 +1285,15 @@ export const SCENARIOS: Scenario[] = [
       line.descriptions = ['COPPER HOUSEHOLD ARTICLES'];
       line.foreignPortOfLading = '58201'; // Hong Kong (Schedule K)
       line.parties = [];
+      // Live 9/3 F771: copper is a 232 metal under NT16 (.05.90's own
+      // description: ALUM, STL, CPR) — the 023 pattern applies: drop the
+      // NT52 country row, .05.90 + the .82.02 content bucket (50%),
+      // substantive zeroes.
       line.tariffs = [
-        { htsNumber: '99030543', valueDollars: 0 }, // NT52 HK 12.5%
+        { htsNumber: '99030590', valueDollars: 0 },
+        { htsNumber: '99038202', valueDollars: 0 },
         // CERT W1 (9/3): KG, not NO.
-        { htsNumber: '7419803000', valueDollars: 3000, uomCode1: 'KG', quantity1Hundredths: 10000 },
+        { htsNumber: '7419803000', valueDollars: 3000, uomCode1: 'KG', quantity1Hundredths: 10000, dutyCents: 0 },
       ];
     },
   }),
