@@ -1249,8 +1249,10 @@ export const SCENARIOS: Scenario[] = [
         { htsNumber: '99038209', valueDollars: 0 }, // COP/DER ALU & STL bucket, 25%
         // CERT W1 (9/3): 8211.10 reports PCS — 4,000 five-piece sets.
         { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 2000000, dutyCents: 0 },
-        { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 134400 },
-        { htsNumber: '8211930035', valueDollars: 8000, uomCode1: 'NO', quantity1Hundredths: 400000, dutyCents: 55200 },
+        // F624 with the stacked reading (bucket + set pins, live 9/3) —
+        // trying .82.10's replace semantics: the 25% IS the line duty.
+        { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 0 },
+        { htsNumber: '8211930035', valueDollars: 8000, uomCode1: 'NO', quantity1Hundredths: 400000, dutyCents: 0 },
       ];
       // Live F794: steel melt-and-pour declaration, DE origin.
       line.declarations = [{ typeCode: '08', information: 'DE' }];
