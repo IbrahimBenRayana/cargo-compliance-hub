@@ -1704,7 +1704,10 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '9802004040', valueDollars: 3406, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 44000 },
+        // NT52-alone-replaces (the 037 precedent, same commodity family):
+        // ACE's calc = 12.5% x $9,426 combined value; the 44-cent repair
+        // duty and all constituents are '[replaced]'.
+        { htsNumber: '9802004040', valueDollars: 3406, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
         { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH 12.5%
         { htsNumber: '9102111010', valueDollars: 1852, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
         { htsNumber: '9102111020', valueDollars: 2619, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
@@ -1730,7 +1733,7 @@ export const SCENARIOS: Scenario[] = [
       line.ruling = { typeCode: 'C', number: '832264' };
       line.tariffs = [
         { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
-        { htsNumber: '8536490055', valueDollars: 17100, uomCode1: 'NO', quantity1Hundredths: 900000 },
+        { htsNumber: '8536490055', valueDollars: 17100, uomCode1: 'NO', quantity1Hundredths: 900000, dutyCents: 0 }, // NT52-alone-replaces
       ];
     },
     notes: 'PGA disclaimer FC0 rides the PG-record message set (workstream D \u2014 spec download pending); dry-run transmits the ruling core without the PG grouping.',
@@ -1739,13 +1742,19 @@ export const SCENARIOS: Scenario[] = [
   appScenario('050', 'Entry Summary Query', 'EQ', (params) => {
     // Package: EES criteria, from 30 days prior to today \u2014 derived from the
     // applicability date so dry-run goldens stay stable.
-    const cy = params.currentYear.slice(2);
+    // Window derived from the applicability date (30 days back) — the
+    // fixed Jul-Aug window would miss every entry we actually filed.
+    const d = params.applicabilityDate;
+    const to = new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(4, 6)) - 1, Number(d.slice(6, 8))));
+    const from = new Date(to.getTime() - 30 * 86400000);
+    const mmddyy = (x: Date) =>
+      `${String(x.getUTCMonth() + 1).padStart(2, '0')}${String(x.getUTCDate()).padStart(2, '0')}${String(x.getUTCFullYear()).slice(2)}`;
     return buildEntrySummaryQuery({
       returnDetail: true,
       criteria: {
         type: 'EES',
-        fromDateTime: `0721${cy}120000AM`,
-        toDateTime: `0820${cy}115959PM`,
+        fromDateTime: `${mmddyy(from)}120000AM`,
+        toDateTime: `${mmddyy(to)}115959PM`,
         entrySummaries: true,
       },
     });
