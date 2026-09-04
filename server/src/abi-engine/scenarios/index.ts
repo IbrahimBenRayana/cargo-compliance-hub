@@ -1530,10 +1530,11 @@ export const SCENARIOS: Scenario[] = [
 
   aeScenario('043', 'ADD/CVD & Quota', {
     rates: {
-      // 9903.85.37 (Sec 232 aluminum): overlay wording pinned — confirm the
-      // exact provision text with the client rep at cert time.
-      '99038537': 'The duty provided in the applicable subheading + 25%',
-      '99030539': NT52_100, // NT52 EU (ES)
+      // Modernized 9/4: the 9903.85 aluminum family is expired like the
+      // .80 steel range — NT16 treatment instead (023 pattern): .05.90
+      // excludes the EU NT52, .82.02 content bucket stacks on col 1.
+      '99030590': 'Free',
+      '99038202': '50%',
       '7606123096': '3%',
     },
     mutate: (p) => {
@@ -1548,10 +1549,13 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '99038537', valueDollars: 0, uomCode1: 'X' },
-        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10%
+        { htsNumber: '99030590', valueDollars: 0 }, // NT52-side 232 exclusion
+        { htsNumber: '99038202', valueDollars: 0 }, // metal content bucket, 50%, stacks
         { htsNumber: '7606123096', valueDollars: 68707, uomCode1: 'KG', quantity1Hundredths: 2192600 },
       ];
+      // Aluminum mill product: Type 07 smelt/cast declaration (ESF-111/112
+      // layout proven live on 035).
+      line.declarations = [{ typeCode: '07', information: 'Y  ESN    ES' }];
       // AD deposit rate comes from the AD case query at cert time (scenario
       // 063); dry-run pins a zero deposit.
       line.adCvdCases = [
@@ -1571,6 +1575,7 @@ export const SCENARIOS: Scenario[] = [
       // in the Special column; preference pinned to Free.
       line.spiClaimCode = 'W';
       line.descriptions = ['DRIED MEAT PRODUCTS'];
+      line.foreignPortOfLading = '24871'; // Kingstown, St Vincent (Schedule K)
       line.parties = [
         { type: 'M', identifier: 'VCKINMEA754KIN' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },

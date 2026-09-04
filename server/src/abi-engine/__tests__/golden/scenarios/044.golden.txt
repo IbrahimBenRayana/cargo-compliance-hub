@@ -6,7 +6,7 @@ B  2704ZZZAE                                               SCENARIO 044
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-40  001 VCVC080126      W        500           1200    N                        
+40  001 VCVC080126      W        50024871      1200    N                        
 44DRIED MEAT PRODUCTS                                                           
 47MVCKINMEA754KIN                                                               
 47S26-164751100                                                                 
