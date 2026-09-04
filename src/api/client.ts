@@ -1243,6 +1243,12 @@ export const certApi = {
       body: JSON.stringify({ htsNumbers, asOfDate }),
     });
   },
+  adcvdQuery(caseNumbers: string[]) {
+    return apiFetch<{ transport: string; messageId: string; raw: string[][]; note?: string }>(
+      '/api/cert/transport/adcvd-query',
+      { method: 'POST', body: JSON.stringify({ caseNumbers }) }
+    );
+  },
 
   /** Backfill: replay every audit-logged received batch through the response auto-attach. */
   attachLoggedResponses() {

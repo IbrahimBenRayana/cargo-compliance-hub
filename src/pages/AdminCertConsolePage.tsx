@@ -411,6 +411,44 @@ function AmfCard() {
 // CERT's HTS table can diverge from the published tariff (live F642/F434
 // evidence). This asks ACE's own table what it considers valid — validity
 // window + required units per number — so filings match CERT's reality.
+function AdCaseQueryCard() {
+  const [cases, setCases] = useState('');
+  const [result, setResult] = useState<Awaited<ReturnType<typeof certApi.adcvdQuery>> | null>(null);
+  const query = useMutation({
+    mutationFn: () =>
+      certApi.adcvdQuery(cases.split(/[\s,]+/).map((c) => c.trim()).filter((c) => /^[A-Za-z0-9]{7}([A-Za-z0-9]{3})?$/.test(c))),
+    onSuccess: (r) => {
+      setResult(r);
+      if (r.note) toast.info(r.note);
+      else toast.success('AD/CVD case answers received');
+    },
+    onError: (err: any) => toast.error(apiErrorMessage(err, 'AD/CVD query failed')),
+  });
+  const valid = cases.split(/[\s,]+/).some((c) => /^[A-Za-z0-9]{7}([A-Za-z0-9]{3})?$/.test(c.trim()));
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg">Background data — AD/CVD case query (AD)</CardTitle>
+        <CardDescription>
+          Case detail straight from ACE — deposit rates, suspension status, covered HTS numbers. Space- or
+          comma-separated case numbers, 7 or 10 characters, no dashes (A470820000).
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex gap-2">
+          <Input value={cases} onChange={(e) => setCases(e.target.value)} placeholder="A470820000 A412824000" className="font-mono" />
+          <Button onClick={() => query.mutate()} disabled={!valid || query.isPending}>
+            {query.isPending ? 'Querying…' : 'Query cases'}
+          </Button>
+        </div>
+        {result && result.raw.length > 0 && (
+          <WireTextBlock text={result.raw.map((b) => b.join('\n')).join('\n\n')} label="Case file response" />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function HtsQueryCard() {
   const [numbers, setNumbers] = useState('');
   const [asOf, setAsOf] = useState('');
@@ -904,6 +942,7 @@ export function AdminCertConsolePage() {
 
       {/* Background data (HTS queries + manufacturer adds) */}
       <HtsQueryCard />
+      <AdCaseQueryCard />
       <AmfCard />
 
       {/* Parameters */}

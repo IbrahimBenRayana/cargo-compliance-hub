@@ -26,6 +26,7 @@ import { createTransport, MqiptTransport } from '../abi-engine/transport/index.j
 import { buildAddManufacturers } from '../abi-engine/apps/addManufacturer/builder.js';
 import { CERT_MANUFACTURERS } from '../abi-engine/scenarios/certManufacturers.js';
 import { buildHtsQuery } from '../abi-engine/apps/htsQuery/builder.js';
+import { buildAdCvdCaseQuery } from '../abi-engine/apps/adcvd/builder.js';
 import { parseHtsQueryResponseBatch } from '../abi-engine/apps/htsQuery/responseParser.js';
 import { buildBatch } from '../abi-engine/envelope/batch.js';
 import { deriveMid } from '../abi-engine/payload/mid.js';
@@ -593,6 +594,60 @@ router.post('/transport/hts-query', async (req: AuthRequest, res: Response): Pro
     }
     res.status(502).json({
       error: 'HTS query transmit failed',
+      detail: err instanceof Error ? err.message : String(err),
+      transport: transport.kind,
+    });
+  }
+});
+
+// ─── POST /transport/adcvd-query ──────────────────────────
+// Background data: AD/CVD case detail straight from ACE (AD/AC). Type-03
+// scenarios (043, 067-073) need live deposit rates that only the case
+// file holds.
+const adCaseQuerySchema = z.object({
+  caseNumbers: z.array(z.string().regex(/^[A-Za-z0-9]{7}([A-Za-z0-9]{3})?$/)).min(1).max(20),
+});
+router.post('/transport/adcvd-query', async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = adCaseQuerySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+    return;
+  }
+  try {
+    const params = await loadParams();
+    const records = buildAdCvdCaseQuery({ type: 'caseNumbers', caseNumbers: parsed.data.caseNumbers.map((c) => c.toUpperCase()) });
+    const lines = buildBatch({
+      sender: params.sender,
+      appId: 'AD',
+      blocks: [{
+        port: params.districtPortOfEntry,
+        filerCode: params.filerCode,
+        userData: 'ADCVD BACKGROUND',
+        transactionLines: records,
+      }],
+    });
+    const receipt = await transport.send(lines, { correlationId: 'ADCVD-QUERY' });
+    const batches = await transport.receive({ timeoutMs: 25000, max: 10 });
+    const acBatch = batches.find((b) => b.some((l) => l.startsWith('R')));
+    await writeAuditLog({
+      orgId: req.user!.orgId, userId: req.user!.id,
+      action: 'cert.adcvd_query', entityType: 'cert_transmission',
+      newValue: { caseNumbers: parsed.data.caseNumbers, messageId: receipt.messageId, batches },
+      ...getRequestMeta(req),
+    });
+    res.json({
+      transport: transport.kind,
+      messageId: receipt.messageId,
+      raw: batches,
+      note: acBatch ? undefined : 'No AC batch arrived within 25s — use Check for responses to drain it later.',
+    });
+  } catch (err) {
+    if (err instanceof RecordCodecError) {
+      res.status(422).json({ error: 'AD/CVD query failed to build', issues: err.issues });
+      return;
+    }
+    res.status(502).json({
+      error: 'AD/CVD query transmit failed',
       detail: err instanceof Error ? err.message : String(err),
       transport: transport.kind,
     });
