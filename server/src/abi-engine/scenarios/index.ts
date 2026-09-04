@@ -1661,6 +1661,11 @@ export const SCENARIOS: Scenario[] = [
     rates: { '99038815': 'The duty provided in the applicable subheading + 7.5%', '99030531': NT52_125, '6601990000': '8.2%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '21';
+      // Live F173 9/4: warehouse entries report the bonded facility's
+      // FIRMS code (10-record location of goods). Package supplies none —
+      // well-formed test code; the TPL-cert precedent suggests unknown
+      // reference numbers downgrade to informationals.
+      p.entrySummary.cargo = { ...p.entrySummary.cargo!, locationOfGoodsCode: 'W303' };
       const line = p.entrySummary.lines[0];
       line.descriptions = ['UMBRELLAS'];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
