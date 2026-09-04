@@ -177,7 +177,10 @@ export async function enrichWithDuty(
     // (live F629 FORMAL MPF NOT ALLOWED / F480 HMF NOT ALLOWED - SET
     // COMPONENT, 8/28).
     const setComponent = line.articleSetIndicator === 'V';
-    if (!mpfExempt && !line.feeExemptionCode && !spiMpfExempt && !setComponent) {
+    // 9802.00 repair/alteration provisions are MPF-exempt ARTICLES (live
+    // F632 FORMAL MPF NOT ALLOWED - ARTICLE EXEMPT, scenario 048, 9/5).
+    const repairProvision = line.tariffs.some((t) => t.htsNumber.startsWith('980200'));
+    if (!mpfExempt && !line.feeExemptionCode && !spiMpfExempt && !setComponent && !repairProvision) {
       const mpf = computeLineMpfCents(value);
       totalLineMpfCents += mpf;
       fees.push({ classCode: '499', amountCents: mpf });
