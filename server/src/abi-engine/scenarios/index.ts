@@ -1247,8 +1247,11 @@ export const SCENARIOS: Scenario[] = [
       line.tariffs = [
         { htsNumber: '99030590', valueDollars: 0 }, // NT52-side 232 exclusion
         { htsNumber: '99038209', valueDollars: 0 }, // COP/DER ALU & STL bucket, 25%
-        // CERT W1 (9/3): 8211.10 reports PCS — 4,000 five-piece sets.
-        { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 2000000, dutyCents: 0 },
+        // Karl's ESV trace 9/4: the set provision line carries THE HIGHEST
+        // COMPONENT'S OWN DUTY (8211.92: 0.4¢×16,000 + 6.1%×$16,000 =
+        // \$1,040.00); the other component is 'Excluded from final calc'
+        // at \$0. Winner-takes-all, not rate-applied-to-all.
+        { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 2000000, dutyCents: 104000 },
         // F624 with the stacked reading (bucket + set pins, live 9/3) —
         // trying .82.10's replace semantics: the 25% IS the line duty.
         { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 0 },
@@ -1558,14 +1561,14 @@ export const SCENARIOS: Scenario[] = [
       // Aluminum mill product: Type 07 smelt/cast declaration (ESF-111/112
       // layout proven live on 035).
       line.declarations = [{ typeCode: '07', information: 'Y  ESN    ES' }];
-      // Live F687 9/4: aluminum import license, spec type 28 (steel's
-      // S23+date pattern, A-prefixed).
-      const d43 = params.applicabilityDate;
-      line.license = { typeCode: '28', number: `A23${d43.slice(4, 8)}${d43.slice(2, 4)}` };
+      // Karl 9/4: "No steel licenses because of 232 duty" — the license
+      // requirement is suspended when the 232 bucket duty applies.
       // AD deposit rate comes from the AD case query at cert time (scenario
       // 063); dry-run pins a zero deposit.
+      // Karl 9/4: deposit rate 3.8% (case not queryable in CERT's file).
+      // 3.8% × \$68,707 = \$2,610.87 (half-up).
       line.adCvdCases = [
-        { caseNumber: 'A470820000', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+        { caseNumber: 'A470820000', bondCashClaimCode: 'C', depositRateHundredths: 380, rateTypeQualifier: 'A', dutyCents: 261087 },
       ];
     },
     notes: 'AD deposit rate arrives from the AD query (scenario 063) at cert; pinned 0 for the dry run.',
