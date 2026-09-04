@@ -10,7 +10,7 @@ B  2704ZZZAE                                               SCENARIO 048
 44WRIST WATCHES REPAIRED IN GREENLAND, MOVEMENTS ONLY                           
 47MGLGOHWAT219GOH                                                               
 47S26-164751100                                                                 
-509802004040          0       3406       100000NO                               
+509802004040          0       3406                                              
 5099030574       117825          0                                              
 509102111010          0       1852       100000NO                               
 509102111020          0       2619       100000NO                               

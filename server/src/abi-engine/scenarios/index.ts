@@ -1707,7 +1707,10 @@ export const SCENARIOS: Scenario[] = [
         // NT52-alone-replaces (the 037 precedent, same commodity family):
         // ACE's calc = 12.5% x $9,426 combined value; the 44-cent repair
         // duty and all constituents are '[replaced]'.
-        { htsNumber: '9802004040', valueDollars: 3406, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
+        // CERT W1 (9/5): 9802.00.40.40 has ZERO reporting units — omit
+        // uom/quantity (the zero-units family; CERT's table beats the
+        // package's 'quantity on all HTS numbers').
+        { htsNumber: '9802004040', valueDollars: 3406, dutyCents: 0 },
         { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH 12.5%
         { htsNumber: '9102111010', valueDollars: 1852, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
         { htsNumber: '9102111020', valueDollars: 2619, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
