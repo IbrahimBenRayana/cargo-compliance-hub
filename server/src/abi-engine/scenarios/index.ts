@@ -1476,7 +1476,8 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '7101223000', valueDollars: 10000, uomCode1: 'GM', quantity1Hundredths: 100000 },
+        // CERT W1 (9/4): 'G', not 'GM' (live F442).
+        { htsNumber: '7101223000', valueDollars: 10000, uomCode1: 'G', quantity1Hundredths: 100000 },
       ];
     },
   }),
@@ -1499,7 +1500,9 @@ export const SCENARIOS: Scenario[] = [
         // NT52 alongside another action → STACKS; 12.5% x $1,189 = 148.625
         // pinned half-up per tariff (the 036 trace's rounding).
         { htsNumber: '99030531', valueDollars: 0, dutyCents: 14863 }, // NT52 CN 12.5%
-        { htsNumber: '9106100000', valueDollars: 1189, uomCode1: 'NO', quantity1Hundredths: 12000, dutyCents: 10978 },
+        // CERT W1 (9/4): NO + JWL — the jewel count reports even at zero
+        // (live F443).
+        { htsNumber: '9106100000', valueDollars: 1189, uomCode1: 'NO', quantity1Hundredths: 12000, uomCode2: 'JWL', quantity2Hundredths: 0, dutyCents: 10978 },
       ];
     },
     notes: 'MOT 50 + duty due triggers the 496 dutiable-mail fee automatically (engine). Rate pinned: 36\u00a2 each + 5.6% (no jewels).',

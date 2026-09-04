@@ -72,6 +72,9 @@ export const HMF_DE_MINIMIS_CENTS = 300;
  */
 export const MPF_EXEMPT_SPI = new Set([
   'AU', 'BH', 'P', 'P+', 'CL', 'CO', 'KS', 'S', 'S+', 'OM', 'PA', 'PE', 'SG',
+  // Y = insular possessions (general note 3(a)(iv)) — live F632 FORMAL MPF
+  // NOT ALLOWED - ARTICLE EXEMPT, scenario 040, 9/4.
+  'Y',
 ]);
 
 const HMF_MOTS = new Set(['10', '11', '12']);
