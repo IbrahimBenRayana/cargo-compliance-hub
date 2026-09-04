@@ -1537,15 +1537,17 @@ export const SCENARIOS: Scenario[] = [
       '99038202': '50%',
       '7606123096': '3%',
     },
-    mutate: (p) => {
+    mutate: (p, params) => {
       p.entrySummary.entryTypeCode = '07';
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'ES';
       line.countryOfExport = 'ES';
       line.descriptions = ['ALUMINUM ALLOY SHEET'];
       line.foreignPortOfLading = '47094'; // Valencia (Schedule K)
+      // Live F499 9/4: type 07 requires the FOREIGN EXPORTER party.
       line.parties = [
         { type: 'M', identifier: 'ESMADALU365MAD' },
+        { type: 'E', identifier: 'ESMADALU365MAD' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
@@ -1556,6 +1558,10 @@ export const SCENARIOS: Scenario[] = [
       // Aluminum mill product: Type 07 smelt/cast declaration (ESF-111/112
       // layout proven live on 035).
       line.declarations = [{ typeCode: '07', information: 'Y  ESN    ES' }];
+      // Live F687 9/4: aluminum import license, spec type 28 (steel's
+      // S23+date pattern, A-prefixed).
+      const d43 = params.applicabilityDate;
+      line.license = { typeCode: '28', number: `A23${d43.slice(4, 8)}${d43.slice(2, 4)}` };
       // AD deposit rate comes from the AD case query at cert time (scenario
       // 063); dry-run pins a zero deposit.
       line.adCvdCases = [

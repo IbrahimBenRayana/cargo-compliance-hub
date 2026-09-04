@@ -75,6 +75,8 @@ export const MPF_EXEMPT_SPI = new Set([
   // Y = insular possessions (general note 3(a)(iv)) — live F632 FORMAL MPF
   // NOT ALLOWED - ARTICLE EXEMPT, scenario 040, 9/4.
   'Y',
+  // W = CBERA meat provision — live F632, scenario 044, 9/4.
+  'W',
 ]);
 
 const HMF_MOTS = new Set(['10', '11', '12']);
