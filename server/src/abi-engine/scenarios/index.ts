@@ -1612,11 +1612,12 @@ export const SCENARIOS: Scenario[] = [
         { type: 'M', identifier: 'ITMILFER426MIL' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
-      // \u20ac5,000 converted at the CBP-certified quarterly rate; dry-run pins
-      // 1.08 USD/EUR \u2192 $5,400 (cert run uses the actual quarterly rate).
+      // \u20ac5,000 at CBP's OWN certified rate from the daily %R broadcast
+      // (live 9/2: EUR 1159200 D \u2192 1.1592) = $5,796.00. Confirm the
+      // transmit-morning %R EUR line before sending.
       line.tariffs = [
         { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (IT)
-        { htsNumber: '3103190000', valueDollars: 5400, uomCode1: 'T', quantity1Hundredths: 10000 },
+        { htsNumber: '3103190000', valueDollars: 5796, uomCode1: 'T', quantity1Hundredths: 10000 },
       ];
     },
     notes: 'Foreign-currency value: \u20ac5,000 \u00d7 CBP quarterly rate. Dry-run pinned at 1.08; substitute the certified rate at cert time.',
@@ -1657,13 +1658,14 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('047', 'Warehouse Entry', {
-    rates: { '99030531': NT52_125, '6601990000': '8.2%' },
+    rates: { '99038815': 'The duty provided in the applicable subheading + 7.5%', '99030531': NT52_125, '6601990000': '8.2%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '21';
       const line = p.entrySummary.lines[0];
       line.descriptions = ['UMBRELLAS'];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
       line.tariffs = [
+        { htsNumber: '99038815', valueDollars: 0 }, // 301 List 4A, 7.5% — CN line (028 rule)
         { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
         { htsNumber: '6601990000', valueDollars: 50000, uomCode1: 'DOZ', quantity1Hundredths: 120000 },
       ];
