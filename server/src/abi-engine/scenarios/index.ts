@@ -1561,8 +1561,12 @@ export const SCENARIOS: Scenario[] = [
       // Aluminum mill product: Type 07 smelt/cast declaration (ESF-111/112
       // layout proven live on 035).
       line.declarations = [{ typeCode: '07', information: 'Y  ESN    ES' }];
-      // Karl 9/4: "No steel licenses because of 232 duty" — the license
-      // requirement is suspended when the 232 bucket duty applies.
+      // F687 timeline: round 1 = no license → F687; Karl said none needed
+      // ("No steel licenses because of 232 duty") but round 2 without one
+      // → F687 again. The type-28 license was never live-tested — filing
+      // it now (aluminum import license, A-prefixed steel date pattern).
+      const d43 = params.applicabilityDate;
+      line.license = { typeCode: '28', number: `A23${d43.slice(4, 8)}${d43.slice(2, 4)}` };
       // AD deposit rate comes from the AD case query at cert time (scenario
       // 063); dry-run pins a zero deposit.
       // Karl 9/4: deposit rate 3.8% (case not queryable in CERT's file).
