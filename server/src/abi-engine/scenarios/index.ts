@@ -1711,7 +1711,10 @@ export const SCENARIOS: Scenario[] = [
         // uom/quantity (the zero-units family; CERT's table beats the
         // package's 'quantity on all HTS numbers').
         { htsNumber: '9802004040', valueDollars: 3406, dutyCents: 0 },
-        { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH 12.5%
+        // F624 with 12.5% x $9,426 (live 9/5): under 9802.00.40 the
+        // dutiable value is the REPAIRS ($3,406) — NT52 base follows it.
+        // 12.5% x $3,406 = $425.75.
+        { htsNumber: '99030574', valueDollars: 0, dutyCents: 42575 }, // NT52 CH 12.5%
         { htsNumber: '9102111010', valueDollars: 1852, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
         { htsNumber: '9102111020', valueDollars: 2619, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
         { htsNumber: '9102111030', valueDollars: 1345, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
