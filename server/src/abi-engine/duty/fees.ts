@@ -77,6 +77,9 @@ export const MPF_EXEMPT_SPI = new Set([
   'Y',
   // W = CBERA meat provision — live F632, scenario 044, 9/4.
   'W',
+  // D = AGOA — unilateral preference, MPF-exempt like Y/W (preempting
+  // scenario 051's F632).
+  'D',
 ]);
 
 const HMF_MOTS = new Set(['10', '11', '12']);
