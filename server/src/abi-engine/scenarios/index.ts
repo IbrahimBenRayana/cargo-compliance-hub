@@ -1887,10 +1887,13 @@ export const SCENARIOS: Scenario[] = [
       line.parties = [];
       // 9811.00.60: sample of negligible value \u2014 $1. The 9811 provision is
       // itself 98xx, so the NT52 number follows it.
+      // Live F613 9/8: the 9811 provision pairs with the underlying
+      // commodity's HTS (the 9802-constituent pattern). Package names no
+      // commodity — 3306.90 (Free, KG, CERT-verified) as the sample.
       line.tariffs = [
-        // CERT W1 (9/8): 9811.00.60 has zero units (live F442 with NO).
         { htsNumber: '98110060', valueDollars: 1 },
         { htsNumber: '99030529', valueDollars: 0 }, // NT52 CA 10%
+        { htsNumber: '3306900000', valueDollars: 0, uomCode1: 'KG', quantity1Hundredths: 100, dutyCents: 0 },
       ];
     },
   }),

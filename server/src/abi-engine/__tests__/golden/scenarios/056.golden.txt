@@ -10,6 +10,7 @@ B  2704ZZZAE                                               SCENARIO 056
 44SAMPLES FOR SOLICITING ORDERS                                                 
 5098110060            0          1                                              
 5099030529           10          0                                              
+503306900000          0          0          100KG                               
 90         10           0           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        
