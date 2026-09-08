@@ -2054,13 +2054,14 @@ export const SCENARIOS: Scenario[] = [
         { type: 'M', identifier: 'FRCOGBRA759COG' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
-      // IRC distilled-spirits tax pinned: $13.50/proof gallon \u00d7 324 PFL =
-      // $4,374.00, accounting class 016, EFT deferral (code 2).
+      // IRC distilled-spirits tax per CERT's W5 (9/10): class 016 at
+      // $3.5663227/PFL ($13.50/proof-gallon converted) × 324 PFL =
+      // $1,155.49, EFT deferral (code 2).
       line.tariffs = [
         { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (FR)
         { htsNumber: '2208202000', valueDollars: 5022, uomCode1: 'PFL', quantity1Hundredths: 32400 },
       ];
-      line.irTax = { classCode: '016', amountCents: 437400 };
+      line.irTax = { classCode: '016', amountCents: 115549 };
     },
     notes: 'IR tax on a DAILY statement (monthly would be barred by note y); EFT deferral code 2.',
   }),
