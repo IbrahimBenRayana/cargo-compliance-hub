@@ -1939,12 +1939,11 @@ export const SCENARIOS: Scenario[] = [
         { type: 'M', identifier: 'XOTORVIN926TOR' }, // XO = Ontario
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
-      // F624 with NT52-replace (live 9/8): the .05.29 row is
-      // origin-enforced to CA, and this line's origin is the PROVINCE XO —
-      // ACE computes zero against the row and column 1 stands un-replaced
-      // (the 027-XQ pattern).
+      // Elimination (live 9/8): replace (\$1,000) and inapplicable (\$530)
+      // both F624'd — the remaining cell is the STACK: for Canadian
+      // province origins the NT52 stacks on column 1. \$1,530.00.
       line.tariffs = [
-        { htsNumber: '99030529', valueDollars: 0, dutyCents: 0 }, // NT52 CA — inapplicable to XO origin
+        { htsNumber: '99030529', valueDollars: 0 }, // NT52 CA 10% — stacks
         { htsNumber: '3918101020', valueDollars: 10000, uomCode1: 'M2', quantity1Hundredths: 100000 },
       ];
     },
