@@ -9,6 +9,7 @@ B  2704ZZZAE                                               SCENARIO 067
 40  001 ITIT080126               50047527      1200    N                        
 44DRIED PASTA                                                                   
 47MITROMPAS284ROM                                                               
+47EITROMPAS284ROM                                                               
 47S26-164751100                                                                 
 5099030539       100000          0                                              
 501902192020          0      10000       500000KG                               

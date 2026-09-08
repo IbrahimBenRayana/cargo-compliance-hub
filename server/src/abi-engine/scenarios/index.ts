@@ -2084,6 +2084,7 @@ export const SCENARIOS: Scenario[] = [
       line.foreignPortOfLading = '47527'; // Genoa (Schedule K)
       line.parties = [
         { type: 'M', identifier: 'ITROMPAS284ROM' },
+        { type: 'E', identifier: 'ITROMPAS284ROM' }, // live F499: type 03 needs the exporter
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
@@ -2100,14 +2101,24 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('068', 'Case Status', {
-    rates: { '99030531': NT52_125, '1902192020': 'Free' },
+    rates: { '99030539': NT52_100, '1902192020': 'Free' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
-      line.descriptions = ['STEEL WIRE ROD'];
-      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      // Live 9/10: F547 — the case is French; origin follows it. The
+      // remaining F559 CASE REVOKED is the scenario's own evidence (the
+      // 057 'correct error' class); I548 HTS-not-on-case is informational.
+      line.countryOfOrigin = 'FR';
+      line.countryOfExport = 'FR';
+      line.descriptions = ['DRIED PASTA'];
+      line.foreignPortOfLading = '42737'; // Le Havre (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'FRPARMUS791PAR' },
+        { type: 'E', identifier: 'FRPARMUS791PAR' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
       line.tariffs = [
-        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
+        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (FR)
         { htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
       ];
       line.adCvdCases = [
@@ -2118,14 +2129,24 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('069', 'HTS Number and Case Number', {
-    rates: { '99030531': NT52_125, '3912390000': '4.2%' },
+    rates: { '99030539': NT52_100, '3912390000': '4.2%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
+      // Live 9/10: F547 — Finnish case; origin follows. F559 (revoked
+      // 2014) expected as evidence; I548 informational (package pairs an
+      // HTS outside the case's coverage on purpose).
+      line.countryOfOrigin = 'FI';
+      line.countryOfExport = 'FI';
       line.descriptions = ['CELLULOSE ETHERS'];
-      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.foreignPortOfLading = '40500'; // Helsinki (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'ITMILTOM468MIL' },
+        { type: 'E', identifier: 'ITMILTOM468MIL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
       line.tariffs = [
-        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
+        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (FI)
         { htsNumber: '3912390000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 200000 },
       ];
       line.adCvdCases = [
@@ -2135,13 +2156,19 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('070', 'Case with Ad Valorem Rate', {
-    rates: { '99030531': NT52_125, '1902192020': 'Free' },
+    rates: { '99038803': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '1902192020': 'Free' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
-      line.descriptions = ['CASED PENCILS'];
+      line.descriptions = ['ALUMINUM EXTRUSION HARDWARE'];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'CNSHEBAT123SHA' },
+        { type: 'E', identifier: 'CNSHEBAT123SHA' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
       line.tariffs = [
+        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3 (live F771)
         { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
         { htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
       ];
@@ -2153,15 +2180,24 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('071', 'Case with Cash Deposit', {
-    rates: { '99030531': NT52_125, '1902192020': 'Free' },
+    rates: { '99030549': NT52_125, '1902192020': 'Free' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
-      line.descriptions = ['PORCELAIN-ON-STEEL COOKWARE'];
-      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      // Live 9/10: F547 — Japanese case; origin follows (I548 stays
+      // informational for the off-case commodity).
+      line.countryOfOrigin = 'JP';
+      line.countryOfExport = 'JP';
+      line.descriptions = ['PIPE FITTINGS'];
+      line.foreignPortOfLading = '58886'; // Tokyo (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'JPTYOSHO913TYO' },
+        { type: 'E', identifier: 'JPTYOSHO913TYO' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
       line.tariffs = [
-        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
-        { htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
+        { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
+        { htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000, dutyCents: 0 },
       ];
       // Live case file: 30.83% CASH ONLY.
       line.adCvdCases = [
@@ -2181,6 +2217,7 @@ export const SCENARIOS: Scenario[] = [
       line.foreignPortOfLading = '47527'; // Genoa (Schedule K)
       line.parties = [
         { type: 'M', identifier: 'ITROMPAS284ROM' },
+        { type: 'E', identifier: 'ITROMPAS284ROM' }, // live F499
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
@@ -2199,7 +2236,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('073', 'Case and Deposit Rate', {
-    rates: { '99030531': NT52_125, '2841610000': 'Free' },
+    rates: { '99038803': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '2841610000': 'Free' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
@@ -2210,7 +2247,13 @@ export const SCENARIOS: Scenario[] = [
       // Live case file: covered HTS 2841610000 (potassium permanganate),
       // 128.94% CASH ONLY.
       line.descriptions = ['POTASSIUM PERMANGANATE'];
+      line.parties = [
+        { type: 'M', identifier: 'CNSHEBAT123SHA' },
+        { type: 'E', identifier: 'CNSHEBAT123SHA' }, // live F499
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
       line.tariffs = [
+        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3 (live F771)
         { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
         { htsNumber: '2841610000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
       ];

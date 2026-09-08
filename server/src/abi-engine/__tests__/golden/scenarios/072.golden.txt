@@ -9,6 +9,7 @@ B  2704ZZZAE                                               SCENARIO 072
 40  001 ITIT080126               50047527      1200    N                        
 44DRIED EGG PASTA                                                               
 47MITROMPAS284ROM                                                               
+47EITROMPAS284ROM                                                               
 47S26-164751100                                                                 
 5099030539       200000          0                                              
 501902192030          0      20000        32000KG                               

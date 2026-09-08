@@ -6,11 +6,12 @@ B  2704ZZZAE                                               SCENARIO 071
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-40  001 CNCN080126               50057035      1200    N                        
-44PORCELAIN-ON-STEEL COOKWARE                                                   
-47MCNSHEBAT123SHA                                                               
+40  001 JPJP080126               50058886      1200    N                        
+44PIPE FITTINGS                                                                 
+47MJPTYOSHO913TYO                                                               
+47EJPTYOSHO913TYO                                                               
 47S26-164751100                                                                 
-5099030531       125000          0                                              
+5099030549       125000          0                                              
 501902192020          0      10000       500000KG                               
 53A588602001C    3083A           0           0    308300                        
 62499    3464                                                                   
