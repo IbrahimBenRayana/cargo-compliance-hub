@@ -65,6 +65,11 @@ export function appScenario(
       buildBatch({
         sender: params.sender,
         appId,
+        // QA rejects envelope-level without a transmission date (live FX10
+        // 9/10, scenario 066); the other query apps accept either way.
+        transmissionDate: appId === 'QA'
+          ? `${params.applicabilityDate.slice(4, 8)}${params.applicabilityDate.slice(2, 4)}`
+          : undefined,
         blocks: [
           {
             port: params.districtPortOfEntry,

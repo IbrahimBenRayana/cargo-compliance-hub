@@ -1245,7 +1245,7 @@ export const certApi = {
   },
   adcvdQuery(caseNumbers: string[]) {
     return apiFetch<{ transport: string; messageId: string; raw: string[][]; note?: string }>(
-      '/api/cert/transport/adcvd-query',
+      '/api/v1/admin/cert/transport/adcvd-query',
       { method: 'POST', body: JSON.stringify({ caseNumbers }) }
     );
   },
