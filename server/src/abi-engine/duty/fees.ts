@@ -72,6 +72,8 @@ export const HMF_DE_MINIMIS_CENTS = 300;
  */
 export const MPF_EXEMPT_SPI = new Set([
   'AU', 'BH', 'P', 'P+', 'CL', 'CO', 'KS', 'S', 'S+', 'OM', 'PA', 'PE', 'SG',
+  // KR = Korea FTA — live F632, scenario 054, 9/8.
+  'KR',
   // Y = insular possessions (general note 3(a)(iv)) — live F632 FORMAL MPF
   // NOT ALLOWED - ARTICLE EXEMPT, scenario 040, 9/4.
   'Y',

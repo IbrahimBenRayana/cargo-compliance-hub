@@ -1833,7 +1833,9 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '99030571', valueDollars: 0 }, // NT52 KR 12.5%
-        { htsNumber: '4409106500', valueDollars: 10000, uomCode1: 'M3', quantity1Hundredths: 4000 },
+        // CERT W1 (9/8): 'M M3' — meters first, cubic meters second (live
+        // F442+F443). 40,000 m of moulding ≈ 40 m3.
+        { htsNumber: '4409106500', valueDollars: 10000, uomCode1: 'M', quantity1Hundredths: 4000000, uomCode2: 'M3', quantity2Hundredths: 4000 },
       ];
     },
   }),
@@ -1846,6 +1848,7 @@ export const SCENARIOS: Scenario[] = [
       line.countryOfOrigin = 'HT';
       line.countryOfExport = 'HT';
       line.descriptions = ['KNIT T-SHIRTS, MAN-MADE FIBERS'];
+      line.foreignPortOfLading = '24585'; // Port-au-Prince (Schedule K) — live F429
       line.parties = [
         { type: 'M', identifier: 'HTPAPTEX593PAP' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
@@ -1853,11 +1856,18 @@ export const SCENARIOS: Scenario[] = [
       // 9820.62.25 Haiti EIAP provision + apparel line; in-program = Free
       // (pinned). 52-Record type 13 = Haiti Earned Import Allowance.
       line.tariffs = [
-        { htsNumber: '98206225', valueDollars: 0, uomCode1: 'X' },
-        { htsNumber: '6109901007', valueDollars: 309, uomCode1: 'DOZ', quantity1Hundredths: 500, dutyCents: 0 },
+        // CERT W1 (9/8): 9820.62.25 has zero units (live F441 with 'X').
+        { htsNumber: '98206225', valueDollars: 0 },
+        // DOZ + KG (live F443); cotton fee 056 required (live F657, W5:
+        // \$0.00390509/kg × 12 kg = 4.686¢ → 5¢ half-up).
+        { htsNumber: '6109901007', valueDollars: 309, uomCode1: 'DOZ', quantity1Hundredths: 500, uomCode2: 'KG', quantity2Hundredths: 1200, dutyCents: 0 },
       ];
+      line.fees = [{ classCode: '056', amountCents: 5 }];
       line.license = { typeCode: '13', number: 'H623AD329' };
-      line.visaNumber = '123456';
+      // Standard visa format = year-digit + ISO country + sequence (the
+      // 6CA123456 TPL-cert pattern) — bare '123456' drew F468 STANDARD
+      // VISA COUNTRY UNKNOWN.
+      line.visaNumber = '6HT123456';
       line.textileCategoryCode = '638';
     },
     notes: 'EIAP certificate as 52-rec type 13; in-program preference pinned to Free.',
@@ -1878,7 +1888,8 @@ export const SCENARIOS: Scenario[] = [
       // 9811.00.60: sample of negligible value \u2014 $1. The 9811 provision is
       // itself 98xx, so the NT52 number follows it.
       line.tariffs = [
-        { htsNumber: '98110060', valueDollars: 1, uomCode1: 'NO', quantity1Hundredths: 100 },
+        // CERT W1 (9/8): 9811.00.60 has zero units (live F442 with NO).
+        { htsNumber: '98110060', valueDollars: 1 },
         { htsNumber: '99030529', valueDollars: 0 }, // NT52 CA 10%
       ];
     },

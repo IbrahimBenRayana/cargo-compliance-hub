@@ -177,10 +177,14 @@ export async function enrichWithDuty(
     // (live F629 FORMAL MPF NOT ALLOWED / F480 HMF NOT ALLOWED - SET
     // COMPONENT, 8/28).
     const setComponent = line.articleSetIndicator === 'V';
-    // 9802.00 repair/alteration provisions are MPF-exempt ARTICLES (live
-    // F632 FORMAL MPF NOT ALLOWED - ARTICLE EXEMPT, scenario 048, 9/5).
-    const repairProvision = line.tariffs.some((t) => t.htsNumber.startsWith('980200'));
-    if (!mpfExempt && !line.feeExemptionCode && !spiMpfExempt && !setComponent && !repairProvision) {
+    // MPF-exempt ARTICLE provisions, each live-proven by F632 FORMAL MPF
+    // NOT ALLOWED - ARTICLE EXEMPT: 9802.00 repairs (048, 9/5) and
+    // 9820 Haiti preference (055, 9/8). Deliberately narrow — 9823 TRQ
+    // lines exempt via SPI instead (027).
+    const exemptProvision = line.tariffs.some(
+      (t) => t.htsNumber.startsWith('980200') || t.htsNumber.startsWith('9820')
+    );
+    if (!mpfExempt && !line.feeExemptionCode && !spiMpfExempt && !setComponent && !exemptProvision) {
       const mpf = computeLineMpfCents(value);
       totalLineMpfCents += mpf;
       fees.push({ classCode: '499', amountCents: mpf });
@@ -220,7 +224,10 @@ export async function enrichWithDuty(
 
   // 5. Header fees (recomputed): informal 311; dutiable mail 496 (MOT 50).
   const headerFees: NonNullable<typeof es.headerFees> = [];
-  if (informal) headerFees.push({ classCode: '311', amountCents: informalEntryFeeCents(date) });
+  // Sample entries (9811.00 provisions) are exempt from even the informal
+  // MPF (live F635 INFRML MPF NOT ALLOWED - SUMMARY EXEMPT, scenario 056).
+  const sampleEntry = es.lines.every((l) => l.tariffs.some((t) => t.htsNumber.startsWith('981100')));
+  if (informal && !sampleEntry) headerFees.push({ classCode: '311', amountCents: informalEntryFeeCents(date) });
   if (es.motCode === '50' && totalDutyCents > 0) {
     headerFees.push({ classCode: '496', amountCents: dutiableMailFeeCents(date) });
   }

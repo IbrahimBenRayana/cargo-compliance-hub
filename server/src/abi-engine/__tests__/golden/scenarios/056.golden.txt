@@ -6,12 +6,10 @@ B  2704ZZZAE                                               SCENARIO 056
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-34311     269                                                                   
 40  001 CACA080126               50012493      1200                             
 44SAMPLES FOR SOLICITING ORDERS                                                 
-5098110060            0          1          100NO                               
+5098110060            0          1                                              
 5099030529           10          0                                              
-89311        269                                                                
-90         10         269           0           0           0           0       
+90         10           0           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        
