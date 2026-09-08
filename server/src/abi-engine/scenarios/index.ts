@@ -2147,7 +2147,8 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (FI)
-        { htsNumber: '3912390000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 200000 },
+        // F624 with the stack (live 9/10) — trying the EU replace reading.
+        { htsNumber: '3912390000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 200000, dutyCents: 0 },
       ];
       line.adCvdCases = [
         { caseNumber: 'A405803001', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
@@ -2254,7 +2255,9 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3 (live F771)
-        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
+        // F624 with the full stack (live 9/10) — unlike 028, this is a
+        // type-03 AD line; trying NT52-gives-way (301 + col1 only).
+        { htsNumber: '99030531', valueDollars: 0, dutyCents: 0 }, // NT52 CN
         { htsNumber: '2841610000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
       ];
       line.adCvdCases = [
