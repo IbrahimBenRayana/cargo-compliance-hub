@@ -1980,6 +1980,9 @@ export const SCENARIOS: Scenario[] = [
   aeScenario('060', 'Flag for Future Reconciliation', {
     rates: { '99030581': NT52_100, '8414513000': '4.7%' },
     mutate: (p) => {
+      // Karl 9/9: the params IOR has no recon bond in CERT — 060 files
+      // under 57-123456789 (live F162 answer).
+      p.entrySummary.importerOfRecord = { ...p.entrySummary.importerOfRecord, number: '57-123456789' };
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'GB';
       line.countryOfExport = 'GB';
@@ -1991,7 +1994,7 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '99030581', valueDollars: 0 }, // NT52 GB 10%
-        { htsNumber: '8414513000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000, dutyCents: 0 }, // NT52-alone-replaces (GB)
+        { htsNumber: '8414513000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000 }, // Karl's trace 9/9: GB STACKS — \$1,000 NT52 + \$470 col1
       ];
       // Value reconciliation flag: conventional recon issue code 001
       // (note aa) \u2014 requires the continuous bond the baseline carries.
