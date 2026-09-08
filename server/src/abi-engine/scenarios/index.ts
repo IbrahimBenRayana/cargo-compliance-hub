@@ -1913,7 +1913,7 @@ export const SCENARIOS: Scenario[] = [
       line.descriptions = ['INDUSTRIAL FURNACE PARTS'];
       line.foreignPortOfLading = '12493'; // Vancouver, BC (Schedule K)
       line.parties = [
-        { type: 'M', identifier: 'CATORFUR815TOR' },
+        { type: 'M', identifier: 'XOTORFUR815TOR' }, // XO = Ontario (CA MIDs carry the province X-code)
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
@@ -1932,12 +1932,12 @@ export const SCENARIOS: Scenario[] = [
       line.descriptions = ['VINYL FLOOR TILE - MARBLE SIMULATED, 12X12'];
       line.foreignPortOfLading = '12493'; // Vancouver, BC (Schedule K)
       line.parties = [
-        { type: 'M', identifier: 'CATORVIN926TOR' },
+        { type: 'M', identifier: 'XOTORVIN926TOR' }, // XO = Ontario
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
         { htsNumber: '99030529', valueDollars: 0 }, // NT52 CA 10%
-        { htsNumber: '3918101020', valueDollars: 10000, uomCode1: 'M2', quantity1Hundredths: 100000 },
+        { htsNumber: '3918101020', valueDollars: 10000, uomCode1: 'M2', quantity1Hundredths: 100000, dutyCents: 0 }, // NT52-alone-replaces
       ];
     },
   }),
@@ -1959,7 +1959,7 @@ export const SCENARIOS: Scenario[] = [
       // $500,000 prototype value ($62,500) \u2014 whether the 9817 prototype
       // provision shields NT52 needs rep confirmation (flagged).
       line.tariffs = [
-        { htsNumber: '98178501', valueDollars: 0, uomCode1: 'X' },
+        { htsNumber: '98178501', valueDollars: 0 }, // zero-units family — no uom
         { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
         { htsNumber: '8703330145', valueDollars: 500000, uomCode1: 'NO', quantity1Hundredths: 100, dutyCents: 0 },
       ];

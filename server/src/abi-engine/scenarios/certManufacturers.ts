@@ -44,6 +44,9 @@ export const CERT_MANUFACTURERS: CertManufacturer[] = [
   { mid: 'GLGOHAIR428GOH', name: 'G O H AIRCRAFT PARTS', street: '428 AQQUSINERSUAQ', city: 'GOH', countryCode: 'GL', added: true },
   { mid: 'CHGENWAT552GEN', name: 'GENEVA WATCH SA', street: '552 RUE DU RHONE', city: 'GENEVA', countryCode: 'CH', added: true },
   { mid: 'MACASBEL713CAS', name: 'CASABLANCA BELTS', street: '713 BLVD MOHAMMED V', city: 'CASABLANCA', countryCode: 'MA', added: true },
+  // 057/058 — Toronto firms, XO prefix (Ontario), AMF-17 postal codes.
+  { mid: 'XOTORFUR815TOR', name: 'TORONTO FURNACES', street: '815 KING ST W', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M5V1N4', added: false },
+  { mid: 'XOTORVIN926TOR', name: 'TORONTO VINYL', street: '926 QUEEN ST E', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M4M1J6', added: false },
   // 027 (Karl 9/3: XQ = Canadian province) — CA MIDs need postal codes (AMF-17).
   { mid: 'XOTORAPP159TOR', name: 'TORONTO APPAREL', street: '159 SPADINA AVE', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M5V2T6', added: false },
   { mid: 'CNSHETOO654SHA', name: 'SHENZHEN TOOLS CO', street: '654 BAO AN RD', city: 'SHANGHAI', countryCode: 'CN', zipOrPostalCode: '200001', added: true },
