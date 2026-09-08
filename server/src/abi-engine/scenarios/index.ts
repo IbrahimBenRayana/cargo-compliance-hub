@@ -1991,7 +1991,7 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '99030581', valueDollars: 0 }, // NT52 GB 10%
-        { htsNumber: '8414513000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000 },
+        { htsNumber: '8414513000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000, dutyCents: 0 }, // NT52-alone-replaces (GB)
       ];
       // Value reconciliation flag: conventional recon issue code 001
       // (note aa) \u2014 requires the continuous bond the baseline carries.
@@ -2017,7 +2017,7 @@ export const SCENARIOS: Scenario[] = [
       // 2.3%\u00d7$10,000 = $230.00 \u2192 $305.00.
       line.tariffs = [
         { htsNumber: '99030571', valueDollars: 0 }, // NT52 KR 12.5%
-        { htsNumber: '9106908500', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000, dutyCents: 30500 },
+        { htsNumber: '9106908500', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000, dutyCents: 0 }, // NT52-alone-replaces — the compound col1 is superseded
       ];
     },
     notes: 'Certify-for-release on the Add; AMS bill assumed on file (SE16/SE20 only for non-AMS, ESF-45).',
