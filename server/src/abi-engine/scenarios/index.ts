@@ -2090,9 +2090,11 @@ export const SCENARIOS: Scenario[] = [
         { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (IT)
         { htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
       ];
+      // Live case file (9/10 AD query): A475818029 latest RF = 0.00%
+      // (2020 review), C475819011 = 2.04%; both CASH ONLY.
       line.adCvdCases = [
         { caseNumber: 'A475818029', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
-        { caseNumber: 'C475819011', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+        { caseNumber: 'C475819011', bondCashClaimCode: 'C', depositRateHundredths: 204, rateTypeQualifier: 'A', dutyCents: 20400 },
       ];
     },
   }),
@@ -2145,7 +2147,7 @@ export const SCENARIOS: Scenario[] = [
       ];
       // Rate qualifier S = specific (per package title/qualifier pairing).
       line.adCvdCases = [
-        { caseNumber: 'A570967000', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'S', quantityTenThousandths: 5000000, dutyCents: 0 },
+        { caseNumber: 'A570967000', bondCashClaimCode: 'C', depositRateHundredths: 8601, rateTypeQualifier: 'S', quantityTenThousandths: 5000000, dutyCents: 4300500 }, // live RF 86.01 x 500 units
       ];
     },
   }),
@@ -2161,8 +2163,9 @@ export const SCENARIOS: Scenario[] = [
         { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
         { htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
       ];
+      // Live case file: 30.83% CASH ONLY.
       line.adCvdCases = [
-        { caseNumber: 'A588602001', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+        { caseNumber: 'A588602001', bondCashClaimCode: 'C', depositRateHundredths: 3083, rateTypeQualifier: 'A', dutyCents: 308300 },
       ];
     },
   }),
@@ -2186,15 +2189,17 @@ export const SCENARIOS: Scenario[] = [
       ];
       // The AD case covers a $15,000 subset of the $20,000 line (53-record
       // Value of Goods differs from the 50-record value).
+      // Live case file: A475818001 19.09%, C475819001 2.44% — on the
+      // $15,000 AD value subset.
       line.adCvdCases = [
-        { caseNumber: 'A475818001', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', valueOfGoodsDollars: 15000, dutyCents: 0 },
-        { caseNumber: 'C475819001', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', valueOfGoodsDollars: 15000, dutyCents: 0 },
+        { caseNumber: 'A475818001', bondCashClaimCode: 'C', depositRateHundredths: 1909, rateTypeQualifier: 'A', valueOfGoodsDollars: 15000, dutyCents: 286350 },
+        { caseNumber: 'C475819001', bondCashClaimCode: 'C', depositRateHundredths: 244, rateTypeQualifier: 'A', valueOfGoodsDollars: 15000, dutyCents: 36600 },
       ];
     },
   }),
 
   aeScenario('073', 'Case and Deposit Rate', {
-    rates: { '99030531': NT52_125, '1902192020': 'Free' },
+    rates: { '99030531': NT52_125, '2841610000': 'Free' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
@@ -2202,12 +2207,15 @@ export const SCENARIOS: Scenario[] = [
       line.countryOfExport = 'CN';
       line.descriptions = ['WOODEN BEDROOM FURNITURE'];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      // Live case file: covered HTS 2841610000 (potassium permanganate),
+      // 128.94% CASH ONLY.
+      line.descriptions = ['POTASSIUM PERMANGANATE'];
       line.tariffs = [
         { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
-        { htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
+        { htsNumber: '2841610000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
       ];
       line.adCvdCases = [
-        { caseNumber: 'A570001002', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+        { caseNumber: 'A570001002', bondCashClaimCode: 'C', depositRateHundredths: 12894, rateTypeQualifier: 'A', dutyCents: 1289400 },
       ];
     },
   }),
