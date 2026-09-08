@@ -1918,7 +1918,7 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '99030529', valueDollars: 0 }, // NT52 CA 10%
-        { htsNumber: '8514908000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 1000000 },
+        { htsNumber: '8514908000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 1000000 }, // CERT W1 (9/8): KG, not NO
       ];
     },
   }),
