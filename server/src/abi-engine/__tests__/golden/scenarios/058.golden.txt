@@ -6,7 +6,7 @@ B  2704ZZZAE                                               SCENARIO 058
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-40  001 CACA080126               50012493      1200    N                        
+40  001 XOCA080126               50012493      1200    N                        
 44VINYL FLOOR TILE - MARBLE SIMULATED, 12X12                                    
 47MXOTORVIN926TOR                                                               
 47S26-164751100                                                                 

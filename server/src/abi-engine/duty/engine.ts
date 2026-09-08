@@ -182,7 +182,7 @@ export async function enrichWithDuty(
     // 9820 Haiti preference (055, 9/8). Deliberately narrow — 9823 TRQ
     // lines exempt via SPI instead (027).
     const exemptProvision = line.tariffs.some(
-      (t) => t.htsNumber.startsWith('980200') || t.htsNumber.startsWith('9820')
+      (t) => t.htsNumber.startsWith('980200') || t.htsNumber.startsWith('9820') || t.htsNumber.startsWith('981785')
     );
     if (!mpfExempt && !line.feeExemptionCode && !spiMpfExempt && !setComponent && !exemptProvision) {
       const mpf = computeLineMpfCents(value);

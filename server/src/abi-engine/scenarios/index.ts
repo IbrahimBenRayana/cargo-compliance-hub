@@ -1908,7 +1908,9 @@ export const SCENARIOS: Scenario[] = [
         { filerCode: params.filerCode, entryNumber: '00100503' },
       ];
       const line = p.entrySummary.lines[0];
-      line.countryOfOrigin = 'CA';
+      // Live F414 9/8: formal entries report the Canadian PROVINCE as
+      // origin (the XQ scheme) — informals like 056 are exempt.
+      line.countryOfOrigin = 'XO';
       line.countryOfExport = 'CA';
       line.descriptions = ['INDUSTRIAL FURNACE PARTS'];
       line.foreignPortOfLading = '12493'; // Vancouver, BC (Schedule K)
@@ -1927,7 +1929,9 @@ export const SCENARIOS: Scenario[] = [
     rates: { '99030529': NT52_100, '3918101020': '5.3%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
-      line.countryOfOrigin = 'CA';
+      // Live F414 9/8: formal entries report the Canadian PROVINCE as
+      // origin (the XQ scheme) — informals like 056 are exempt.
+      line.countryOfOrigin = 'XO';
       line.countryOfExport = 'CA';
       line.descriptions = ['VINYL FLOOR TILE - MARBLE SIMULATED, 12X12'];
       line.foreignPortOfLading = '12493'; // Vancouver, BC (Schedule K)

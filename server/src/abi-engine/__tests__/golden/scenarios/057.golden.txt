@@ -7,7 +7,7 @@ B  2704ZZZAE                                               SCENARIO 057
 23MMAEU123456789012                                                             
 318B 123                                                                        
 32ZZZ  00100501ZZZ  00100502ZZZ  00100503                                       
-40  001 CACA080126               50012493      1200    N                        
+40  001 XOCA080126               50012493      1200    N                        
 44INDUSTRIAL FURNACE PARTS                                                      
 47MXOTORFUR815TOR                                                               
 47S26-164751100                                                                 
