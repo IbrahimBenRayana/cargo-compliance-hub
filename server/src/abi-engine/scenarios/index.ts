@@ -2267,10 +2267,10 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('074', 'FTZ Withdrawal with Privilege Date', {
-    // NT52 applied mechanically — but the privileged-foreign status fixes
-    // rates as of 05/13/2020, which PREDATES the NT52 regime; whether the
-    // adjustment belongs on a P-status withdrawal needs rep confirmation.
-    rates: { '99030531': NT52_125, '8536410060': '2.7%' },
+    // Privileged-foreign status fixes rates as of 05/13/2020 — which
+    // PREDATES the NT52 regime entirely (the 011 era-lesson in reverse):
+    // the 2020-era CN adjustment is 301 List 2, stacked per that era.
+    rates: { '99038802': 'The duty provided in the applicable subheading + 25%', '8536410060': '2.7%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '06';
       p.entrySummary.foreignTradeZoneId = '124';
@@ -2286,7 +2286,7 @@ export const SCENARIOS: Scenario[] = [
       // Privileged foreign status: rates fixed as of the privilege date.
       line.ftz = { statusCode: 'P', privilegedFilingDate: '20200513', quantity: 5000 };
       line.tariffs = [
-        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
+        { htsNumber: '99038802', valueDollars: 0 }, // 301 List 2, 25% (2020 era)
         { htsNumber: '8536410060', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 500000 },
       ];
     },
@@ -2299,6 +2299,9 @@ export const SCENARIOS: Scenario[] = [
     rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
+      // PSC replaces an EXISTING accepted type-01 summary — scenario 053's
+      // battery entry (accepted 9/8), whose content this fixture mirrors.
+      p.entrySummary.entryNumber = '0000053';
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
       line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
@@ -2317,6 +2320,8 @@ export const SCENARIOS: Scenario[] = [
     rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
+      // PSC target: scenario 013's accepted battery entry.
+      p.entrySummary.entryNumber = '0000013';
       p.entrySummary.payment = undefined;
       p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
       p.entrySummary.psc = {
