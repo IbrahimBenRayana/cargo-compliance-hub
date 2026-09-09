@@ -2270,10 +2270,13 @@ export const SCENARIOS: Scenario[] = [
     // Privileged-foreign status fixes rates as of 05/13/2020 — which
     // PREDATES the NT52 regime entirely (the 011 era-lesson in reverse):
     // the 2020-era CN adjustment is 301 List 2, stacked per that era.
-    rates: { '99038802': 'The duty provided in the applicable subheading + 25%', '8536410060': '2.7%' },
+    rates: { '99038802': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '8536410060': '2.7%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '06';
-      p.entrySummary.foreignTradeZoneId = '124';
+      p.entrySummary.foreignTradeZoneId = '124'; // F289 live — awaiting Karl's CERT zone id
+      // Live F173 9/11: type 06 wants the FIRMS location too (the 047
+      // precedent — the invented code passed).
+      p.entrySummary.cargo = { ...p.entrySummary.cargo!, locationOfGoodsCode: 'W303' };
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'CN';
       line.countryOfExport = 'CN';
@@ -2285,8 +2288,12 @@ export const SCENARIOS: Scenario[] = [
       ];
       // Privileged foreign status: rates fixed as of the privilege date.
       line.ftz = { statusCode: 'P', privilegedFilingDate: '20200513', quantity: 5000 };
+      // Live F771 9/11 WITH List 2 present: the adjustment edit runs on
+      // the ENTRY date (2026 — NT52 required) while the duty follows the
+      // privilege era (2020 — NT52 zero).
       line.tariffs = [
         { htsNumber: '99038802', valueDollars: 0 }, // 301 List 2, 25% (2020 era)
+        { htsNumber: '99030531', valueDollars: 0, dutyCents: 0 }, // NT52 row for the 2026 edit, era-zero duty
         { htsNumber: '8536410060', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 500000 },
       ];
     },
