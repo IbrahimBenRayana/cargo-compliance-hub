@@ -2406,7 +2406,7 @@ export const SCENARIOS: Scenario[] = [
     rates: {
       '98130020': 'Free', // 'Free, under bond' \u2014 provision text pinned
       '99030543': NT52_125, // NT52 HK \u2014 computes on the $81,408 line value; whether the TIB bond shields NT52 needs rep confirmation
-      '7113195090': 'Free', // TIB: no duty collected under the bond
+      '7113195091': 'Free', // TIB: no duty collected under the bond
     },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '23';
@@ -2425,9 +2425,10 @@ export const SCENARIOS: Scenario[] = [
       ];
       // Air MOT: no foreign port of lading (F429 is vessel-only).
       line.tariffs = [
-        { htsNumber: '98130020', valueDollars: 0, uomCode1: 'X' },
+        { htsNumber: '98130020', valueDollars: 0 }, // zero-units provision (CERT W1)
         { htsNumber: '99030543', valueDollars: 0 }, // NT52 HK 12.5%
-        { htsNumber: '7113195090', valueDollars: 81408, uomCode1: 'G', quantity1Hundredths: 226695 },
+        // CERT sweep 9/11: 5090 expired — gold jewelry = 7113195091, PCS.
+        { htsNumber: '7113195091', valueDollars: 81408, uomCode1: 'PCS', quantity1Hundredths: 15000 },
       ];
     },
   }),
