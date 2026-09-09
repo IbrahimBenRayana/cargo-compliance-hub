@@ -2410,8 +2410,11 @@ export const SCENARIOS: Scenario[] = [
     },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '23';
+      // Live 9/11: F316 — the TIB certification indicator (10-rec pos 69).
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, tibDeclaration: true };
       p.entrySummary.motCode = '40';
-      p.entrySummary.cargo = { carrierCode: '*F', conveyanceName: 'FLIGHT 220' };
+      // Live F167: air needs the unlading port (the 014 lesson — BWI).
+      p.entrySummary.cargo = { carrierCode: '*F', conveyanceName: 'FLIGHT 220', districtPortOfUnlading: '1305' };
       p.entrySummary.manifests = [
         { manifestedQuantity: 10, uomCode: 'CTNS', bills: [{ type: 'M', identifier: '87654321' }] },
       ];
@@ -2426,7 +2429,8 @@ export const SCENARIOS: Scenario[] = [
       // Air MOT: no foreign port of lading (F429 is vessel-only).
       line.tariffs = [
         { htsNumber: '98130020', valueDollars: 0 }, // zero-units provision (CERT W1)
-        { htsNumber: '99030543', valueDollars: 0 }, // NT52 HK 12.5%
+        // Live F624: TIB deposits NOTHING — the bond covers (duty zero).
+        { htsNumber: '99030543', valueDollars: 0, dutyCents: 0 }, // NT52 HK — bond-covered
         // CERT sweep 9/11: 5090 expired — gold jewelry = 7113195091, PCS.
         { htsNumber: '7113195091', valueDollars: 81408, uomCode1: 'PCS', quantity1Hundredths: 15000 },
       ];
@@ -2691,7 +2695,8 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '99030543', valueDollars: 0 }, // NT52 HK 12.5%
+        // Live F624: TIB deposits NOTHING — the bond covers (duty zero).
+        { htsNumber: '99030543', valueDollars: 0, dutyCents: 0 }, // NT52 HK — bond-covered
         { htsNumber: '8527910500', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000 },
       ];
     },
