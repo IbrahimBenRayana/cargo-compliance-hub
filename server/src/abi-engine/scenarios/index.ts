@@ -2514,8 +2514,8 @@ export const SCENARIOS: Scenario[] = [
         { htsNumber: '99038210', valueDollars: 0, dutyCents: 11069295 }, // 15% x $737,953 (replace)
         { htsNumber: '8516710020', valueDollars: 737953, uomCode1: 'NO', quantity1Hundredths: 5546800, dutyCents: 0 },
       ];
-      // Steel-derivative appliance (the 006 pattern): Type 08 melt/pour.
-      line.declarations = [{ typeCode: '08', information: 'CN' }];
+      // Live F773 9/14: coffee makers are NOT on the steel list — no
+      // melt/pour declaration (unlike 006's A/C units).
     },
     postMap: (input, params) => {
       // FDA food-contact article set per SG ch.10 (FOO/CCW): OI + PG01 +
@@ -2535,11 +2535,11 @@ export const SCENARIOS: Scenario[] = [
             productName: 'COFFEE MAKER',
             entities: [
               {
-                // FDA actual manufacturer (CSMS 00-0824); the Appendix-PGA
-                // entity-id qualifier for a MID is pending confirmation.
+                // FDA actual manufacturer — live FPF6 9/14: a MID is not an
+                // accepted FDA entity id; FEI filed instead.
                 roleCode: 'MF',
-                identificationCode: 'MID',
-                number: 'TWNICSAN435TAI',
+                identificationCode: 'FEI',
+                number: '3004567891',
                 name: 'NICSAN APPLIANCE WORKS',
                 address1: '435 INDUSTRIAL RD',
                 city: 'TAICHUNG',
@@ -2561,7 +2561,8 @@ export const SCENARIOS: Scenario[] = [
                 country: 'US',
                 zip: '90001',
                 contacts: [
-                  { qualifier: 'FD1', name: 'IMRAN SIDDIQUE', emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM' },
+                  // Live FPI9 9/14: the certifying individual's phone.
+                  { qualifier: 'FD1', name: 'IMRAN SIDDIQUE', emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM', telephone: '5715551234' },
                 ],
               },
               {
@@ -2591,7 +2592,7 @@ export const SCENARIOS: Scenario[] = [
     // (G) row 9903.05.93 at 0% (mirrors the US-goods 9903.05.86 treatment)
     // — NEEDS LIVE VERIFICATION: the duty-bearing CA row 9903.05.29 (10%)
     // would apply if CERT refuses the subdivision claim.
-    rates: { '1004100000': 'Free' },
+    rates: { '99030593': 'Free', '1004100000': 'Free' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'XC';
@@ -2601,12 +2602,14 @@ export const SCENARIOS: Scenario[] = [
       line.descriptions = ['SEED OATS'];
       line.foreignPortOfLading = '12493'; // Vancouver, BC (Schedule K)
       line.parties = [
-        { type: 'M', identifier: 'CAWPGOAT173WPG' },
+        { type: 'M', identifier: 'XMWINOAT173WIN' }, // XM = Manitoba (province X-code)
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
-      // XC (like XQ in 027) is not NT52-listed — no ch99 row at all; the
-      // .05.93 subdivision is origin-restricted like 027's .05.94 was.
+      // Live F771 9/14: XC IS in the adjustment family (058's XO line
+      // proved provinces work against Canadian rows) — the USMCA
+      // subdivision .05.93 returns at 0%.
       line.tariffs = [
+        { htsNumber: '99030593', valueDollars: 0, dutyCents: 0 }, // USMCA-CA subdivision (G)
         { htsNumber: '1004100000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 8500000 },
       ];
     },

@@ -44,6 +44,8 @@ export const CERT_MANUFACTURERS: CertManufacturer[] = [
   { mid: 'GLGOHAIR428GOH', name: 'G O H AIRCRAFT PARTS', street: '428 AQQUSINERSUAQ', city: 'GOH', countryCode: 'GL', added: true },
   { mid: 'CHGENWAT552GEN', name: 'GENEVA WATCH SA', street: '552 RUE DU RHONE', city: 'GENEVA', countryCode: 'CH', added: true },
   { mid: 'MACASBEL713CAS', name: 'CASABLANCA BELTS', street: '713 BLVD MOHAMMED V', city: 'CASABLANCA', countryCode: 'MA', added: true },
+  // 084 — Winnipeg oats, XM prefix (Manitoba).
+  { mid: 'XMWINOAT173WIN', name: 'WINNIPEG OAT GROWERS', street: '173 GRAIN RD', city: 'WINNIPEG', stateOrProvince: 'MB', countryCode: 'CA', zipOrPostalCode: 'R3C0V8', added: false },
   // 057/058 — Toronto firms, XO prefix (Ontario), AMF-17 postal codes.
   { mid: 'XOTORFUR815TOR', name: 'TORONTO FURNACES', street: '815 KING ST W', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M5V1N4', added: false },
   { mid: 'XOTORVIN926TOR', name: 'TORONTO VINYL', street: '926 QUEEN ST E', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M4M1J6', added: false },
