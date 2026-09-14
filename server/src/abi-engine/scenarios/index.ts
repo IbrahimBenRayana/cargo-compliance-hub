@@ -2620,7 +2620,7 @@ export const SCENARIOS: Scenario[] = [
     // NT33 vehicle family (9/14 sweep): EU vehicles take the threshold
     // pair .94.60/.94.61 — col 1 2.5% < 15% → .94.61 at 15% (the .82.10
     // replace pattern); .05.90 lists PAX VEH.
-    rates: { '99030590': 'Free', '99039461': 'The duty provided in the applicable subheading + 15%', '8703210130': '2.5%' },
+    rates: { '99030590': 'Free', '99039451': 'The duty provided in the applicable subheading + 15%', '8703210130': '2.5%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'DE';
@@ -2633,15 +2633,14 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '99030590', valueDollars: 0, dutyCents: 0 }, // PAX VEH exclusion row
-        { htsNumber: '99039461', valueDollars: 0, dutyCents: 150000 }, // 15% replaces col 1
+        // .94.61 is KR-restricted (live F603) — the unrestricted EU-deal
+        // subdivision (M) threshold row is .94.51.
+        { htsNumber: '99039451', valueDollars: 0, dutyCents: 150000 }, // 15% replaces col 1
         { htsNumber: '8703210130', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100, dutyCents: 0 },
       ];
-      // Live F794: vehicles carry the metal content declarations (both
-      // lists, the 8302 pattern).
-      line.declarations = [
-        { typeCode: '07', information: 'Y  DEN    DE' },
-        { typeCode: '08', information: 'DE' },
-      ];
+      // Live F773 (round 2): aluminum not allowed — snowmobiles are
+      // steel-only, the 006 pattern.
+      line.declarations = [{ typeCode: '08', information: 'DE' }];
     },
     postMap: (input, params) => {
       // NHTSA Box-8 set per the supplemental guide's own OFF-vehicle sample
