@@ -2237,7 +2237,9 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('073', 'Case and Deposit Rate', {
-    rates: { '99038803': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '2841610000': 'Free' },
+    // Christopher's trace 9/14: all three STACK (the 028 rule held) — our
+    // one error was col 1: 2841.61.0000 is 5% in CERT, not Free.
+    rates: { '99038803': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '2841610000': '5%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
@@ -2254,10 +2256,8 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3 (live F771)
-        // F624 with the full stack (live 9/10) — unlike 028, this is a
-        // type-03 AD line; trying NT52-gives-way (301 + col1 only).
-        { htsNumber: '99030531', valueDollars: 0, dutyCents: 0 }, // NT52 CN
+        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3, 25%
+        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5% — stacks
         { htsNumber: '2841610000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
       ];
       line.adCvdCases = [
