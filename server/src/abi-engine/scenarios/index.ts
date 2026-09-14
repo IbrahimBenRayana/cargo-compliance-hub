@@ -2738,7 +2738,9 @@ export const SCENARIOS: Scenario[] = [
       input.lines![0].pga = {
         commercialDescription: 'RADIO BROADCAST RECEIVERS, HOUSEHOLD',
         sets: [
-          { kind: 'disclaimer', agencyCode: 'FCC', programCode: 'RAD', disclaimerCode: 'A' },
+          // Live FPR9 9/15: FCC's accepted subset excludes 'A' (FDA's 'A'
+          // passed) — 'B' = data not required per agency guidance.
+          { kind: 'disclaimer', agencyCode: 'FCC', programCode: 'RAD', disclaimerCode: 'B' },
           { kind: 'disclaimer', agencyCode: 'FDA', programCode: 'FDA', processingCode: 'FDA', disclaimerCode: 'A' },
         ],
       };
@@ -2815,6 +2817,7 @@ export const SCENARIOS: Scenario[] = [
         ...base,
         countryOfOrigin: coo,
         countryOfExport: 'CH',
+        foreignPortOfLading: '42876', // Hamburg — live F429 9/15 (the 019/037 CH lesson)
         descriptions: [desc],
         parties: [
           { type: 'M' as const, identifier: 'CHGENWAT552GEN' },
@@ -2827,8 +2830,10 @@ export const SCENARIOS: Scenario[] = [
         ],
       });
       p.entrySummary.lines = [
-        mk('9102114510', 40000, 'CH', 'WATCH MOVEMENTS'),
-        mk('9102114520', 85000, 'CH', 'WATCH CASES'),
+        // Live F624 9/15 on the CH lines only: NT52-alone-replaces (the
+        // 037 twin) — constituents zero, NT52 carries the duty.
+        mk('9102114510', 0, 'CH', 'WATCH MOVEMENTS'),
+        mk('9102114520', 0, 'CH', 'WATCH CASES'),
         {
           ...mk('9102114530', 28000, 'CN', 'WATCH STRAPS'),
           // 301 + NT52 stacked ahead of the substantive (mirrors 001's
@@ -2839,7 +2844,7 @@ export const SCENARIOS: Scenario[] = [
             { htsNumber: '9102114530', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 28000 },
           ],
         },
-        mk('9102114540', 53000, 'CH', 'WATCH BATTERIES'),
+        mk('9102114540', 0, 'CH', 'WATCH BATTERIES'),
       ];
     },
     notes: 'Constituent duties pinned from the 9102.11.45 compound rate; CN strap line carries 301 List-4A (9903.88.15 +7.5%). Confirm suffix\u2194constituent mapping with rep (CSMS #50019756).',
