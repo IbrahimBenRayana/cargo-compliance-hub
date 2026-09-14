@@ -2208,7 +2208,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('072', 'Case with Differing Values', {
-    rates: { '99030539': NT52_100, '1902192030': 'Free' },
+    rates: { '99030539': NT52_100, '1902192020': 'Free' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
@@ -2221,9 +2221,11 @@ export const SCENARIOS: Scenario[] = [
         { type: 'E', identifier: 'ITROMPAS284ROM' }, // live F499
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
+      // CERT sweep 9/14: 1902.19.20.30 is NOT in the HTS file (suffixes
+      // jump 2020→2040) — Christopher's own sample wire files 2020.
       line.tariffs = [
         { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (IT)
-        { htsNumber: '1902192030', valueDollars: 20000, uomCode1: 'KG', quantity1Hundredths: 32000 },
+        { htsNumber: '1902192020', valueDollars: 20000, uomCode1: 'KG', quantity1Hundredths: 32000 },
       ];
       // The AD case covers a $15,000 subset of the $20,000 line (53-record
       // Value of Goods differs from the 50-record value).
