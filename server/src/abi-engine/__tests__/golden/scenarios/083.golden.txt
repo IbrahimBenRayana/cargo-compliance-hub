@@ -19,7 +19,7 @@ PG01001FDAFOOCCW                         130.029
 PG02PFDP 52AOJ51                                                                
 PG0639 CN                                                                       
 PG10                   COFFEE MAKER                                             
-PG19MF FEI3004567891     NICSAN APPLIANCE WORKS          435 INDUSTRIAL RD      
+PG19MF 47 3004567891     NICSAN APPLIANCE WORKS          435 INDUSTRIAL RD      
 PG20                                     TAICHUNG                TW             
 PG19DEQ                  NICSAN APPLIANCE WORKS          435 INDUSTRIAL RD      
 PG20                                     TAICHUNG                TW             

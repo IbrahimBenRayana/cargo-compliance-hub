@@ -2538,7 +2538,7 @@ export const SCENARIOS: Scenario[] = [
                 // FDA actual manufacturer — live FPF6 9/14: a MID is not an
                 // accepted FDA entity id; FEI filed instead.
                 roleCode: 'MF',
-                identificationCode: 'FEI',
+                identificationCode: '47', // numeric per Appendix PGA: 47 = FEI (live FP93 on the literal)
                 number: '3004567891',
                 name: 'NICSAN APPLIANCE WORKS',
                 address1: '435 INDUSTRIAL RD',
@@ -2617,7 +2617,10 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('085', 'DOT Form Data (HS-7)', {
-    rates: { '99030539': NT52_100, '8703210130': '2.5%' },
+    // NT33 vehicle family (9/14 sweep): EU vehicles take the threshold
+    // pair .94.60/.94.61 — col 1 2.5% < 15% → .94.61 at 15% (the .82.10
+    // replace pattern); .05.90 lists PAX VEH.
+    rates: { '99030590': 'Free', '99039461': 'The duty provided in the applicable subheading + 15%', '8703210130': '2.5%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'DE';
@@ -2629,8 +2632,15 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (DE)
-        { htsNumber: '8703210130', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100, dutyCents: 0 }, // NT52-alone-replaces (EU, the 069 rule)
+        { htsNumber: '99030590', valueDollars: 0, dutyCents: 0 }, // PAX VEH exclusion row
+        { htsNumber: '99039461', valueDollars: 0, dutyCents: 150000 }, // 15% replaces col 1
+        { htsNumber: '8703210130', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100, dutyCents: 0 },
+      ];
+      // Live F794: vehicles carry the metal content declarations (both
+      // lists, the 8302 pattern).
+      line.declarations = [
+        { typeCode: '07', information: 'Y  DEN    DE' },
+        { typeCode: '08', information: 'DE' },
       ];
     },
     postMap: (input, params) => {
