@@ -2275,7 +2275,9 @@ export const SCENARIOS: Scenario[] = [
     rates: { '99038802': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '8536410060': '2.7%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '06';
-      p.entrySummary.foreignTradeZoneId = '124'; // F289 live — awaiting Karl's CERT zone id
+      // Christopher 9/14: port-1303 CERT zone 074, subzone 004, site 0A1
+      // (9AN format NNN/XXX/XXX per the spec note).
+      p.entrySummary.foreignTradeZoneId = '0740040A1';
       // Live F173 9/11: type 06 wants the FIRMS location too (the 047
       // precedent — the invented code passed).
       p.entrySummary.cargo = { ...p.entrySummary.cargo!, locationOfGoodsCode: 'W303' };
