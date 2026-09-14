@@ -2490,7 +2490,12 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('083', 'FDA Entry', {
-    rates: { '99030531': NT52_125, '8516710020': '3.7%' },
+    rates: {
+      '99038815': 'The duty provided in the applicable subheading + 7.5%',
+      '99030590': 'Free',
+      '99038210': 'The duty provided in the applicable subheading + 15%',
+      '8516710020': '3.7%',
+    },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'CN';
@@ -2501,10 +2506,16 @@ export const SCENARIOS: Scenario[] = [
         { type: 'M', identifier: 'TWNICSAN435TAI' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
+      // 006-class metal appliance under NT16: .05.90 + .82.10 replaces
+      // col 1; CN adds its 301 (List 4A consumer appliances) which stacks.
       line.tariffs = [
-        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
-        { htsNumber: '8516710020', valueDollars: 737953, uomCode1: 'NO', quantity1Hundredths: 5546800 },
+        { htsNumber: '99038815', valueDollars: 0 }, // 301 List 4A, 7.5%
+        { htsNumber: '99030590', valueDollars: 0 }, // NT52-side 232 exclusion
+        { htsNumber: '99038210', valueDollars: 0, dutyCents: 11069295 }, // 15% x $737,953 (replace)
+        { htsNumber: '8516710020', valueDollars: 737953, uomCode1: 'NO', quantity1Hundredths: 5546800, dutyCents: 0 },
       ];
+      // Steel-derivative appliance (the 006 pattern): Type 08 melt/pour.
+      line.declarations = [{ typeCode: '08', information: 'CN' }];
     },
     postMap: (input, params) => {
       // FDA food-contact article set per SG ch.10 (FOO/CCW): OI + PG01 +
@@ -2580,7 +2591,7 @@ export const SCENARIOS: Scenario[] = [
     // (G) row 9903.05.93 at 0% (mirrors the US-goods 9903.05.86 treatment)
     // — NEEDS LIVE VERIFICATION: the duty-bearing CA row 9903.05.29 (10%)
     // would apply if CERT refuses the subdivision claim.
-    rates: { '99030593': 'Free', '1004100000': 'Free' },
+    rates: { '1004100000': 'Free' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'XC';
@@ -2593,8 +2604,9 @@ export const SCENARIOS: Scenario[] = [
         { type: 'M', identifier: 'CAWPGOAT173WPG' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
+      // XC (like XQ in 027) is not NT52-listed — no ch99 row at all; the
+      // .05.93 subdivision is origin-restricted like 027's .05.94 was.
       line.tariffs = [
-        { htsNumber: '99030593', valueDollars: 0 }, // NT52 USMCA-CA subdivision (G), 0%
         { htsNumber: '1004100000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 8500000 },
       ];
     },
@@ -2615,7 +2627,7 @@ export const SCENARIOS: Scenario[] = [
       ];
       line.tariffs = [
         { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (DE)
-        { htsNumber: '8703210130', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100 },
+        { htsNumber: '8703210130', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100, dutyCents: 0 }, // NT52-alone-replaces (EU, the 069 rule)
       ];
     },
     postMap: (input, params) => {
@@ -2743,7 +2755,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('088', 'Aluminum Licensing', {
-    rates: { '99030571': NT52_125, '7601103000': '2.6%' },
+    rates: { '99030590': 'Free', '99038202': '50%', '7601103000': '2.6%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'KR';
@@ -2754,14 +2766,16 @@ export const SCENARIOS: Scenario[] = [
         { type: 'M', identifier: 'KRSELALU906SEL' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
+      // The full 043 aluminum treatment: NT52 country row DROPPED, .05.90
+      // + .82.02 stacking on col 1, type-28 license, Type 07 smelt/cast.
       line.tariffs = [
-        { htsNumber: '99030571', valueDollars: 0 }, // NT52 KR 12.5%
+        { htsNumber: '99030590', valueDollars: 0, dutyCents: 0 },
+        { htsNumber: '99038202', valueDollars: 0 }, // 50% stacks
         { htsNumber: '7601103000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 400000 },
       ];
-      // 52-Record type 28 = Aluminum Import License (chapter change log #79/
-      // license table). CERT format AALUMmmdd from the import date.
       const d = params.applicabilityDate;
-      line.license = { typeCode: '28', number: `AALUM${d.slice(4, 8)}` };
+      line.license = { typeCode: '28', number: `A23${d.slice(4, 8)}${d.slice(2, 4)}` };
+      line.declarations = [{ typeCode: '07', information: 'Y  KRN    KR' }];
     },
   }),
 
