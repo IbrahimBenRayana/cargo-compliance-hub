@@ -2723,8 +2723,10 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        // Live F624: TIB deposits NOTHING — the bond covers (duty zero).
-        { htsNumber: '99030543', valueDollars: 0, dutyCents: 0 }, // NT52 HK — bond-covered
+        // (An earlier 079 edit string-matched this identical line and
+        // zeroed it — reverted: this is a regular type 01, the NT52
+        // computes normally.)
+        { htsNumber: '99030543', valueDollars: 0 }, // NT52 HK 12.5%
         { htsNumber: '8527910500', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000 },
       ];
     },
@@ -2832,7 +2834,7 @@ export const SCENARIOS: Scenario[] = [
           // 301 + NT52 stacked ahead of the substantive (mirrors 001's
           // accepted marker → adjustment → substantive order).
           tariffs: [
-            { htsNumber: '99038815', valueDollars: 0, uomCode1: 'X' },
+            { htsNumber: '99038815', valueDollars: 0 }, // zero-units ch99 — no uom
             { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
             { htsNumber: '9102114530', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 28000 },
           ],
