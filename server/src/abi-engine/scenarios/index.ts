@@ -2272,7 +2272,7 @@ export const SCENARIOS: Scenario[] = [
     // Privileged-foreign status fixes rates as of 05/13/2020 — which
     // PREDATES the NT52 regime entirely (the 011 era-lesson in reverse):
     // the 2020-era CN adjustment is 301 List 2, stacked per that era.
-    rates: { '99038802': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '8536410060': '2.7%' },
+    rates: { '99038802': 'The duty provided in the applicable subheading + 25%', '8536410060': '2.7%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '06';
       // Christopher 9/14: port-1303 CERT zone 074, subzone 004, site 0A1
@@ -2292,12 +2292,11 @@ export const SCENARIOS: Scenario[] = [
       ];
       // Privileged foreign status: rates fixed as of the privilege date.
       line.ftz = { statusCode: 'P', privilegedFilingDate: '20200513', quantity: 5000 };
-      // Live F771 9/11 WITH List 2 present: the adjustment edit runs on
-      // the ENTRY date (2026 — NT52 required) while the duty follows the
-      // privilege era (2020 — NT52 zero).
+      // Christopher 9/15: the graded item is applying the PRIVILEGED DATE
+      // per CATAIR — 2026-era numbers must not appear (the .05.31 F434
+      // cascaded every F642). 2020-era stack only, duties at 2020 rates.
       line.tariffs = [
         { htsNumber: '99038802', valueDollars: 0 }, // 301 List 2, 25% (2020 era)
-        { htsNumber: '99030531', valueDollars: 0, dutyCents: 0 }, // NT52 row for the 2026 edit, era-zero duty
         { htsNumber: '8536410060', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 500000 },
       ];
     },
@@ -2355,6 +2354,8 @@ export const SCENARIOS: Scenario[] = [
     rates: { '99030539': NT52_100, '1902192020': 'Free' },
     action: 'R',
     mutate: (p) => {
+      // PSC target: the third paid entry (Christopher 9/15).
+      p.entrySummary.entryNumber = '0000018';
       p.entrySummary.payment = undefined;
       p.entrySummary.entryTypeCode = '03';
       p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
@@ -2617,10 +2618,10 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('085', 'DOT Form Data (HS-7)', {
-    // NT33 vehicle family (9/14 sweep): EU vehicles take the threshold
-    // pair .94.60/.94.61 — col 1 2.5% < 15% → .94.61 at 15% (the .82.10
-    // replace pattern); .05.90 lists PAX VEH.
-    rates: { '99030590': 'Free', '99039451': 'The duty provided in the applicable subheading + 15%', '8703210130': '2.5%' },
+    // Christopher's tables 9/15: this HTS pairs S301-FL-EU (.05.39 for
+    // col 1 < 10% — the .38/.39 split is a threshold pair) with a
+    // S232-ALSTCU-16 bucket (.82.10, col 1 < 15%). No .94 family.
+    rates: { '99030539': NT52_100, '99038210': 'The duty provided in the applicable subheading + 15%', '8703210130': '2.5%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'DE';
@@ -2632,10 +2633,8 @@ export const SCENARIOS: Scenario[] = [
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [
-        { htsNumber: '99030590', valueDollars: 0, dutyCents: 0 }, // PAX VEH exclusion row
-        // .94.61 is KR-restricted (live F603) — the unrestricted EU-deal
-        // subdivision (M) threshold row is .94.51.
-        { htsNumber: '99039451', valueDollars: 0, dutyCents: 150000 }, // 15% replaces col 1
+        { htsNumber: '99030539', valueDollars: 0 }, // S301-FL EU < 10%, stacks
+        { htsNumber: '99038210', valueDollars: 0, dutyCents: 150000 }, // S232, 15% replaces col 1
         { htsNumber: '8703210130', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100, dutyCents: 0 },
       ];
       // Live F773 (round 2): aluminum not allowed — snowmobiles are
@@ -2738,9 +2737,9 @@ export const SCENARIOS: Scenario[] = [
       input.lines![0].pga = {
         commercialDescription: 'RADIO BROADCAST RECEIVERS, HOUSEHOLD',
         sets: [
-          // Live FPR9 9/15: FCC's accepted subset excludes 'A' (FDA's 'A'
-          // passed) — 'B' = data not required per agency guidance.
-          { kind: 'disclaimer', agencyCode: 'FCC', programCode: 'RAD', disclaimerCode: 'B' },
+          // Christopher 9/15: the FCC reference in the package is
+          // obsolete (no FCC Supplemental Guide in ACE) — FDA-only, per
+          // his own accepted transmission of this entry.
           { kind: 'disclaimer', agencyCode: 'FDA', programCode: 'FDA', processingCode: 'FDA', disclaimerCode: 'A' },
         ],
       };
@@ -2790,7 +2789,9 @@ export const SCENARIOS: Scenario[] = [
         { htsNumber: '7601103000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 400000 },
       ];
       const d = params.applicabilityDate;
-      line.license = { typeCode: '28', number: `A23${d.slice(4, 8)}${d.slice(2, 4)}` };
+      // Christopher 9/15: format-only validation, AALUM + mmdd keeps
+      // CERT licenses unique.
+      line.license = { typeCode: '28', number: `AALUM${d.slice(4, 8)}` };
       line.declarations = [{ typeCode: '07', information: 'Y  KRN    KR' }];
     },
   }),

@@ -13,7 +13,6 @@ B  2704ZZZAE                                               SCENARIO 086
 5099030543       125000          0                                              
 508527910500          0      10000        50000NO                               
 OI        RADIO BROADCAST RECEIVERS, HOUSEHOLD                                  
-PG01001FCCRAD                                                                  B
 PG01001FDAFDAFDA                                                               A
 62499    3464                                                                   
 62501    1250                                                                   
