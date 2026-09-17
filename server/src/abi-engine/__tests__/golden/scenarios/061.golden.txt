@@ -3,9 +3,14 @@ B  2704ZZZAE                                               SCENARIO 061
 10AZZZ  00000615 2704061         0111 XA          2083126                       
 1126-16475110026-164751100               082026081526       CA                  
 20MAEU3001081426    EVER GIVEN                                                  
+SE13IMRAN SIDDIQUE                          5715551234                          
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
+SE30SE SEL TIME SWITCH CO                                                       
+SE3501682                                02TEHERAN-RO                           
+SE36SEOUL                                                      KR               
+SE30BY                                    34 26-164751100                       
 40  001 KRKR080126               50058023      1200    N                        
 44TIME SWITCHES                                                                 
 47MKRSELTIM682SEL                                                               

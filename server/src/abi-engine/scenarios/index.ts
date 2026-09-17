@@ -2023,7 +2023,29 @@ export const SCENARIOS: Scenario[] = [
         { htsNumber: '9106908500', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000, uomCode2: 'JWL', quantity2Hundredths: 0, dutyCents: 0 }, // NO+JWL (CERT W1); NT52-alone-replaces
       ];
     },
-    notes: 'Certify-for-release on the Add; AMS bill assumed on file (SE16/SE20 only for non-AMS, ESF-45).',
+    postMap: (input, params) => {
+      // Christopher 9/17: 061 needs BOTH the summary AND the SX release
+      // acceptance. The derived release mandates the SE13 contact plus
+      // Seller and Buyer header entities (ESF-41/58) — the live SE90s
+      // (1208/1037/1038) named them.
+      input.certifyContact = { name: 'IMRAN SIDDIQUE', phone: '5715551234' };
+      input.cargoEntities = [
+        {
+          code: 'SE',
+          name: 'SEL TIME SWITCH CO',
+          addressComponents: [
+            { qualifier: '01', information: '682' },
+            { qualifier: '02', information: 'TEHERAN-RO' },
+          ],
+          geography: { city: 'SEOUL', countryCode: 'KR' },
+        },
+        {
+          code: 'BY',
+          identifier: { qualifier: '34', value: params.importerOfRecordNumber },
+        },
+      ];
+    },
+    notes: 'Certify-for-release on the Add; SE13 + SE/BY entities per the live SE90 set (9/17).',
   }),
 
   appScenario('063', 'AD/CVD Case Information Query \u2014 HTS Number', 'AD', () =>
@@ -2067,7 +2089,9 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   appScenario('066', 'Quota Query', 'QA', () =>
-    buildQuotaQuery([{ typeCode: 'R', queryId: '0202305085', countryOfOrigin: 'NZ' }])
+    // Christopher 9/17: 0202305085 expired since the package was written —
+    // 0202305091 is the current-era number.
+    buildQuotaQuery([{ typeCode: 'R', queryId: '0202305091', countryOfOrigin: 'NZ' }])
   ),
 
   // \u2500\u2500 Type-03 AD/CVD block (067\u2013073): deposit rates arrive from the AD
