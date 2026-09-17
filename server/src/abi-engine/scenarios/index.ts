@@ -2040,8 +2040,23 @@ export const SCENARIOS: Scenario[] = [
           geography: { city: 'SEOUL', countryCode: 'KR' },
         },
         {
+          // Live SE90 11050 (9/17): qualifier 34 means SSN format — the
+          // IOR is an EIN.
           code: 'BY',
-          identifier: { qualifier: '34', value: params.importerOfRecordNumber },
+          identifier: { qualifier: 'EI', value: params.importerOfRecordNumber },
+        },
+      ];
+      // Live SE90 11038 (9/17): the release wants the MANUFACTURER as a
+      // line-level SE50 entity (name route mandatory for MF).
+      input.lines![0].cargoEntities = [
+        {
+          code: 'MF',
+          name: 'SEL TIME SWITCH CO',
+          addressComponents: [
+            { qualifier: '01', information: '682' },
+            { qualifier: '02', information: 'TEHERAN-RO' },
+          ],
+          geography: { city: 'SEOUL', countryCode: 'KR' },
         },
       ];
     },

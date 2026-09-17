@@ -31,6 +31,9 @@ import {
   INPUT_SE30,
   INPUT_SE35,
   INPUT_SE36,
+  INPUT_SE50,
+  INPUT_SE55,
+  INPUT_SE56,
 } from './headerRecordDefs.js';
 import {
   INPUT_40,
@@ -208,6 +211,12 @@ export interface AeLine {
   censusOverrides?: { conditionCode: string; overrideCode: string }[];
   /** PGA message-set data for the line (OI + PG records follow the 50s). */
   pga?: PgaLineInput;
+  /**
+   * Line Level Cargo Entity Grouping (SE50 [+SE55][+SE56]) — certify-only
+   * entities the derived release needs that the summary does not
+   * (MF/SE/CS/LG by name; BY/ST may use the identifier route).
+   */
+  cargoEntities?: AeCargoEntity[];
 }
 
 export interface AeEntrySummaryInput {
@@ -654,6 +663,57 @@ export function buildEntrySummary(input: AeEntrySummaryInput): string[] {
         })
       );
     }
+
+    // Line Level Cargo Entity Grouping (SE50/SE55/SE56) — certify-only
+    // (live SE90 11038 MISSING MANUFACTURER, 9/17): mirrors the header
+    // grouping at line scope.
+    const lineEntities = line.cargoEntities ?? [];
+    if (lineEntities.length > 0 && !input.cargoReleaseCertification) {
+      fail(`lines[${index}].cargoEntities`, 'line cargo entities are only transmitted when certifying for cargo release');
+    }
+    lineEntities.forEach((entity, ei) => {
+      const eAt = `lines[${index}].cargoEntities[${ei}]`;
+      const hasName = entity.name !== undefined;
+      if (hasName === (entity.identifier !== undefined)) {
+        fail(eAt, 'provide either an Entity Name or an Entity Identifier, never both');
+      }
+      if (entity.identifier && entity.code !== 'BY' && entity.code !== 'ST') {
+        fail(eAt, 'an Entity Identifier may only be used with Entity Codes BY or ST (SE50 note)');
+      }
+      lines.push(
+        writeRecord(INPUT_SE50, {
+          entityCode: entity.code,
+          entityName: entity.name,
+          entityIdentifierQualifier: entity.identifier?.qualifier,
+          entityIdentifier: entity.identifier?.value,
+        })
+      );
+      if (hasName) {
+        const components = entity.addressComponents ?? [];
+        if (components.length === 0 || !entity.geography) {
+          fail(eAt, 'the SE55 address and SE56 city/country records are mandatory when an Entity Name is reported');
+        }
+        for (const pair of chunk(components, 2)) {
+          lines.push(
+            writeRecord(INPUT_SE55, {
+              addressComponentQualifier1: pair[0].qualifier,
+              addressInformation1: pair[0].information,
+              addressComponentQualifier2: pair[1]?.qualifier,
+              addressInformation2: pair[1]?.information,
+            })
+          );
+        }
+        const geo = entity.geography!;
+        lines.push(
+          writeRecord(INPUT_SE56, {
+            cityName: geo.city,
+            countrySubEntityCode: geo.countrySubEntityCode,
+            postalCode: geo.postalCode,
+            countryCode: geo.countryCode,
+          })
+        );
+      }
+    });
 
     if (line.tariffs.length === 0) {
       fail(`lines[${index}].tariffs`, 'the tariff grouping is mandatory for a line item');

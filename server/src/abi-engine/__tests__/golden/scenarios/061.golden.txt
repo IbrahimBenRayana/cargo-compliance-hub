@@ -10,11 +10,14 @@ SE13IMRAN SIDDIQUE                          5715551234
 SE30SE SEL TIME SWITCH CO                                                       
 SE3501682                                02TEHERAN-RO                           
 SE36SEOUL                                                      KR               
-SE30BY                                    34 26-164751100                       
+SE30BY                                    EI 26-164751100                       
 40  001 KRKR080126               50058023      1200    N                        
 44TIME SWITCHES                                                                 
 47MKRSELTIM682SEL                                                               
 47S26-164751100                                                                 
+SE50MF SEL TIME SWITCH CO                                                       
+SE5501682                                02TEHERAN-RO                           
+SE56SEOUL                                                      KR               
 5099030571       125000          0                                              
 509106908500          0      10000        50000NO            0JWL               
 62499    3464                                                                   

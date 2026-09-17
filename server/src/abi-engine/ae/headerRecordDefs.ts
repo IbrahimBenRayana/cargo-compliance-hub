@@ -346,6 +346,50 @@ export const INPUT_SE35: RecordDef = {
   ],
 };
 
+/** Line Level Cargo Entity records (SE50/SE55/SE56) — the SE30/35/36
+ * layouts repeated at line level (ESF-xx, 'Line Level Cargo Entity
+ * Grouping'): certify-only entities the release needs that the summary
+ * does not (MF/SE/CS/LG by name; BY/ST may use the identifier route). */
+export const INPUT_SE50: RecordDef = {
+  id: 'SE50',
+  name: 'LineEntityName',
+  fields: [
+    { name: 'controlIdentifier', start: 1, end: 4, class: 'AN', designation: 'M', constant: 'SE50' },
+    { name: 'entityCode', start: 5, end: 7, class: 'A', designation: 'M' },
+    { name: 'entityName', start: 8, end: 42, class: 'X', designation: 'C' },
+    { name: 'entityIdentifierQualifier', start: 43, end: 45, class: 'X', designation: 'C' },
+    { name: 'entityIdentifier', start: 46, end: 65, class: 'X', designation: 'C' },
+    { name: 'filler', start: 66, end: 80, class: 'S', designation: 'M' },
+  ],
+};
+
+export const INPUT_SE55: RecordDef = {
+  id: 'SE55',
+  name: 'LineEntityAddress',
+  fields: [
+    { name: 'controlIdentifier', start: 1, end: 4, class: 'AN', designation: 'M', constant: 'SE55' },
+    { name: 'addressComponentQualifier1', start: 5, end: 6, class: 'AN', designation: 'M' },
+    { name: 'addressInformation1', start: 7, end: 41, class: 'X', designation: 'M' },
+    { name: 'addressComponentQualifier2', start: 42, end: 43, class: 'AN', designation: 'O' },
+    { name: 'addressInformation2', start: 44, end: 78, class: 'X', designation: 'O' },
+    { name: 'filler', start: 79, end: 80, class: 'S', designation: 'M' },
+  ],
+};
+
+export const INPUT_SE56: RecordDef = {
+  id: 'SE56',
+  name: 'LineEntityGeographicArea',
+  fields: [
+    { name: 'controlIdentifier', start: 1, end: 4, class: 'AN', designation: 'M', constant: 'SE56' },
+    { name: 'cityName', start: 5, end: 39, class: 'X', designation: 'M' },
+    { name: 'countrySubEntityCode', start: 40, end: 42, class: 'AN', designation: 'C' },
+    { name: 'filler', start: 43, end: 48, class: 'S', designation: 'M' },
+    { name: 'postalCode', start: 49, end: 63, class: 'X', designation: 'C' },
+    { name: 'countryCode', start: 64, end: 65, class: 'A', designation: 'M' },
+    { name: 'filler2', start: 66, end: 80, class: 'S', designation: 'M' },
+  ],
+};
+
 /** Entity Geographic Area — input SE36-Record (ESF-64). */
 export const INPUT_SE36: RecordDef = {
   id: 'SE36',
@@ -372,6 +416,9 @@ for (const def of [
   INPUT_22,
   INPUT_23,
   INPUT_SE16,
+  INPUT_SE50,
+  INPUT_SE55,
+  INPUT_SE56,
   INPUT_SE17,
   INPUT_30,
   INPUT_31,
