@@ -2104,9 +2104,10 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   appScenario('066', 'Quota Query', 'QA', () =>
-    // Christopher 9/17: 0202305085 expired since the package was written —
-    // 0202305091 is the current-era number.
-    buildQuotaQuery([{ typeCode: 'R', queryId: '0202305091', countryOfOrigin: 'NZ' }])
+    // Both 0202305085 (package) and 0202305091 (Christopher 9/17) return
+    // Q49: neither is active in CERT's quota module. Michael Barela 9/29:
+    // 0201101010 is present there.
+    buildQuotaQuery([{ typeCode: 'R', queryId: '0201101010', countryOfOrigin: 'NZ' }])
   ),
 
   // \u2500\u2500 Type-03 AD/CVD block (067\u2013073): deposit rates arrive from the AD
