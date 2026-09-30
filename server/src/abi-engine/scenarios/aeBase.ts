@@ -18,6 +18,7 @@ import { validateEntrySummary, type ValidationIssue } from '../validate/entrySum
 import { buildBatch, scenarioTag } from '../envelope/batch.js';
 import { RecordCodecError } from '../records/codec.js';
 import { type CertParams, entrySequenceFor, brokerReferenceFor } from './params.js';
+import { isUsFederalHoliday } from '../calendar/usFederalHolidays.js';
 
 export type ScenarioKind = 'transmit' | 'reject';
 
@@ -85,7 +86,8 @@ export function appScenario(
 /** Baseline type-01 consumption entry, parameterized per scenario. */
 /**
  * Preliminary statement print date: applicability date + 10 days, rolled
- * forward off weekends (usage note (y) bars them). Strictly future for any
+ * forward off weekends AND federal holidays (usage note (y); live F204 on
+ * 9/30 when a weekend roll landed on Columbus Day). Strictly future for any
  * generate-day at or before the applicability date.
  */
 export function statementDateFrom(applicabilityDate: string): string {
@@ -94,10 +96,11 @@ export function statementDateFrom(applicabilityDate: string): string {
     Number(applicabilityDate.slice(4, 6)) - 1,
     Number(applicabilityDate.slice(6, 8)) + 10
   ));
-  const dow = dt.getUTCDay();
-  if (dow === 6) dt.setUTCDate(dt.getUTCDate() + 2);
-  else if (dow === 0) dt.setUTCDate(dt.getUTCDate() + 1);
-  return dt.toISOString().slice(0, 10).replace(/-/g, '');
+  const iso = () => dt.toISOString().slice(0, 10).replace(/-/g, '');
+  while (dt.getUTCDay() === 0 || dt.getUTCDay() === 6 || isUsFederalHoliday(iso())) {
+    dt.setUTCDate(dt.getUTCDate() + 1);
+  }
+  return iso();
 }
 
 export function baseAePayload(params: CertParams, scenarioId: string): AbiPayloadV2 {

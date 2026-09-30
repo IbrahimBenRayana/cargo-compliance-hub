@@ -21,6 +21,7 @@
  * (their conditions live in dedicated rules where the scenarios need them).
  */
 import type { AeEntrySummaryInput, AeLine } from '../ae/builder.js';
+import { isUsFederalHoliday } from '../calendar/usFederalHolidays.js';
 import { ENTRY_TYPE_CODES, MOT_CODES } from '../ae/tables.js';
 
 export interface ValidationIssue {
@@ -107,6 +108,13 @@ function wireDateToComparable(mmddyy: string): string {
 }
 
 /** Day of week for an MMDDYY wire date (0 = Sunday, 6 = Saturday). */
+/** MMDDYY wire date → YYYYMMDD (70-99 → 19xx, as wireDateDayOfWeek). */
+function wireDateToYmd(mmddyy: string): string {
+  const yy = Number(mmddyy.slice(4, 6));
+  const year = yy >= 70 ? 1900 + yy : 2000 + yy;
+  return `${year}${mmddyy.slice(0, 2)}${mmddyy.slice(2, 4)}`;
+}
+
 function wireDateDayOfWeek(mmddyy: string): number {
   const yy = Number(mmddyy.slice(4, 6));
   const year = yy >= 70 ? 1900 + yy : 2000 + yy;
@@ -448,6 +456,10 @@ function validatePayment(input: AeEntrySummaryInput, issues: ValidationIssue[]):
     const day = wireDateDayOfWeek(payment.preliminaryStatementPrintDate);
     if (day === 0 || day === 6) {
       push('payment.preliminaryStatementPrintDate', 'statement print date cannot be a weekend day (note y)');
+    } else if (isUsFederalHoliday(wireDateToYmd(payment.preliminaryStatementPrintDate))) {
+      // ACE fatal F204 PRELIM STMT DATE IS SAT, SUN, OR HOL — caught here
+      // so the filer can fix it before transmission.
+      push('payment.preliminaryStatementPrintDate', 'statement print date cannot be a federal holiday (note y, ACE F204)');
     }
   }
 
