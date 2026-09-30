@@ -1,28 +1,28 @@
 ALA  MCLPASSWD           AE                                                     
 B  2704ZZZAE                                               SCENARIO 061         
-10AZZZ  00000615 2704061         0111 XA          2083126                       
+10AZZZ  00006109 2704061         0111 XA          2083126                       
 1126-16475110026-164751100               082026081526       CA                  
 20MAEU3001081426    EVER GIVEN                                                  
 SE13IMRAN SIDDIQUE                          5715551234                          
 22     100CTNS                                                                  
 23MMAEU123456789012                                                             
 318B 123                                                                        
-SE30SE SEL TIME SWITCH CO                                                       
-SE3501682                                02TEHERAN-RO                           
-SE36SEOUL                                                      KR               
+SE30SE SHENZHEN BATTERY CO                                                      
+SE3501123                                02PUDONG AVE                           
+SE36SHANGHAI                                    200001         CN               
 SE30BY                                    EI 26-164751100                       
-40  001 KRKR080126               50058023      1200    N                        
-44TIME SWITCHES                                                                 
-47MKRSELTIM682SEL                                                               
+40  001 CNCN080126               50057035      1200    N                        
+44QUILTS AND COMFORTERS                                                         
+47MCNSHEBAT123SHA                                                               
 47S26-164751100                                                                 
-SE50MF SEL TIME SWITCH CO                                                       
-SE5501682                                02TEHERAN-RO                           
-SE56SEOUL                                                      KR               
-5099030571       125000          0                                              
-509106908500          0      10000        50000NO            0JWL               
-62499    3464                                                                   
-62501    1250                                                                   
-89499       3464501       1250                                                  
-90     125000        4714           0           0           0           0       
+SE50MF SHENZHEN BATTERY CO                                                      
+SE5501123                                02PUDONG AVE                           
+SE56SHANGHAI                                    200001         CN               
+5099030531       191100          0                                              
+509404409022     195686      15288        67200NO       348700KG                
+62499    5296                                                                   
+62501    1911                                                                   
+89499       5296501       1911                                                  
+90     386786        7207           0           0           0           0       
 Y  2704ZZZAE                                                                    
 ZLA  MCL                                                                        

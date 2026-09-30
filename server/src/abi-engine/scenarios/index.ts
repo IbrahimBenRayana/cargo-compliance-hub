@@ -2004,63 +2004,54 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('061', 'Cargo Release Certification', {
-    rates: { '99030571': NT52_125, '9106908500': '15\u00a2 each + 2.3% + 0.8\u00a2/jewel' },
+    // Rebuilt 9/30 on Michael Barela's working example: the prior 061 entry
+    // (S7P-0000061-8) sits in CBP control status and cannot return to trade
+    // status, so this files a NEW entry number certified for cargo release.
+    // Its SX came back with SE10 Estimated Entry Value = 0 (errors 11022 and
+    // 11119); Michael's reference line derives a value of 15288.
+    rates: {
+      '99030531': NT52_125,
+      '9404409022': '12.8%',
+    },
     mutate: (p) => {
+      p.entrySummary.entryNumber = '0000610';
       p.entrySummary.cargoReleaseCertification = true;
       const line = p.entrySummary.lines[0];
-      line.countryOfOrigin = 'KR';
-      line.countryOfExport = 'KR';
-      line.descriptions = ['TIME SWITCHES'];
-      line.foreignPortOfLading = '58023'; // Busan (Schedule K)
+      line.countryOfOrigin = 'CN';
+      line.countryOfExport = 'CN';
+      line.descriptions = ['QUILTS AND COMFORTERS'];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
       line.parties = [
-        { type: 'M', identifier: 'KRSELTIM682SEL' },
+        { type: 'M', identifier: 'CNSHEBAT123SHA' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
-      // Compound watch-style rate pinned (no jewels): 15\u00a2\u00d7500 = $75.00 +
-      // 2.3%\u00d7$10,000 = $230.00 \u2192 $305.00.
+      // Michael's reference 50-records, verbatim: NT52 CN 12.5% = $1,911.00
+      // and 12.8% = $1,956.86 on $15,288 (672 NO, 3,487 KG), both assessed.
       line.tariffs = [
-        { htsNumber: '99030571', valueDollars: 0 }, // NT52 KR 12.5%
-        { htsNumber: '9106908500', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000, uomCode2: 'JWL', quantity2Hundredths: 0, dutyCents: 0 }, // NO+JWL (CERT W1); NT52-alone-replaces
+        { htsNumber: '99030531', valueDollars: 0, dutyCents: 191100 },
+        { htsNumber: '9404409022', valueDollars: 15288, uomCode1: 'NO', quantity1Hundredths: 67200, uomCode2: 'KG', quantity2Hundredths: 348700, dutyCents: 195686 },
       ];
     },
     postMap: (input, params) => {
-      // Christopher 9/17: 061 needs BOTH the summary AND the SX release
-      // acceptance. The derived release mandates the SE13 contact plus
-      // Seller and Buyer header entities (ESF-41/58) — the live SE90s
-      // (1208/1037/1038) named them.
+      // Release entities, all accepted on the 9/17 SX: SE13 contact, Seller
+      // (name route), Buyer (EIN route, qualifier EI), and the Manufacturer
+      // as a line-level SE50 entity.
+      const firm = {
+        name: 'SHENZHEN BATTERY CO',
+        addressComponents: [
+          { qualifier: '01', information: '123' },
+          { qualifier: '02', information: 'PUDONG AVE' },
+        ],
+        geography: { city: 'SHANGHAI', postalCode: '200001', countryCode: 'CN' },
+      };
       input.certifyContact = { name: 'IMRAN SIDDIQUE', phone: '5715551234' };
       input.cargoEntities = [
-        {
-          code: 'SE',
-          name: 'SEL TIME SWITCH CO',
-          addressComponents: [
-            { qualifier: '01', information: '682' },
-            { qualifier: '02', information: 'TEHERAN-RO' },
-          ],
-          geography: { city: 'SEOUL', countryCode: 'KR' },
-        },
-        {
-          // Live SE90 11050 (9/17): qualifier 34 means SSN format — the
-          // IOR is an EIN.
-          code: 'BY',
-          identifier: { qualifier: 'EI', value: params.importerOfRecordNumber },
-        },
+        { code: 'SE', ...firm },
+        { code: 'BY', identifier: { qualifier: 'EI', value: params.importerOfRecordNumber } },
       ];
-      // Live SE90 11038 (9/17): the release wants the MANUFACTURER as a
-      // line-level SE50 entity (name route mandatory for MF).
-      input.lines![0].cargoEntities = [
-        {
-          code: 'MF',
-          name: 'SEL TIME SWITCH CO',
-          addressComponents: [
-            { qualifier: '01', information: '682' },
-            { qualifier: '02', information: 'TEHERAN-RO' },
-          ],
-          geography: { city: 'SEOUL', countryCode: 'KR' },
-        },
-      ];
+      input.lines![0].cargoEntities = [{ code: 'MF', ...firm }];
     },
-    notes: 'Certify-for-release on the Add; SE13 + SE/BY entities per the live SE90 set (9/17).',
+    notes: 'New entry 0000610 certified for cargo release, modeled on the CBP rep\'s working 50-records (9/30).',
   }),
 
   appScenario('063', 'AD/CVD Case Information Query \u2014 HTS Number', 'AD', () =>
