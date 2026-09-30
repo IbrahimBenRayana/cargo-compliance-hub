@@ -73,6 +73,15 @@ export function getAccessToken() {
 }
 
 // ─── Core Fetch with Auth ─────────────────────────────────
+// Endpoints where a 401 means "these credentials were rejected", not "your
+// session expired". Refresh-and-redirect there reloads the login page and
+// swallows the error the user needs to see (wrong password, stale MFA token).
+const CREDENTIAL_PATHS = new Set([
+  '/api/v1/auth/login',
+  '/api/v1/auth/mfa/verify',
+  '/api/v1/auth/mfa/email/send',
+]);
+
 async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {}
@@ -93,7 +102,7 @@ async function apiFetch<T = any>(
   // If 401, attempt a refresh — the browser will send the httpOnly
   // mcl_refresh cookie if it has one. If it doesn't, the refresh call
   // will fail fast (401) and we surface the original 401 unchanged.
-  if (response.status === 401) {
+  if (response.status === 401 && !CREDENTIAL_PATHS.has(path)) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
       headers['Authorization'] = `Bearer ${accessToken}`;
