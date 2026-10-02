@@ -2173,9 +2173,12 @@ export const SCENARIOS: Scenario[] = [
       line.countryOfExport = 'FI';
       line.descriptions = ['CELLULOSE ETHERS'];
       line.foreignPortOfLading = '40500'; // Helsinki (Schedule K)
+      // Manufacturer and exporter = the company named on the case (CP KELCO
+      // OY, Finland). The Italian tomato-paste MID used before did not match
+      // the FI origin (found in the 10/2 wire review).
       line.parties = [
-        { type: 'M', identifier: 'ITMILTOM468MIL' },
-        { type: 'E', identifier: 'ITMILTOM468MIL' },
+        { type: 'M', identifier: 'FICPKEL12AAN' },
+        { type: 'E', identifier: 'FICPKEL12AAN' },
         { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
       ];
       line.tariffs = [

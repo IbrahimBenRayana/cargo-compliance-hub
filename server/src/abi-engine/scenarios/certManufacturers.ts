@@ -44,6 +44,8 @@ export const CERT_MANUFACTURERS: CertManufacturer[] = [
   { mid: 'GLGOHAIR428GOH', name: 'G O H AIRCRAFT PARTS', street: '428 AQQUSINERSUAQ', city: 'GOH', countryCode: 'GL', added: true },
   { mid: 'CHGENWAT552GEN', name: 'GENEVA WATCH SA', street: '552 RUE DU RHONE', city: 'GENEVA', countryCode: 'CH', added: true },
   { mid: 'MACASBEL713CAS', name: 'CASABLANCA BELTS', street: '713 BLVD MOHAMMED V', city: 'CASABLANCA', countryCode: 'MA', added: true },
+  // 069 — the company named on AD case A405803001 (purified CMC, Finland).
+  { mid: 'FICPKEL12AAN', name: 'CP KELCO OY', street: '12 SELLUTIE', city: 'AANEKOSKI', countryCode: 'FI', added: false },
   // 084 — Winnipeg oats, XM prefix (Manitoba).
   { mid: 'XMWINOAT173WIN', name: 'WINNIPEG OAT GROWERS', street: '173 GRAIN RD', city: 'WINNIPEG', stateOrProvince: 'MB', countryCode: 'CA', zipOrPostalCode: 'R3C0V8', added: false },
   // 057/058 — Toronto firms, XO prefix (Ontario), AMF-17 postal codes.

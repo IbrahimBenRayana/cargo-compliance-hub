@@ -8,8 +8,8 @@ B  2704ZZZAE                                               SCENARIO 069
 318B 123                                                                        
 40  001 FIFI080126        0000000500405000000001200    N                        
 44CELLULOSE ETHERS                                                              
-47MITMILTOM468MIL                                                               
-47EITMILTOM468MIL                                                               
+47MFICPKEL12AAN                                                                 
+47EFICPKEL12AAN                                                                 
 47S26-164751100                                                                 
 5099030539   0000100000 0000000000                                              
 503912390000 0000000000 0000010000 000000200000KG                               
