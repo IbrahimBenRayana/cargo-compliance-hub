@@ -2014,7 +2014,9 @@ export const SCENARIOS: Scenario[] = [
       '9404409022': '12.8%',
     },
     mutate: (p) => {
-      p.entrySummary.entryNumber = '0000610';
+      // 0000610 (9/30) was accepted but its SX rejected; each retry needs a
+      // fresh number (Michael Barela 10/2).
+      p.entrySummary.entryNumber = '0000611';
       p.entrySummary.cargoReleaseCertification = true;
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'CN';
@@ -2051,7 +2053,7 @@ export const SCENARIOS: Scenario[] = [
       ];
       input.lines![0].cargoEntities = [{ code: 'MF', ...firm }];
     },
-    notes: 'New entry 0000610 certified for cargo release, modeled on the CBP rep\'s working 50-records (9/30).',
+    notes: 'New entry 0000611 certified for cargo release; numerics zero-filled per CBP (10/2).',
   }),
 
   appScenario('063', 'AD/CVD Case Information Query \u2014 HTS Number', 'AD', () =>

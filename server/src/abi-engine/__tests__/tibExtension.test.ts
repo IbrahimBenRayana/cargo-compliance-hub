@@ -70,9 +70,10 @@ describe('TIB response record defs', () => {
       entryFilerCode: 'ABC',
       entryNumber: '12345676',
     });
-    // E0 | SUMMRY 4-9 | occurrence 11-16 right-justified | REF ID: 18-24
+    // E0 | SUMMRY 4-9 | occurrence 11-16 zero-filled (as CBP's own AX
+    // responses render it: 'E0 SUMMRY 000001') | REF ID: 18-24
     // | filer 26-28 | entry 30-37 | 43S
-    expect(line).toBe('E0 SUMMRY      1 REF ID: ABC 12345676' + ' '.repeat(43));
+    expect(line).toBe('E0 SUMMRY 000001 REF ID: ABC 12345676' + ' '.repeat(43));
   });
 
   it('lays out the E1 disposition exactly per TIB-13..14', () => {

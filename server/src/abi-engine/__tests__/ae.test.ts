@@ -114,13 +114,13 @@ describe('buildEntrySummary', () => {
     expect(rec10.slice(51, 57)).toBe('090126'); // preliminary statement print date
   });
 
-  it('right-justifies (S)N money and quantity fields on the 50-record (ESF-89)', () => {
+  it('zero-fills (S)N money and quantity fields on the 50-record (ESF-89)', () => {
     const lines = buildEntrySummary(TYPE_01);
     const rec50 = lines.find((l) => l.startsWith('50'))!;
     expect(rec50.slice(2, 12)).toBe('8507600020'); // HTS
-    expect(rec50.slice(13, 23)).toBe('     34100'); // duty, cents, right-justified
-    expect(rec50.slice(24, 34)).toBe('     10000'); // value, whole dollars
-    expect(rec50.slice(35, 47)).toBe('       50000'); // qty 1, 2 implied decimals
+    expect(rec50.slice(13, 23)).toBe('0000034100'); // duty, cents, right-justified
+    expect(rec50.slice(24, 34)).toBe('0000010000'); // value, whole dollars
+    expect(rec50.slice(35, 47)).toBe('000000050000'); // qty 1, 2 implied decimals
     expect(rec50.slice(47, 50)).toBe('NO '); // UOM 1
   });
 
@@ -128,13 +128,13 @@ describe('buildEntrySummary', () => {
     const lines = buildEntrySummary(TYPE_01);
     const rec89 = lines.find((l) => l.startsWith('89'))!;
     expect(rec89.slice(2, 5)).toBe('499');
-    expect(rec89.slice(5, 16)).toBe('       3464');
+    expect(rec89.slice(5, 16)).toBe('00000003464');
     expect(rec89.slice(16, 19)).toBe('501');
-    expect(rec89.slice(19, 30)).toBe('       1250');
+    expect(rec89.slice(19, 30)).toBe('00000001250');
     const rec90 = lines.find((l) => l.startsWith('90'))!;
-    expect(rec90.slice(2, 13)).toBe('      34100'); // grand total duty
-    expect(rec90.slice(14, 25)).toBe('       4714'); // grand total user fees
-    expect(rec90.slice(26, 37)).toBe('          0'); // IR tax reported as $0.00
+    expect(rec90.slice(2, 13)).toBe('00000034100'); // grand total duty
+    expect(rec90.slice(14, 25)).toBe('00000004714'); // grand total user fees
+    expect(rec90.slice(26, 37)).toBe('00000000000'); // IR tax reported as $0.00
   });
 
   it('emits only the 10-record on a Delete, with conditionals space-filled (Note 2, ESF-34)', () => {
