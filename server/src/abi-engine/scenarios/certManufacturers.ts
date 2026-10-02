@@ -45,14 +45,14 @@ export const CERT_MANUFACTURERS: CertManufacturer[] = [
   { mid: 'CHGENWAT552GEN', name: 'GENEVA WATCH SA', street: '552 RUE DU RHONE', city: 'GENEVA', countryCode: 'CH', added: true },
   { mid: 'MACASBEL713CAS', name: 'CASABLANCA BELTS', street: '713 BLVD MOHAMMED V', city: 'CASABLANCA', countryCode: 'MA', added: true },
   // 069 — the company named on AD case A405803001 (purified CMC, Finland).
-  { mid: 'FICPKEL12AAN', name: 'CP KELCO OY', street: '12 SELLUTIE', city: 'AANEKOSKI', countryCode: 'FI', added: false },
+  { mid: 'FICPKEL12AAN', name: 'CP KELCO OY', street: '12 SELLUTIE', city: 'AANEKOSKI', countryCode: 'FI', added: true },
   // 084 — Winnipeg oats, XM prefix (Manitoba).
-  { mid: 'XMWINOAT173WIN', name: 'WINNIPEG OAT GROWERS', street: '173 GRAIN RD', city: 'WINNIPEG', stateOrProvince: 'MB', countryCode: 'CA', zipOrPostalCode: 'R3C0V8', added: false },
+  { mid: 'XMWINOAT173WIN', name: 'WINNIPEG OAT GROWERS', street: '173 GRAIN RD', city: 'WINNIPEG', stateOrProvince: 'MB', countryCode: 'CA', zipOrPostalCode: 'R3C0V8', added: true },
   // 057/058 — Toronto firms, XO prefix (Ontario), AMF-17 postal codes.
-  { mid: 'XOTORFUR815TOR', name: 'TORONTO FURNACES', street: '815 KING ST W', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M5V1N4', added: false },
-  { mid: 'XOTORVIN926TOR', name: 'TORONTO VINYL', street: '926 QUEEN ST E', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M4M1J6', added: false },
+  { mid: 'XOTORFUR815TOR', name: 'TORONTO FURNACES', street: '815 KING ST W', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M5V1N4', added: true },
+  { mid: 'XOTORVIN926TOR', name: 'TORONTO VINYL', street: '926 QUEEN ST E', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M4M1J6', added: true },
   // 027 (Karl 9/3: XQ = Canadian province) — CA MIDs need postal codes (AMF-17).
-  { mid: 'XOTORAPP159TOR', name: 'TORONTO APPAREL', street: '159 SPADINA AVE', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M5V2T6', added: false },
+  { mid: 'XOTORAPP159TOR', name: 'TORONTO APPAREL', street: '159 SPADINA AVE', city: 'TORONTO', stateOrProvince: 'ON', countryCode: 'CA', zipOrPostalCode: 'M5V2T6', added: true },
   { mid: 'CNSHETOO654SHA', name: 'SHENZHEN TOOLS CO', street: '654 BAO AN RD', city: 'SHANGHAI', countryCode: 'CN', zipOrPostalCode: '200001', added: true },
   { mid: 'GUHAGPEA842HAG', name: 'HAGATNA PEARLS', street: '842 MARINE CORPS DR', city: 'HAGATNA', countryCode: 'GU', added: true },
   { mid: 'MXMTYSTL654MTY', name: 'M T Y STL METALS', street: '654 AV CONSTITUCION', city: 'MTY', countryCode: 'MX', added: true },
