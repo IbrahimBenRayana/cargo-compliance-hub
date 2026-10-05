@@ -2061,13 +2061,16 @@ export const SCENARIOS: Scenario[] = [
   ),
 
   appScenario('064', 'AD/CVD Case Information Query \u2014 Date Since Last Update', 'AD', (params) => {
-    // Two days prior to transmission, derived from the applicability date.
+    // Two days prior to transmission, derived from the applicability date
+    // with real date arithmetic (the old day-minus-2 broke on the 1st/2nd
+    // of a month, e.g. Oct 1 gave day '-1').
     const d = params.applicabilityDate;
-    const dayMinus2 = String(Number(d.slice(6, 8)) - 2).padStart(2, '0');
+    const since = new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(4, 6)) - 1, Number(d.slice(6, 8)) - 2));
+    const mmddyy = `${String(since.getUTCMonth() + 1).padStart(2, '0')}${String(since.getUTCDate()).padStart(2, '0')}${String(since.getUTCFullYear()).slice(2)}`;
     return buildAdCvdCaseQuery({
       type: 'criteria',
       companyCaseStatus: 'A',
-      dateSinceLastUpdate: `${d.slice(4, 6)}${dayMinus2}${d.slice(2, 4)}`,
+      dateSinceLastUpdate: mmddyy,
     });
   }),
 
