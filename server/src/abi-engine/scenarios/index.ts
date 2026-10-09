@@ -2960,10 +2960,13 @@ export const SCENARIOS: Scenario[] = [
             name: 'SHENZHEN BATTERY CO',
             addressComponents: [{ qualifier: '01', information: '123' }, { qualifier: '02', information: 'PUDONG AVE' }],
             geography: { city: 'SHANGHAI', postalCode: '200001', countryCode: 'CN' },
-            // The Replace changes the HTS detail, giving CBP a real amendment.
+            // 6-digit headings: the ISF side rejected 8507600030 as 404 HTS
+            // CODE NOT ON FILE (10/9) although the AE table accepts it, so
+            // the filing avoids statistical suffixes (ISF allows 6 to 10
+            // digits). The Replace adds a line, giving CBP a real amendment.
             tariffs: action === 'A'
-              ? [{ htsNumber: '8507600030', countryOfOrigin: 'CN' }]
-              : [{ htsNumber: '8507600030', countryOfOrigin: 'CN' }, { htsNumber: '850650', countryOfOrigin: 'CN' }],
+              ? [{ htsNumber: '850760', countryOfOrigin: 'CN' }]
+              : [{ htsNumber: '850760', countryOfOrigin: 'CN' }, { htsNumber: '850650', countryOfOrigin: 'CN' }],
           },
         ],
       };

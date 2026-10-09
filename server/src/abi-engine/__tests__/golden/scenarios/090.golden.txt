@@ -21,6 +21,6 @@ SF36SHANGHAI                                                   CN
 SF30MF SHENZHEN BATTERY CO                                                      
 SF3501123                                02PUDONG AVE                           
 SF36SHANGHAI                                    200001         CN               
-SF408507600030CN                                                                
+SF40850760    CN                                                                
 Y  2704ZZZSF                                                                    
 ZLA  MCL                                                                        
