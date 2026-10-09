@@ -25,6 +25,8 @@ export type ScenarioKind = 'transmit' | 'reject';
 export interface ScenarioRunContext {
   /** responseText of this scenario's newest transmission carrying one. */
   priorResponseText?: string;
+  /** Every responseText for this scenario, oldest first (090 tracks state across them). */
+  allResponseTexts?: string[];
 }
 
 export interface Scenario {

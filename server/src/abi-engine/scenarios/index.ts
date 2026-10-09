@@ -2917,7 +2917,9 @@ export const SCENARIOS: Scenario[] = [
         submissionType: '1', // ISF-10
         shipmentTypeCode: '01', // standard shipment
         action,
-        actionReasonCode: action === 'A' ? 'CT' : 'FR', // CT complete, FR flexible replace
+        // CT complete transaction on the Replace too: FR drew warning 141
+        // COMPLETE TRANSACTION REQUIRED live (10/9).
+        actionReasonCode: 'CT',
         importer: { qualifier: 'EI', number: ior },
         modeOfTransportationCode: '11',
         scac: 'MAEU',
@@ -2972,16 +2974,36 @@ export const SCENARIOS: Scenario[] = [
       };
     };
 
-    /** Next step from the latest attached SN response. */
-    const nextStep = (prior: string | undefined): { action: 'A' | 'R' | 'D'; transactionNumber?: string } => {
-      if (!prior) return { action: 'A' };
-      const parsed = parseIsfResponseBatch(prior.split(/\r?\n/).filter((l) => l.length > 0));
-      const accepted = parsed.filings.find((f) => f.accepted && f.isfTransactionNumber);
-      if (!accepted) return { action: 'A' };
-      const echoedAction = accepted.echoedRecords.find((r) => r.recordId === 'SF10')?.values.actionCode;
-      if (echoedAction === 'A') return { action: 'R', transactionNumber: accepted.isfTransactionNumber };
-      if (echoedAction === 'R') return { action: 'D', transactionNumber: accepted.isfTransactionNumber };
-      return { action: 'A' }; // a completed Delete starts the cycle again
+    /**
+     * Next step from the whole response history. A text can hold several
+     * envelopes (SN verdicts and SA advisories share a scenario tag), so each
+     * envelope is parsed on its own and the last accepted filing wins; SA
+     * advisories and rejected retries carry no accepted filing and are skipped.
+     */
+    const nextStep = (history: string[]): { action: 'A' | 'R' | 'D'; transactionNumber?: string } => {
+      let last: { action?: string; transactionNumber?: string } | undefined;
+      for (const text of history) {
+        const envelopes: string[][] = [];
+        for (const line of text.split(/\r?\n/).filter((l) => l.length > 0)) {
+          if (line.startsWith('A') || envelopes.length === 0) envelopes.push([]);
+          envelopes[envelopes.length - 1].push(line);
+        }
+        for (const envelope of envelopes) {
+          let filings;
+          try {
+            filings = parseIsfResponseBatch(envelope).filings;
+          } catch {
+            continue; // not an ISF response envelope
+          }
+          for (const f of filings) {
+            if (!f.accepted || !f.isfTransactionNumber) continue;
+            last = { action: f.echoedRecords.find((r) => r.recordId === 'SF10')?.values.actionCode, transactionNumber: f.isfTransactionNumber };
+          }
+        }
+      }
+      if (last?.action === 'A') return { action: 'R', transactionNumber: last.transactionNumber };
+      if (last?.action === 'R') return { action: 'D', transactionNumber: last.transactionNumber };
+      return { action: 'A' }; // nothing accepted yet, or a completed Delete starts the cycle again
     };
 
     const scenario: Scenario = {
@@ -2990,9 +3012,9 @@ export const SCENARIOS: Scenario[] = [
       application: 'SF',
       kind: 'transmit',
       notes:
-        'ISF certification (CBP, 10/8): transmit three times. Each Generate reads the latest SN response: Add first, then Replace with the CBP-assigned ISF transaction number, then Delete.',
+        'ISF certification (CBP, 10/8): transmit three times. Each Generate reads every attached SN response (SA advisories ignored): Add first, then Replace with the CBP-assigned ISF transaction number, then Delete.',
       run: async (params, ctx) => {
-        const step = nextStep(ctx?.priorResponseText);
+        const step = nextStep(ctx?.allResponseTexts ?? (ctx?.priorResponseText ? [ctx.priorResponseText] : []));
         return buildBatch({
           sender: params.sender,
           appId: 'SF',

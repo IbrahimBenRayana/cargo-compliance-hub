@@ -135,14 +135,16 @@ router.post('/scenarios/:id/generate', async (req: AuthRequest, res: Response): 
     return;
   }
   const params = await loadParams();
-  // Multi-phase scenarios (006) branch on their latest attached response.
-  const prior = await prisma.certTransmission.findFirst({
+  // Multi-phase scenarios branch on their attached responses: 006 on the
+  // latest, 090 on the whole history.
+  const priors = await prisma.certTransmission.findMany({
     where: { scenarioId: id, responseText: { not: null } },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: 'asc' },
     select: { responseText: true },
   });
+  const allResponseTexts = priors.map((p) => p.responseText as string);
   try {
-    const result = await scenario.run(params, { priorResponseText: prior?.responseText ?? undefined });
+    const result = await scenario.run(params, { priorResponseText: allResponseTexts[allResponseTexts.length - 1], allResponseTexts });
     const isWire = Array.isArray(result) && typeof result[0] === 'string';
     const transmission = await prisma.certTransmission.create({
       data: isWire
@@ -328,11 +330,18 @@ async function attachBatch(batch: string[]): Promise<{ scenarioId: string; trans
   } catch {
     responseParsed = undefined; // raw text still attaches; parse failure is visible in the console
   }
-  const status = verdictStatusOf(batch);
+  // A transmission can draw several batches (an ISF SN verdict, then an SA
+  // advisory). Append rather than overwrite so the verdict is never lost, and
+  // don't let an unrecognised follow-up batch downgrade an earlier verdict.
+  const text = batch.join('\n');
+  const existing = transmission.responseText;
+  if (existing?.includes(text)) return { scenarioId, transmissionId: transmission.id, status: transmission.status };
+  const verdict = verdictStatusOf(batch);
+  const status = existing && verdict === 'conditional' ? transmission.status : verdict;
   await prisma.certTransmission.update({
     where: { id: transmission.id },
     data: {
-      responseText: batch.join('\n'),
+      responseText: existing ? `${existing}\n${text}` : text,
       responseParsed: responseParsed === undefined ? undefined : JSON.parse(JSON.stringify(responseParsed)),
       status,
     },
