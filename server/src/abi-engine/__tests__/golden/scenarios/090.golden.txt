@@ -1,0 +1,26 @@
+ALA  MCLPASSWD           SF                                                     
+B  2704ZZZSF                                               SCENARIO 090         
+SF10101ACTEI 26-164751100           11               MAEU26-164751100   018     
+SF15BMMAEU123456789012                                                          
+SF20CR ISF090                                                                   
+SF30IM                                    EI 26-164751100                       
+SF30CN                                    EI 26-164751100                       
+SF30SE SHENZHEN BATTERY CO                                                      
+SF3501123                                02PUDONG AVE                           
+SF36SHANGHAI                                    200001         CN               
+SF30BY                                    EI 26-164751100                       
+SF30ST MYCARGOLENS TEST WAREHOUSE                                               
+SF3501100                                02MARKET ST                            
+SF36LOS ANGELES                        CA       90001          US               
+SF30LG SHANGHAI CFS                                                             
+SF3515PORT ROAD 1                                                               
+SF36SHANGHAI                                                   CN               
+SF30CS SHANGHAI CONSOLIDATORS                                                   
+SF3515HARBOUR WAY 2                                                             
+SF36SHANGHAI                                                   CN               
+SF30MF SHENZHEN BATTERY CO                                                      
+SF3501123                                02PUDONG AVE                           
+SF36SHANGHAI                                    200001         CN               
+SF408507600030CN                                                                
+Y  2704ZZZSF                                                                    
+ZLA  MCL                                                                        

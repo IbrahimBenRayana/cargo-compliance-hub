@@ -20,6 +20,9 @@ import { buildTibExtension } from '../apps/tib/builder.js';
 import { buildCensusOverride } from '../apps/census/cwBuilder.js';
 import { buildBatch, scenarioTag } from '../envelope/batch.js';
 import { buildCensusWarningQuery } from '../apps/census/cjBuilder.js';
+import { buildIsf, type IsfInput } from '../isf/builder.js';
+import type { CertParams } from './params.js';
+import { parseIsfResponseBatch } from '../isf/responseParser.js';
 
 // ── NT52 reciprocal adjustment (F771) + F429 foreign port of lading ──
 // Proven by live CERT ACCEPTs on 001/002: every AE entry line carries its
@@ -2889,6 +2892,118 @@ export const SCENARIOS: Scenario[] = [
     },
     notes: 'Constituent duties pinned from the 9102.11.45 compound rate; CN strap line carries 301 List-4A (9903.88.15 +7.5%). Confirm suffix\u2194constituent mapping with rep (CSMS #50019756).',
   }),
+
+  // ── ISF certification (090): Add, then Replace, then Delete ────────────
+  // Not in the 89-scenario AE package: CBP rep Michael Barela (10/8) offered
+  // ISF certification as a three-step test on one filing. The step is chosen
+  // from the latest attached SN response, like 006: no accepted filing yet
+  // means Add; an accepted Add means Replace with CBP's ISF transaction
+  // number; an accepted Replace means Delete.
+  (() => {
+    const isfFor = (params: CertParams, action: 'A' | 'R' | 'D', transactionNumber?: string): IsfInput => {
+      const ior = params.importerOfRecordNumber;
+      if (action === 'D') {
+        return {
+          submissionType: '1',
+          shipmentTypeCode: '01',
+          action: 'D',
+          importer: { qualifier: 'EI', number: ior },
+          isfTransactionNumber: transactionNumber,
+          bills: [{ qualifier: 'BM', scac: 'MAEU', billNumber: '123456789012' }],
+          entities: [],
+        };
+      }
+      return {
+        submissionType: '1', // ISF-10
+        shipmentTypeCode: '01', // standard shipment
+        action,
+        actionReasonCode: action === 'A' ? 'CT' : 'FR', // CT complete, FR flexible replace
+        importer: { qualifier: 'EI', number: ior },
+        modeOfTransportationCode: '11',
+        scac: 'MAEU',
+        isfTransactionNumber: action === 'R' ? transactionNumber : undefined,
+        bond: { holder: ior, activityCode: '01', type: '8' },
+        bills: [{ qualifier: 'BM', scac: 'MAEU', billNumber: '123456789012' }],
+        references: [{ qualifier: 'CR', value: 'ISF090' }],
+        entities: [
+          { code: 'IM', identifier: { qualifier: 'EI', value: ior } },
+          { code: 'CN', identifier: { qualifier: 'EI', value: ior } },
+          {
+            code: 'SE',
+            name: 'SHENZHEN BATTERY CO',
+            addressComponents: [{ qualifier: '01', information: '123' }, { qualifier: '02', information: 'PUDONG AVE' }],
+            geography: { city: 'SHANGHAI', postalCode: '200001', countryCode: 'CN' },
+          },
+          { code: 'BY', identifier: { qualifier: 'EI', value: ior } },
+          {
+            // Ship-To cannot use an EIN (ISF-29..31): name and US address.
+            code: 'ST',
+            name: 'MYCARGOLENS TEST WAREHOUSE',
+            addressComponents: [{ qualifier: '01', information: '100' }, { qualifier: '02', information: 'MARKET ST' }],
+            geography: { city: 'LOS ANGELES', countrySubEntityCode: 'CA', postalCode: '90001', countryCode: 'US' },
+          },
+          {
+            code: 'LG',
+            name: 'SHANGHAI CFS',
+            addressComponents: [{ qualifier: '15', information: 'PORT ROAD 1' }],
+            geography: { city: 'SHANGHAI', countryCode: 'CN' },
+          },
+          {
+            code: 'CS',
+            name: 'SHANGHAI CONSOLIDATORS',
+            addressComponents: [{ qualifier: '15', information: 'HARBOUR WAY 2' }],
+            geography: { city: 'SHANGHAI', countryCode: 'CN' },
+          },
+        ],
+        manufacturers: [
+          {
+            name: 'SHENZHEN BATTERY CO',
+            addressComponents: [{ qualifier: '01', information: '123' }, { qualifier: '02', information: 'PUDONG AVE' }],
+            geography: { city: 'SHANGHAI', postalCode: '200001', countryCode: 'CN' },
+            // The Replace changes the HTS detail, giving CBP a real amendment.
+            tariffs: action === 'A'
+              ? [{ htsNumber: '8507600030', countryOfOrigin: 'CN' }]
+              : [{ htsNumber: '8507600030', countryOfOrigin: 'CN' }, { htsNumber: '850650', countryOfOrigin: 'CN' }],
+          },
+        ],
+      };
+    };
+
+    /** Next step from the latest attached SN response. */
+    const nextStep = (prior: string | undefined): { action: 'A' | 'R' | 'D'; transactionNumber?: string } => {
+      if (!prior) return { action: 'A' };
+      const parsed = parseIsfResponseBatch(prior.split(/\r?\n/).filter((l) => l.length > 0));
+      const accepted = parsed.filings.find((f) => f.accepted && f.isfTransactionNumber);
+      if (!accepted) return { action: 'A' };
+      const echoedAction = accepted.echoedRecords.find((r) => r.recordId === 'SF10')?.values.actionCode;
+      if (echoedAction === 'A') return { action: 'R', transactionNumber: accepted.isfTransactionNumber };
+      if (echoedAction === 'R') return { action: 'D', transactionNumber: accepted.isfTransactionNumber };
+      return { action: 'A' }; // a completed Delete starts the cycle again
+    };
+
+    const scenario: Scenario = {
+      id: '090',
+      title: 'ISF: Add, Replace, Delete',
+      application: 'SF',
+      kind: 'transmit',
+      notes:
+        'ISF certification (CBP, 10/8): transmit three times. Each Generate reads the latest SN response: Add first, then Replace with the CBP-assigned ISF transaction number, then Delete.',
+      run: async (params, ctx) => {
+        const step = nextStep(ctx?.priorResponseText);
+        return buildBatch({
+          sender: params.sender,
+          appId: 'SF',
+          blocks: [{
+            port: params.districtPortOfEntry,
+            filerCode: params.filerCode,
+            userData: scenarioTag('090'),
+            transactionLines: buildIsf(isfFor(params, step.action, step.transactionNumber)),
+          }],
+        });
+      },
+    };
+    return scenario;
+  })(),
 ];
 
 export const SCENARIO_INDEX: Map<string, Scenario> = new Map(SCENARIOS.map((s) => [s.id, s]));
