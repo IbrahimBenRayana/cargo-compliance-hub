@@ -4,7 +4,7 @@ Spec: `docs/abi-engine/NATIVE_GO_LIVE_SPEC.md` (approved with decisions 2026-10-
 Phases 1-5 are expanded after the platform audit (`docs/audit/2026-10-platform-audit.md`) lands,
 so its findings fold into the right tasks. Phase 0 is fully specified and starts now.
 
-## Phase 0: Safety rails (CERT vs PROD can never be crossed)
+## Phase 0: Safety rails (CERT vs PROD can never be crossed) — DONE 2026-10-15 (d441c4d on staging)
 
 Goal: before prod is ever given an MQ connection, make it structurally impossible for staging
 to reach CBP PROD, for prod to send a certification scenario, or for an environment to run a
