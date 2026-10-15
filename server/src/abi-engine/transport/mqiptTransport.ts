@@ -12,7 +12,7 @@
  * and optional MQIPT_BRIDGE_TOKEN (shared-secret header, defense in depth
  * on top of network isolation).
  */
-import type { AbiTransport, SendReceipt } from './contract.js';
+import type { AbiTransport, SendReceipt, TransportHealth } from './contract.js';
 
 export interface MqiptConfig {
   /** Base URL of the mq-bridge sidecar (internal network only). */
@@ -75,9 +75,9 @@ export class MqiptTransport implements AbiTransport {
     return result.batches;
   }
 
-  async healthcheck(): Promise<{ ok: boolean; detail?: string }> {
+  async healthcheck(): Promise<TransportHealth> {
     try {
-      return await this.call<{ ok: boolean; detail?: string }>('GET', '/health');
+      return await this.call<TransportHealth>('GET', '/health');
     } catch (err) {
       return { ok: false, detail: (err as Error).message };
     }

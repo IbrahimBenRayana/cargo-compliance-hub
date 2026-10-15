@@ -9,7 +9,7 @@ import type { AbiTransport } from './contract.js';
 import { MockTransport } from './mockTransport.js';
 import { MqiptTransport } from './mqiptTransport.js';
 
-export type { AbiTransport, SendReceipt } from './contract.js';
+export type { AbiTransport, SendReceipt, TransportHealth } from './contract.js';
 export { MockTransport } from './mockTransport.js';
 export { MqiptTransport, type MqiptConfig } from './mqiptTransport.js';
 

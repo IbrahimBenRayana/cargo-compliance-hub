@@ -15,6 +15,18 @@ export interface SendReceipt {
   messageId: string;
 }
 
+/**
+ * Transport health. Live bridges also report the CBP queue manager they are
+ * connected to (QGC1 = CERT, QGP2 = PROD) so the environment guard can
+ * refuse a mismatch before anything is sent.
+ */
+export interface TransportHealth {
+  ok: boolean;
+  detail?: string;
+  qmgr?: string;
+  environment?: string;
+}
+
 export interface AbiTransport {
   readonly kind: 'mock' | 'mqipt';
   /** Send one complete batch (A…Z lines, 80 chars each) to CBP. */
@@ -24,6 +36,6 @@ export interface AbiTransport {
    * Resolves with an empty array when nothing arrived within timeoutMs.
    */
   receive(opts?: { timeoutMs?: number; max?: number }): Promise<string[][]>;
-  healthcheck(): Promise<{ ok: boolean; detail?: string }>;
+  healthcheck(): Promise<TransportHealth>;
   close(): Promise<void>;
 }
