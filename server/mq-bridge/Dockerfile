@@ -19,7 +19,7 @@ COPY --chown=node:node package.json ./
 USER node
 RUN npm install --omit=dev --no-audit --no-fund
 
-COPY --chown=node:node index.js ./
+COPY --chown=node:node index.js envCheck.js ./
 
 ENV PORT=8080
 EXPOSE 8080

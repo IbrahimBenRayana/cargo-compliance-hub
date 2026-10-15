@@ -153,10 +153,14 @@ services:
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
       SENTRY_RELEASE:     ${SENTRY_RELEASE:-}
 
-      # Native ABI transport (CBP MQIPT). Default 'mock' everywhere; staging
-      # flips to 'mqipt' via .env once the mq-bridge sidecar is running
-      # (COMPOSE_PROFILES=mqipt). Prod stays on mock until CBP certification.
+      # Native ABI transport (CBP MQIPT). Default 'mock'; a VM flips to
+      # 'mqipt' via .env once the mq-bridge sidecar runs (COMPOSE_PROFILES=mqipt).
+      # CBP_ENVIRONMENT declares which CBP system this VM talks to and is
+      # required with mqipt: staging = CERT (QGC1), production = PROD (QGP2).
+      # The server refuses to boot without it and refuses to send through a
+      # bridge on the other environment's queue manager.
       ABI_TRANSPORT:      ${ABI_TRANSPORT:-mock}
+      CBP_ENVIRONMENT:    ${CBP_ENVIRONMENT:-}
       MQIPT_BRIDGE_URL:   ${MQIPT_BRIDGE_URL:-http://mq-bridge:8080}
       MQIPT_BRIDGE_TOKEN: ${MQIPT_BRIDGE_TOKEN:-}
     volumes:
@@ -204,10 +208,12 @@ services:
         soft: 65536
         hard: 65536
 
-  # ── CBP MQIPT bridge (staging-only via profile) ──────────
+  # ── CBP MQIPT bridge (opt-in per VM via profile) ─────────
   # The one process with IBM MQ client libs (glibc; can't live in the Alpine
-  # app image). Starts ONLY where COMPOSE_PROFILES=mqipt is set in .env —
-  # staging today; prod after CBP certification. No published ports: the
+  # app image). Starts ONLY where COMPOSE_PROFILES=mqipt is set in .env.
+  # CBP_ENVIRONMENT (CERT|PROD) selects the queue manager and channel table
+  # (QGC1_SIGMATP.TAB / QGP2_SIGMATP.TAB) unless MQ_QMGR / MQCHLTAB are set,
+  # and the bridge refuses to start on a mismatch. No published ports: the
   # server reaches it on the internal compose network. The CBP trade package
   # (CCDT .TAB, CMS keystore, mqclient.ini) is DHS-restricted, lives at
   # /opt/mycargolens/mqipt on the VM (scp'd, never in git), mounted read-only.
@@ -219,8 +225,9 @@ services:
     environment:
       PORT: 8080
       MQ_BRIDGE_TOKEN: ${MQIPT_BRIDGE_TOKEN:-}
-      # CERT by default; PROD values (QGP2 / QGP2_SIGMATP.TAB) after certification.
-      MQ_QMGR:          ${MQ_QMGR:-QGC1}
+      CBP_ENVIRONMENT:  ${CBP_ENVIRONMENT:-}
+      # Derived from CBP_ENVIRONMENT when empty; set only to override (checked).
+      MQ_QMGR:          ${MQ_QMGR:-}
       MQ_SEND_QUEUE:    ${MQ_SEND_QUEUE:-ACS.BRK.INBOUND}
       MQ_RECEIVE_QUEUE: ${MQ_RECEIVE_QUEUE:-ACS.BRK.1303S7P.OUTBOUND}
       MQ_RECORD_DELIMITER: ${MQ_RECORD_DELIMITER:-lf}
@@ -228,7 +235,7 @@ services:
       MQ_KEY_REPOSITORY: /opt/mqipt/sigmatp
       # Standard IBM MQ client env: CCDT location + client ini (OCSP bypass).
       MQCHLLIB: /opt/mqipt
-      MQCHLTAB: ${MQCHLTAB:-QGC1_SIGMATP.TAB}
+      MQCHLTAB: ${MQCHLTAB:-}
       MQCLNTCF: /opt/mqipt/mqclient.ini
     volumes:
       - /opt/mycargolens/mqipt:/opt/mqipt:ro

@@ -7,9 +7,13 @@
  * exposed to the internet (no published ports, shared-token auth as depth).
  *
  * MQ specifics (CBP SIGMATP trade package, Aug 2026):
- *   - Connection is CCDT-driven: MQCHLLIB/MQCHLTAB point at QGC1_SIGMATP.TAB,
+ *   - Connection is CCDT-driven: MQCHLLIB/MQCHLTAB point at the environment's
+ *     channel table (QGC1_SIGMATP.TAB for CERT, QGP2_SIGMATP.TAB for PROD),
  *     which carries channel, host:port, and cipher. MQCLNTCF points at CBP's
  *     mqclient.ini (OCSP bypass). All three are plain MQ-client env vars.
+ *   - CBP_ENVIRONMENT (CERT|PROD) is required; envCheck.js derives or checks
+ *     the queue manager and channel table against it and refuses to start on
+ *     a mismatch, so a bridge can never serve the other environment.
  *   - TLS keystore is CMS (sigmatp.kdb + .sth stash); MQ_KEY_REPOSITORY is
  *     the path WITHOUT the .kdb extension, per GSKit convention.
  *   - One MQ message = one complete ABI batch (A…Z records). Outbound we
@@ -20,8 +24,20 @@
 'use strict';
 
 const http = require('http');
-const mq = require('ibmmq');
+const { resolveBridgeEnvironment } = require('./envCheck.js');
 
+// ── CBP environment (refuse to start on a CERT/PROD mismatch) ──────────
+// Checked before the MQ client library loads, so a misconfigured bridge
+// fails fast and never opens a connection.
+const cbp = resolveBridgeEnvironment(process.env);
+if (cbp.problems.length > 0) {
+  console.error(`mq-bridge: refusing to start: ${cbp.problems.join('; ')}`);
+  process.exit(1);
+}
+// The IBM MQ client reads MQCHLTAB from the environment at connect time.
+process.env.MQCHLTAB = cbp.chltab;
+
+const mq = require('ibmmq');
 const MQC = mq.MQC;
 
 // ── config ──────────────────────────────────────────────────────────────
@@ -33,7 +49,8 @@ const env = (name, fallback) => {
 const CONFIG = {
   port: Number(env('PORT', '8080')),
   token: env('MQ_BRIDGE_TOKEN', ''),
-  qmgr: env('MQ_QMGR', ''),
+  environment: cbp.environment,
+  qmgr: cbp.qmgr,
   sendQueue: env('MQ_SEND_QUEUE', ''),
   receiveQueue: env('MQ_RECEIVE_QUEUE', ''),
   verifyPutQueue: env('MQ_VERIFY_PUT_QUEUE', 'TRADE.VERIFY.QR'),
@@ -230,9 +247,15 @@ const handlers = {
         await s.open(CONFIG.sendQueue, false);
         await s.open(CONFIG.receiveQueue, true);
       });
-      return { status: 200, body: { ok: true, detail: `connected to ${CONFIG.qmgr}` } };
+      return {
+        status: 200,
+        body: { ok: true, detail: `connected to ${CONFIG.qmgr}`, qmgr: CONFIG.qmgr, environment: CONFIG.environment },
+      };
     } catch (err) {
-      return { status: 200, body: { ok: false, detail: describeMqError(err) } };
+      return {
+        status: 200,
+        body: { ok: false, detail: describeMqError(err), qmgr: CONFIG.qmgr, environment: CONFIG.environment },
+      };
     }
   },
 
@@ -305,7 +328,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(CONFIG.port, () => {
   console.log(
-    `mq-bridge listening on :${CONFIG.port} — qmgr=${CONFIG.qmgr} send=${CONFIG.sendQueue} receive=${CONFIG.receiveQueue} delimiter=${CONFIG.recordDelimiter}`
+    `mq-bridge listening on :${CONFIG.port} — env=${CONFIG.environment} qmgr=${CONFIG.qmgr} chltab=${process.env.MQCHLTAB} send=${CONFIG.sendQueue} receive=${CONFIG.receiveQueue} delimiter=${CONFIG.recordDelimiter}`
   );
 });
 
