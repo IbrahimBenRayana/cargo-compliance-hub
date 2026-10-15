@@ -253,6 +253,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The CBP environment check (CERT↔QGC1, PROD↔QGP2) is pure JS with no
+      # MQ dependency, so it is tested before any image is built.
+      - name: Test mq-bridge environment check
+        working-directory: server/mq-bridge
+        run: node --test
+
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
@@ -521,14 +527,58 @@ jobs:
             echo "✅ Deploy complete — server live (${NEW_TAG:0:12})"
 
             # ── MQ bridge (CBP MQIPT sidecar) — profile-gated ─────────────
-            # Runs only where .env opts in with COMPOSE_PROFILES=mqipt
-            # (staging today; prod after CBP certification). The bridge tag
-            # follows :latest — it changes rarely and independently of the
-            # server image.
+            # Runs only where .env opts in with COMPOSE_PROFILES=mqipt.
+            # Pinned to this commit's bridge image (never the shared :latest,
+            # which a push to the other branch would overwrite), then gated:
+            # the bridge must come up serving this VM's CBP_ENVIRONMENT, or
+            # it is rolled back to the image that was running before.
             if grep -q '^COMPOSE_PROFILES=.*mqipt' .env; then
-              echo "▶ mqipt profile active — refreshing mq-bridge"
-              docker compose pull mq-bridge
+              BRIDGE_IMAGE=ghcr.io/ibrahimbenrayana/cargo-compliance-hub-mq-bridge
+              CBP_ENV=$(grep '^CBP_ENVIRONMENT=' .env | cut -d= -f2)
+              BRIDGE_TOKEN=$(grep '^MQIPT_BRIDGE_TOKEN=' .env | cut -d= -f2-)
+              OLD_BRIDGE_TAG=$(grep '^MQ_BRIDGE_IMAGE_TAG=' .env | cut -d= -f2 || true)
+              echo "▶ mqipt profile active — mq-bridge ${NEW_TAG:0:12} for CBP ${CBP_ENV:-<unset>} (previous: ${OLD_BRIDGE_TAG:-latest})"
+              # Keep the running image addressable for rollback.
+              RUNNING_BRIDGE=$(docker inspect --format '{{.Image}}' mycargolens-mq-bridge 2>/dev/null || true)
+              if [ -n "$RUNNING_BRIDGE" ]; then docker tag "$RUNNING_BRIDGE" "${BRIDGE_IMAGE}:rollback"; fi
+              set_bridge_tag() {
+                if grep -q '^MQ_BRIDGE_IMAGE_TAG=' .env; then
+                  sed -i "s|^MQ_BRIDGE_IMAGE_TAG=.*|MQ_BRIDGE_IMAGE_TAG=$1|" .env
+                else
+                  echo "MQ_BRIDGE_IMAGE_TAG=$1" >> .env
+                fi
+              }
+              rollback_bridge() {
+                if [ -n "$RUNNING_BRIDGE" ]; then set_bridge_tag rollback; else sed -i '/^MQ_BRIDGE_IMAGE_TAG=/d' .env; fi
+                docker compose up -d mq-bridge
+                docker compose logs --tail=40 mq-bridge || true
+              }
+              set_bridge_tag "${NEW_TAG}"
+              if ! docker compose pull mq-bridge; then
+                echo "❌ mq-bridge pull failed — rolling back"
+                rollback_bridge
+                exit 1
+              fi
               docker compose up -d mq-bridge
+              BRIDGE_UP=false
+              for i in $(seq 1 20); do
+                BRIDGE_HEALTH=$(docker compose exec -T server wget -qO- --header "x-bridge-token: ${BRIDGE_TOKEN}" http://mq-bridge:8080/health 2>/dev/null || true)
+                if echo "$BRIDGE_HEALTH" | grep -q "\"environment\":\"${CBP_ENV}\""; then
+                  BRIDGE_UP=true
+                  break
+                fi
+                sleep 3
+              done
+              if [ "$BRIDGE_UP" != "true" ]; then
+                echo "❌ mq-bridge did not come up serving CBP ${CBP_ENV:-<unset>} — rolling back"
+                rollback_bridge
+                exit 1
+              fi
+              if echo "$BRIDGE_HEALTH" | grep -q '"ok":true'; then
+                echo "✅ mq-bridge live (${NEW_TAG:0:12}) and connected to CBP ${CBP_ENV}"
+              else
+                echo "⚠ mq-bridge up for CBP ${CBP_ENV}, but the MQ connection is not healthy: ${BRIDGE_HEALTH}"
+              fi
               docker compose ps mq-bridge
             fi
 
