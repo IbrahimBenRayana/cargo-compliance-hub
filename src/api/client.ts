@@ -1208,11 +1208,21 @@ export const certApi = {
     );
   },
 
-  /** Transport kind + health (mock, or mqipt → live CBP connection). */
+  /**
+   * Transport kind + health (mock, or mqipt → live CBP connection), the CBP
+   * environment this server is declared for, the bridge's queue manager, and
+   * whether certification traffic is allowed here (CERT only).
+   */
   transport() {
-    return apiFetch<{ transport: 'mock' | 'mqipt'; ok: boolean; detail?: string }>(
-      '/api/v1/admin/cert/transport',
-    );
+    return apiFetch<{
+      transport: 'mock' | 'mqipt';
+      ok: boolean;
+      detail?: string;
+      environment?: 'NONE' | 'CERT' | 'PROD';
+      qmgr?: string;
+      expectedQmgr?: string | null;
+      certTrafficAllowed?: boolean;
+    }>('/api/v1/admin/cert/transport');
   },
 
   /** Drain waiting CBP response batches off the live queue (audit-logged server-side). */

@@ -22,7 +22,9 @@ import { parseQuotaResponseBatch } from '../abi-engine/apps/quota/responseParser
 import { parseTibResponseBatch } from '../abi-engine/apps/tib/responseParser.js';
 import { parseEsQueryResponseBatch } from '../abi-engine/apps/esQuery/responseParser.js';
 import { parseUcNotificationBatch } from '../abi-engine/apps/uc/parser.js';
-import { createTransport, MqiptTransport } from '../abi-engine/transport/index.js';
+import { cbpTransport, cbpTrafficConfig } from '../services/cbp/transport.js';
+import { certTrafficGate, transportErrorStatus } from '../services/cbp/certTrafficGate.js';
+import { certTrafficAllowed } from '../services/cbp/environment.js';
 import { buildAddManufacturers } from '../abi-engine/apps/addManufacturer/builder.js';
 import { CERT_MANUFACTURERS } from '../abi-engine/scenarios/certManufacturers.js';
 import { buildHtsQuery } from '../abi-engine/apps/htsQuery/builder.js';
@@ -35,8 +37,11 @@ const router = Router();
 router.use(authMiddleware);
 router.use(requirePlatformAdmin);
 
-// Phase-4 transport: mock loopback until CBP's MQIPT parameters land in env.
-const transport = createTransport(process.env as Record<string, string | undefined>);
+// The shared, environment-guarded CBP transport (services/cbp/transport.ts).
+// Certification traffic reaches CBP only on CERT: every route that sends to
+// or reads from the MQ queues carries certOnly, which answers 409 elsewhere.
+const transport = cbpTransport;
+const certOnly = certTrafficGate(cbpTrafficConfig);
 
 const PARAMS_ID = 'default';
 
@@ -246,7 +251,7 @@ router.patch('/transmissions/:id', async (req: AuthRequest, res: Response): Prom
 // Send a generated transmission through the configured transport. With the
 // mock transport this rehearses the full flow; once MQIPT is configured the
 // same button reaches CBP CERT.
-router.post('/transmissions/:id/transmit', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/transmissions/:id/transmit', certOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const existing = await prisma.certTransmission.findUnique({ where: { id: String(req.params.id) } });
   if (!existing) {
     res.status(404).json({ error: 'Transmission not found' });
@@ -277,7 +282,7 @@ router.post('/transmissions/:id/transmit', async (req: AuthRequest, res: Respons
     });
     res.json({ transmission, transport: transport.kind, messageId: receipt.messageId });
   } catch (err) {
-    res.status(502).json({
+    res.status(transportErrorStatus(err)).json({
       error: 'Transport send failed',
       detail: err instanceof Error ? err.message : String(err),
       transport: transport.kind,
@@ -288,7 +293,7 @@ router.post('/transmissions/:id/transmit', async (req: AuthRequest, res: Respons
 // ─── GET /transport ───────────────────────────────────────
 router.get('/transport', async (_req: AuthRequest, res: Response): Promise<void> => {
   const health = await transport.healthcheck();
-  res.json({ transport: transport.kind, ...health });
+  res.json({ transport: transport.kind, ...health, certTrafficAllowed: certTrafficAllowed(cbpTrafficConfig) });
 });
 
 // ─── response auto-attach ─────────────────────────────────
@@ -353,7 +358,7 @@ async function attachBatch(batch: string[]): Promise<{ scenarioId: string; trans
 // Drain available response batches from the live queue. Each batch is
 // audit-logged verbatim (nothing off the queue is ever lost) and scenario
 // batches auto-attach to their transmissions via the SCENARIO tag.
-router.post('/transport/receive', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/transport/receive', certOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const timeoutMs = Math.min(Math.max(Number(req.body?.timeoutMs) || 5000, 0), 30000);
   try {
     const batches = await transport.receive({ timeoutMs, max: 25 });
@@ -370,7 +375,7 @@ router.post('/transport/receive', async (req: AuthRequest, res: Response): Promi
     }
     res.json({ transport: transport.kind, batches, attached });
   } catch (err) {
-    res.status(502).json({
+    res.status(transportErrorStatus(err)).json({
       error: 'Transport receive failed',
       detail: err instanceof Error ? err.message : String(err),
       transport: transport.kind,
@@ -382,7 +387,7 @@ router.post('/transport/receive', async (req: AuthRequest, res: Response): Promi
 // One-click backfill: replay every audit-logged received batch through the
 // auto-attach so historical responses land on their transmissions. Newest
 // batch per scenario wins (rows replayed oldest-first).
-router.post('/transport/attach-logged', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/transport/attach-logged', certOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const rows = await prisma.auditLog.findMany({
     where: { action: 'cert.received' },
     orderBy: { createdAt: 'asc' },
@@ -418,7 +423,7 @@ const amfSchema = z.object({
   /** Expected MID — the batch is refused if the details derive differently. */
   expectedMid: z.string().min(6).max(15).optional(),
 });
-router.post('/transport/amf', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/transport/amf', certOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = amfSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
@@ -470,7 +475,7 @@ router.post('/transport/amf', async (req: AuthRequest, res: Response): Promise<v
       res.status(422).json({ error: 'AMF batch failed to build', issues: err.issues });
       return;
     }
-    res.status(502).json({
+    res.status(transportErrorStatus(err)).json({
       error: 'AMF transmit failed',
       detail: err instanceof Error ? err.message : String(err),
       transport: transport.kind,
@@ -482,7 +487,7 @@ router.post('/transport/amf', async (req: AuthRequest, res: Response): Promise<v
 // Add every pending scenario manufacturer to CERT in chunked $I batches.
 // Firm details ship in certManufacturers.ts, each verified to derive its
 // MID byte-exact; the send re-checks derivation and refuses on mismatch.
-router.post('/transport/amf-bulk', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/transport/amf-bulk', certOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const pending = CERT_MANUFACTURERS.filter((m) => !m.added);
     if (pending.length === 0) {
@@ -536,7 +541,7 @@ router.post('/transport/amf-bulk', async (req: AuthRequest, res: Response): Prom
       res.status(422).json({ error: 'AMF bulk batch failed to build', issues: err.issues });
       return;
     }
-    res.status(502).json({
+    res.status(transportErrorStatus(err)).json({
       error: 'AMF bulk transmit failed',
       detail: err instanceof Error ? err.message : String(err),
       transport: transport.kind,
@@ -555,7 +560,7 @@ const htsQuerySchema = z.object({
   /** YYYYMMDD or MMDDYY; defaults to the params applicability date. */
   asOfDate: z.string().optional(),
 });
-router.post('/transport/hts-query', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/transport/hts-query', certOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = htsQuerySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
@@ -601,7 +606,7 @@ router.post('/transport/hts-query', async (req: AuthRequest, res: Response): Pro
       res.status(422).json({ error: 'HTS query failed to build', issues: err.issues });
       return;
     }
-    res.status(502).json({
+    res.status(transportErrorStatus(err)).json({
       error: 'HTS query transmit failed',
       detail: err instanceof Error ? err.message : String(err),
       transport: transport.kind,
@@ -616,7 +621,7 @@ router.post('/transport/hts-query', async (req: AuthRequest, res: Response): Pro
 const adCaseQuerySchema = z.object({
   caseNumbers: z.array(z.string().regex(/^[A-Za-z0-9]{7}([A-Za-z0-9]{3})?$/)).min(1).max(20),
 });
-router.post('/transport/adcvd-query', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/transport/adcvd-query', certOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = adCaseQuerySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
@@ -655,7 +660,7 @@ router.post('/transport/adcvd-query', async (req: AuthRequest, res: Response): P
       res.status(422).json({ error: 'AD/CVD query failed to build', issues: err.issues });
       return;
     }
-    res.status(502).json({
+    res.status(transportErrorStatus(err)).json({
       error: 'AD/CVD query transmit failed',
       detail: err instanceof Error ? err.message : String(err),
       transport: transport.kind,
@@ -666,13 +671,24 @@ router.post('/transport/adcvd-query', async (req: AuthRequest, res: Response): P
 // ─── POST /transport/verify ───────────────────────────────
 // CBP's own connectivity proof: put a probe on TRADE.VERIFY.QR and wait for
 // the queue manager's echo on TRADE.VERIFY.QL. Only meaningful on mqipt.
+// Allowed on CERT and PROD (it is the go-live connectivity proof), but the
+// transport guard still refuses a bridge on the wrong queue manager.
 router.post('/transport/verify', async (_req: AuthRequest, res: Response): Promise<void> => {
-  if (!(transport instanceof MqiptTransport)) {
+  if (transport.kind !== 'mqipt') {
     res.json({ transport: transport.kind, ok: false, detail: 'verify is only available on the mqipt transport' });
     return;
   }
-  const result = await transport.verify();
-  res.json({ transport: transport.kind, ...result });
+  try {
+    const result = await transport.verify();
+    res.json({ transport: transport.kind, environment: transport.environment, ...result });
+  } catch (err) {
+    res.status(transportErrorStatus(err)).json({
+      transport: transport.kind,
+      environment: transport.environment,
+      ok: false,
+      detail: err instanceof Error ? err.message : String(err),
+    });
+  }
 });
 
 export default router;

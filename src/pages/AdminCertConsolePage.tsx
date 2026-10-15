@@ -109,6 +109,20 @@ const EMPTY_PARAMS: CertParamsInput = {
   senderSiteCode: '', senderIdCode: '', senderPassword: '',
 };
 
+/**
+ * Certification traffic reaches CBP only on CERT. The server enforces it
+ * (409 elsewhere); the page mirrors it so send/receive controls are disabled
+ * on production instead of failing on click.
+ */
+function useCertTraffic() {
+  const { data } = useQuery({
+    queryKey: ['cert', 'transport'],
+    queryFn: () => certApi.transport(),
+    refetchInterval: 60_000,
+  });
+  return { allowed: data?.certTrafficAllowed !== false, environment: data?.environment };
+}
+
 function ParamsCard() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -268,6 +282,8 @@ function TransportCard() {
   });
 
   const live = data?.transport === 'mqipt';
+  const certAllowed = data?.certTrafficAllowed !== false;
+  const envLabel = data?.environment && data.environment !== 'NONE' ? `CBP ${data.environment}` : 'no CBP environment';
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -285,7 +301,7 @@ function TransportCard() {
                       : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                   }
                 >
-                  {live ? 'MQIPT — live CBP CERT' : 'Mock loopback'}
+                  {live ? `MQIPT · ${envLabel}${data.qmgr ? ` · ${data.qmgr}` : ''}` : 'Mock loopback'}
                 </Badge>
                 <Badge variant={data.ok ? 'secondary' : 'destructive'} className="text-[10px]">
                   {data.ok ? (data.detail ?? 'healthy') : (data.detail ?? 'unhealthy')}
@@ -297,7 +313,7 @@ function TransportCard() {
             size="sm"
             variant="outline"
             onClick={() => backfill.mutate()}
-            disabled={backfill.isPending}
+            disabled={backfill.isPending || !certAllowed}
           >
             {backfill.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
             Attach logged responses
@@ -306,7 +322,7 @@ function TransportCard() {
             size="sm"
             variant="outline"
             onClick={() => receive.mutate()}
-            disabled={receive.isPending || !data?.ok}
+            disabled={receive.isPending || !data?.ok || !certAllowed}
           >
             {receive.isPending ? (
               <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -316,7 +332,16 @@ function TransportCard() {
             Check for responses
           </Button>
         </div>
-        {live && (
+        {!certAllowed && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Certification traffic is disabled here ({envLabel}). Scenarios, AMF, queries and queue
+              checks run on staging, which is connected to CBP CERT.
+            </span>
+          </div>
+        )}
+        {live && certAllowed && (
           <CardDescription>
             Transmissions go to CBP for real. Responses pulled here are audit-logged — copy each
             batch into its transmission's CBP response box below.
@@ -339,6 +364,7 @@ function TransportCard() {
 // bounce with F523 MFGR CODE UNKNOWN. The server refuses the batch if the
 // firm details don't derive the expected MID (Directive 3500-13 check).
 function AmfCard() {
+  const certTraffic = useCertTraffic();
   const [form, setForm] = useState({
     name: '', street: '', city: '', countryCode: '', expectedMid: '',
   });
@@ -392,11 +418,11 @@ function AmfCard() {
             <Input value={form.expectedMid} onChange={set('expectedMid')} placeholder="SGSIGPRI123SIN" className="font-mono" /></div>
         </div>
         <div className="flex items-center gap-3">
-          <Button size="sm" onClick={() => send.mutate()} disabled={!complete || send.isPending}>
+          <Button size="sm" onClick={() => send.mutate()} disabled={!complete || send.isPending || !certTraffic.allowed}>
             {send.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 mr-1.5" />}
             Send $I batch to CBP
           </Button>
-          <Button size="sm" variant="outline" onClick={() => bulk.mutate()} disabled={bulk.isPending}>
+          <Button size="sm" variant="outline" onClick={() => bulk.mutate()} disabled={bulk.isPending || !certTraffic.allowed}>
             {bulk.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 mr-1.5" />}
             Add all scenario manufacturers
           </Button>
@@ -412,6 +438,7 @@ function AmfCard() {
 // evidence). This asks ACE's own table what it considers valid — validity
 // window + required units per number — so filings match CERT's reality.
 function AdCaseQueryCard() {
+  const certTraffic = useCertTraffic();
   const [cases, setCases] = useState('');
   const [result, setResult] = useState<Awaited<ReturnType<typeof certApi.adcvdQuery>> | null>(null);
   const query = useMutation({
@@ -437,7 +464,7 @@ function AdCaseQueryCard() {
       <CardContent className="space-y-3">
         <div className="flex gap-2">
           <Input value={cases} onChange={(e) => setCases(e.target.value)} placeholder="A470820000 A412824000" className="font-mono" />
-          <Button onClick={() => query.mutate()} disabled={!valid || query.isPending}>
+          <Button onClick={() => query.mutate()} disabled={!valid || query.isPending || !certTraffic.allowed}>
             {query.isPending ? 'Querying…' : 'Query cases'}
           </Button>
         </div>
@@ -450,6 +477,7 @@ function AdCaseQueryCard() {
 }
 
 function HtsQueryCard() {
+  const certTraffic = useCertTraffic();
   const [numbers, setNumbers] = useState('');
   const [asOf, setAsOf] = useState('');
   const [result, setResult] = useState<Awaited<ReturnType<typeof certApi.htsQuery>> | null>(null);
@@ -491,7 +519,7 @@ function HtsQueryCard() {
             className="font-mono w-36"
             title="Optional validity date — CERT answers per this date (defaults to the params applicability date). Date-scenarios need era-correct numbers."
           />
-          <Button size="sm" onClick={() => query.mutate()} disabled={!valid || query.isPending}>
+          <Button size="sm" onClick={() => query.mutate()} disabled={!valid || query.isPending || !certTraffic.allowed}>
             {query.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 mr-1.5" />}
             Query CERT
           </Button>
@@ -585,11 +613,13 @@ function TransmissionCard({
     onError: (err: any) => toast.error(apiErrorMessage(err, 'Transmit failed')),
   });
 
+  const certAllowed = transportInfo?.certTrafficAllowed !== false;
+
   const handleTransmit = () => {
     const live = transportInfo?.transport === 'mqipt';
     const ok = window.confirm(
       live
-        ? 'Send this batch to CBP CERT for real (transport: mqipt)?'
+        ? `Send this batch to CBP ${transportInfo?.environment ?? 'CERT'} for real (transport: mqipt)?`
         : 'Send this batch through the mock loopback transport?'
     );
     if (ok) transmit.mutate();
@@ -646,7 +676,7 @@ function TransmissionCard({
         </div>
         <div className="flex items-center gap-2">
           {transmission.status === 'generated' && transmission.wireText && (
-            <Button size="sm" onClick={handleTransmit} disabled={transmit.isPending}>
+            <Button size="sm" onClick={handleTransmit} disabled={transmit.isPending || !certAllowed}>
               {transmit.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
               ) : (
