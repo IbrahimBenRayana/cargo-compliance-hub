@@ -149,6 +149,45 @@ describe('guardTransport caching', () => {
   });
 });
 
+describe('guardTransport after a refusal or error', () => {
+  it('forgets a cached success when the health check later shows a mismatch', async () => {
+    const inner = new FakeBridgeTransport();
+    const guarded = guardTransport(inner, { environment: 'CERT' });
+    await guarded.send(BATCH);
+    inner.health = { ok: true, qmgr: 'QGP2' };
+    await guarded.healthcheck();
+    await expect(guarded.send(BATCH)).rejects.toBeInstanceOf(CbpEnvironmentMismatchError);
+    expect(inner.sends).toHaveLength(1);
+  });
+
+  it('re-checks the bridge after a send fails', async () => {
+    const inner = new FakeBridgeTransport();
+    const guarded = guardTransport(inner, { environment: 'CERT' });
+    await guarded.send(BATCH);
+    inner.send = async () => { throw new Error('bridge restarted'); };
+    await expect(guarded.send(BATCH)).rejects.toThrow('bridge restarted');
+    inner.health = { ok: true, qmgr: 'QGP2' };
+    await expect(guarded.receive()).rejects.toBeInstanceOf(CbpEnvironmentMismatchError);
+  });
+});
+
+describe('guardTransport verify', () => {
+  it('runs the connectivity probe on the right queue manager even when the business queues are down', async () => {
+    const inner = new FakeBridgeTransport();
+    inner.health = { ok: false, detail: 'MQRC 2085', qmgr: 'QGC1' };
+    const guarded = guardTransport(inner, { environment: 'CERT' });
+    await expect(guarded.verify()).resolves.toMatchObject({ ok: true });
+    expect(inner.verifies).toBe(1);
+  });
+
+  it('still refuses the probe on the wrong queue manager when unhealthy', async () => {
+    const inner = new FakeBridgeTransport();
+    inner.health = { ok: false, detail: 'MQRC 2085', qmgr: 'QGP2' };
+    const guarded = guardTransport(inner, { environment: 'CERT' });
+    await expect(guarded.verify()).rejects.toBeInstanceOf(CbpEnvironmentMismatchError);
+  });
+});
+
 describe('guardTransport healthcheck', () => {
   it('reports the environment, the required queue manager and whether they match', async () => {
     const inner = new FakeBridgeTransport();

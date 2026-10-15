@@ -6,8 +6,8 @@
  * PROD = QGP2). A wrong queue manager, an unhealthy bridge, a bridge that
  * does not say where it is connected, or no declared environment all
  * refuse: nothing is sent and nothing is drained. Successful checks are
- * cached for a short TTL; refusals never are, so a fixed bridge is picked up
- * on the next call.
+ * cached for a short TTL; any refusal, error or unhealthy health check clears
+ * the cache, so a swapped or fixed bridge is re-checked on the next call.
  *
  * The mock loopback cannot reach CBP and passes through untouched.
  */
@@ -82,46 +82,64 @@ export function guardTransport(inner: Verifiable, opts: GuardOptions): GuardedTr
     };
   }
 
-  const assertEnvironment = async (): Promise<void> => {
-    if (verifiedAt !== undefined && now() - verifiedAt < ttlMs) return;
+  /**
+   * 'traffic' (send/receive) needs a healthy bridge on the right queue
+   * manager and caches success. 'probe' (TRADE.VERIFY) only needs the right
+   * queue manager: it is the diagnostic for an unhealthy connection, so the
+   * business queues being down must not block it. Probes are never cached.
+   */
+  const assertEnvironment = async (mode: 'traffic' | 'probe'): Promise<void> => {
+    if (mode === 'traffic' && verifiedAt !== undefined && now() - verifiedAt < ttlMs) return;
     if (!expected) {
       throw new CbpEnvironmentMismatchError(
         'No CBP environment is declared for the live transport (set CBP_ENVIRONMENT to CERT or PROD)',
       );
     }
     const health = await inner.healthcheck();
-    if (!health.ok) {
+    const actual = queueManagerOf(health);
+    if (!health.ok && actual === undefined) {
+      verifiedAt = undefined;
       throw new CbpTransportUnavailableError(`CBP transport is not healthy: ${health.detail ?? 'no detail'}`);
     }
-    const actual = queueManagerOf(health);
     if (actual !== expected) {
+      verifiedAt = undefined;
       throw new CbpEnvironmentMismatchError(
         `Refusing to use the CBP connection: this environment is ${environment} and requires queue manager ` +
           `${expected}, but the bridge is connected to ${actual ?? 'an unreported queue manager'}`,
       );
     }
+    if (mode === 'probe') return;
+    if (!health.ok) {
+      verifiedAt = undefined;
+      throw new CbpTransportUnavailableError(`CBP transport is not healthy: ${health.detail ?? 'no detail'}`);
+    }
     verifiedAt = now();
+  };
+
+  /** Any failure forgets the cached check, so the next call re-verifies the bridge. */
+  const guarded = async <T>(mode: 'traffic' | 'probe', call: () => Promise<T>): Promise<T> => {
+    try {
+      await assertEnvironment(mode);
+      return await call();
+    } catch (err) {
+      verifiedAt = undefined;
+      throw err;
+    }
   };
 
   return {
     kind: inner.kind,
     environment,
-    async send(lines: string[], sendOpts?: { correlationId?: string }): Promise<SendReceipt> {
-      await assertEnvironment();
-      return inner.send(lines, sendOpts);
-    },
-    async receive(receiveOpts?: { timeoutMs?: number; max?: number }): Promise<string[][]> {
-      await assertEnvironment();
-      return inner.receive(receiveOpts);
-    },
-    async verify(): Promise<VerifyResult> {
-      await assertEnvironment();
-      return runVerify();
-    },
+    send: (lines: string[], sendOpts?: { correlationId?: string }): Promise<SendReceipt> =>
+      guarded('traffic', () => inner.send(lines, sendOpts)),
+    receive: (receiveOpts?: { timeoutMs?: number; max?: number }): Promise<string[][]> =>
+      guarded('traffic', () => inner.receive(receiveOpts)),
+    verify: (): Promise<VerifyResult> => guarded('probe', runVerify),
     async healthcheck() {
       const health = await inner.healthcheck();
       const qmgr = queueManagerOf(health);
       const matches = !!expected && qmgr === expected;
+      if (!health.ok || !matches) verifiedAt = undefined;
       return {
         ...health,
         ok: health.ok && matches,

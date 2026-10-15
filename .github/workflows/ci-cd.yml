@@ -328,6 +328,9 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           NEW_TAG: ${{ github.sha }}
+          # The CBP environment this deploy target must declare, from the
+          # branch, not from the VM: staging -> CBP CERT, main -> CBP PROD.
+          EXPECTED_CBP_ENV: ${{ github.ref_name == 'main' && 'PROD' || 'CERT' }}
           # AI provider env vars — sourced from GitHub repo secrets, written
           # into /opt/mycargolens/.env at the start of the deploy script so the
           # server container picks them up on the upcoming `docker compose up`.
@@ -379,10 +382,26 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: NEW_TAG,AI_ASSESSMENT_ENABLED,AI_PROVIDER,AI_MODEL,AI_API_KEY,AI_MAX_TOKENS,AI_TEMPERATURE,AI_RATE_LIMIT_PER_USER,AI_DISABLE_TRAINING_DATA,TERMINAL49_API_BASE_URL,TERMINAL49_API_KEY,CC_API_TOKEN,CC_ENVIRONMENT,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,STRIPE_PUBLISHABLE_KEY,JWT_ACCESS_SECRET,JWT_REFRESH_SECRET,EMAIL_USER,EMAIL_PASS,SENTRY_DSN,SENTRY_ENVIRONMENT,CHAT_SESSION_SECRET,MFA_ENC_KEY
+          envs: NEW_TAG,EXPECTED_CBP_ENV,AI_ASSESSMENT_ENABLED,AI_PROVIDER,AI_MODEL,AI_API_KEY,AI_MAX_TOKENS,AI_TEMPERATURE,AI_RATE_LIMIT_PER_USER,AI_DISABLE_TRAINING_DATA,TERMINAL49_API_BASE_URL,TERMINAL49_API_KEY,CC_API_TOKEN,CC_ENVIRONMENT,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,STRIPE_PUBLISHABLE_KEY,JWT_ACCESS_SECRET,JWT_REFRESH_SECRET,EMAIL_USER,EMAIL_PASS,SENTRY_DSN,SENTRY_ENVIRONMENT,CHAT_SESSION_SECRET,MFA_ENC_KEY
           script: |
             set -euo pipefail
             cd /opt/mycargolens
+
+            # ── CBP environment must match the deploy target ──────────────
+            # The VM .env is hand-maintained; one wrong CBP_ENVIRONMENT would
+            # point server and bridge at the other CBP system together, which
+            # their own cross-checks cannot see. Refuse before touching anything.
+            env_value() { (grep "^$1=" .env || true) | tail -1 | cut -d= -f2- | tr -d '"\r '; }
+            DECLARED_CBP_ENV=$(env_value CBP_ENVIRONMENT | tr '[:lower:]' '[:upper:]')
+            DECLARED_TRANSPORT=$(env_value ABI_TRANSPORT | tr '[:upper:]' '[:lower:]')
+            if [ -n "$DECLARED_CBP_ENV" ] && [ "$DECLARED_CBP_ENV" != "NONE" ] && [ "$DECLARED_CBP_ENV" != "$EXPECTED_CBP_ENV" ]; then
+              echo "❌ .env declares CBP_ENVIRONMENT=${DECLARED_CBP_ENV}, but this deploy target is CBP ${EXPECTED_CBP_ENV}. Refusing to deploy."
+              exit 1
+            fi
+            if [ "$DECLARED_TRANSPORT" = "mqipt" ] && [ "$DECLARED_CBP_ENV" != "$EXPECTED_CBP_ENV" ]; then
+              echo "❌ ABI_TRANSPORT=mqipt requires CBP_ENVIRONMENT=${EXPECTED_CBP_ENV} in .env. Refusing to deploy."
+              exit 1
+            fi
 
             # ── Activate the just-scp'd compose file ─────────────────────
             # The scp-action step above dropped deploy/docker-compose.prod.yml
@@ -534,9 +553,8 @@ jobs:
             # it is rolled back to the image that was running before.
             if grep -q '^COMPOSE_PROFILES=.*mqipt' .env; then
               BRIDGE_IMAGE=ghcr.io/ibrahimbenrayana/cargo-compliance-hub-mq-bridge
-              CBP_ENV=$(grep '^CBP_ENVIRONMENT=' .env | cut -d= -f2)
-              BRIDGE_TOKEN=$(grep '^MQIPT_BRIDGE_TOKEN=' .env | cut -d= -f2-)
-              OLD_BRIDGE_TAG=$(grep '^MQ_BRIDGE_IMAGE_TAG=' .env | cut -d= -f2 || true)
+              CBP_ENV="$DECLARED_CBP_ENV"
+              OLD_BRIDGE_TAG=$(env_value MQ_BRIDGE_IMAGE_TAG)
               echo "▶ mqipt profile active — mq-bridge ${NEW_TAG:0:12} for CBP ${CBP_ENV:-<unset>} (previous: ${OLD_BRIDGE_TAG:-latest})"
               # Keep the running image addressable for rollback.
               RUNNING_BRIDGE=$(docker inspect --format '{{.Image}}' mycargolens-mq-bridge 2>/dev/null || true)
@@ -549,9 +567,16 @@ jobs:
                 fi
               }
               rollback_bridge() {
-                if [ -n "$RUNNING_BRIDGE" ]; then set_bridge_tag rollback; else sed -i '/^MQ_BRIDGE_IMAGE_TAG=/d' .env; fi
-                docker compose up -d mq-bridge
                 docker compose logs --tail=40 mq-bridge || true
+                if [ -n "$RUNNING_BRIDGE" ]; then
+                  set_bridge_tag rollback
+                  docker compose up -d mq-bridge
+                else
+                  # Nothing ran before: stop rather than fall back to :latest,
+                  # which the other branch also publishes.
+                  sed -i '/^MQ_BRIDGE_IMAGE_TAG=/d' .env
+                  docker compose rm -sf mq-bridge || true
+                fi
               }
               set_bridge_tag "${NEW_TAG}"
               if ! docker compose pull mq-bridge; then
@@ -562,7 +587,8 @@ jobs:
               docker compose up -d mq-bridge
               BRIDGE_UP=false
               for i in $(seq 1 20); do
-                BRIDGE_HEALTH=$(docker compose exec -T server wget -qO- --header "x-bridge-token: ${BRIDGE_TOKEN}" http://mq-bridge:8080/health 2>/dev/null || true)
+                # The token is expanded inside the container, never on the host command line.
+                BRIDGE_HEALTH=$(docker compose exec -T server sh -c 'wget -q -T 10 -O- --header "x-bridge-token: $MQIPT_BRIDGE_TOKEN" http://mq-bridge:8080/health' 2>/dev/null || true)
                 if echo "$BRIDGE_HEALTH" | grep -q "\"environment\":\"${CBP_ENV}\""; then
                   BRIDGE_UP=true
                   break
@@ -577,7 +603,7 @@ jobs:
               if echo "$BRIDGE_HEALTH" | grep -q '"ok":true'; then
                 echo "✅ mq-bridge live (${NEW_TAG:0:12}) and connected to CBP ${CBP_ENV}"
               else
-                echo "⚠ mq-bridge up for CBP ${CBP_ENV}, but the MQ connection is not healthy: ${BRIDGE_HEALTH}"
+                echo "⚠ mq-bridge up for CBP ${CBP_ENV}, but the MQ connection is not healthy (check the cert console Transport card)"
               fi
               docker compose ps mq-bridge
             fi

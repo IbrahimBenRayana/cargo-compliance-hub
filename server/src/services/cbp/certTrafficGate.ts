@@ -8,7 +8,8 @@ import { certTrafficAllowed, type AbiTransportKind, type CbpEnvironment } from '
 import { CbpEnvironmentMismatchError, CbpTransportUnavailableError } from './guardedTransport.js';
 
 export function certTrafficGate(cfg: { transport: AbiTransportKind; environment: CbpEnvironment }) {
-  return (_req: Request, res: Response, next: NextFunction): void => {
+  // Named so route wiring can be asserted (routes/__tests__/certConsoleGate.test.ts).
+  return function certOnlyGate(_req: Request, res: Response, next: NextFunction): void {
     if (certTrafficAllowed(cfg)) {
       next();
       return;
