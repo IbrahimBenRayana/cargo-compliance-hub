@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
+import { cbpEnvShape, cbpConfigProblems } from '../services/cbp/environment.js';
 
 dotenv.config();
 
@@ -93,6 +94,9 @@ const envSchema = z.object({
       message: 'MFA_ENC_KEY must be 64 hex characters (32 bytes)',
     })
     .optional(),
+  // Native CBP connection (services/cbp/environment.ts): ABI_TRANSPORT,
+  // CBP_ENVIRONMENT (staging = CERT, production = PROD), mq-bridge URL+token.
+  ...cbpEnvShape,
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -104,6 +108,15 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+// CBP environment safety (all NODE_ENVs: staging also runs as production).
+// The live MQ transport must declare which CBP environment it talks to, so
+// staging can never reach CBP PROD and production never CBP CERT.
+const cbpProblems = cbpConfigProblems(env);
+if (cbpProblems.length > 0) {
+  console.error(`❌ Unsafe CBP connection configuration: ${cbpProblems.join('; ')}`);
+  process.exit(1);
+}
 
 // Production-only hard requirements — fail fast at boot rather than at runtime
 if (env.NODE_ENV === 'production') {
