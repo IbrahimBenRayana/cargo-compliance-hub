@@ -45,6 +45,7 @@ model Organization {
   cbpTransmissions  CbpTransmission[]
 
   @@map("organizations")
+  cbpConfig        OrgCbpConfig?
 }
 
 // ─── Entry number blocks ───────────────────────────────────
@@ -293,6 +294,8 @@ model Filing {
   orgId            String  @map("org_id") @db.Uuid
   createdById      String  @map("created_by") @db.Uuid
   filingType       String  @map("filing_type") @db.VarChar(10) // ISF-10 | ISF-5
+  /** Who files this ISF: SIGMA (S7P, Sigma as ISF filer) or CLIENT (the org's own filer code). Null = org default. */
+  isfFilerMode     String? @map("isf_filer_mode") @db.VarChar(8)
   status           String  @default("draft") @db.VarChar(30)
   ccFilingId       String? @map("cc_filing_id") @db.VarChar(100)
   cbpTransactionId String? @map("cbp_transaction_id") @db.VarChar(100)
@@ -1199,4 +1202,31 @@ model CbpInboundMessage {
   @@index([transmissionId])
   @@index([userDataTag])
   @@map("cbp_inbound_messages")
+}
+
+// ─── Per-org CBP identity (native go-live Phase 2; audit BNA-01, FNA-04/07) ──
+// The only source of a client's filer identity. Set by platform admins, never
+// by the client: entries must carry this filer code, and ISF goes out under
+// it (CLIENT) or under Sigma's S7P (SIGMA, Sigma as ISF filer).
+model OrgCbpConfig {
+  id                      String    @id @default(uuid()) @db.Uuid
+  orgId                   String    @unique @map("org_id") @db.Uuid
+  /** NATIVE (our certified engine) | CC (CustomsCity emergency fallback). */
+  gateway                 String    @default("NATIVE") @db.VarChar(8)
+  /** The client's own CBP filer code; unique across orgs. Null until assigned. */
+  filerCode               String?   @unique @map("filer_code") @db.VarChar(3)
+  /** Default ISF filer for new filings: SIGMA | CLIENT. */
+  isfFilerModeDefault     String    @default("SIGMA") @map("isf_filer_mode_default") @db.VarChar(8)
+  /** When the client's CBP client rep approved our service-center queue (CBP, 10/15). */
+  serviceCenterApprovedAt DateTime? @map("service_center_approved_at") @db.Timestamptz()
+  /** Who at CBP approved it (rep name / email), for the record. */
+  serviceCenterApprovedBy String?   @map("service_center_approved_by") @db.VarChar(200)
+  notes                   String?   @db.Text
+  updatedById             String?   @map("updated_by") @db.Uuid
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("org_cbp_configs")
 }
