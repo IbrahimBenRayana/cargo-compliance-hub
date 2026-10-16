@@ -296,6 +296,16 @@ model Filing {
   filingType       String  @map("filing_type") @db.VarChar(10) // ISF-10 | ISF-5
   /** Who files this ISF: SIGMA (S7P, Sigma as ISF filer) or CLIENT (the org's own filer code). Null = org default. */
   isfFilerMode     String? @map("isf_filer_mode") @db.VarChar(8)
+  /** What CBP holds for this ISF: NOT_ON_FILE | ON_FILE | DELETED (services/cbp/isfLifecycle). */
+  cbpState           String  @default("NOT_ON_FILE") @map("cbp_state") @db.VarChar(12)
+  /** The ISF transaction in flight: ADD | REPLACE | DELETE; null when none. */
+  pendingAction      String? @map("pending_action") @db.VarChar(8)
+  /** Filer code CBP accepted the ISF under; frozen at the first accepted add. */
+  isfFilerCode       String? @map("isf_filer_code") @db.VarChar(3)
+  /** The latest native transmission for this filing (cbp_transmissions). */
+  lastTransmissionId String? @map("last_transmission_id") @db.Uuid
+  /** SCAC of the house-bill issuer (NVOCC); the carrier SCAC stays in scacCode (audit ENG-07). */
+  houseBillScac      String? @map("house_bill_scac") @db.VarChar(4)
   status           String  @default("draft") @db.VarChar(30)
   ccFilingId       String? @map("cc_filing_id") @db.VarChar(100)
   cbpTransactionId String? @map("cbp_transaction_id") @db.VarChar(100)
