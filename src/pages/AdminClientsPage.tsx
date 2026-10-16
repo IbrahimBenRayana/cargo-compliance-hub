@@ -23,6 +23,7 @@ import {
 import {
   Building2, UserPlus, Loader2, MoreHorizontal, CheckCircle2, Clock,
   Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck, Radio,
+  Activity,
 } from 'lucide-react';
 import { adminApi } from '@/api/client';
 import type { AdminOrganization, AdminUserLookup } from '@/api/client';
@@ -317,6 +318,12 @@ export function AdminClientsPage() {
           <p className="text-muted-foreground">Provision and manage client accounts</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/admin/cbp">
+              <Activity className="mr-2 h-3.5 w-3.5" />
+              CBP traffic
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <Link to="/admin/cert">
               <Radio className="mr-2 h-3.5 w-3.5" />

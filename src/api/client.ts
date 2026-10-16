@@ -1169,6 +1169,64 @@ export interface CertTransmission {
   updatedAt: string;
 }
 
+// ─── CBP traffic console (platform admins) ──────────────────
+export interface CbpConnectionInfo {
+  environment: 'CERT' | 'PROD' | 'MOCK';
+  transport: 'mock' | 'mqipt';
+  health: { ok: boolean; detail?: string; qmgr?: string; expectedQmgr?: string | null };
+  lastInboundAt: string | null;
+  counts: { pendingDispatch: number; unmatched: number; unknownOutcome: number };
+}
+export interface CbpInboundRow {
+  id: string;
+  application: string | null;
+  userDataTag: string | null;
+  receivedAt: string;
+  dispatchedAt: string | null;
+  matchedEntityType: string | null;
+  matchedEntityId: string | null;
+  transmissionId: string | null;
+  parseError: string | null;
+}
+export interface CbpTransmissionRow {
+  id: string;
+  orgId: string | null;
+  application: string;
+  action: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  filerCode: string;
+  userDataTag: string;
+  entryNumber: string | null;
+  isfTransactionNumber: string | null;
+  status: string;
+  sentAt: string | null;
+  respondedAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  _count: { inbound: number };
+}
+
+export const cbpTrafficApi = {
+  connection() {
+    return apiFetch<CbpConnectionInfo>('/api/v1/admin/cbp/connection');
+  },
+  inbound(filter: 'all' | 'unmatched' | 'pending' = 'all') {
+    return apiFetch<{ messages: CbpInboundRow[] }>(`/api/v1/admin/cbp/inbound?filter=${filter}`);
+  },
+  inboundMessage(id: string) {
+    return apiFetch<{ message: CbpInboundRow & { rawText: string; parsed: unknown } }>(`/api/v1/admin/cbp/inbound/${encodeURIComponent(id)}`);
+  },
+  transmissions(status?: string) {
+    return apiFetch<{ transmissions: CbpTransmissionRow[] }>(`/api/v1/admin/cbp/transmissions${status ? `?status=${encodeURIComponent(status)}` : ''}`);
+  },
+  transmission(id: string) {
+    return apiFetch<{ transmission: CbpTransmissionRow & { wireText: string; mqMessageId: string | null; inbound: (CbpInboundRow & { rawText: string; parsed: unknown })[] } }>(
+      `/api/v1/admin/cbp/transmissions/${encodeURIComponent(id)}`,
+    );
+  },
+};
+
 export const certApi = {
   params() {
     return apiFetch<{ params: CertParamsRow }>('/api/v1/admin/cert/params');

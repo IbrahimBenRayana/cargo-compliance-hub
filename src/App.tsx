@@ -16,6 +16,7 @@ import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
 import { AdminClientsPage } from "@/pages/AdminClientsPage";
 import { AdminChatConsolePage } from "@/pages/AdminChatConsolePage";
 import { AdminCertConsolePage } from "@/pages/AdminCertConsolePage";
+import { AdminCbpTrafficPage } from "@/pages/AdminCbpTrafficPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import MfaSetupPage from "@/pages/MfaSetupPage";
 import OnboardingPage from "@/pages/OnboardingPage";
@@ -119,6 +120,7 @@ const App = () => (
                   <Route path="/admin" element={<ErrorBoundary><AdminClientsPage /></ErrorBoundary>} />
                   <Route path="/admin/chat" element={<ErrorBoundary><AdminChatConsolePage /></ErrorBoundary>} />
                   <Route path="/admin/cert" element={<ErrorBoundary><AdminCertConsolePage /></ErrorBoundary>} />
+                  <Route path="/admin/cbp" element={<ErrorBoundary><AdminCbpTrafficPage /></ErrorBoundary>} />
                 </Route>
               </Route>
             </Route>
