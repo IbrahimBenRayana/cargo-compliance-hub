@@ -4,6 +4,19 @@ import { env } from '../config/env.js';
 import { prisma } from '../config/database.js';
 
 
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+/** Writes a viewer may make about themselves (session, own profile, MFA, inbox, chat). */
+const VIEWER_SELF_SERVICE = [
+  /^\/api\/v1\/auth(\/|$)/,
+  /^\/api\/v1\/settings\/(profile|change-password)(\/|\?|$)/,
+  /^\/api\/v1\/notifications(\/|\?|$)/,
+  /^\/api\/v1\/chat(\/|\?|$)/,
+];
+function isViewerSelfService(url: string | undefined): boolean {
+  return !!url && VIEWER_SELF_SERVICE.some((re) => re.test(url));
+}
+
 export interface AccessTokenClaims {
   sub: string;
   email?: string;
@@ -78,6 +91,13 @@ export async function authMiddleware(
       role: user.role,
       isPlatformAdmin: user.isPlatformAdmin,
     };
+
+    // The viewer role is read-only: no filing, transmitting, billing or
+    // settings writes. Only self-service writes stay open to viewers.
+    if (user.role === 'viewer' && !SAFE_METHODS.has(req.method) && !isViewerSelfService(req.originalUrl)) {
+      res.status(403).json({ error: 'Your role is view-only. Ask an admin for operator access.', code: 'VIEWER_READ_ONLY' });
+      return;
+    }
 
     next();
   } catch (err) {
