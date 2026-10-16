@@ -104,8 +104,10 @@ class MqSession {
     const od = new mq.MQOD();
     od.ObjectName = queueName;
     od.ObjectType = MQC.MQOT_Q;
+    // Input handles can also browse, so responses can be read without
+    // removing them and deleted by MsgId once the server has stored them.
     const openOptions = forInput
-      ? MQC.MQOO_INPUT_AS_Q_DEF | MQC.MQOO_FAIL_IF_QUIESCING
+      ? MQC.MQOO_INPUT_AS_Q_DEF | MQC.MQOO_BROWSE | MQC.MQOO_FAIL_IF_QUIESCING
       : MQC.MQOO_OUTPUT | MQC.MQOO_FAIL_IF_QUIESCING;
     const hObj = await mq.OpenPromise(conn, od, openOptions);
     this.queues.set(key, hObj);
@@ -161,6 +163,54 @@ class MqSession {
               return reject(err);
             }
             resolve(buf.subarray(0, len).toString('utf8'));
+          });
+        })
+    );
+  }
+
+  /**
+   * Non-destructive read: browse the first (or next) message. The message
+   * stays on the queue until ackById removes it. Resolves null when none.
+   */
+  browseOne(queueName, first) {
+    return this.open(queueName, true).then(
+      (hObj) =>
+        new Promise((resolve, reject) => {
+          const md = new mq.MQMD();
+          const gmo = new mq.MQGMO();
+          gmo.Options =
+            (first ? MQC.MQGMO_BROWSE_FIRST : MQC.MQGMO_BROWSE_NEXT) |
+            MQC.MQGMO_NO_WAIT |
+            MQC.MQGMO_CONVERT |
+            MQC.MQGMO_FAIL_IF_QUIESCING;
+          gmo.MatchOptions = MQC.MQMO_NONE;
+          const buf = Buffer.alloc(GET_BUFFER_BYTES);
+          mq.GetSync(hObj, md, gmo, buf, (err, len) => {
+            if (err) {
+              if (err.mqrc === MQC.MQRC_NO_MSG_AVAILABLE) return resolve(null);
+              return reject(err);
+            }
+            // Copy the MsgId: the library reuses MQMD buffers (ibmmq mqi.js note).
+            resolve({ msgId: Buffer.from(md.MsgId).toString('hex'), text: buf.subarray(0, len).toString('utf8') });
+          });
+        })
+    );
+  }
+
+  /** Destructively remove one message by MsgId. Resolves false when it is already gone. */
+  ackById(queueName, msgIdHex) {
+    return this.open(queueName, true).then(
+      (hObj) =>
+        new Promise((resolve, reject) => {
+          const md = new mq.MQMD();
+          md.MsgId = Buffer.from(msgIdHex, 'hex');
+          const gmo = new mq.MQGMO();
+          gmo.Options = MQC.MQGMO_NO_SYNCPOINT | MQC.MQGMO_NO_WAIT | MQC.MQGMO_FAIL_IF_QUIESCING;
+          gmo.MatchOptions = MQC.MQMO_MATCH_MSG_ID;
+          mq.GetSync(hObj, md, gmo, Buffer.alloc(GET_BUFFER_BYTES), (err) => {
+            if (!err) return resolve(true);
+            if (err.mqrc === MQC.MQRC_NO_MSG_AVAILABLE) return resolve(false);
+            return reject(err);
           });
         })
     );
@@ -287,6 +337,46 @@ const handlers = {
       return out;
     });
     return { status: 200, body: { batches } };
+  },
+
+  // At-least-once receive (native go-live D2): browse leaves messages on the
+  // queue; the server stores them, then /ack removes exactly those MsgIds.
+  // A crash between the two re-delivers instead of losing CBP's response.
+  'POST /browse': async (body) => {
+    const timeoutMs = Math.min(Math.max(Number(body.timeoutMs) || 0, 0), 60000);
+    const max = Math.min(Math.max(Number(body.max) || 25, 1), 100);
+    const messages = await withSession(async (s) => {
+      const out = [];
+      const deadline = Date.now() + timeoutMs;
+      let first = await s.browseOne(CONFIG.receiveQueue, true);
+      while (first === null && Date.now() < deadline) {
+        await sleep(500);
+        first = await s.browseOne(CONFIG.receiveQueue, true);
+      }
+      if (first === null) return out;
+      out.push({ msgId: first.msgId, lines: messageToLines(first.text) });
+      while (out.length < max) {
+        const next = await s.browseOne(CONFIG.receiveQueue, false);
+        if (next === null) break;
+        out.push({ msgId: next.msgId, lines: messageToLines(next.text) });
+      }
+      return out;
+    });
+    return { status: 200, body: { messages } };
+  },
+
+  'POST /ack': async (body) => {
+    const ids = Array.isArray(body.msgIds) ? body.msgIds : [];
+    if (ids.length === 0 || ids.length > 100 || !ids.every((id) => typeof id === 'string' && /^[0-9a-f]{48}$/.test(id))) {
+      return { status: 400, body: { error: 'msgIds must be 1-100 hex MQ message ids (48 chars)' } };
+    }
+    const result = await withSession(async (s) => {
+      const acked = [];
+      const missing = [];
+      for (const id of ids) ((await s.ackById(CONFIG.receiveQueue, id)) ? acked : missing).push(id);
+      return { acked, missing };
+    });
+    return { status: 200, body: result };
   },
 
   // CBP's own connectivity check: put to TRADE.VERIFY.QR, the queue manager

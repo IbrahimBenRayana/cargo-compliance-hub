@@ -11,7 +11,7 @@
  *
  * The mock loopback cannot reach CBP and passes through untouched.
  */
-import type { AbiTransport, SendReceipt, TransportHealth } from '../../abi-engine/transport/contract.js';
+import type { AbiTransport, BrowsedMessage, SendReceipt, TransportHealth } from '../../abi-engine/transport/contract.js';
 import { expectedQueueManager, type CbpEnvironment } from './environment.js';
 
 export class CbpEnvironmentMismatchError extends Error {
@@ -76,6 +76,8 @@ export function guardTransport(inner: Verifiable, opts: GuardOptions): GuardedTr
       environment,
       send: (lines, sendOpts) => inner.send(lines, sendOpts),
       receive: (receiveOpts) => inner.receive(receiveOpts),
+      browse: (browseOpts) => inner.browse(browseOpts),
+      ack: (ids) => inner.ack(ids),
       healthcheck: async () => ({ ...(await inner.healthcheck()), environment, expectedQmgr: expected }),
       verify: runVerify,
       close: () => inner.close(),
@@ -134,6 +136,9 @@ export function guardTransport(inner: Verifiable, opts: GuardOptions): GuardedTr
       guarded('traffic', () => inner.send(lines, sendOpts)),
     receive: (receiveOpts?: { timeoutMs?: number; max?: number }): Promise<string[][]> =>
       guarded('traffic', () => inner.receive(receiveOpts)),
+    browse: (browseOpts?: { timeoutMs?: number; max?: number }): Promise<BrowsedMessage[]> =>
+      guarded('traffic', () => inner.browse(browseOpts)),
+    ack: (ids: string[]) => guarded('traffic', () => inner.ack(ids)),
     verify: (): Promise<VerifyResult> => guarded('probe', runVerify),
     async healthcheck() {
       const health = await inner.healthcheck();

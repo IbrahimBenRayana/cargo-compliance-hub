@@ -12,7 +12,7 @@
  * and optional MQIPT_BRIDGE_TOKEN (shared-secret header, defense in depth
  * on top of network isolation).
  */
-import type { AbiTransport, SendReceipt, TransportHealth } from './contract.js';
+import type { AbiTransport, BrowsedMessage, SendReceipt, TransportHealth } from './contract.js';
 
 export interface MqiptConfig {
   /** Base URL of the mq-bridge sidecar (internal network only). */
@@ -73,6 +73,18 @@ export class MqiptTransport implements AbiTransport {
       max: opts?.max,
     });
     return result.batches;
+  }
+
+  async browse(opts?: { timeoutMs?: number; max?: number }): Promise<BrowsedMessage[]> {
+    const result = await this.call<{ messages: BrowsedMessage[] }>('POST', '/browse', {
+      timeoutMs: opts?.timeoutMs,
+      max: opts?.max,
+    });
+    return result.messages;
+  }
+
+  async ack(msgIds: string[]): Promise<{ acked: string[]; missing: string[] }> {
+    return this.call<{ acked: string[]; missing: string[] }>('POST', '/ack', { msgIds });
   }
 
   async healthcheck(): Promise<TransportHealth> {

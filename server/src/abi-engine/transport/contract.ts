@@ -27,6 +27,13 @@ export interface TransportHealth {
   environment?: string;
 }
 
+/** A response message read without removing it from the queue. */
+export interface BrowsedMessage {
+  /** Transport message id (hex MQ MsgId); the key for ack and dedupe. */
+  msgId: string;
+  lines: string[];
+}
+
 export interface AbiTransport {
   readonly kind: 'mock' | 'mqipt';
   /** Send one complete batch (A…Z lines, 80 chars each) to CBP. */
@@ -36,6 +43,14 @@ export interface AbiTransport {
    * Resolves with an empty array when nothing arrived within timeoutMs.
    */
   receive(opts?: { timeoutMs?: number; max?: number }): Promise<string[][]>;
+  /**
+   * At-least-once receive: read waiting responses WITHOUT removing them.
+   * The caller stores each one, then calls ack() with those ids. Anything
+   * not acked is returned again by the next browse.
+   */
+  browse(opts?: { timeoutMs?: number; max?: number }): Promise<BrowsedMessage[]>;
+  /** Remove stored messages from the queue by id. */
+  ack(msgIds: string[]): Promise<{ acked: string[]; missing: string[] }>;
   healthcheck(): Promise<TransportHealth>;
   close(): Promise<void>;
 }

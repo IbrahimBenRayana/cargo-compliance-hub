@@ -32,6 +32,16 @@ class FakeBridgeTransport implements AbiTransport {
     this.receives++;
     return [];
   }
+  browses = 0;
+  acks: string[][] = [];
+  async browse(): Promise<{ msgId: string; lines: string[] }[]> {
+    this.browses++;
+    return [];
+  }
+  async ack(ids: string[]): Promise<{ acked: string[]; missing: string[] }> {
+    this.acks.push(ids);
+    return { acked: ids, missing: [] };
+  }
   async healthcheck(): Promise<Health> {
     this.healthChecks++;
     return this.health;
@@ -98,6 +108,25 @@ describe('guardTransport on CERT', () => {
     inner.health = { ok: true, detail: 'connected to QGC1' };
     const guarded = guardTransport(inner, { environment: 'CERT' });
     await expect(guarded.send(BATCH)).resolves.toEqual({ messageId: 'abc' });
+  });
+});
+
+describe('guardTransport browse and ack', () => {
+  it('refuses to browse or ack a bridge on the wrong queue manager', async () => {
+    const inner = new FakeBridgeTransport();
+    inner.health = { ok: true, qmgr: 'QGP2' };
+    const guarded = guardTransport(inner, { environment: 'CERT' });
+    await expect(guarded.browse()).rejects.toBeInstanceOf(CbpEnvironmentMismatchError);
+    await expect(guarded.ack(['a'.repeat(48)])).rejects.toBeInstanceOf(CbpEnvironmentMismatchError);
+    expect(inner.browses).toBe(0);
+    expect(inner.acks).toHaveLength(0);
+  });
+
+  it('passes browse and ack through on the right queue manager', async () => {
+    const inner = new FakeBridgeTransport();
+    const guarded = guardTransport(inner, { environment: 'CERT' });
+    await guarded.browse();
+    await expect(guarded.ack(['a'.repeat(48)])).resolves.toEqual({ acked: ['a'.repeat(48)], missing: [] });
   });
 });
 

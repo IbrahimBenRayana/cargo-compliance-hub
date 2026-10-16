@@ -230,7 +230,8 @@ services:
       MQ_QMGR:          ${MQ_QMGR:-}
       MQ_SEND_QUEUE:    ${MQ_SEND_QUEUE:-ACS.BRK.INBOUND}
       MQ_RECEIVE_QUEUE: ${MQ_RECEIVE_QUEUE:-ACS.BRK.1303S7P.OUTBOUND}
-      MQ_RECORD_DELIMITER: ${MQ_RECORD_DELIMITER:-lf}
+      # CERT-proven framing: 80-byte records with no delimiter.
+      MQ_RECORD_DELIMITER: ${MQ_RECORD_DELIMITER:-none}
       # CMS keystore path WITHOUT the .kdb extension (GSKit convention).
       MQ_KEY_REPOSITORY: /opt/mqipt/sigmatp
       # Standard IBM MQ client env: CCDT location + client ini (OCSP bypass).
