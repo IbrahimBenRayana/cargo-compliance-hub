@@ -139,6 +139,10 @@ export const TextField = memo(function TextField({
 });
 
 // ─── SelectField ───────────────────────────────────────────
+// Radix Select throws on an empty-string item value (and its content mounts
+// even while closed), so a "None" option ('') maps to a sentinel internally.
+const NONE_VALUE = '__none__';
+
 export const SelectField = memo(function SelectField({
   label,
   hint,
@@ -171,7 +175,11 @@ export const SelectField = memo(function SelectField({
   return (
     <div className={cn('space-y-1.5', cls)}>
       <HintLabel label={label} hint={hint} required={required} labelExtra={labelExtra} htmlFor={fieldId} />
-      <Select value={value || undefined} onValueChange={onChange} disabled={disabled}>
+      <Select
+        value={value ? value : options.some((o) => o.value === '') ? NONE_VALUE : undefined}
+        onValueChange={(v) => onChange(v === NONE_VALUE ? '' : v)}
+        disabled={disabled}
+      >
         <SelectTrigger
           id={fieldId}
           aria-invalid={error ? true : undefined}
@@ -183,8 +191,8 @@ export const SelectField = memo(function SelectField({
         <SelectContent>
           {options.map((o) => (
             <SelectItem
-              key={o.value}
-              value={o.value}
+              key={o.value || NONE_VALUE}
+              value={o.value || NONE_VALUE}
               disabled={disabledValues?.includes(o.value)}
             >
               {o.label}
