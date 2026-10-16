@@ -22,9 +22,10 @@ import {
 } from '@/components/ui/table';
 import {
   Building2, UserPlus, Loader2, MoreHorizontal, CheckCircle2, Clock,
-  Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck, Radio,
+  Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck, Radio, Landmark,
   Activity,
 } from 'lucide-react';
+import { CbpSetupDialog } from '@/components/admin/CbpSetupDialog';
 import { adminApi } from '@/api/client';
 import type { AdminOrganization, AdminUserLookup } from '@/api/client';
 import { PLAN_META } from '@/lib/planMeta';
@@ -281,6 +282,7 @@ export function AdminClientsPage() {
 
   // ─── Change plan dialog ─────────────────────────────────
   const [planDialogOrg, setPlanDialogOrg] = useState<AdminOrganization | null>(null);
+  const [cbpDialogOrg, setCbpDialogOrg] = useState<AdminOrganization | null>(null);
   const [selectedPlan, setSelectedPlan] = useState('');
 
   const openPlanDialog = (org: AdminOrganization) => {
@@ -468,6 +470,7 @@ export function AdminClientsPage() {
                   <TableHead>Company</TableHead>
                   <TableHead>Plan</TableHead>
                   <TableHead>Owner</TableHead>
+                  <TableHead>CBP</TableHead>
                   <TableHead>Users</TableHead>
                   <TableHead>Filings</TableHead>
                   <TableHead>Created</TableHead>
@@ -519,6 +522,23 @@ export function AdminClientsPage() {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
+                    <TableCell>
+                      {org.cbp?.filerCode ? (
+                        <div className="space-y-1">
+                          <p className="font-mono text-sm">{org.cbp.filerCode}</p>
+                          <Badge
+                            variant="secondary"
+                            className={`text-[10px] ${org.cbp.serviceCenterApprovedAt
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'}`}
+                          >
+                            {org.cbp.serviceCenterApprovedAt ? 'Queue approved' : 'Awaiting rep'}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">ISF via S7P only</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm tabular-nums">
                       {org.userCount} / {org.maxUsers}
                     </TableCell>
@@ -532,6 +552,10 @@ export function AdminClientsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setCbpDialogOrg(org)}>
+                            <Landmark className="h-3.5 w-3.5 mr-2" />
+                            CBP setup…
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openPlanDialog(org)}>
                             <ArrowRightLeft className="h-3.5 w-3.5 mr-2" />
                             Change plan
@@ -557,6 +581,8 @@ export function AdminClientsPage() {
       </Card>
 
       <UserLookupCard />
+
+      <CbpSetupDialog org={cbpDialogOrg} onClose={() => setCbpDialogOrg(null)} />
 
       {/* Change plan dialog */}
       <Dialog open={!!planDialogOrg} onOpenChange={(open) => !open && setPlanDialogOrg(null)}>

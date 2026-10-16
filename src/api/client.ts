@@ -733,7 +733,7 @@ export const settingsApi = {
     return apiFetch<{ data: EntryNumberBlock[] }>('/api/v1/settings/entry-blocks');
   },
 
-  createEntryBlock(data: { filerCode: string; rangeStart: number; rangeEnd: number; label?: string }) {
+  createEntryBlock(data: { rangeStart: number; rangeEnd: number; label?: string }) {
     return apiFetch<{ data: EntryNumberBlock }>('/api/v1/settings/entry-blocks', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1032,6 +1032,27 @@ export interface AdminOrganization {
   owner: { email: string; firstName: string | null; lastName: string | null; emailVerified: boolean } | null;
   userCount: number;
   filingCount: number;
+  cbp: OrgCbpSetup | null;
+}
+
+/** A client's CBP identity, set by MyCargoLens (native go-live Phase 2). */
+export interface OrgCbpSetup {
+  gateway: 'NATIVE' | 'CC';
+  filerCode: string | null;
+  isfFilerModeDefault: 'SIGMA' | 'CLIENT';
+  serviceCenterApprovedAt: string | null;
+  serviceCenterApprovedBy: string | null;
+  notes: string | null;
+}
+
+/** What a member sees about their org's CBP identity. */
+export interface OrgCbpIdentity {
+  filerCode: string | null;
+  gateway: 'NATIVE' | 'CC';
+  isfFilerModeDefault: 'SIGMA' | 'CLIENT';
+  serviceCenterApprovedAt: string | null;
+  sigmaFilerCode: string;
+  environment: 'NONE' | 'CERT' | 'PROD';
 }
 
 export interface AdminPlan {
@@ -1066,6 +1087,13 @@ export const adminApi = {
       owner: { id: string; email: string };
       plan: { id: string; name: string };
     }>('/api/v1/admin/organizations', { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  setCbpSetup(orgId: string, body: Partial<Omit<OrgCbpSetup, 'serviceCenterApprovedAt'>> & { serviceCenterApprovedAt?: string | null }) {
+    return apiFetch<{ cbp: OrgCbpSetup }>(`/api/v1/admin/organizations/${orgId}/cbp`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
   },
 
   changePlan(orgId: string, planId: string) {
@@ -1738,6 +1766,17 @@ export interface OrgInvitation {
 }
 
 export const organizationApi = {
+  cbpIdentity() {
+    return apiFetch<{ cbp: OrgCbpIdentity }>('/api/v1/organization/cbp');
+  },
+
+  setIsfFilerDefault(isfFilerModeDefault: 'SIGMA' | 'CLIENT') {
+    return apiFetch<{ cbp: { isfFilerModeDefault: 'SIGMA' | 'CLIENT' } }>('/api/v1/organization/cbp', {
+      method: 'PATCH',
+      body: JSON.stringify({ isfFilerModeDefault }),
+    });
+  },
+
   getOverview() {
     return apiFetch<{
       id: string; name: string; slug: string | null; iorNumber: string | null;

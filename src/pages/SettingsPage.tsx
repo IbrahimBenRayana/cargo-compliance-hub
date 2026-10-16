@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useProfile, useUpdateProfile,
-  useOrganization, useUpdateOrganization, useAuditLog, useTestCCConnection,
+  useOrganization, useUpdateOrganization, useAuditLog,
 } from '@/hooks/useFilings';
 import {
   User, Building2, Shield, Key, Activity, CheckCircle2, XCircle,
@@ -18,6 +18,7 @@ import {
 import { useSearchParams } from 'react-router-dom';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { EntryNumberBlocksCard } from '@/components/settings/EntryNumberBlocksCard';
+import { CbpIdentityCard } from '@/components/settings/CbpIdentityCard';
 import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
 import { ChangePasswordCard } from '@/components/settings/ChangePasswordCard';
 import { BillingSettings } from '@/components/billing/BillingSettings';
@@ -30,7 +31,7 @@ const tabs: { id: SettingsTab; label: string; desc: string; icon: React.ElementT
   { id: 'profile',       label: 'Profile',           desc: 'Personal info & security',  icon: User },
   { id: 'organization',  label: 'Organization',      desc: 'Company & IOR details',     icon: Building2 },
   { id: 'billing',       label: 'Billing',           desc: 'Plan, card & charges',      icon: CreditCard },
-  { id: 'api',           label: 'API & Integrations',desc: 'Filing gateway connection', icon: Key },
+  { id: 'api',           label: 'CBP identity',      desc: 'Filer code & service center', icon: Key },
   { id: 'notifications', label: 'Notifications',     desc: 'Per-event delivery channels', icon: Bell },
   { id: 'activity',      label: 'Audit Log',         desc: 'Recent activity',           icon: Activity },
 ];
@@ -41,7 +42,6 @@ export default function SettingsPage() {
   const { data: auditData, isLoading: auditLoading } = useAuditLog({ limit: 30 });
   const updateProfile = useUpdateProfile();
   const updateOrganization = useUpdateOrganization();
-  const testConnection = useTestCCConnection();
 
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
@@ -60,9 +60,6 @@ export default function SettingsPage() {
   const [einNumber, setEinNumber] = useState('');
 
   // Connection test
-  const [connectionResult, setConnectionResult] = useState<{
-    connected: boolean; environment: string; baseUrl: string;
-  } | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -98,16 +95,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleTestConnection = async () => {
-    try {
-      const result = await testConnection.mutateAsync();
-      setConnectionResult(result);
-      if (result.connected) toast.success('CBP Filing Gateway connected');
-      else toast.error('CBP Filing Gateway connection failed');
-    } catch (err: any) {
-      toast.error('Connection test failed: ' + (err.message || 'Unknown error'));
-    }
-  };
 
   const initials = ((profile?.firstName?.[0] || '') + (profile?.lastName?.[0] || '')).toUpperCase() || 'U';
 
@@ -341,88 +328,7 @@ export default function SettingsPage() {
           {activeTab === 'billing' && <BillingSettings />}
 
           {activeTab === 'api' && (
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Key className="h-4 w-4 text-amber-600" />
-                  CBP Filing Gateway
-                </CardTitle>
-                <CardDescription>Test and manage your filing gateway integration</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-5">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Button onClick={handleTestConnection} disabled={testConnection.isPending} variant="outline" className="cursor-pointer">
-                    {testConnection.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Activity className="h-4 w-4 mr-2" />
-                    )}
-                    Test Connection
-                  </Button>
-
-                  {connectionResult && (
-                    <div className="flex items-center gap-2">
-                      {connectionResult.connected ? (
-                        <>
-                          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                          <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Connected</span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="h-5 w-5 text-red-500" />
-                          <span className="text-sm font-semibold text-red-600 dark:text-red-400">Failed</span>
-                        </>
-                      )}
-                      <Badge variant="secondary" className="text-xs ml-1">
-                        {connectionResult.environment}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-
-                {connectionResult && (
-                  <div className="rounded-xl border bg-muted/30 p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">Status</p>
-                      <div
-                        className={cn(
-                          'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold',
-                          connectionResult.connected
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                        )}
-                      >
-                        <span className={cn('h-1.5 w-1.5 rounded-full', connectionResult.connected ? 'bg-emerald-500' : 'bg-red-500')} />
-                        {connectionResult.connected ? 'Online' : 'Offline'}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">Environment</p>
-                      <p className="font-semibold capitalize">{connectionResult.environment}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">API Base URL</p>
-                      <p className="font-mono text-xs truncate">{connectionResult.baseUrl}</p>
-                    </div>
-                  </div>
-                )}
-
-                <Separator />
-
-                <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40 p-4 flex gap-3">
-                  <Key className="h-4 w-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-                    <p className="font-semibold mb-1">API Credentials Managed Server-Side</p>
-                    <p className="text-amber-700 dark:text-amber-400/90">
-                      Filing gateway credentials are configured via environment variables on the server
-                      (<code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded font-mono">CC_API_EMAIL</code>,
-                      {' '}<code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded font-mono">CC_API_PASSWORD</code>).
-                      Contact your administrator to update them.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <CbpIdentityCard canEdit={profile?.role === 'owner' || profile?.role === 'admin'} />
           )}
 
           {/* ── NOTIFICATIONS ── */}

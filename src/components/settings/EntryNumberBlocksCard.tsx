@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Hash, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { settingsApi, type EntryNumberBlock } from '@/api/client';
+import { settingsApi, organizationApi, type EntryNumberBlock } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,7 +34,6 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
   });
 
   const [showForm, setShowForm] = useState(false);
-  const [filerCode, setFilerCode] = useState('');
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
   const [label, setLabel] = useState('');
@@ -42,7 +41,6 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
   const createBlock = useMutation({
     mutationFn: () =>
       settingsApi.createEntryBlock({
-        filerCode: filerCode.trim().toUpperCase(),
         rangeStart: Number(rangeStart),
         rangeEnd: Number(rangeEnd),
         label: label.trim() || undefined,
@@ -50,7 +48,7 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       setShowForm(false);
-      setFilerCode(''); setRangeStart(''); setRangeEnd(''); setLabel('');
+      setRangeStart(''); setRangeEnd(''); setLabel('');
       toast.success('Entry number block added');
     },
     onError: (err) =>
@@ -65,8 +63,15 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
       toast.error(err instanceof Error ? err.message : 'Failed to update block'),
   });
 
+  // The filer code comes from the org's CBP setup (set by MyCargoLens), never typed.
+  const { data: cbpData } = useQuery({
+    queryKey: ['org', 'cbp'],
+    queryFn: () => organizationApi.cbpIdentity(),
+  });
+  const filerCode = cbpData?.cbp.filerCode ?? null;
+
   const formValid =
-    /^[A-Za-z0-9]{3}$/.test(filerCode.trim()) &&
+    !!filerCode &&
     Number(rangeStart) >= 1 &&
     Number(rangeEnd) >= Number(rangeStart) &&
     Number(rangeEnd) <= 9_999_999;
@@ -108,9 +113,16 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
         )}
 
         {canEdit && !showForm && (
-          <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1.5" /> Add block
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => setShowForm(true)} disabled={!filerCode}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Add block
+            </Button>
+            {!filerCode && (
+              <span className="text-xs text-muted-foreground">
+                Entry numbers use your own CBP filer code, which MyCargoLens sets up with you first.
+              </span>
+            )}
+          </div>
         )}
 
         {canEdit && showForm && (
@@ -120,14 +132,7 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
                 <Label htmlFor="blk-filer" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Filer Code
                 </Label>
-                <Input
-                  id="blk-filer"
-                  value={filerCode}
-                  onChange={(e) => setFilerCode(e.target.value.toUpperCase())}
-                  placeholder="S7P"
-                  maxLength={3}
-                  className="font-mono"
-                />
+                <Input id="blk-filer" value={filerCode ?? ''} readOnly disabled className="font-mono" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="blk-label" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
