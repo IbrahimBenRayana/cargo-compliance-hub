@@ -37,7 +37,7 @@ export class MqiptTransport implements AbiTransport {
     this.token = config.token;
   }
 
-  private async call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+  private async call<T>(method: 'GET' | 'POST', path: string, body?: unknown, timeoutMs = 30_000): Promise<T> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (this.token) headers['x-bridge-token'] = this.token;
     let res: Response;
@@ -46,9 +46,17 @@ export class MqiptTransport implements AbiTransport {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
-      throw new Error(`mq-bridge unreachable at ${this.bridgeUrl}: ${(err as Error).message}`);
+      // Only a refused connection or failed lookup proves the request never
+      // reached the bridge ("unreachable" = safe to retry a send). A timeout
+      // or a dropped connection may have happened after the bridge acted.
+      const code = (err as { cause?: { code?: string } }).cause?.code;
+      if (code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
+        throw new Error(`mq-bridge unreachable at ${this.bridgeUrl}: ${code}`);
+      }
+      throw new Error(`mq-bridge ${path} outcome uncertain: ${(err as Error).name}: ${(err as Error).message}`);
     }
     const payload = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (!res.ok) {
@@ -71,7 +79,7 @@ export class MqiptTransport implements AbiTransport {
     const result = await this.call<{ batches: string[][] }>('POST', '/receive', {
       timeoutMs: opts?.timeoutMs,
       max: opts?.max,
-    });
+    }, (opts?.timeoutMs ?? 15_000) + 15_000);
     return result.batches;
   }
 
@@ -79,7 +87,7 @@ export class MqiptTransport implements AbiTransport {
     const result = await this.call<{ messages: BrowsedMessage[] }>('POST', '/browse', {
       timeoutMs: opts?.timeoutMs,
       max: opts?.max,
-    });
+    }, (opts?.timeoutMs ?? 0) + 30_000);
     return result.messages;
   }
 
@@ -102,7 +110,7 @@ export class MqiptTransport implements AbiTransport {
    */
   async verify(): Promise<{ ok: boolean; detail?: string; echoed?: string }> {
     try {
-      return await this.call<{ ok: boolean; detail?: string; echoed?: string }>('POST', '/verify');
+      return await this.call<{ ok: boolean; detail?: string; echoed?: string }>('POST', '/verify', undefined, 45_000);
     } catch (err) {
       return { ok: false, detail: (err as Error).message };
     }

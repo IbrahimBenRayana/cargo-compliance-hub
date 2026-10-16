@@ -125,3 +125,10 @@ describe('createTransport env wiring', () => {
     expect(createTransport({}).kind).toBe('mock');
   });
 });
+
+describe('MqiptTransport failure classification', () => {
+  it('reports a refused connection as unreachable (the request never reached the bridge)', async () => {
+    const closed = new MqiptTransport({ bridgeUrl: 'http://127.0.0.1:1' });
+    await expect(closed.send(['A'])).rejects.toThrow(/^mq-bridge unreachable/);
+  });
+});
