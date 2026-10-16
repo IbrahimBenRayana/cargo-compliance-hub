@@ -6,6 +6,7 @@
  * (callers pass userId + audit meta, and submit returns a {httpStatus, body}
  * outcome the caller maps to its response).
  */
+import { isfFilingDeadline } from './isfDeadline.js';
 import type { Filing } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { abiGateway } from './abi/gateway.js';
@@ -36,12 +37,8 @@ export async function createFilingForOrg(params: {
 }): Promise<Filing> {
   const { data, orgId, userId, meta = {} } = params;
 
-  // Calculate filing deadline (24h before departure)
-  let filingDeadline: Date | null = null;
-  if (data.estimatedDeparture) {
-    filingDeadline = new Date(data.estimatedDeparture);
-    filingDeadline.setHours(filingDeadline.getHours() - 24);
-  }
+  // ISF deadline: 24h before lading, estimated from departure (services/isfDeadline).
+  const filingDeadline: Date | null = data.estimatedDeparture ? isfFilingDeadline(data.estimatedDeparture) : null;
 
   const filing = await prisma.filing.create({
     data: {

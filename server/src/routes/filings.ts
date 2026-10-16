@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { isfFilingDeadline } from '../services/isfDeadline.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
@@ -149,11 +150,7 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
       return;
     }
 
-    let filingDeadline: Date | null = null;
-    if (shared.estimatedDeparture) {
-      filingDeadline = new Date(shared.estimatedDeparture);
-      filingDeadline.setHours(filingDeadline.getHours() - 24);
-    }
+    const filingDeadline: Date | null = shared.estimatedDeparture ? isfFilingDeadline(shared.estimatedDeparture) : null;
 
     const consolidationId = randomUUID();
 
@@ -356,8 +353,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     // Recalculate deadline if departure changed
     let filingDeadline = existing.filingDeadline;
     if (data.estimatedDeparture) {
-      filingDeadline = new Date(data.estimatedDeparture);
-      filingDeadline.setHours(filingDeadline.getHours() - 24);
+      filingDeadline = isfFilingDeadline(data.estimatedDeparture);
     }
 
     // Atomic org-scoped write (updateMany accepts the orgId in its where; the
@@ -448,8 +444,7 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
     // Recalculate deadline if departure changed
     let filingDeadline = filing.filingDeadline;
     if (updates.estimatedDeparture) {
-      filingDeadline = new Date(updates.estimatedDeparture);
-      filingDeadline.setHours(filingDeadline.getHours() - 24);
+      filingDeadline = isfFilingDeadline(updates.estimatedDeparture);
     }
 
     // Update the filing locally first

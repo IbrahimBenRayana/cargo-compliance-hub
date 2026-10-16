@@ -14,6 +14,7 @@
  * of the per-user daily AI cap.
  */
 
+import { isfFilingDeadline } from '../services/isfDeadline.js';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
@@ -122,7 +123,7 @@ router.get('/health-summary', async (req: AuthRequest, res: Response): Promise<v
   for (const f of recent) {
     if (!f.submittedAt || !f.estimatedDeparture) continue;
     trackable++;
-    const cutoff = new Date(new Date(f.estimatedDeparture).getTime() - 24 * 60 * 60 * 1000);
+    const cutoff = isfFilingDeadline(f.estimatedDeparture);
     if (f.submittedAt.getTime() <= cutoff.getTime()) onTime++;
   }
   const deadlineAdherence = trackable > 0 ? Math.round((onTime / trackable) * 100) : null;
@@ -424,7 +425,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
   for (const f of filings) {
     if (f.status !== 'draft') continue;
     if (!f.estimatedDeparture) continue;
-    const cutoff = new Date(f.estimatedDeparture).getTime() - 24 * 60 * 60 * 1000;
+    const cutoff = isfFilingDeadline(f.estimatedDeparture).getTime();
     const hoursToCutoff = (cutoff - now) / (60 * 60 * 1000);
     if (hoursToCutoff < -24 || hoursToCutoff > 72) continue;
     const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
