@@ -1238,67 +1238,29 @@ router.post('/bulk-submit', filingMutationLimiter, ccApiLimiter, requireVerified
       newStatus?: string;
     }> = [];
 
+    // Each filing goes through the same service as the single Submit button
+    // (validation, billing gate, create + transmit, history, notifications),
+    // so bulk can never mark a filing submitted without transmitting it.
+    const meta = getRequestMeta(req);
     for (const filing of filings) {
+      const bol = filing.houseBol || filing.masterBol || filing.id.slice(0, 8);
       try {
-        // Validate first
-        const validation = validateFiling(filing);
-        if (!validation.valid) {
-          results.push({
-            filingId: filing.id,
-            bol: filing.houseBol || filing.masterBol || filing.id.slice(0, 8),
-            success: false,
-            error: `${validation.criticalCount} critical errors`,
-          });
-          continue;
-        }
+        const outcome = await submitFilingToCBP({ filingId: filing.id, orgId: req.user!.orgId, userId: req.user!.id, requestMeta: meta });
+        const body = outcome.body as { filing?: { status?: string }; error?: string } | undefined;
+        const status = body?.filing?.status;
+        const ok = outcome.httpStatus < 300 && status === 'submitted';
+        results.push(ok
+          ? { filingId: filing.id, bol, success: true, newStatus: 'submitted' }
+          : { filingId: filing.id, bol, success: false, error: body?.error ?? (status ? `CBP gateway returned ${status}` : `HTTP ${outcome.httpStatus}`), newStatus: status });
+        // A missing card stops the batch: every remaining filing would fail the same way.
+        if (outcome.httpStatus === 402) break;
 
-        // Map and submit to CC API
-        const payload = mapFilingToCCPayload(filing);
-        const ccResult = await abiGateway.createDocument(payload);
-
-        // Update filing status
-        const ccFilingId = ccResult?.data?._id || ccResult?.data?.id || null;
-        await prisma.filing.update({
-          where: { id: filing.id },
-          data: {
-            status: 'submitted',
-            ccFilingId: ccFilingId ? String(ccFilingId) : undefined,
-            submittedAt: new Date(),
-          },
-        });
-
-        // Create status history
-        await prisma.filingStatusHistory.create({
-          data: {
-            filingId: filing.id,
-            status: 'submitted',
-            message: 'Bulk submission to CBP',
-            ccResponse: ccResult?.data || null,
-            changedById: req.user!.id,
-          },
-        });
-        await recordScoreSnapshot(filing.id, 'submitted');
-
-        await notifyFilingSubmitted(req.user!.orgId, req.user!.id, filing.id, filing.houseBol || filing.masterBol || '');
-
-        results.push({
-          filingId: filing.id,
-          bol: filing.houseBol || filing.masterBol || filing.id.slice(0, 8),
-          success: true,
-          newStatus: 'submitted',
-        });
-
-        // Rate limit: wait 500ms between CC API calls
+        // Rate limit: wait 500ms between gateway calls
         if (filings.indexOf(filing) < filings.length - 1) {
           await new Promise(r => setTimeout(r, 500));
         }
       } catch (err: any) {
-        results.push({
-          filingId: filing.id,
-          bol: filing.houseBol || filing.masterBol || filing.id.slice(0, 8),
-          success: false,
-          error: err.message,
-        });
+        results.push({ filingId: filing.id, bol, success: false, error: err.message });
       }
     }
 
