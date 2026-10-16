@@ -14,6 +14,7 @@
 import { prisma } from '../../config/database.js';
 import type { InboundHandler } from './dispatcher.js';
 import { summarizeResponse } from './responses.js';
+import { applyIsfVerdict } from './isfVerdicts.js';
 
 export const taggedTransmissionHandler: InboundHandler = async (row) => {
   if (!row.userDataTag?.startsWith('MCL')) return null;
@@ -30,6 +31,10 @@ export const taggedTransmissionHandler: InboundHandler = async (row) => {
         entryNumber: tx.entryNumber ?? summary.keys.entryNumber,
       },
     });
+    // The filing itself follows CBP's verdict (status, notify, webhook, billing).
+    if (tx.entityType === 'filing' && tx.entityId) {
+      await applyIsfVerdict({ filingId: tx.entityId, transmissionId: tx.id, filerCode: tx.filerCode, summary });
+    }
   }
   return {
     entityType: tx.entityType ?? 'cbp_transmission',

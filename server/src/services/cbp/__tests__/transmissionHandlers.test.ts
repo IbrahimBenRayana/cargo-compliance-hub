@@ -10,8 +10,9 @@ const { prisma } = vi.hoisted(() => ({
   prisma: { cbpTransmission: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() } },
 }));
 vi.mock('../../../config/database.js', () => ({ prisma }));
-const { summary } = vi.hoisted(() => ({ summary: vi.fn() }));
+const { summary, applyIsf } = vi.hoisted(() => ({ summary: vi.fn(), applyIsf: vi.fn() }));
 vi.mock('../responses.js', () => ({ summarizeResponse: summary }));
+vi.mock('../isfVerdicts.js', () => ({ applyIsfVerdict: applyIsf }));
 
 import { taggedTransmissionHandler, businessKeyHandler } from '../transmissionHandlers.js';
 
@@ -34,6 +35,7 @@ describe('taggedTransmissionHandler', () => {
       data: expect.objectContaining({ status: 'ACCEPTED', isfTransactionNumber: 'S7P-1', respondedAt: expect.any(Date) }),
     });
     expect(m).toMatchObject({ entityType: 'filing', entityId: 'f1', transmissionId: 't1' });
+    expect(applyIsf).toHaveBeenCalledWith(expect.objectContaining({ filingId: 'f1', transmissionId: 't1' }));
   });
 
   it('ignores rows without our tag', async () => {
