@@ -109,9 +109,9 @@ export default function IntegrationsApi() {
   };
 
   const capabilities = [
-    { icon: FileText, label: 'ISF-10 Filing', desc: 'Importer Security Filing (10+2) — full E2E with CBP', status: 'active' as const },
+    { icon: FileText, label: 'ISF-10 Filing', desc: 'Importer Security Filing (10+2)', status: 'active' as const },
     { icon: FileText, label: 'ISF-5 Filing', desc: 'Carrier Security Filing (5+2)', status: 'active' as const },
-    { icon: Radio, label: 'Status Polling', desc: 'Automated CBP response checking every 5 minutes', status: 'active' as const },
+    { icon: Radio, label: 'Status Updates', desc: 'CBP responses are checked automatically', status: 'active' as const },
     { icon: Search, label: 'HTS Classification', desc: 'AI-powered tariff code suggestions', status: 'active' as const },
     { icon: Zap, label: 'Amendment & Cancel', desc: 'File amendments and cancellations via filing gateway', status: 'active' as const },
     { icon: Globe, label: 'MID Lookup', desc: 'Manufacturer Identification (MID) database', status: 'beta' as const },
@@ -198,7 +198,7 @@ export default function IntegrationsApi() {
                   <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">v2</span>
                 </CardTitle>
                 <CardDescription className="mt-0.5">
-                  Direct integration with US Customs &amp; Border Protection for ISF filings
+                  Transmits your ISF and entry filings to US Customs &amp; Border Protection
                 </CardDescription>
               </div>
             </div>

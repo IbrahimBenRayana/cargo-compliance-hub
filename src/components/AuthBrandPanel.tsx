@@ -1,5 +1,5 @@
 import { motion, MotionConfig } from 'framer-motion';
-import { Shield, Lock, Zap } from 'lucide-react';
+import { Shield, Lock } from 'lucide-react';
 import { LoginScene } from './illustrations/login-scene';
 import { RegisterJourneyScene } from './illustrations/register-journey';
 import { LogoMark } from '@/components/LogoMark';
@@ -124,16 +124,12 @@ export function AuthBrandPanel({ variant = 'login' }: AuthBrandPanelProps) {
         {/* ── Trust badges — bottom left ── */}
         <div className="absolute bottom-8 left-8 flex items-center gap-6 z-10">
           <span className="flex items-center gap-1.5 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            <Shield size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
-            SOC 2
-          </span>
-          <span className="flex items-center gap-1.5 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
             <Lock size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
             256-bit TLS
           </span>
           <span className="flex items-center gap-1.5 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            <Zap size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
-            Direct CBP
+            <Shield size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
+            Multi-factor sign-in
           </span>
         </div>
       </div>

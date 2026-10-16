@@ -183,9 +183,9 @@ export default function InbondListPage() {
         >
           <Radio className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span className="flex-1">
-            Transmission to CBP activates once our direct ABI connection is live. Until
-            then, validated filings queue as <span className="font-semibold">Ready</span> and
-            transmit automatically when the connection opens.
+            In-bond transmission to CBP is not available yet: it needs its own CBP
+            certification. Validated filings are saved as <span className="font-semibold">Ready</span>{' '}
+            so they can be transmitted once it is.
           </span>
           <button
             type="button"

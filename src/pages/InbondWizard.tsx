@@ -1604,8 +1604,8 @@ function ReviewStep({
           </div>
           <WirePreview text={wireText} />
           <p className="text-[11px] text-muted-foreground">
-            This filing is validated and queued. It will transmit automatically once the
-            direct ABI connection to CBP is live.
+            This filing is validated and saved as Ready. In-bond transmission to CBP needs
+            its own CBP certification and is not available yet.
           </p>
         </div>
       )}
