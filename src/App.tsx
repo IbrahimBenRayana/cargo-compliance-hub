@@ -12,6 +12,7 @@ import { CAPABILITIES } from "@/lib/planMeta";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import { SetPasswordPage } from "@/pages/SetPasswordPage";
+import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
 import { AdminClientsPage } from "@/pages/AdminClientsPage";
 import { AdminChatConsolePage } from "@/pages/AdminChatConsolePage";
 import { AdminCertConsolePage } from "@/pages/AdminCertConsolePage";
@@ -66,6 +67,7 @@ const App = () => (
             <Route path="/register" element={<RegisterPage />} />
             {/* Set first password (sales-led onboarding) — public; the token is the credential */}
             <Route path="/set-password" element={<ErrorBoundary><SetPasswordPage /></ErrorBoundary>} />
+            <Route path="/forgot-password" element={<ErrorBoundary><ForgotPasswordPage /></ErrorBoundary>} />
 
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>

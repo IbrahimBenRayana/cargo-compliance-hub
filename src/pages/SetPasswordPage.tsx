@@ -131,11 +131,14 @@ export function SetPasswordPage() {
                   This link is invalid or has expired
                 </h1>
                 <p className="mt-1 text-sm text-muted-foreground mb-8">
-                  Setup links are single-use and time-limited. Request a new one or get in touch
-                  with us to continue.
+                  Password links are single-use and time-limited. Request a new reset link, or get in
+                  touch with us if your account is new.
                 </p>
                 <Button asChild variant="default" size="lg" className="w-full">
-                  <a href={DEMO_URL}>Request a demo</a>
+                  <Link to="/forgot-password">Send a new reset link</Link>
+                </Button>
+                <Button asChild variant="ghost" size="lg" className="w-full mt-2">
+                  <a href={DEMO_URL}>New to MyCargoLens? Request a demo</a>
                 </Button>
                 <p className="mt-6 text-sm text-muted-foreground text-center">
                   Already have an account?{' '}
@@ -180,7 +183,7 @@ export function SetPasswordPage() {
                     Set your password
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground mb-8">
-                    Choose a password to finish setting up your account.
+                    Choose a password for your account.
                   </p>
                 </motion.div>
 

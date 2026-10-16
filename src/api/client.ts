@@ -272,6 +272,14 @@ export const authApi = {
     );
   },
 
+  /** Email a 1-hour password reset link (same response whether or not the account exists). */
+  forgotPassword(email: string) {
+    return apiFetch<{ success: true; message: string }>('/api/v1/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
   setPassword(token: string, password: string) {
     return apiFetch<{ success: true }>('/api/v1/auth/set-password', {
       method: 'POST',
