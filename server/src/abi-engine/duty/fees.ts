@@ -27,6 +27,8 @@ export const MPF_RATE_PER_MILLION = 3464;
 
 /** Min/max thresholds in cents, newest first (ESF-173). */
 const MPF_LIMITS: FeeEra<{ minCents: number; maxCents: number }>[] = [
+  // FY2027: CBP Dec. 26-14, FR 2026-15530 (Jul 31 2026).
+  { from: '20261001', value: { minCents: 3458, maxCents: 67086 } },
   { from: '20251001', value: { minCents: 3358, maxCents: 65150 } },
   { from: '20241001', value: { minCents: 3271, maxCents: 63462 } },
   { from: '20231001', value: { minCents: 3167, maxCents: 61435 } },
@@ -104,6 +106,7 @@ export function computeLineHmfCents(lineValueDollarsSum: number): number {
 
 /** Informal Entry Fee, class 311 (ESF-164). */
 const INFORMAL_FEE: FeeEra<number>[] = [
+  { from: '20261001', value: 277 },
   { from: '20251001', value: 269 },
   { from: '20241001', value: 262 },
   { from: '20231001', value: 253 },
@@ -118,6 +121,7 @@ const INFORMAL_FEE: FeeEra<number>[] = [
 
 /** Dutiable Mail Fee, class 496 (ESF-163). */
 const MAIL_FEE: FeeEra<number>[] = [
+  { from: '20261001', value: 761 },
   { from: '20251001', value: 739 },
   { from: '20241001', value: 720 },
   { from: '20231001', value: 697 },
@@ -132,6 +136,7 @@ const MAIL_FEE: FeeEra<number>[] = [
 
 /** Manual Entry Surcharge, class 500 (ESF-165). */
 const SURCHARGE: FeeEra<number>[] = [
+  { from: '20261001', value: 415 },
   { from: '20251001', value: 403 },
   { from: '20241001', value: 393 },
   { from: '20231001', value: 380 },

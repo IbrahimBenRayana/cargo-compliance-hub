@@ -299,3 +299,30 @@ describe('ch.99 overlay surcharges (Section 301/232)', () => {
     expect(overlay.dutyCents).toBe(250000); // 301 unaffected by the claim
   });
 });
+
+describe('FY2027 user fees (CBP Dec. 26-14, FR 2026-15530, effective 2026-10-01)', () => {
+  it('clamps formal MPF to $34.58 / $670.86', () => {
+    expect(applyMpfMinMax(100, '20261001')).toBe(3458);
+    expect(applyMpfMinMax(10_000_000, '20261015')).toBe(67086);
+  });
+
+  it('keeps FY2026 limits for the day before', () => {
+    expect(applyMpfMinMax(100, '20260930')).toBe(3358);
+  });
+
+  it('charges $2.77 informal, $7.61 dutiable mail and $4.15 manual surcharge', () => {
+    expect(informalEntryFeeCents('20261001')).toBe(277);
+    expect(dutiableMailFeeCents('20261001')).toBe(761);
+    expect(manualEntrySurchargeCents('20261001')).toBe(415);
+  });
+});
+
+describe('user-fee table freshness', () => {
+  it('has an era no older than 12 months (CBP adjusts fees every October 1)', () => {
+    const now = new Date();
+    const yearAgo = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate()))
+      .toISOString().slice(0, 10).replace(/-/g, '');
+    // If this fails, add the new fiscal year's fees from CBP's July Federal Register notice.
+    expect(applyMpfMinMax(100, yearAgo)).not.toBe(applyMpfMinMax(100, '29991231'));
+  });
+});
