@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { abiGateway } from '../services/abi/gateway.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest, requirePlatformAdmin } from '../middleware/auth.js';
 import { requireCapability } from '../middleware/requireCapability.js';
 import { CAPABILITIES } from '../config/plans.js';
 import { sendTestEmail, verifyEmailConnection } from '../services/email.js';
@@ -10,7 +10,8 @@ const router = Router();
 router.use(authMiddleware);
 
 // ─── POST /api/v1/integrations/test — Test CC API connection
-router.post('/test', async (req: AuthRequest, res: Response): Promise<void> => {
+// Gateway diagnostics (environment, base URL) are for MyCargoLens staff only (audit USA-09).
+router.post('/test', requirePlatformAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const connected = await abiGateway.testConnection();
     res.json({

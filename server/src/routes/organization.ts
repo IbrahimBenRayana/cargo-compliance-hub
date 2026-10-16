@@ -14,6 +14,8 @@ import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js'
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { sendInvitationEmail } from '../services/email.js';
 import logger from '../config/logger.js';
+import { env } from '../config/env.js';
+import { resolveIsfFiler, SIGMA_FILER_CODE } from '../services/cbp/filerIdentity.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -386,6 +388,54 @@ router.post('/accept-invite', async (req: AuthRequest, res: Response): Promise<v
 });
 
 // ─── GET /api/v1/organization/overview — Org overview for dashboard
+// GET /api/v1/organization/cbp — the org's CBP identity, read-only for
+// members (set by MyCargoLens). Includes the environment this server files to.
+router.get('/cbp', async (req: AuthRequest, res: Response): Promise<void> => {
+  const cfg = await prisma.orgCbpConfig.findUnique({ where: { orgId: req.user!.orgId } });
+  res.json({
+    cbp: {
+      filerCode: cfg?.filerCode ?? null,
+      gateway: cfg?.gateway ?? 'NATIVE',
+      isfFilerModeDefault: cfg?.isfFilerModeDefault ?? 'SIGMA',
+      serviceCenterApprovedAt: cfg?.serviceCenterApprovedAt ?? null,
+      sigmaFilerCode: SIGMA_FILER_CODE,
+      environment: env.CBP_ENVIRONMENT,
+    },
+  });
+});
+
+// PATCH /api/v1/organization/cbp — owners/admins choose the default ISF filer.
+// Filing under their own code needs it assigned and our queue approved first.
+router.patch('/cbp', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = z.object({ isfFilerModeDefault: z.enum(['SIGMA', 'CLIENT']) }).strict().safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'isfFilerModeDefault must be SIGMA or CLIENT' });
+    return;
+  }
+  const orgId = req.user!.orgId;
+  const cfg = await prisma.orgCbpConfig.findUnique({ where: { orgId } });
+  if (parsed.data.isfFilerModeDefault === 'CLIENT') {
+    const ready = resolveIsfFiler(cfg, 'CLIENT');
+    if (!ready.ok) {
+      res.status(409).json({ error: ready.message, code: ready.code });
+      return;
+    }
+  }
+  const updated = await prisma.orgCbpConfig.upsert({
+    where: { orgId },
+    create: { orgId, isfFilerModeDefault: parsed.data.isfFilerModeDefault, updatedById: req.user!.id },
+    update: { isfFilerModeDefault: parsed.data.isfFilerModeDefault, updatedById: req.user!.id },
+  });
+  writeAuditLog({
+    orgId, userId: req.user!.id, action: 'org.isf_filer_default_set',
+    entityType: 'organization', entityId: orgId,
+    oldValue: { isfFilerModeDefault: cfg?.isfFilerModeDefault ?? 'SIGMA' },
+    newValue: { isfFilerModeDefault: updated.isfFilerModeDefault },
+    ...getRequestMeta(req),
+  });
+  res.json({ cbp: { isfFilerModeDefault: updated.isfFilerModeDefault } });
+});
+
 router.get('/overview', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const org = await prisma.organization.findUnique({

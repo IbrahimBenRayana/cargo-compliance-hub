@@ -50,6 +50,7 @@ router.get('/organizations', async (_req: AuthRequest, res: Response): Promise<v
     orderBy: { createdAt: 'desc' },
     include: {
       subscription: { include: { plan: true } },
+      cbpConfig: true,
       users: {
         where: { isActive: true },
         select: { id: true, email: true, firstName: true, lastName: true, role: true, emailVerified: true },
@@ -76,9 +77,86 @@ router.get('/organizations', async (_req: AuthRequest, res: Response): Promise<v
           : null,
         userCount: o._count.users,
         filingCount: o._count.filings,
+        cbp: o.cbpConfig
+          ? {
+              gateway: o.cbpConfig.gateway,
+              filerCode: o.cbpConfig.filerCode,
+              isfFilerModeDefault: o.cbpConfig.isfFilerModeDefault,
+              serviceCenterApprovedAt: o.cbpConfig.serviceCenterApprovedAt,
+              serviceCenterApprovedBy: o.cbpConfig.serviceCenterApprovedBy,
+              notes: o.cbpConfig.notes,
+            }
+          : null,
       };
     }),
   });
+});
+
+// PUT /api/v1/admin/organizations/:id/cbp — set a client's CBP identity
+// (native go-live Phase 2). Platform admins only: the filer code and the
+// service-center approval are what make a client's filings legal to send.
+const cbpConfigSchema = z.object({
+  gateway: z.enum(['NATIVE', 'CC']).optional(),
+  filerCode: z
+    .string().trim().toUpperCase()
+    .regex(/^[A-Z0-9]{3}$/, 'Filer code must be 3 letters/digits')
+    .refine((v) => v !== 'S7P', 'S7P is Sigma\'s own filer code and cannot be assigned to a client')
+    .nullable().optional(),
+  isfFilerModeDefault: z.enum(['SIGMA', 'CLIENT']).optional(),
+  /** ISO date the client's CBP client rep approved our queue; null clears it. */
+  serviceCenterApprovedAt: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).nullable().optional(),
+  serviceCenterApprovedBy: z.string().trim().max(200).nullable().optional(),
+  notes: z.string().max(5000).nullable().optional(),
+}).strict();
+
+router.put('/organizations/:id/cbp', async (req: AuthRequest, res: Response): Promise<void> => {
+  const orgId = String(req.params.id);
+  const parsed = cbpConfigSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed', issues: parsed.error.issues });
+    return;
+  }
+  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { id: true } });
+  if (!org) {
+    res.status(404).json({ error: 'Organization not found' });
+    return;
+  }
+  const d = parsed.data;
+  if (d.filerCode) {
+    const taken = await prisma.orgCbpConfig.findFirst({ where: { filerCode: d.filerCode, orgId: { not: orgId } }, select: { orgId: true } });
+    if (taken) {
+      res.status(409).json({ error: `Filer code ${d.filerCode} is already assigned to another organization.` });
+      return;
+    }
+  }
+  const before = await prisma.orgCbpConfig.findUnique({ where: { orgId } });
+  const data = {
+    ...(d.gateway !== undefined && { gateway: d.gateway }),
+    ...(d.filerCode !== undefined && { filerCode: d.filerCode }),
+    ...(d.isfFilerModeDefault !== undefined && { isfFilerModeDefault: d.isfFilerModeDefault }),
+    ...(d.serviceCenterApprovedAt !== undefined && {
+      serviceCenterApprovedAt: d.serviceCenterApprovedAt ? new Date(d.serviceCenterApprovedAt) : null,
+    }),
+    ...(d.serviceCenterApprovedBy !== undefined && { serviceCenterApprovedBy: d.serviceCenterApprovedBy }),
+    ...(d.notes !== undefined && { notes: d.notes }),
+    updatedById: req.user!.id,
+  };
+  const config = await prisma.orgCbpConfig.upsert({
+    where: { orgId },
+    create: { orgId, ...data },
+    update: data,
+  });
+  writeAuditLog({
+    orgId,
+    userId: req.user!.id,
+    action: 'admin.org_cbp_config_set',
+    entityType: 'organization',
+    entityId: orgId,
+    oldValue: before ?? undefined,
+    newValue: config,
+    ...getRequestMeta(req),
+  });
+  res.json({ cbp: config });
 });
 
 const provisionSchema = z.object({
