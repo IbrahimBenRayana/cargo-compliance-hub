@@ -118,3 +118,34 @@ requires it deploys; deploy; verify.
 | Bridge env check blocks a legitimate config | Med | Clear startup log naming the mismatch; check is a tested pure function |
 | Guard adds latency to every send | Low | Health check cached with a short TTL |
 | Audit agents reading files being edited | Low | Phase 0 items are listed as already known in the audit context |
+
+---
+
+## Audit fold-in (2026-10-16)
+
+Source: `docs/audit/2026-10-platform-audit.md` (237 findings; ids below refer to its JSON).
+
+### Workstream H: hardening quick wins (now, parallel to Phase 1; each S, independent)
+- [ ] H1 FY2027 MPF/HMF fee tables (effective 2026-10-01) (ENG-01)
+- [ ] H2 Type 86 suspended by CBP: remove from wizard/API/landing, enable Type 11 (ENG-08, CAP-01, FNA-06, MHT-13, LND-01)
+- [ ] H3 Entry wizard code tables match CATAIR: mode of transport, payment type, 4-digit Schedule D ports (FNA-01/02, UFF-02/03)
+- [ ] H4 Fix wizard crash on "Advanced, trade compliance" (Radix SelectItem value '') (UFF-05)
+- [ ] H5 Remove false claims: fabricated stats + "Live" badge, AWS security page, SOC 2 / "Direct CBP" badges, in-bond "live" (LND-03/04/05, FPR-07, BPR-12, USA-02)
+- [ ] H6 MFA: streams reject the partial-auth token (BPR-03)
+- [ ] H7 Enforce the viewer role server-side (BPR-05, FNA-16)
+- [ ] H8 Password reset flow (USA-13)
+- [ ] H9 Bulk submit goes through filingWrite (transmit + billing gate) (LND-M1)
+- [ ] H10 ISF deadline = 24h before lading, not ETD-24h (UOP-M1)
+
+### Phase 1: inbound pipeline + CBP message model (expanded)
+- [ ] 1.1 Bridge: non-destructive browse + delete-by-MsgId ack; return MsgId; fix delimiter default (ENG-11)
+- [ ] 1.2 `CbpInboundMessage` (immutable, unique env+msgId) + `CbpTransmission` (immutable wire, status) (BPR-02)
+- [ ] 1.3 Inbound job (sole queue consumer; cert console reads from the table) (D1)
+- [ ] 1.4 Dispatcher + correlation (B-record tag, business keys, unmatched view data) (BNA-10)
+- [ ] 1.5 CBP response model: conditions (F/W/P/I), versions, release/hold/PGA, SA bill match, UC (BNA-07, CAP-03)
+- [ ] 1.6 Condition catalog from engine tables → user-facing rejection text + field pointers (BNA-08, FNA-10, FPR-06)
+- [ ] 1.7 Exactly-once send: transmission row before send, unknown-outcome state, no blind retries (ENG-12, BPR-06, BPR-M1)
+- [ ] 1.8 Admin ops views: transmissions, inbound/unmatched, bridge health (FNA-18, UOP-08)
+
+### Phases 2-5
+Expanded when each starts, from the workstream table in the audit report (A2-A5, C, D).
