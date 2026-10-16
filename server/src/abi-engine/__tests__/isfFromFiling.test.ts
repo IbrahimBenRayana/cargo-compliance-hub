@@ -271,3 +271,36 @@ describe('mapFilingToIsfInput — unusable source data', () => {
     expect(() => mapFilingToIsfInput(broken, ADD)).toThrow(/bookingParty/);
   });
 });
+
+describe('mapFilingToIsfInput never fabricates regulated data (audit BNA-05, ENG-06)', () => {
+  it('refuses a party with no country instead of defaulting to US', () => {
+    const seller = { ...JSON.parse(ISF10_FILING.seller as string), country: "" };
+    expect(() => mapFilingToIsfInput({ ...ISF10_FILING, seller }, ADD)).toThrow(/seller: country is required/);
+  });
+
+  it('refuses a party with no street instead of sending NA', () => {
+    const seller = { ...JSON.parse(ISF10_FILING.seller as string), address1: "" };
+    expect(() => mapFilingToIsfInput({ ...ISF10_FILING, seller }, ADD)).toThrow(/seller: street address is required/);
+  });
+
+  it('refuses a missing consignee number instead of reusing the importer', () => {
+    expect(() => mapFilingToIsfInput({ ...ISF10_FILING, consigneeNumber: null }, ADD)).toThrow(/consignee number is required/);
+  });
+});
+
+describe('importer identifier type (audit ENG-07)', () => {
+  const imOf = (importerNumber: string) =>
+    mapFilingToIsfInput({ ...ISF10_FILING, importerNumber }, ADD).entities.find((e) => e.code === 'IM')!.identifier;
+
+  it('files an SSN as qualifier 34, not as a mangled EIN', () => {
+    expect(imOf('123-45-6789')).toEqual({ qualifier: '34', value: '123-45-6789' });
+  });
+
+  it('files a CBP-assigned number as ANI', () => {
+    expect(imOf('261015-AB123')).toEqual({ qualifier: 'ANI', value: '261015-AB123' });
+  });
+
+  it('keeps EINs as EI', () => {
+    expect(imOf('12-3456789')).toMatchObject({ qualifier: 'EI' });
+  });
+});

@@ -233,6 +233,21 @@ function normalizeEin(raw: string, field: string): string {
   fail(field, `cannot normalise '${raw}' into an EI identifier (NN-NNNNNNNXX, ISF-29)`);
 }
 
+/**
+ * Importer / consignee identifier with its ISF-29 qualifier, detected from
+ * the number's format instead of forcing every number into EI form:
+ *   EI  NN-NNNNNNNXX   (EIN, suffix zero filled)
+ *   34  NNN-NN-NNNN    (SSN; only when written with SSN hyphenation)
+ *   ANI YYDDPP-NNNNN   (CBP-assigned number)
+ */
+function importerIdentifier(raw: string, field: string): { qualifier: 'EI' | 'ANI' | '34'; number: string } {
+  const cleaned = raw.trim().toUpperCase();
+  if (/^[0-9]{3}-[0-9]{2}-[0-9]{4}$/.test(cleaned)) return { qualifier: '34', number: cleaned };
+  const ani = /^([0-9]{6})-?([A-Z0-9]{5})$/.exec(cleaned.replace(/\s/g, ''));
+  if (ani) return { qualifier: 'ANI', number: `${ani[1]}-${ani[2]}` };
+  return { qualifier: 'EI', number: normalizeEin(raw, field) };
+}
+
 /** Digits-only HTS, left 6-10 (SF40 takes 10N left-justified, min 6 mandatory). */
 function htsDigits(raw: string, field: string): string {
   const digits = raw.replace(/[^0-9]/g, '');
@@ -358,9 +373,8 @@ function buildContainers(filing: PlatformIsfFiling): IsfContainer[] {
 /**
  * Name+address entity (SE/BY/ST/LG/CS/BKP + MF): SF30 name, SF35 with
  * qualifier '15' (unstructured street address) lines, SF36 geography.
- * A missing party name is unusable regulated data → throw. The street/city
- * fallbacks ('NA' / 'UNKNOWN' / country 'US') are cosmetic legacy-parity
- * choices carried over from the CustomsCity mapper.
+ * A missing party name, street, city or country is unusable regulated data,
+ * so the mapper throws with the field path; it never fills them in.
  */
 function nameAddressBase(
   party: unknown,
@@ -370,19 +384,22 @@ function nameAddressBase(
   const name = cleanName(partyField(party, 'name') || fallback.name || '');
   if (!name) fail(label, 'party name is missing — every named ISF entity requires one (SF30, ISF-28)');
   const fb = fallback.party;
-  // Legacy parity: street 'NA' when no address line survives sanitisation.
-  const address1 = cleanAddress(partyField(party, 'address1') || partyField(fb, 'address1')) || 'NA';
+  // Every named ISF party needs a real street, city and country (SF35/SF36,
+  // ISF-33..35); nothing is ever filled in for the filer (audit ENG-06).
+  const address1 = cleanAddress(partyField(party, 'address1') || partyField(fb, 'address1'));
+  if (!address1) fail(`${label}.address1`, `${label}: street address is required (SF35, ISF-33)`);
   // SF35 pair 2 is printed 35AN (recordDefs.ts) — sanitise line 2 to AN.
   const address2 = cleanAn(partyField(party, 'address2'), 35);
   const addressComponents = [{ qualifier: '15', information: address1 }];
   if (address2) addressComponents.push({ qualifier: '15', information: address2 });
-  const city = cleanAn(partyField(party, 'city') || partyField(fb, 'city'), 35) || 'UNKNOWN'; // legacy parity
+  const city = cleanAn(partyField(party, 'city') || partyField(fb, 'city'), 35);
+  if (!city) fail(`${label}.city`, `${label}: city is required (SF36, ISF-35)`);
   const state = cleanAn(partyField(party, 'state') || partyField(fb, 'state'), 8).replace(/ /g, '').slice(0, 3);
   const postal = cleanAn(partyField(party, 'zip') || partyField(fb, 'zip'), 20).replace(/ /g, '').slice(0, 15);
   const countryRaw = partyField(party, 'country') || partyField(fb, 'country');
   let countryCode: string;
   if (!countryRaw) {
-    countryCode = 'US'; // legacy parity — the CC mapper defaulted every party country to US
+    fail(`${label}.country`, `${label}: country is required (SF36, ISF-35)`);
   } else {
     const code = iso2(countryRaw);
     if (!code) fail(label, `'${countryRaw}' is not an ISO country code (SF36, ISF-35)`);
@@ -436,7 +453,7 @@ function manufacturerTariffs(mfr: unknown, mfrIndex: number, commodities: unknow
 function isf10Importer(filing: PlatformIsfFiling): IsfImporter {
   const raw = str(filing.importerNumber);
   if (!raw) fail('importerNumber', 'the ISF importer (IOR) number is missing — an ISF-10 cannot be filed without it (SF10, ISF-18)');
-  return { qualifier: 'EI', number: normalizeEin(raw, 'importerNumber') };
+  return importerIdentifier(raw, 'importerNumber');
 }
 
 function isf5Importer(filing: PlatformIsfFiling, isf5: Record<string, unknown>): IsfImporter {
@@ -565,24 +582,21 @@ export function mapFilingToIsfInput(filing: PlatformIsfFiling, options: MapFilin
   // ── ISF-10 ───────────────────────────────────────────────
   const bond = buildBond(filing, importer.number, references);
 
-  // Judgment call: when no consignee number is on file, report the IOR as
-  // the consignee (CN falls back to the importer's EIN) — the legacy mapper
-  // fabricated '00-000000000' here, which we refuse to transmit.
+  // The consignee number is its own ISF element (ISF-28); it is never
+  // silently replaced by the importer's (audit BNA-05, ENG-06).
   const consigneeRaw = str(filing.consigneeNumber);
-  const consigneeEin = consigneeRaw ? normalizeEin(consigneeRaw, 'consigneeNumber') : importer.number;
+  if (!consigneeRaw) fail('consigneeNumber', 'the consignee number is required (SF30 CN, ISF-28); enter it even when it is the same as the importer');
+  const consignee = importerIdentifier(consigneeRaw, 'consigneeNumber');
 
   const entities: IsfEntity[] = [
     // CN/IM are SF30-only, identifier mandatory (ISF-28).
-    { code: 'IM', identifier: { qualifier: 'EI', value: importer.number } },
-    { code: 'CN', identifier: { qualifier: 'EI', value: consigneeEin } },
+    { code: 'IM', identifier: { qualifier: importer.qualifier as 'EI' | 'ANI' | '34', value: importer.number } },
+    { code: 'CN', identifier: { qualifier: consignee.qualifier, value: consignee.number } },
     nameAddressEntity('SE', filing.seller, 'seller'),
-    // Legacy parity: buyer/ship-to fall back to the importer's name and the
-    // consignee address when their own party is sparse.
-    nameAddressEntity('BY', filing.buyer, 'buyer', { name: str(filing.importerName), party: filing.consigneeAddress }),
-    nameAddressEntity('ST', filing.shipToParty, 'shipToParty', {
-      name: str(filing.importerName),
-      party: filing.consigneeAddress,
-    }),
+    // Buyer and ship-to are their own ISF elements; they are not filled in
+    // from the importer or consignee (audit BNA-05).
+    nameAddressEntity('BY', filing.buyer, 'buyer'),
+    nameAddressEntity('ST', filing.shipToParty, 'shipToParty'),
     nameAddressEntity('LG', filing.containerStuffingLocation, 'containerStuffingLocation'),
     nameAddressEntity('CS', filing.consolidator, 'consolidator'),
   ];
