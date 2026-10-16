@@ -42,6 +42,7 @@ model Organization {
   chatConversations ChatConversation[]
   inbondFilings     InbondFiling[]
   entryNumberBlocks EntryNumberBlock[]
+  cbpTransmissions  CbpTransmission[]
 
   @@map("organizations")
 }
@@ -55,11 +56,17 @@ model EntryNumberBlock {
   id           String   @id @default(uuid()) @db.Uuid
   orgId        String   @map("org_id") @db.Uuid
   filerCode    String   @map("filer_code") @db.VarChar(3)
-  /** First 7-digit sequence in the range (inclusive). */
+  /**
+   * First 7-digit sequence in the range (inclusive).
+   */
   rangeStart   Int      @map("range_start")
-  /** Last 7-digit sequence in the range (inclusive). */
+  /**
+   * Last 7-digit sequence in the range (inclusive).
+   */
   rangeEnd     Int      @map("range_end")
-  /** Next sequence to hand out; > rangeEnd means exhausted. */
+  /**
+   * Next sequence to hand out; > rangeEnd means exhausted.
+   */
   nextSequence Int      @map("next_sequence")
   active       Boolean  @default(true)
   label        String?  @db.VarChar(100)
@@ -74,22 +81,22 @@ model EntryNumberBlock {
 
 // ─── Users ─────────────────────────────────────────────────
 model User {
-  id              String    @id @default(uuid()) @db.Uuid
-  orgId           String    @map("org_id") @db.Uuid
-  email           String    @unique @db.VarChar(255)
-  passwordHash    String    @map("password_hash") @db.VarChar(255)
-  firstName       String?   @map("first_name") @db.VarChar(100)
-  lastName        String?   @map("last_name") @db.VarChar(100)
-  role            String    @default("operator") @db.VarChar(20)
+  id                  String    @id @default(uuid()) @db.Uuid
+  orgId               String    @map("org_id") @db.Uuid
+  email               String    @unique @db.VarChar(255)
+  passwordHash        String    @map("password_hash") @db.VarChar(255)
+  firstName           String?   @map("first_name") @db.VarChar(100)
+  lastName            String?   @map("last_name") @db.VarChar(100)
+  role                String    @default("operator") @db.VarChar(20)
   // Platform-level staff (MyCargoLens), distinct from the org-scoped role.
   // Grants access to the /admin area that provisions client organizations.
-  isPlatformAdmin Boolean   @default(false) @map("is_platform_admin")
-  isActive        Boolean   @default(true) @map("is_active")
-  emailVerified   Boolean   @default(false) @map("email_verified")
-  lastLoginAt     DateTime? @map("last_login_at") @db.Timestamptz()
-  failedAttempts  Int       @default(0) @map("failed_attempts")
-  lockedUntil     DateTime? @map("locked_until") @db.Timestamptz()
-  refreshToken    String?   @map("refresh_token")
+  isPlatformAdmin     Boolean   @default(false) @map("is_platform_admin")
+  isActive            Boolean   @default(true) @map("is_active")
+  emailVerified       Boolean   @default(false) @map("email_verified")
+  lastLoginAt         DateTime? @map("last_login_at") @db.Timestamptz()
+  failedAttempts      Int       @default(0) @map("failed_attempts")
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz()
+  refreshToken        String?   @map("refresh_token")
   // ── Multi-factor auth (TOTP + email OTP fallback + recovery codes) ──
   // Secrets are AES-256-GCM encrypted at rest (services/mfaCrypto.ts); the
   // pending secret is the verify-before-activate staging slot (15-min TTL).
@@ -103,8 +110,8 @@ model User {
   mfaEnrolledAt       DateTime? @map("mfa_enrolled_at") @db.Timestamptz()
   mfaEnforced         Boolean   @default(false) @map("mfa_enforced")
   mfaFailedAttempts   Int       @default(0) @map("mfa_failed_attempts")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   organization            Organization             @relation(fields: [orgId], references: [id], onDelete: Cascade)
   filings                 Filing[]                 @relation("FilingCreator")
@@ -1103,4 +1110,93 @@ model HtsRateLine {
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@map("hts_rate_lines")
+}
+
+// ─── Native CBP traffic (native go-live spec D1-D3, audit BPR-02) ──────────
+// Every batch we transmit and every message CBP sends back, kept as filed:
+// the wire/raw text is write-once (DB trigger) and rows survive org deletion
+// (org_id SET NULL), so the 5-year CBP recordkeeping copy (19 CFR 163) is
+// exactly what crossed the wire.
+
+model CbpTransmission {
+  id                   String    @id @default(uuid()) @db.Uuid
+  orgId                String?   @map("org_id") @db.Uuid
+  /**
+   * CERT | PROD — the CBP system this went to.
+   */
+  environment          String    @db.VarChar(4)
+  /**
+   * CATAIR application id: SF, AE, SE, QP, ...
+   */
+  application          String    @db.VarChar(2)
+  /**
+   * Action code on the transaction (A add, R replace, D delete, ...).
+   */
+  action               String?   @db.VarChar(2)
+  /**
+   * filing | abi_document | inbond_filing | cert_transmission
+   */
+  entityType           String?   @map("entity_type") @db.VarChar(32)
+  entityId             String?   @map("entity_id") @db.Uuid
+  filerCode            String    @map("filer_code") @db.VarChar(3)
+  /**
+   * B-record user data (cols 60-80) CBP echoes back; the correlation key.
+   */
+  userDataTag          String    @unique @map("user_data_tag") @db.VarChar(21)
+  entryNumber          String?   @map("entry_number") @db.VarChar(11)
+  isfTransactionNumber String?   @map("isf_transaction_number") @db.VarChar(15)
+  reference            String?   @db.VarChar(35)
+  wireText             String    @map("wire_text") @db.Text
+  mqMessageId          String?   @map("mq_message_id") @db.VarChar(48)
+  /**
+   * QUEUED | SENDING | SENT | UNKNOWN | ACCEPTED | REJECTED | CONDITIONAL | FAILED
+   */
+  status               String    @default("QUEUED") @db.VarChar(16)
+  sentAt               DateTime? @map("sent_at") @db.Timestamptz()
+  respondedAt          DateTime? @map("responded_at") @db.Timestamptz()
+  lastError            String?   @map("last_error") @db.Text
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization?       @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  inbound      CbpInboundMessage[]
+
+  @@index([entityType, entityId])
+  @@index([entryNumber])
+  @@index([isfTransactionNumber])
+  @@index([status])
+  @@map("cbp_transmissions")
+}
+
+model CbpInboundMessage {
+  id                String    @id @default(uuid()) @db.Uuid
+  environment       String    @db.VarChar(4)
+  /**
+   * Hex MQ MsgId: with environment, the at-least-once dedupe key.
+   */
+  mqMessageId       String    @map("mq_message_id") @db.VarChar(48)
+  rawText           String    @map("raw_text") @db.Text
+  /**
+   * Application id from the A record (SN, SA, AX, SX, SO, UC, ...).
+   */
+  application       String?   @db.VarChar(2)
+  /**
+   * B-record user data, when present (our tag or a cert SCENARIO tag).
+   */
+  userDataTag       String?   @map("user_data_tag") @db.VarChar(21)
+  receivedAt        DateTime  @default(now()) @map("received_at") @db.Timestamptz()
+  parsed            Json?
+  parseError        String?   @map("parse_error") @db.Text
+  transmissionId    String?   @map("transmission_id") @db.Uuid
+  matchedEntityType String?   @map("matched_entity_type") @db.VarChar(32)
+  matchedEntityId   String?   @map("matched_entity_id") @db.Uuid
+  dispatchedAt      DateTime? @map("dispatched_at") @db.Timestamptz()
+
+  transmission CbpTransmission? @relation(fields: [transmissionId], references: [id], onDelete: SetNull)
+
+  @@unique([environment, mqMessageId])
+  @@index([dispatchedAt])
+  @@index([transmissionId])
+  @@index([userDataTag])
+  @@map("cbp_inbound_messages")
 }
