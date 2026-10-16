@@ -8,8 +8,8 @@ import { Container } from "@/components/ui/container";
 
 const EASE_OUT_QUART = [0.25, 1, 0.5, 1] as const;
 
-const HEADLINE_BEFORE = "Start filing in";
-const HEADLINE_HIGHLIGHT = "90 seconds.";
+const HEADLINE_BEFORE = "See every filing";
+const HEADLINE_HIGHLIGHT = "ranked by urgency.";
 
 export function ClosingCta() {
   const ref = React.useRef<HTMLDivElement | null>(null);

@@ -74,7 +74,7 @@ export default async function Image() {
               lineHeight: 1.4,
             }}
           >
-            File ISF, Entry, and In-Bond in one calm workspace — with an AI
+            File ISF and Entry in one calm workspace — with an AI
             coach for every CBP rejection.
           </div>
         </div>

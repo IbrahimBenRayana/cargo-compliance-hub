@@ -50,7 +50,7 @@ const STEPS: Step[] = [
     number: "01",
     short: "File",
     title: "File it once.",
-    body: "ISF-10, ISF-5, Entry, Entry Summary, Type 86 — one wizard for all of them. Templates, one-click duplication, bulk submit, and an AI pre-flight before anything leaves your hands. Brokers and 3PLs can drive the same pipeline through the REST API.",
+    body: "ISF-10, ISF-5, Entry, Entry Summary: one wizard for all of them. Templates, one-click duplication, bulk submit, and an AI pre-flight before anything leaves your hands. Brokers and 3PLs can drive the same pipeline through the REST API.",
     href: "/platform/filings",
     linkLabel: "See the filing pipeline",
     urlBar: "app.mycargolens.com/filings/new",

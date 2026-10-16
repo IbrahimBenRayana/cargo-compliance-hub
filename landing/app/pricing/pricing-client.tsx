@@ -472,8 +472,8 @@ const FAQ = [
     a: "No. Signing up is free, and you can browse and draft at no cost. Filing requires picking a tier and adding a card — but you pay from your first filing, and only per shipment. No setup fees, no monthly minimums.",
   },
   {
-    q: "Can you file Type 86 (Section 321) entries?",
-    a: "Yes. Low-value de-minimis shipments under $800 can be filed as Type 86 entries on the same rails as your other filings — same inbox, same pre-flight checks. If de-minimis is a big part of your volume, talk to us about the right setup.",
+    q: "How are low-value shipments handled?",
+    a: "Low-value shipments file as formal or informal entries on the same rails as your other filings: same inbox, same pre-flight checks. CBP has suspended Type 86 (Section 321) entries, so we do not offer them. If low-value volume is a big part of your business, talk to us about the right setup.",
   },
   {
     q: "Is there an API?",

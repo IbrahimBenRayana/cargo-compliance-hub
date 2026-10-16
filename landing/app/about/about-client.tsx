@@ -199,7 +199,7 @@ const STORY_BEATS = [
   {
     when: "The shift",
     title: "We rebuilt customs as an inbox.",
-    body: "Action queue ranked by urgency. AI Coach that translates CBP error codes into plain English. Templates so the third filing takes 30 seconds, not 90. ADD/CVD synced from the Federal Register every morning. 314-day liquidation clock tracked on every entry. The plumbing runs itself — you read your inbox.",
+    body: "Action queue ranked by urgency. AI Coach that translates CBP error codes into plain English. Templates and one-click duplicate so repeat filings start mostly filled in. ADD/CVD synced from the Federal Register every morning. 314-day liquidation clock tracked on every entry. The plumbing runs itself — you read your inbox.",
   },
   {
     when: "Today",
@@ -209,7 +209,7 @@ const STORY_BEATS = [
 ];
 
 const NUMBERS = [
-  { value: "≤ 90s", label: "first ISF filing", icon: Sparkles },
+  { value: "ISF + Entry", label: "in one workspace", icon: Sparkles },
   { value: "314d", label: "liquidation clock per entry", icon: Layers },
   { value: "5 min", label: "CBP polling cadence", icon: Wrench },
   { value: "17", label: "FTA programs supported", icon: Compass },

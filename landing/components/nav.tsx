@@ -52,7 +52,7 @@ const coreWorkflows: MenuItem[] = [
   {
     icon: Ship,
     title: "Filings",
-    description: "ISF-10, ISF-5, ABI Entry, in-bond, bulk submit, and templates.",
+    description: "ISF-10, ISF-5, ABI Entry, bulk submit, and templates.",
     href: "/platform/filings",
   },
   {

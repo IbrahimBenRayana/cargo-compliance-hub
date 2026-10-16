@@ -35,7 +35,7 @@ const HTS_SUGGESTIONS = [
 const HOW_IT_WORKS = [
   { title: "The model", body: "gpt-4o via OpenAI. We send only the filing data plus the CBP response. We do not send your AR data, banking, billing, or other unrelated tenant data." },
   { title: "The gate", body: "Gated by your team's enable flag. An admin can toggle AI off per-team or per-feature. Rule-based fallback is always available." },
-  { title: "Your data", body: "Your data is not used for model training. OpenAI's API tier we use has zero-retention by contract." },
+  { title: "Your data", body: "Your data is not used for model training. OpenAI does not train on data sent through its API." },
 ];
 
 const ASSISTANT_POINTS = [

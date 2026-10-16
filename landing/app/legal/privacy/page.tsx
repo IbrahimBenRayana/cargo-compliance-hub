@@ -106,8 +106,9 @@ export default function PrivacyPolicyPage() {
 
         <h2 className="text-xl font-semibold mt-10 mb-4">6. Security</h2>
         <p className="mb-4">
-          All data is encrypted in transit (TLS 1.3) and at rest (AES-256). We maintain access
-          controls, audit logging, and conduct regular security reviews. While we implement
+          All data is encrypted in transit with TLS. Sensitive secrets, such as MFA keys, are
+          stored encrypted. We maintain role-based access controls and audit logging, and back
+          up customer data regularly. While we implement
           industry-standard safeguards, no system is completely secure and we cannot guarantee
           absolute security.
         </p>

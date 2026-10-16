@@ -179,7 +179,7 @@ function SecurityHeroIllustration() {
       >
         <circle cx="60" cy="56" r="2.5" fill={EMERALD} stroke="none" />
         <text x="72" y="60" fontSize="8.5" fontFamily="ui-monospace, monospace" fontWeight="600" fill="currentColor" fillOpacity="0.55" stroke="none">
-          encrypted in transit &amp; at rest
+          encrypted in transit
         </text>
       </motion.g>
     </motion.svg>
@@ -188,10 +188,10 @@ function SecurityHeroIllustration() {
 
 const AUTH_ITEMS = [
   { icon: Smartphone, title: "Multi-factor authentication", body: "Available on every account: authenticator-app TOTP, email one-time codes as a fallback, and single-use recovery codes if you lose your device." },
-  { icon: Mail, title: "Email-verified accounts", body: "Sign-up requires a 6-digit code sent to your work email. Account isn't usable until verified." },
+  { icon: Mail, title: "Email-verified accounts", body: "Accounts are created by invitation, and each user proves their email address before they can file." },
   { icon: KeyRound, title: "Password hashing", body: "bcrypt with cost 12. We never store, log, or transmit raw passwords. Reset flows time-bound, single-use." },
-  { icon: ShieldCheck, title: "Session security", body: "HTTP-only, secure, SameSite=Lax session cookies. Sessions invalidate on password change. Server-side session store." },
-  { icon: AlertCircle, title: "Brute-force protection", body: "Per-account rate limits on login attempts. Suspicious activity flagged in the audit log and emailed to admins." },
+  { icon: ShieldCheck, title: "Session security", body: "Short-lived access tokens held in memory, rotating refresh tokens, and every session ends when a password is reset." },
+  { icon: AlertCircle, title: "Brute-force protection", body: "Rate limits on login attempts and multi-factor sign-in with an authenticator app or email code." },
   { icon: KeySquare, title: "Scoped API keys", body: "Public-API access runs on scoped keys (prefixed mcl_live_), separate from user sessions. Revoke a key in one click without touching anyone's login." },
 ];
 
@@ -203,18 +203,18 @@ const ROLES: { name: string; tone: Severity; body: string }[] = [
 ];
 
 const DATA_ITEMS = [
-  { icon: Lock, title: "Encryption in transit", body: "TLS 1.2+ on every endpoint. HSTS preload. Certificate pinning on critical API paths." },
-  { icon: Database, title: "Encryption at rest", body: "AES-256 disk encryption on the Postgres primary and all replicas. Backups encrypted with separate keys." },
-  { icon: Server, title: "Data residency", body: "All customer data stays in the US. Postgres + object storage hosted in AWS us-east-1 with backups to us-west-2." },
-  { icon: ClipboardList, title: "Backups & DR", body: "Continuous WAL streaming + nightly full backups, 30-day retention. Quarterly restore drills documented." },
+  { icon: Lock, title: "Encryption in transit", body: "TLS on every endpoint, for the app, the public API, and webhooks." },
+  { icon: Database, title: "Encrypted secrets", body: "MFA secrets are stored encrypted. API keys are shown once and can be revoked at any time." },
+  { icon: Server, title: "US-hosted infrastructure", body: "The app and its PostgreSQL database run on US-hosted VPS infrastructure." },
+  { icon: ClipboardList, title: "Backups", body: "Customer data is backed up regularly. Access is limited by role, and actions are recorded in the audit log." },
 ];
 
 const VENDORS = [
   { name: "CustomsCity", role: "ABI gateway", data: "Filing data, party data, MBOL", region: "US" },
-  { name: "OpenAI (gpt-4o-class models)", role: "AI Coach + pre-flight + HTS classifier", data: "Filing data + CBP response only", region: "US (zero-retention API tier)" },
+  { name: "OpenAI", role: "AI Coach + pre-flight + HTS classifier", data: "Filing data + CBP response only", region: "US" },
   { name: "Stripe", role: "Billing", data: "Email, plan, invoice events", region: "US" },
-  { name: "AWS (us-east-1)", role: "Hosting + Postgres + S3", data: "All app data", region: "US" },
-  { name: "Resend", role: "Transactional email", data: "Recipient email + message body", region: "US" },
+  { name: "Contabo", role: "VPS hosting + PostgreSQL", data: "All app data", region: "US" },
+  { name: "Microsoft Azure", role: "Transactional email", data: "Recipient email + message body", region: "US" },
 ];
 
 /** Shared scroll-reveal for card grids: fade + small rise, 60ms stagger.
@@ -267,7 +267,7 @@ export function SecurityClient() {
         tone="muted"
         eyebrow="Authorization"
         title="Four roles. Same data, different permissions."
-        intro="Role assignment is set at invite time. Owners and admins can change roles for any member. Email-verified invites with a 6-digit code; suspend access in one click."
+        intro="Role assignment is set at invite time. Owners and admins can change roles for any member. Invites arrive as single-use email links; suspend access in one click."
       >
         <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {ROLES.map((r, i) => (

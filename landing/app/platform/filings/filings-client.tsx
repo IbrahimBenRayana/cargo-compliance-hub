@@ -48,16 +48,6 @@ const FILE_TYPES = [
     title: "Entry / Immediate Delivery",
     body: "ABI Documents API. Manifest queries by Master BOL. Release approval, hold notices, and exam intent, all in one timeline.",
   },
-  {
-    code: "In-bond",
-    title: "Transportation In-Bond",
-    body: "Across-port moves with hand-off tracking and arrival notices.",
-  },
-  {
-    code: "T86",
-    title: "Type 86 · Section 321",
-    body: "De-minimis (≤ $800) low-value e-commerce entries. Filed from the same workspace — or in bulk through the API.",
-  },
 ];
 
 const STEPS = [
@@ -117,7 +107,7 @@ const API_FLOW = [
 const FAQ = [
   {
     q: "Which filing types do you support?",
-    a: "ISF-10, ISF-5, ABI 7501 Entry Summary, ABI 3461 Entry, In-Bond, and Type 86 (Section 321 de-minimis). Manifest queries by Master BOL are also included.",
+    a: "ISF-10, ISF-5, ABI 7501 Entry Summary, and ABI 3461 Entry. Manifest queries by Master BOL are also included. Low-value shipments file as formal or informal entries. In-bond (7512) is not available yet.",
   },
   {
     q: "Are filings actually submitted to CBP or to a sandbox?",
@@ -128,8 +118,8 @@ const FAQ = [
     a: "Yes. The public REST API at /api/public/v1 covers ISF and customs-entry read/write, XML document upload, and webhooks for filing-status events, with scoped API keys.",
   },
   {
-    q: "How long does an ISF take in the wizard?",
-    a: "~90 seconds for the first one. ~30 seconds for follow-ups via templates and duplicate.",
+    q: "How do repeat filings get faster?",
+    a: "Save parties, ports, HTS, and bond as templates, or duplicate any past filing as a new draft, so follow-ups start mostly filled in.",
   },
   {
     q: "What happens when CBP rejects?",
@@ -150,7 +140,7 @@ export function FilingsClient() {
       <PageHero
         label="Platform"
         title="One wizard. Every shipment type."
-        description="ISF-10, ISF-5, Entry Summary, Entry, In-bond, and Type 86, all in the same flow. Save reusable templates. Duplicate any filing as a new draft. Bulk-submit dozens at once. Every draft gets a rule-based validation gate plus an optional AI pre-flight review."
+        description="ISF-10, ISF-5, Entry Summary, and Entry, all in the same flow. Save reusable templates. Duplicate any filing as a new draft. Bulk-submit dozens at once. Every draft gets a rule-based validation gate plus an optional AI pre-flight review."
         breadcrumbs={[
           { label: "Platform", href: "/features" },
           { label: "Filings", href: "/platform/filings" },

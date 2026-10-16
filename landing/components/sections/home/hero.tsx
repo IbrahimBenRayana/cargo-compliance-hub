@@ -19,8 +19,8 @@ const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const;
 const HEADLINE = "Know which filing needs you now.";
 
 const STATS: { value: string; label: string }[] = [
-  { value: "99.8%", label: "CBP acceptance" },
-  { value: "< 90 sec", label: "average filing" },
+  { value: "ISF + Entry", label: "in one workspace" },
+  { value: "AI Coach", label: "for every rejection" },
   { value: "314-day", label: "clocks tracked" },
 ];
 
@@ -108,15 +108,9 @@ export function Hero() {
               }}
               className="mb-6 inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/50 px-3 py-1 backdrop-blur-sm"
             >
-              <span className="relative flex size-2">
-                <span
-                  aria-hidden
-                  className="absolute inline-flex size-full rounded-full bg-emerald-500/60 motion-safe:animate-ping"
-                />
-                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-              </span>
+              <span aria-hidden className="relative inline-flex size-2 rounded-full bg-gold" />
               <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Live for US importers
+                CBP ABI certified
               </span>
             </motion.span>
 

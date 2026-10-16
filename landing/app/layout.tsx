@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: "%s — MyCargoLens",
   },
   description:
-    "The complete CBP compliance platform for modern importers. File ISF, Entry, and In-Bond in one secure workspace.",
+    "The complete CBP compliance platform for modern importers. File ISF and Entry in one secure workspace.",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     siteName: "MyCargoLens",
     title: "MyCargoLens — CBP Compliance Platform",
     description:
-      "The complete CBP compliance platform for modern importers. File ISF, Entry, and In-Bond in one secure workspace.",
+      "The complete CBP compliance platform for modern importers. File ISF and Entry in one secure workspace.",
   },
   twitter: {
     card: "summary_large_image",

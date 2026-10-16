@@ -406,7 +406,7 @@ const DIFFERENTIATORS = [
     icon: Inbox,
     title: "A calm, modern interface — not a 1990s terminal",
     body:
-      "ISF-10/ISF-5, Entry Summary 7501, Cargo Release 3461, Type 86 de-minimis entries, container tracking, manifest queries, and HTS classification all live in one quiet inbox. Work a ranked queue instead of juggling a dozen browser tabs. Filing customs should feel like clearing email, not operating legacy software.",
+      "ISF-10/ISF-5, Entry Summary 7501, Cargo Release 3461, container tracking, manifest queries, and HTS classification all live in one quiet inbox. Work a ranked queue instead of juggling a dozen browser tabs. Filing customs should feel like clearing email, not operating legacy software.",
     hover: "lift" as const,
   },
   {
