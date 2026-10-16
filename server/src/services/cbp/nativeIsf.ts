@@ -80,7 +80,12 @@ export async function transmitIsfNative(opts: {
   const started = isfStateOnStart(filing, opts.action);
   const claimed = await prisma.filing.updateMany({
     where: { id: filing.id, pendingAction: null, status: filing.status },
-    data: { status: started.status, pendingAction: started.pendingAction, ...(opts.action === 'ADD' && { submittedAt: new Date() }) },
+    data: {
+      status: started.status,
+      pendingAction: started.pendingAction,
+      // A new add supersedes the previous attempt's rejection.
+      ...(opts.action === 'ADD' && { submittedAt: new Date(), rejectionReason: null, rejectedAt: null }),
+    },
   });
   if (claimed.count === 0) {
     return { httpStatus: 409, body: { error: 'This ISF is already being transmitted.', code: 'ISF_ALREADY_PENDING' } };

@@ -40,7 +40,7 @@ describe('transmitIsfNative', () => {
     const out = await transmitIsfNative(ARGS);
     expect(prisma.filing.updateMany.mock.calls[0][0]).toMatchObject({
       where: { id: 'f1', pendingAction: null, status: 'draft' },
-      data: { status: 'submitted', pendingAction: 'ADD' },
+      data: { status: 'submitted', pendingAction: 'ADD', rejectionReason: null, rejectedAt: null },
     });
     expect(transmit.transmitNative).toHaveBeenCalledWith(expect.objectContaining({ application: 'SF', action: 'A', filerCode: 'S7P', entityId: 'f1' }));
     expect(out.httpStatus).toBe(202);
