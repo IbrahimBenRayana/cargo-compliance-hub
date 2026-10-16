@@ -34,6 +34,13 @@ export const cbpEnvShape = {
   MQIPT_BRIDGE_URL: z.string().default('http://mq-bridge:8080'),
   /** Shared secret sent to the bridge as X-Bridge-Token. */
   MQIPT_BRIDGE_TOKEN: z.string().default(''),
+  /**
+   * Our ABI transmitter identity for the batch A record (site code, id code,
+   * password), issued by CBP. Secrets, not DB rows (go-live D7).
+   */
+  CBP_SENDER_SITE: z.string().trim().default(''),
+  CBP_SENDER_ID: z.string().trim().default(''),
+  CBP_SENDER_PASSWORD: z.string().default(''),
 };
 
 const QUEUE_MANAGERS: Record<Exclude<CbpEnvironment, 'NONE'>, string> = {

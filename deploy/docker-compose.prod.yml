@@ -161,6 +161,10 @@ services:
       # bridge on the other environment's queue manager.
       ABI_TRANSPORT:      ${ABI_TRANSPORT:-mock}
       CBP_ENVIRONMENT:    ${CBP_ENVIRONMENT:-}
+      # Our ABI transmitter identity for the batch A record (CBP-issued secrets).
+      CBP_SENDER_SITE:     ${CBP_SENDER_SITE:-}
+      CBP_SENDER_ID:       ${CBP_SENDER_ID:-}
+      CBP_SENDER_PASSWORD: ${CBP_SENDER_PASSWORD:-}
       MQIPT_BRIDGE_URL:   ${MQIPT_BRIDGE_URL:-http://mq-bridge:8080}
       MQIPT_BRIDGE_TOKEN: ${MQIPT_BRIDGE_TOKEN:-}
     volumes:

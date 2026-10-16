@@ -19,6 +19,7 @@ import { cbpTransport, cbpTrafficConfig } from '../services/cbp/transport.js';
 import { certTrafficGate, transportErrorStatus } from '../services/cbp/certTrafficGate.js';
 import { certTrafficAllowed } from '../services/cbp/environment.js';
 import { RESPONSE_PARSERS, attachBatch } from '../services/cbp/certAttach.js';
+import { cbpSenderFromEnv } from '../services/cbp/sender.js';
 import { processInbound, awaitInbound } from '../services/cbp/inboundJob.js';
 import { buildAddManufacturers } from '../abi-engine/apps/addManufacturer/builder.js';
 import { CERT_MANUFACTURERS } from '../abi-engine/scenarios/certManufacturers.js';
@@ -45,7 +46,8 @@ async function loadParams(): Promise<CertParams> {
     (await prisma.certParamsConfig.findUnique({ where: { id: PARAMS_ID } })) ??
     (await prisma.certParamsConfig.create({ data: { id: PARAMS_ID } }));
   return {
-    sender: { siteCode: row.senderSiteCode, idCode: row.senderIdCode, password: row.senderPassword },
+    // Server secrets when configured (go-live D7); the legacy DB row until then.
+    sender: cbpSenderFromEnv() ?? { siteCode: row.senderSiteCode, idCode: row.senderIdCode, password: row.senderPassword },
     filerCode: row.filerCode,
     districtPortOfEntry: row.districtPortOfEntry,
     importerOfRecordNumber: row.importerOfRecordNumber,
