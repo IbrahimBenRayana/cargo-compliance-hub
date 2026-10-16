@@ -1839,7 +1839,7 @@ export interface ABIManifest {
  */
 export interface ABIDocumentBody {
   entryType: '01' | '11' | '86'; // 86 = de minimis (Section 321), cargo-release only
-  modeOfTransport: string;   // "40" vessel, "41" air
+  modeOfTransport: string;   // CATAIR AE Table 3, e.g. "11" vessel containerized, "40" air
   entryNumber: string;       // filer-assigned (not CBP-assigned)
   dates: ABIDates;
   location: ABILocation;

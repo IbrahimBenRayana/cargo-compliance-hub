@@ -95,15 +95,25 @@ export const ENTRY_TYPES: EnumOption[] = [
   { value: '86', label: 'De Minimis (Type 86), suspended by CBP' },
 ];
 
-// ─── CBP Modes of Transport (common codes) ─────────────────────────────────
-// Full list is 30+ codes; Phase 1 ships the most common half-dozen.
+// ─── CBP Modes of Transportation (CATAIR AE Table 3, ESF-215) ───────────────
+// Mirrors server/src/abi-engine/ae/tables.ts MOT_CODES; the code is
+// transmitted as-is, so labels must match CBP exactly.
 export const MODES_OF_TRANSPORT: EnumOption[] = [
-  { value: '10', label: '10 — Vessel, Non-Container' },
-  { value: '11', label: '11 — Vessel, Container' },
-  { value: '31', label: '31 — Air' },
-  { value: '40', label: '40 — Truck (Rail-Only Border Crossing)' },
-  { value: '41', label: '41 — Rail, Containerized' },
-  { value: '42', label: '42 — Truck' },
+  { value: '10', label: '10 — Vessel, non-containerized' },
+  { value: '11', label: '11 — Vessel, containerized' },
+  { value: '12', label: '12 — Border water borne' },
+  { value: '20', label: '20 — Rail, non-containerized' },
+  { value: '21', label: '21 — Rail, containerized' },
+  { value: '30', label: '30 — Truck, non-containerized' },
+  { value: '31', label: '31 — Truck, containerized' },
+  { value: '32', label: '32 — Auto' },
+  { value: '33', label: '33 — Pedestrian' },
+  { value: '34', label: '34 — Road, other' },
+  { value: '40', label: '40 — Air, non-containerized' },
+  { value: '41', label: '41 — Air, containerized' },
+  { value: '50', label: '50 — Mail' },
+  { value: '60', label: '60 — Passenger, hand carried' },
+  { value: '70', label: '70 — Fixed transport (pipeline, power)' },
 ];
 
 // ─── Bond Types ────────────────────────────────────────────────────────────
@@ -112,14 +122,17 @@ export const BOND_TYPES: EnumOption[] = [
   { value: '9', label: '9 — Single Transaction' },
 ];
 
-// ─── ABI Payment Type Codes ────────────────────────────────────────────────
+// ─── ABI Payment Type Codes (CATAIR AE 10-record, ESF-31) ──────────────────
+// 2/3/5 batch into the daily statement and 6/7/8 into the periodic monthly
+// statement (by filer, full IOR number, IOR without suffix respectively).
 export const PAYMENT_TYPE_CODES: EnumOption[] = [
-  { value: '1', label: '1 — Cash / Check' },
-  { value: '2', label: '2 — Statement' },
-  { value: '3', label: '3 — Broker PMS (Periodic Monthly Statement)' },
-  { value: '6', label: '6 — Importer ACH Credit' },
-  { value: '7', label: '7 — Daily Statement' },
-  { value: '8', label: '8 — Periodic Monthly Statement' },
+  { value: '1', label: '1 — Individual payment' },
+  { value: '2', label: '2 — Daily statement, by filer' },
+  { value: '3', label: '3 — Daily statement, by importer of record' },
+  { value: '5', label: '5 — Daily statement, by importer (no suffix)' },
+  { value: '6', label: '6 — Periodic monthly statement, by filer' },
+  { value: '7', label: '7 — Periodic monthly statement, by importer of record' },
+  { value: '8', label: '8 — Periodic monthly statement, by importer (no suffix)' },
 ];
 
 // ─── Bill of Lading Types ──────────────────────────────────────────────────
