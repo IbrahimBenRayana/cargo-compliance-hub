@@ -15,16 +15,11 @@ import { authMiddleware, AuthRequest, requirePlatformAdmin } from '../middleware
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { SCENARIOS, SCENARIO_INDEX, type CertParams } from '../abi-engine/scenarios/index.js';
 import { RecordCodecError } from '../abi-engine/records/codec.js';
-import { parseAeResponseBatch } from '../abi-engine/ae/responseParser.js';
-import { parseCwResponseBatch, parseCjResponseBatch } from '../abi-engine/index.js';
-import { parseAdCvdResponseBatch } from '../abi-engine/apps/adcvd/responseParser.js';
-import { parseQuotaResponseBatch } from '../abi-engine/apps/quota/responseParser.js';
-import { parseTibResponseBatch } from '../abi-engine/apps/tib/responseParser.js';
-import { parseEsQueryResponseBatch } from '../abi-engine/apps/esQuery/responseParser.js';
-import { parseUcNotificationBatch } from '../abi-engine/apps/uc/parser.js';
 import { cbpTransport, cbpTrafficConfig } from '../services/cbp/transport.js';
 import { certTrafficGate, transportErrorStatus } from '../services/cbp/certTrafficGate.js';
 import { certTrafficAllowed } from '../services/cbp/environment.js';
+import { RESPONSE_PARSERS, attachBatch } from '../services/cbp/certAttach.js';
+import { processInbound, awaitInbound } from '../services/cbp/inboundJob.js';
 import { buildAddManufacturers } from '../abi-engine/apps/addManufacturer/builder.js';
 import { CERT_MANUFACTURERS } from '../abi-engine/scenarios/certManufacturers.js';
 import { buildHtsQuery } from '../abi-engine/apps/htsQuery/builder.js';
@@ -185,16 +180,6 @@ router.get('/scenarios/:id/transmissions', async (req: AuthRequest, res: Respons
   res.json({ transmissions });
 });
 
-const RESPONSE_PARSERS: Record<string, (lines: string[]) => unknown> = {
-  AE: parseAeResponseBatch,
-  CW: parseCwResponseBatch,
-  CJ: parseCjResponseBatch,
-  AD: parseAdCvdResponseBatch,
-  QA: parseQuotaResponseBatch,
-  TE: parseTibResponseBatch,
-  EQ: parseEsQueryResponseBatch,
-  UC: parseUcNotificationBatch,
-};
 
 const updateSchema = z.object({
   status: z.enum(['generated', 'rejected_clientside', 'transmitted', 'accepted', 'rejected', 'conditional']).optional(),
@@ -297,83 +282,15 @@ router.get('/transport', async (_req: AuthRequest, res: Response): Promise<void>
 });
 
 // ─── response auto-attach ─────────────────────────────────
-// Every scenario response batch echoes "SCENARIO nnn" in its B-record
-// user-data — CBP's own correlation mechanism (the test doc offers it for
-// exactly this). Attach the batch to that scenario's newest transmitted
-// transmission, run the application parser, and set the lifecycle status
-// from the verdict codes.
-function scenarioTagOf(batch: string[]): string | null {
-  for (const line of batch) {
-    if (line.startsWith('B')) {
-      const m = line.slice(59, 80).match(/SCENARIO\s+(\d{3})/);
-      if (m) return m[1];
-    }
-  }
-  return null;
-}
-
-function verdictStatusOf(batch: string[]): 'accepted' | 'rejected' | 'conditional' {
-  const text = batch.join('\n');
-  if (/E1A[I ]?995|SUMMARY HAS BEEN ADDED|SUMMARY HAS BEEN REPLACED/.test(text)) return 'accepted';
-  if (/TRANSACTION DATA REJECTED|BATCH REJECTED/.test(text)) return 'rejected';
-  return 'conditional';
-}
-
-async function attachBatch(batch: string[]): Promise<{ scenarioId: string; transmissionId: string; status: string } | null> {
-  const scenarioId = scenarioTagOf(batch);
-  if (!scenarioId) return null;
-  const transmission = await prisma.certTransmission.findFirst({
-    where: { scenarioId, status: { in: ['transmitted', 'rejected', 'conditional'] } },
-    orderBy: { createdAt: 'desc' },
-  });
-  if (!transmission) return null;
-  const scenario = SCENARIO_INDEX.get(scenarioId);
-  const parser = scenario ? RESPONSE_PARSERS[scenario.application] : undefined;
-  let responseParsed: unknown;
-  try {
-    responseParsed = parser ? parser(batch) : undefined;
-  } catch {
-    responseParsed = undefined; // raw text still attaches; parse failure is visible in the console
-  }
-  // A transmission can draw several batches (an ISF SN verdict, then an SA
-  // advisory). Append rather than overwrite so the verdict is never lost, and
-  // don't let an unrecognised follow-up batch downgrade an earlier verdict.
-  const text = batch.join('\n');
-  const existing = transmission.responseText;
-  if (existing?.includes(text)) return { scenarioId, transmissionId: transmission.id, status: transmission.status };
-  const verdict = verdictStatusOf(batch);
-  const status = existing && verdict === 'conditional' ? transmission.status : verdict;
-  await prisma.certTransmission.update({
-    where: { id: transmission.id },
-    data: {
-      responseText: existing ? `${existing}\n${text}` : text,
-      responseParsed: responseParsed === undefined ? undefined : JSON.parse(JSON.stringify(responseParsed)),
-      status,
-    },
-  });
-  return { scenarioId, transmissionId: transmission.id, status };
-}
-
 // ─── POST /transport/receive ──────────────────────────────
-// Drain available response batches from the live queue. Each batch is
-// audit-logged verbatim (nothing off the queue is ever lost) and scenario
-// batches auto-attach to their transmissions via the SCENARIO tag.
+// Pull waiting responses through the one inbound consumer: each batch is
+// stored in cbp_inbound_messages before it leaves the queue (nothing is ever
+// lost), then dispatched; scenario batches attach via the SCENARIO tag.
 router.post('/transport/receive', certOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const timeoutMs = Math.min(Math.max(Number(req.body?.timeoutMs) || 5000, 0), 30000);
   try {
-    const batches = await transport.receive({ timeoutMs, max: 25 });
-    const attached: Array<{ scenarioId: string; transmissionId: string; status: string }> = [];
-    for (const batch of batches) {
-      await writeAuditLog({
-        orgId: req.user!.orgId, userId: req.user!.id,
-        action: 'cert.received', entityType: 'cert_transmission',
-        newValue: { transport: transport.kind, lines: batch },
-        ...getRequestMeta(req),
-      });
-      const a = await attachBatch(batch);
-      if (a) attached.push(a);
-    }
-    res.json({ transport: transport.kind, batches, attached });
+    const run = await processInbound({ timeoutMs });
+    res.json({ transport: transport.kind, batches: run.pull.batches, attached: run.dispatch.matched });
   } catch (err) {
     res.status(transportErrorStatus(err)).json({
       error: 'Transport receive failed',
@@ -583,10 +500,12 @@ router.post('/transport/hts-query', certOnly, async (req: AuthRequest, res: Resp
         transactionLines: records,
       }],
     });
+    const since = new Date(Date.now() - 500); // tolerate app/DB clock drift
     const receipt = await transport.send(lines, { correlationId: 'HTS-QUERY' });
-    // Query responses are fast — wait for the HY batch and parse inline.
-    const batches = await transport.receive({ timeoutMs: 25000, max: 10 });
-    const hyBatch = batches.find((b) => b.some((l) => l.startsWith('W')));
+    // Query responses are fast: wait for the HY batch to be stored, then parse inline.
+    const isHy = (b: string[]) => b.some((l) => l.startsWith('W'));
+    const { batches } = await awaitInbound({ since, timeoutMs: 25000, matches: (r) => isHy(r.rawText.split('\n')) });
+    const hyBatch = batches.find(isHy);
     const parsedResponse = hyBatch ? parseHtsQueryResponseBatch(hyBatch) : null;
     await writeAuditLog({
       orgId: req.user!.orgId, userId: req.user!.id,
@@ -640,9 +559,11 @@ router.post('/transport/adcvd-query', certOnly, async (req: AuthRequest, res: Re
         transactionLines: records,
       }],
     });
+    const since = new Date(Date.now() - 500); // tolerate app/DB clock drift
     const receipt = await transport.send(lines, { correlationId: 'ADCVD-QUERY' });
-    const batches = await transport.receive({ timeoutMs: 25000, max: 10 });
-    const acBatch = batches.find((b) => b.some((l) => l.startsWith('R')));
+    const isAc = (b: string[]) => b.some((l) => l.startsWith('R'));
+    const { batches } = await awaitInbound({ since, timeoutMs: 25000, matches: (r) => isAc(r.rawText.split('\n')) });
+    const acBatch = batches.find(isAc);
     await writeAuditLog({
       orgId: req.user!.orgId, userId: req.user!.id,
       action: 'cert.adcvd_query', entityType: 'cert_transmission',

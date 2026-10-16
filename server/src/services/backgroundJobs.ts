@@ -32,6 +32,8 @@ import { invalidateAddCvdCache } from './compliance/addCvd.js';
 import { CRON, ABI_SENDING_TIMEOUT_MS } from '../config/schedules.js';
 import { pollSentAbiDocuments } from './abiPolling.js';
 import { withAdvisoryLock } from './distributedLock.js';
+import { env } from '../config/env.js';
+import { processInbound } from './cbp/inboundJob.js';
 
 // ─── Job State ─────────────────────────────────────────────
 
@@ -471,6 +473,7 @@ let deliveryDrainTask: ScheduledTask | null = null;
 let addCvdSyncTask: ScheduledTask | null = null;
 let abiReaperTask: ScheduledTask | null = null;
 let abiStatusPollTask: ScheduledTask | null = null;
+let cbpInboundTask: ScheduledTask | null = null;
 let chargeRetryTask: ScheduledTask | null = null;
 
 /** Retry per-shipment charges that failed, for every delinquent org. */
@@ -559,6 +562,21 @@ export function startBackgroundJobs(): void {
   }, cronOpts);
   logger.info('[Jobs] ABI status sweep scheduled — every 5 minutes at :02 offset (UTC)');
 
+  // Native CBP inbound (go-live D1): the one consumer of the MQ response
+  // queue. Only where the live transport is configured; the mock loopback is
+  // pulled on demand by the cert console.
+  if (env.ABI_TRANSPORT === 'mqipt') {
+    cbpInboundTask = cron.schedule(CRON.CBP_INBOUND, () => {
+      withAdvisoryLock('jobs:cbp-inbound', async () => {
+        const run = await processInbound();
+        if (run.pull.received > 0 || run.dispatch.failed > 0) {
+          logger.info({ pull: { ...run.pull, batches: undefined }, dispatch: run.dispatch }, '[Jobs:CbpInbound] Processed CBP messages');
+        }
+      }).catch(err => logger.error({ err }, '[Jobs:CbpInbound] Unhandled'));
+    }, cronOpts);
+    logger.info(`[Jobs] CBP inbound pull scheduled — every minute (${env.CBP_ENVIRONMENT})`);
+  }
+
   chargeRetryTask = cron.schedule(CRON.CHARGE_RETRY, () => {
     withAdvisoryLock('jobs:charge-retry', retryDelinquentCharges)
       .catch(err => logger.error({ err }, '[Jobs:ChargeRetry] Unhandled'));
@@ -581,6 +599,7 @@ export function stopBackgroundJobs(): void {
   addCvdSyncTask?.stop();
   abiReaperTask?.stop();
   abiStatusPollTask?.stop();
+  cbpInboundTask?.stop();
   chargeRetryTask?.stop();
   statusPollTask = null;
   deadlineTask = null;
@@ -589,6 +608,7 @@ export function stopBackgroundJobs(): void {
   addCvdSyncTask = null;
   abiReaperTask = null;
   abiStatusPollTask = null;
+  cbpInboundTask = null;
   chargeRetryTask = null;
 }
 
