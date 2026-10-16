@@ -90,8 +90,8 @@ export default function Step1EntryShipment({ value, onChange, errors = {} }: Ste
           value={value.entryType || '01'}
           onChange={(v) => onChange({ entryType: v as '01' | '11' | '86' })}
           options={ENTRY_TYPES}
-          hint="Consumption (01) and De Minimis / Type 86 are supported. Informal (11) is coming soon."
-          disabledValues={['11']}
+          hint="CBP suspended de minimis (Type 86) entries; low-value shipments file as formal (01). Informal (11) is coming soon."
+          disabledValues={['11', '86']}
           error={errors.entryType}
         />
         <SelectField

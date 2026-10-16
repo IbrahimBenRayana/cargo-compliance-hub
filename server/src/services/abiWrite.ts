@@ -124,6 +124,20 @@ export async function sendAbiDocumentToCBP(params: {
     return { httpStatus: 400, body: { error: `Cannot send document in status ${doc.status}` } };
   }
 
+  // CBP suspended de minimis (Section 321 / Type 86) on 2025-08-29 under
+  // EO 14324 and made it indefinite by interim final rule on 2026-06-24;
+  // ACE rejects every Type 86. Low-value shipments need a formal (01) or
+  // informal (11) entry.
+  if (doc.entryType === '86') {
+    return {
+      httpStatus: 422,
+      body: {
+        error: 'CBP no longer accepts Type 86 (de minimis) entries. File this shipment as a formal (01) or informal (11) entry.',
+        code: 'entry_type_suspended',
+      },
+    };
+  }
+
   // Full payload validation (deep) before we touch CC.
   const bodyResult = abiDocumentBodySchema.safeParse(doc.payload);
   if (!bodyResult.success) {

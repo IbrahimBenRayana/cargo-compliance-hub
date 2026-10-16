@@ -64,6 +64,14 @@ beforeEach(() => {
 });
 
 describe('sendAbiDocumentToCBP', () => {
+  it('422 for Type 86: CBP suspended de minimis entries on 2025-08-29 (indefinite since 2026-06-24)', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DRAFT, entryType: '86' });
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(out.httpStatus).toBe(422);
+    expect(out.body).toMatchObject({ code: 'entry_type_suspended' });
+    expect(abiGateway.createABIDocument).not.toHaveBeenCalled();
+  });
+
   it('404 when not found', async () => {
     prisma.abiDocument.findFirst.mockResolvedValue(null);
     const out = await sendAbiDocumentToCBP(ARGS);

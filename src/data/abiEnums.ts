@@ -86,11 +86,13 @@ export const ABI_DOCUMENT_STATUS_MAP: Record<AbiDocumentStatus, StatusOption> =
     {} as Record<AbiDocumentStatus, StatusOption>,
   );
 
-// ─── Entry Types (01 + 86 enabled; 11 still gated in the wizard) ──
+// ─── Entry Types ──────────────────────────────────────────────────────────
+// 86 (de minimis) is listed but disabled: CBP suspended it on 2025-08-29 and
+// made the suspension indefinite on 2026-06-24. 11 opens with native entries.
 export const ENTRY_TYPES: EnumOption[] = [
   { value: '01', label: 'Consumption Entry (Formal)' },
   { value: '11', label: 'Informal Entry' },
-  { value: '86', label: 'De Minimis (Type 86)' },
+  { value: '86', label: 'De Minimis (Type 86), suspended by CBP' },
 ];
 
 // ─── CBP Modes of Transport (common codes) ─────────────────────────────────
