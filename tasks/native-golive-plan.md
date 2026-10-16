@@ -147,5 +147,15 @@ Source: `docs/audit/2026-10-platform-audit.md` (237 findings; ids below refer to
 - [x] 1.7 Exactly-once send: transmission row before send, unknown-outcome state, no blind retries (ENG-12, BPR-06, BPR-M1)
 - [x] 1.8 Admin ops views: transmissions, inbound/unmatched, bridge health (FNA-18, UOP-08)
 
-### Phases 2-5
-Expanded when each starts, from the workstream table in the audit report (A2-A5, C, D).
+### Phase 2: per-org CBP identity — DONE 2026-10-16
+- [x] 2.1 OrgCbpConfig (gateway, filer code unique/never S7P, ISF default, service-center approval) + Filing.isfFilerMode
+- [x] 2.2 services/cbp/filerIdentity: ISF SIGMA->S7P, CLIENT/entries need own code + approval + valid check digit
+- [x] 2.3 Sender identity from server secrets (CBP_SENDER_*), staging .env populated
+- [x] 2.4 Entry sends and entry-number ranges bound to the org filer code; global overlap check (BNA-01, FNA-04)
+- [x] 2.5 Admin CBP setup dialog + client CBP identity card; CC control panel removed (FNA-07, USA-09)
+- [x] API keys/webhooks gated + audited + die with creator; /jobs platform-admin only (BPR-04, BPR-11 partial)
+- [ ] Platform admins must have MFA (BPR-11): blocked on the staging admin enrolling MFA first (asked Ibrahim)
+- [ ] Per-filing ISF filer choice in the wizard: with Phase 3
+
+### Phases 3-5
+Expanded when each starts, from the workstream table in the audit report (A3-A5, C, D).
