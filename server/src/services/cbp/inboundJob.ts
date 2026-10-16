@@ -10,15 +10,22 @@ import { cbpTransport, cbpTrafficConfig } from './transport.js';
 import { pullInbound, type InboundEnvironment, type PullResult } from './inbound.js';
 import { dispatchPending, type DispatchResult, type InboundHandler } from './dispatcher.js';
 import { certInboundHandler } from './certAttach.js';
+import { taggedTransmissionHandler, businessKeyHandler } from './transmissionHandlers.js';
 
 export function inboundEnvironment(): InboundEnvironment {
   if (cbpTrafficConfig.transport === 'mock') return 'MOCK';
   return cbpTrafficConfig.environment === 'PROD' ? 'PROD' : 'CERT';
 }
 
-/** Handlers per environment. Production filing handlers arrive with Phases 3-4. */
+/**
+ * Handlers per environment, first claim wins: our tagged transmissions,
+ * then cert-console scenarios (CERT only), then unsolicited messages by
+ * ISF transaction / entry number.
+ */
 function handlersFor(environment: InboundEnvironment): InboundHandler[] {
-  return environment === 'PROD' ? [] : [certInboundHandler];
+  return environment === 'PROD'
+    ? [taggedTransmissionHandler, businessKeyHandler]
+    : [taggedTransmissionHandler, certInboundHandler, businessKeyHandler];
 }
 
 export interface InboundRun {
