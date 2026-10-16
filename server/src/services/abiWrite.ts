@@ -7,6 +7,7 @@
  * Covers CREATE (createAbiDocumentForOrg) and SEND (sendAbiDocumentToCBP).
  * The send path's polling subsystem lives in ./abiPolling.ts.
  */
+import { checkEntryFiler, loadOrgCbpConfig } from './cbp/filerIdentity.js';
 import type { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { abiGateway } from './abi/gateway.js';
@@ -136,6 +137,14 @@ export async function sendAbiDocumentToCBP(params: {
         code: 'entry_type_suspended',
       },
     };
+  }
+
+  // Filer identity (audit BNA-01): the entry number must carry this org's
+  // own filer code (from its CBP setup, never S7P or another org's code),
+  // a valid check digit, and an approved service-center queue.
+  const filerCheck = checkEntryFiler(await loadOrgCbpConfig(orgId), String((doc.payload as { entryNumber?: unknown } | null)?.entryNumber ?? ''));
+  if (!filerCheck.ok) {
+    return { httpStatus: 422, body: { error: filerCheck.message, code: filerCheck.code } };
   }
 
   // Full payload validation (deep) before we touch CC.

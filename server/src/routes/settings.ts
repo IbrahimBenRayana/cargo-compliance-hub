@@ -4,6 +4,7 @@
  * Manage user profile, organization settings, and CC API configuration.
  */
 
+import { loadOrgCbpConfig } from '../services/cbp/filerIdentity.js';
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -317,8 +318,10 @@ router.get('/audit-log', async (req: AuthRequest, res: Response): Promise<void> 
 // drawn from it. Sequences are the 7-digit filer-assigned part; check
 // digits are computed at draw time (services/entryNumberBlocks.ts).
 
+// The filer code comes from the org's CBP setup (OrgCbpConfig, set by
+// MyCargoLens), never from the client: a sent value must match it.
 const entryBlockCreateSchema = z.object({
-  filerCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}$/, 'Filer code must be 3 letters/digits'),
+  filerCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}$/, 'Filer code must be 3 letters/digits').optional(),
   rangeStart: z.number().int().min(1).max(9_999_999),
   rangeEnd: z.number().int().min(1).max(9_999_999),
   label: z.string().trim().max(100).optional(),
@@ -369,12 +372,28 @@ router.post('/entry-blocks', requireRole('owner', 'admin'), async (req: AuthRequ
     res.status(400).json({ error: 'Validation failed', issues: parsed.error.issues });
     return;
   }
-  const { filerCode, rangeStart, rangeEnd, label } = parsed.data;
+  const { rangeStart, rangeEnd, label } = parsed.data;
+  const cbp = await loadOrgCbpConfig(req.user!.orgId);
+  if (!cbp?.filerCode) {
+    res.status(409).json({
+      error: 'Your CBP filer code is not set up yet. Contact MyCargoLens support to complete your CBP setup.',
+      code: 'CBP_SETUP_INCOMPLETE',
+    });
+    return;
+  }
+  const filerCode = cbp.filerCode;
+  if (parsed.data.filerCode && parsed.data.filerCode !== filerCode) {
+    res.status(422).json({
+      error: `Entry number ranges must use your filer code ${filerCode}.`,
+      code: 'ENTRY_FILER_MISMATCH',
+    });
+    return;
+  }
 
-  // Overlapping ranges for the same filer code would double-issue numbers.
+  // Overlapping ranges for the same filer code would double-issue numbers,
+  // across every org (a filer code is one CBP identity).
   const overlap = await prisma.entryNumberBlock.findFirst({
     where: {
-      orgId: req.user!.orgId,
       filerCode,
       rangeStart: { lte: rangeEnd },
       rangeEnd: { gte: rangeStart },
@@ -441,7 +460,6 @@ router.patch('/entry-blocks/:id', requireRole('owner', 'admin'), async (req: Aut
     // Extending must not collide with a neighbouring block either.
     const overlap = await prisma.entryNumberBlock.findFirst({
       where: {
-        orgId: req.user!.orgId,
         filerCode: block.filerCode,
         id: { not: block.id },
         rangeStart: { lte: parsed.data.rangeEnd },

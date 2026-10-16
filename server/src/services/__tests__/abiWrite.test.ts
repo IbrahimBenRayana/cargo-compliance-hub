@@ -13,6 +13,7 @@ const { prisma, abiGateway, mapper, schema, billing, entitlements } = vi.hoisted
       update: vi.fn(), updateMany: vi.fn(),
     },
     submissionLog: { create: vi.fn() },
+    orgCbpConfig: { findUnique: vi.fn() },
   },
   abiGateway: { createABIDocument: vi.fn(), sendABIDocument: vi.fn(), deleteABIDocument: vi.fn() },
   mapper: {
@@ -46,7 +47,10 @@ vi.mock('../abiPolling.js', () => ({ pollABIDocumentStatus: vi.fn(() => Promise.
 import { sendAbiDocumentToCBP } from '../abiWrite.js';
 
 const ARGS = { docId: 'd1', orgId: 'o1', userId: 'u1' };
-const DRAFT = { id: 'd1', orgId: 'o1', status: 'DRAFT', payload: {}, filingId: null, entryType: '01', entryNumber: 'ENT1', mbolNumber: 'MBOL1' };
+// ABC-1234567 with its CATAIR check digit; the org's approved CBP setup uses ABC.
+const VALID_ENTRY = 'ABC-1234567-6';
+const DRAFT = { id: 'd1', orgId: 'o1', status: 'DRAFT', payload: { entryNumber: VALID_ENTRY }, filingId: null, entryType: '01', entryNumber: 'ENT1', mbolNumber: 'MBOL1' };
+const APPROVED_CBP = { filerCode: 'ABC', isfFilerModeDefault: 'CLIENT', serviceCenterApprovedAt: new Date('2026-10-01'), gateway: 'NATIVE' };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -56,6 +60,7 @@ beforeEach(() => {
   prisma.abiDocument.findUnique.mockResolvedValue(DRAFT);
   prisma.abiDocument.update.mockImplementation(({ data }: any) => Promise.resolve({ ...DRAFT, ...data }));
   prisma.submissionLog.create.mockResolvedValue({});
+  prisma.orgCbpConfig.findUnique.mockResolvedValue(APPROVED_CBP);
   schema.abiDocumentBodySchema.safeParse.mockReturnValue({ success: true });
   mapper.extractDenormFromPayload.mockReturnValue({ mbolNumber: 'MBOL1', entryNumber: 'ENT1', entryType: '01', modeOfTransport: '40' });
   abiGateway.createABIDocument.mockResolvedValue({ status: 201, data: { _id: 'cc1' }, latencyMs: 1 });
@@ -70,6 +75,20 @@ describe('sendAbiDocumentToCBP', () => {
     expect(out.httpStatus).toBe(422);
     expect(out.body).toMatchObject({ code: 'entry_type_suspended' });
     expect(abiGateway.createABIDocument).not.toHaveBeenCalled();
+  });
+
+  it('422 when the entry number uses another filer code (e.g. Sigma S7P)', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DRAFT, payload: { entryNumber: 'S7P-1234567-0' } });
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(out.httpStatus).toBe(422);
+    expect(out.body).toMatchObject({ code: 'ENTRY_FILER_MISMATCH' });
+    expect(abiGateway.createABIDocument).not.toHaveBeenCalled();
+  });
+
+  it('422 when the org has no CBP setup yet', async () => {
+    prisma.orgCbpConfig.findUnique.mockResolvedValue(null);
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(out.body).toMatchObject({ code: 'CBP_SETUP_INCOMPLETE' });
   });
 
   it('404 when not found', async () => {
