@@ -16,7 +16,7 @@ import { env } from './config/env.js';
 import { prisma } from './config/database.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
-import { authMiddleware, requireRole } from './middleware/auth.js';
+import { authMiddleware, requirePlatformAdmin } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
 import mfaRoutes from './routes/mfa.js';
 import adminRoutes from './routes/admin.js';
@@ -178,11 +178,11 @@ app.use('/api/v1/chat', chatRoutes);
 // across every org. Now require an authenticated owner. If you need to
 // run these from outside a logged-in session, do it via a one-off
 // `npm run jobs:*` script on the server, not the public API.
-app.get('/api/v1/jobs/status', authMiddleware, requireRole('owner'), (_req, res) => {
+app.get('/api/v1/jobs/status', authMiddleware, requirePlatformAdmin, (_req, res) => {
   res.json(getJobStatus());
 });
 
-app.post('/api/v1/jobs/trigger-status-poll', authMiddleware, requireRole('owner'), async (_req, res) => {
+app.post('/api/v1/jobs/trigger-status-poll', authMiddleware, requirePlatformAdmin, async (_req, res) => {
   try {
     await pollSubmittedFilings();
     res.json({ success: true, ...getJobStatus() });
@@ -191,7 +191,7 @@ app.post('/api/v1/jobs/trigger-status-poll', authMiddleware, requireRole('owner'
   }
 });
 
-app.post('/api/v1/jobs/trigger-deadline-check', authMiddleware, requireRole('owner'), async (_req, res) => {
+app.post('/api/v1/jobs/trigger-deadline-check', authMiddleware, requirePlatformAdmin, async (_req, res) => {
   try {
     await checkDeadlines();
     res.json({ success: true, ...getJobStatus() });

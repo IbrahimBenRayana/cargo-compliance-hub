@@ -44,8 +44,12 @@ export async function apiKeyAuth(req: ApiRequest, res: Response, next: NextFunct
     return;
   }
 
-  const key = await prisma.apiKey.findUnique({ where: { keyHash: hashApiKey(raw) } });
-  if (!key || key.revokedAt) {
+  const key = await prisma.apiKey.findUnique({
+    where: { keyHash: hashApiKey(raw) },
+    include: { createdBy: { select: { isActive: true } } },
+  });
+  // A key dies with its creator's access: a removed member's keys stop working.
+  if (!key || key.revokedAt || !key.createdBy?.isActive) {
     res.status(401).json({ error: 'Invalid or revoked API key.', code: 'api_key_invalid' });
     return;
   }

@@ -148,6 +148,11 @@ router.delete('/members/:id', requireRole('owner', 'admin'), async (req: AuthReq
       where: { id },
       data: { isActive: false, refreshToken: null },
     });
+    // Their API keys could still file to CBP; revoke them with the account.
+    await prisma.apiKey.updateMany({
+      where: { createdById: id, orgId: req.user!.orgId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
 
     res.json({ message: 'Member removed', memberId: id });
 

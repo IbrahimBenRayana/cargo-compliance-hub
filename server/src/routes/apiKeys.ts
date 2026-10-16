@@ -11,6 +11,9 @@ import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
 import { hashApiKey } from '../middleware/apiKeyAuth.js';
+import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
+import { requireMfaEnrolled } from '../middleware/requireMfaEnrolled.js';
+import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -36,7 +39,9 @@ const createSchema = z.object({
   name: z.string().min(1).max(120),
   scopes: z.array(z.enum(SCOPES)).min(1),
 });
-router.post('/', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
+// A key can submit filings to CBP, so minting one needs the same gates as
+// filing in the app (verified email + MFA) and leaves an audit trail.
+router.post('/', requireRole('owner', 'admin'), requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -52,6 +57,12 @@ router.post('/', requireRole('owner', 'admin'), async (req: AuthRequest, res: Re
       scopes: parsed.data.scopes,
       createdById: req.user!.id,
     },
+  });
+  writeAuditLog({
+    orgId: req.user!.orgId, userId: req.user!.id,
+    action: 'api_key.create', entityType: 'api_key', entityId: created.id,
+    newValue: { name: created.name, prefix: created.prefix, scopes: created.scopes },
+    ...getRequestMeta(req),
   });
   // The raw key is shown exactly once — it is never recoverable after this.
   res.status(201).json({
@@ -72,6 +83,12 @@ router.delete('/:id', requireRole('owner', 'admin'), async (req: AuthRequest, re
     return;
   }
   await prisma.apiKey.update({ where: { id }, data: { revokedAt: new Date() } });
+  writeAuditLog({
+    orgId: req.user!.orgId, userId: req.user!.id,
+    action: 'api_key.revoke', entityType: 'api_key', entityId: id,
+    oldValue: { name: existing.name, prefix: existing.prefix },
+    ...getRequestMeta(req),
+  });
   res.json({ success: true });
 });
 
