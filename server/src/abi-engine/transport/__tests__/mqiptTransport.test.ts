@@ -128,7 +128,12 @@ describe('createTransport env wiring', () => {
 
 describe('MqiptTransport failure classification', () => {
   it('reports a refused connection as unreachable (the request never reached the bridge)', async () => {
-    const closed = new MqiptTransport({ bridgeUrl: 'http://127.0.0.1:1' });
+    // Grab a free port, then close it so nothing is listening there.
+    const probe = http.createServer();
+    await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));
+    const port = (probe.address() as AddressInfo).port;
+    await new Promise((resolve) => probe.close(resolve));
+    const closed = new MqiptTransport({ bridgeUrl: `http://127.0.0.1:${port}` });
     await expect(closed.send(['A'])).rejects.toThrow(/^mq-bridge unreachable/);
   });
 });
