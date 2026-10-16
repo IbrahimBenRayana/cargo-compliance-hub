@@ -64,10 +64,13 @@ async function pollSubmittedFilings(): Promise<void> {
   let errors = 0;
 
   try {
-    // Get all submitted filings across all organizations
+    // Get all submitted filings across all organizations. Native filings
+    // (lastTransmissionId set) are settled by CBP's own responses through the
+    // inbound dispatcher, never by polling CustomsCity.
     const submittedFilings = await prisma.filing.findMany({
       where: {
         status: 'submitted',
+        lastTransmissionId: null,
       },
       include: {
         organization: { select: { id: true, name: true } },

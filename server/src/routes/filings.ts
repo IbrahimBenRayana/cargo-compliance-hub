@@ -1,4 +1,7 @@
 import { Router, Response } from 'express';
+import { loadOrgCbpConfig } from '../services/cbp/filerIdentity.js';
+import { transmitIsfNative } from '../services/cbp/nativeIsf.js';
+import { canStartIsfAction } from '../services/cbp/isfLifecycle.js';
 import { isfFilingDeadline } from '../services/isfDeadline.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -423,6 +426,37 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
     return;
   }
 
+  // Native gateway: an amendment is a CBP REPLACE of the ISF on file. The
+  // filing's data is updated, then sent; CBP's verdict settles the status
+  // (a rejected replace leaves the previously accepted version on file).
+  if (((await loadOrgCbpConfig(req.user!.orgId))?.gateway ?? 'NATIVE') === 'NATIVE') {
+    const parsedUpdates = createFilingSchema.partial().safeParse(req.body);
+    if (!parsedUpdates.success) {
+      res.status(400).json({ error: 'Validation failed', details: parsedUpdates.error.flatten() });
+      return;
+    }
+    const allowed = canStartIsfAction(filing, 'REPLACE');
+    if (!allowed.ok) {
+      res.status(409).json({ error: allowed.reason, code: 'ISF_ACTION_NOT_ALLOWED' });
+      return;
+    }
+    const u = parsedUpdates.data;
+    if (Object.keys(u).length > 0) {
+      await prisma.filing.update({
+        where: { id: filing.id },
+        data: {
+          ...u,
+          estimatedDeparture: u.estimatedDeparture ? new Date(u.estimatedDeparture) : undefined,
+          estimatedArrival: u.estimatedArrival ? new Date(u.estimatedArrival) : undefined,
+          filingDeadline: u.estimatedDeparture ? isfFilingDeadline(u.estimatedDeparture) : undefined,
+        } as never,
+      });
+    }
+    const out = await transmitIsfNative({ filingId: filing.id, orgId: req.user!.orgId, userId: req.user!.id, action: 'REPLACE' });
+    res.status(out.httpStatus).json(out.body);
+    return;
+  }
+
   // Only accepted filings can be amended
   if (filing.status !== 'accepted') {
     res.status(400).json({
@@ -563,6 +597,15 @@ router.post('/:id/cancel', filingMutationLimiter, requireVerifiedEmail, requireM
 
   if (!filing) {
     res.status(404).json({ error: 'Filing not found' });
+    return;
+  }
+
+  // Native gateway: an ISF that CBP holds is removed with a CBP DELETE; it
+  // only becomes 'cancelled' once CBP accepts the delete. A draft that never
+  // reached CBP is simply discarded below.
+  if (filing.cbpState === 'ON_FILE' && ((await loadOrgCbpConfig(req.user!.orgId))?.gateway ?? 'NATIVE') === 'NATIVE') {
+    const out = await transmitIsfNative({ filingId: filing.id, orgId: req.user!.orgId, userId: req.user!.id, action: 'DELETE' });
+    res.status(out.httpStatus).json(out.body);
     return;
   }
 
@@ -744,6 +787,16 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
 
   if (!filing) {
     res.status(404).json({ error: 'Filing not found' });
+    return;
+  }
+
+  // Native filings are settled by CBP's own responses (inbound dispatcher).
+  if (filing.lastTransmissionId) {
+    res.json({
+      statusChanged: false,
+      status: filing.status,
+      message: 'CBP responses for this filing arrive automatically; no manual check is needed.',
+    });
     return;
   }
 
@@ -976,6 +1029,7 @@ router.post('/check-all-statuses', ccApiLimiter, async (req: AuthRequest, res: R
     where: {
       orgId: req.user!.orgId,
       status: 'submitted',
+      lastTransmissionId: null, // native filings settle from CBP responses, not CC polling
     },
     orderBy: { submittedAt: 'asc' },
     take: 20, // Limit to avoid overwhelming CC API
