@@ -16,10 +16,9 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { prisma } from '../config/database.js';
-import { authMiddleware, requirePlatformAdmin, type AuthRequest } from '../middleware/auth.js';
+import { authMiddleware, requirePlatformAdmin, type AuthRequest, verifyAccessToken } from '../middleware/auth.js';
 import { registerAdminClient } from '../services/chat/chatStream.js';
 import {
   getQueue,
@@ -48,7 +47,7 @@ router.get('/stream', async (req: Request, res: Response): Promise<void> => {
   }
   let userId: string;
   try {
-    userId = (jwt.verify(token, env.JWT_ACCESS_SECRET) as { sub: string }).sub;
+    userId = verifyAccessToken(token).sub;
   } catch {
     res.status(401).json({ error: 'Invalid or expired stream token' });
     return;

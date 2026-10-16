@@ -3,6 +3,29 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { prisma } from '../config/database.js';
 
+
+export interface AccessTokenClaims {
+  sub: string;
+  email?: string;
+  orgId?: string;
+  role?: string;
+}
+
+export class InvalidTokenTypeError extends Error {}
+
+/**
+ * Verify an access token. A normal access token carries NO `typ` claim;
+ * partial-auth MFA tokens (typ: 'mfa') are signed with the same
+ * JWT_ACCESS_SECRET, so without this check an mfaToken would grant a full
+ * session before the second factor is proven. Every bearer and ?token=
+ * stream entry point must use this, never jwt.verify directly.
+ */
+export function verifyAccessToken(token: string): AccessTokenClaims {
+  const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as AccessTokenClaims & { typ?: string };
+  if (decoded.typ !== undefined) throw new InvalidTokenTypeError('Invalid token type');
+  return decoded;
+}
+
 export interface AuthRequest extends Request {
   user?: {
     id: string;
@@ -26,22 +49,15 @@ export async function authMiddleware(
     }
 
     const token = header.split(' ')[1];
-    const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as {
-      sub: string;
-      email: string;
-      orgId: string;
-      role: string;
-      typ?: string;
-    };
-
-    // Type-confusion guard: a normal access token carries NO `typ` claim.
-    // Partial-auth MFA tokens (typ: 'mfa') are signed with the same
-    // JWT_ACCESS_SECRET, so without this check an mfaToken would sail through
-    // here and grant a full session before the second factor is proven.
-    // Reject anything carrying a `typ` claim outright.
-    if (decoded.typ !== undefined) {
-      res.status(401).json({ error: 'Invalid token' });
-      return;
+    let decoded: AccessTokenClaims;
+    try {
+      decoded = verifyAccessToken(token);
+    } catch (err) {
+      if (err instanceof InvalidTokenTypeError) {
+        res.status(401).json({ error: 'Invalid token' });
+        return;
+      }
+      throw err;
     }
 
     // Verify user still exists and is active

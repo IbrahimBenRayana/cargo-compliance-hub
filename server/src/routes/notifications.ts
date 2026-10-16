@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest, verifyAccessToken } from '../middleware/auth.js';
 import { inAppOptedOutKinds } from '../services/notifications.js';
 import { registerStreamClient } from '../services/notificationStream.js';
 import { env } from '../config/env.js';
@@ -29,10 +28,15 @@ router.get('/stream', async (req: Request, res: Response): Promise<void> => {
 
   let userId: string;
   try {
-    const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as { sub: string };
-    userId = decoded.sub;
+    userId = verifyAccessToken(token).sub;
   } catch {
     res.status(401).json({ error: 'Invalid or expired stream token' });
+    return;
+  }
+  // Deactivated users (e.g. removed team members) must not keep a live stream.
+  const streamUser = await prisma.user.findUnique({ where: { id: userId }, select: { isActive: true } });
+  if (!streamUser?.isActive) {
+    res.status(401).json({ error: 'User not found or inactive' });
     return;
   }
 

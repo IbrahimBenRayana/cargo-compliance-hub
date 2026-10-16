@@ -13,8 +13,8 @@
  * Routes that operate on an existing conversation must call assertOwnership()
  * to confirm the resolved actor actually owns that conversation.
  */
+import { verifyAccessToken } from './auth.js';
 import type { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { prisma } from '../config/database.js';
 import { verifyConversationToken } from '../services/chat/conversationToken.js';
@@ -53,7 +53,7 @@ export async function chatAuth(req: ChatRequest, _res: Response, next: NextFunct
 
   if (jwtCandidate) {
     try {
-      const decoded = jwt.verify(jwtCandidate, env.JWT_ACCESS_SECRET) as { sub: string };
+      const decoded = verifyAccessToken(jwtCandidate);
       const user = await prisma.user.findUnique({
         where: { id: decoded.sub },
         select: { id: true, email: true, orgId: true, role: true, isActive: true, isPlatformAdmin: true },
