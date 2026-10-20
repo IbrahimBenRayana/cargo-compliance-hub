@@ -56,7 +56,13 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
   if (draft.payment?.typeCode === undefined || draft.payment?.typeCode === null) {
     missing.push('Payment Type');
   }
-  if (!draft.payment?.preliminaryStatementDate) {
+  const paymentType = draft.payment?.typeCode;
+  const statement = paymentType !== undefined && paymentType !== null && paymentType !== 1;
+  const monthly = paymentType === 6 || paymentType === 7 || paymentType === 8;
+  if (monthly && !draft.payment?.periodicStatementMonth) missing.push('Statement Month');
+  if (!statement) {
+    // Individual payment (type 1): no statement fields.
+  } else if (!draft.payment?.preliminaryStatementDate) {
     missing.push('Preliminary Statement Date');
   } else if (
     draft.dates?.entryDate &&

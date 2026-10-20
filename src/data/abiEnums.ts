@@ -135,6 +135,12 @@ export const PAYMENT_TYPE_CODES: EnumOption[] = [
   { value: '8', label: '8 — Periodic monthly statement, by importer (no suffix)' },
 ];
 
+// Periodic monthly statement month (payment types 6-8), MM.
+export const STATEMENT_MONTHS: EnumOption[] = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+].map((name, i) => ({ value: String(i + 1).padStart(2, '0'), label: `${String(i + 1).padStart(2, '0')} — ${name}` }));
+
 // ─── Trade Agreement / Special Program Claims (CATAIR AE Table 8) ──────────
 // Mirrors server/src/abi-engine/refdata/spiCodes.ts. Expired programs (NAFTA
 // CA/MX, ATPA J/J+) are left out; a '#' code adds the FTA MPF exemption.

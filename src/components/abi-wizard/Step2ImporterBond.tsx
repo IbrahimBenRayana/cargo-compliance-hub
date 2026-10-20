@@ -3,7 +3,7 @@
  */
 import { Building2, Landmark } from 'lucide-react';
 import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
-import { BOND_TYPES, PAYMENT_TYPE_CODES } from '@/data/abiEnums';
+import { BOND_TYPES, PAYMENT_TYPE_CODES, STATEMENT_MONTHS } from '@/data/abiEnums';
 import {
   DateField,
   SectionHeader,
@@ -122,19 +122,42 @@ export default function Step2ImporterBond({ value, onChange, errors = {} }: Prop
                 ? String(payment.typeCode)
                 : ''
             }
-            onChange={(v) => setPayment({ typeCode: Number(v) })}
+            onChange={(v) => {
+              // Statement fields follow the payment type (CATAIR note y):
+              // clear the ones the new type does not take.
+              const typeCode = Number(v);
+              const monthly = typeCode >= 6;
+              setPayment({
+                typeCode,
+                ...(typeCode === 1 && { preliminaryStatementDate: undefined }),
+                ...(!monthly && { periodicStatementMonth: undefined }),
+              });
+            }}
             options={PAYMENT_TYPE_CODES}
             hint="ABI payment method code."
             error={errors['payment.typeCode']}
           />
-          <DateField
-            label="Preliminary Statement Date"
-            required
-            value={payment.preliminaryStatementDate || ''}
-            onChange={(v) => setPayment({ preliminaryStatementDate: v })}
-            hint="Statement print/pull date for PMS filings."
-            error={errors['payment.preliminaryStatementDate']}
-          />
+          {payment.typeCode !== undefined && payment.typeCode !== null && payment.typeCode !== 1 && (
+            <DateField
+              label="Preliminary Statement Date"
+              required
+              value={payment.preliminaryStatementDate || ''}
+              onChange={(v) => setPayment({ preliminaryStatementDate: v })}
+              hint="The weekday CBP prints the preliminary statement this entry joins."
+              error={errors['payment.preliminaryStatementDate']}
+            />
+          )}
+          {(payment.typeCode === 6 || payment.typeCode === 7 || payment.typeCode === 8) && (
+            <SelectField
+              label="Statement Month"
+              required
+              value={payment.periodicStatementMonth || ''}
+              onChange={(v) => setPayment({ periodicStatementMonth: v })}
+              options={STATEMENT_MONTHS}
+              hint="The month of the periodic monthly statement that pays this entry."
+              error={errors['payment.periodicStatementMonth']}
+            />
+          )}
         </div>
       </div>
     </div>

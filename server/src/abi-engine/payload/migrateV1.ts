@@ -153,6 +153,7 @@ export function migrateV1ToV2(v1: AbiDocumentBody): AbiPayloadV2 {
     payment: {
       typeCode: paymentTypeCode as '1' | '2' | '3' | '5' | '6' | '7' | '8',
       preliminaryStatementPrintDate: v1.payment.preliminaryStatementDate || undefined,
+      periodicStatementMonth: v1.payment.periodicStatementMonth || undefined,
     },
     cargo: {
       carrierCode: firstManifest?.carrier.code || undefined,

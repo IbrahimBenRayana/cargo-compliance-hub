@@ -66,7 +66,16 @@ export function validateStep2(d: ABIDocumentDraft): FieldErrors {
   if (d.payment?.typeCode === undefined || d.payment?.typeCode === null) {
     e['payment.typeCode'] = 'Required';
   }
-  if (!d.payment?.preliminaryStatementDate) {
+  // Statement fields follow the payment type (CATAIR note y): none for
+  // individual payment (1), a statement date for 2-8, a month for 6-8.
+  const type = d.payment?.typeCode;
+  const statement = type !== undefined && type !== null && type !== 1;
+  if ((type === 6 || type === 7 || type === 8) && !d.payment?.periodicStatementMonth) {
+    e['payment.periodicStatementMonth'] = 'Required';
+  }
+  if (!statement) {
+    // nothing more to check
+  } else if (!d.payment?.preliminaryStatementDate) {
     e['payment.preliminaryStatementDate'] = 'Required';
   } else if (
     d.dates?.entryDate &&

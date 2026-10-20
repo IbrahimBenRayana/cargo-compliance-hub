@@ -48,9 +48,13 @@ const abiBondSchema = z.object({
   taxId: z.string().min(1).max(50),
 });
 
+// Payment type (CATAIR ESF-31): 1 individual; 2/3/5 daily statement;
+// 6/7/8 periodic monthly statement. Which statement fields apply depends on
+// the type (usage note y), enforced in abiDocumentBodySchema below.
 const abiPaymentSchema = z.object({
-  typeCode: z.number().int(),
-  preliminaryStatementDate: YYYYMMDD,
+  typeCode: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(5), z.literal(6), z.literal(7), z.literal(8)]),
+  preliminaryStatementDate: YYYYMMDD.optional(),
+  periodicStatementMonth: z.string().regex(/^(0[1-9]|1[0-2])$/, 'Statement month must be 01-12').optional(),
 });
 
 const abiConsigneeSchema = z.object({
@@ -206,18 +210,28 @@ const abiDocumentBodyBaseSchema = z.object({
   manifest: z.array(abiManifestSchema).min(1),
 });
 
-// Validated schema used at transmit time — adds the cross-field refine
-// that `.deepPartial()` can't survive. CC: Preliminary Statement Date
-// cannot be earlier than the Entry Date.
-export const abiDocumentBodySchema = abiDocumentBodyBaseSchema.refine(
-  (b) => !b.dates?.entryDate || !b.payment?.preliminaryStatementDate
-    ? true
-    : b.payment.preliminaryStatementDate >= b.dates.entryDate,
-  {
-    path: ['payment', 'preliminaryStatementDate'],
-    message: 'Preliminary Statement Date must be on or after the Entry Date',
-  },
-);
+// Validated schema used at transmit time — adds the cross-field rules
+// that `.deepPartial()` can't survive (audit FNA-02, usage note y):
+// statement fields follow the payment type, and the statement date cannot
+// be earlier than the entry date.
+export const abiDocumentBodySchema = abiDocumentBodyBaseSchema.superRefine((b, ctx) => {
+  const { typeCode, preliminaryStatementDate, periodicStatementMonth } = b.payment;
+  const at = (field: string, message: string) =>
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['payment', field], message });
+  if (typeCode === 1) {
+    if (preliminaryStatementDate) at('preliminaryStatementDate', 'Individual payment (type 1) has no statement date');
+    if (periodicStatementMonth) at('periodicStatementMonth', 'Individual payment (type 1) has no statement month');
+    return;
+  }
+  if (!preliminaryStatementDate) {
+    at('preliminaryStatementDate', 'Statement payment needs a preliminary statement date');
+  } else if (b.dates.entryDate && preliminaryStatementDate < b.dates.entryDate) {
+    at('preliminaryStatementDate', 'Preliminary Statement Date must be on or after the Entry Date');
+  }
+  const monthly = typeCode === 6 || typeCode === 7 || typeCode === 8;
+  if (monthly && !periodicStatementMonth) at('periodicStatementMonth', 'Periodic monthly statement needs the statement month');
+  if (!monthly && periodicStatementMonth) at('periodicStatementMonth', 'Only periodic monthly statements (types 6-8) have a statement month');
+});
 
 export type ABIDocumentBody = z.infer<typeof abiDocumentBodySchema>;
 

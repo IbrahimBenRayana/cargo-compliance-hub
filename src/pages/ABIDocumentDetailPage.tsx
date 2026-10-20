@@ -622,10 +622,15 @@ export default function ABIDocumentDetailPage() {
                   : null
               }
             />
-            <LabeledValue
-              label="Prelim. Statement Date"
-              value={formatYYYYMMDD(payment?.preliminaryStatementDate)}
-            />
+            {payment?.preliminaryStatementDate && (
+              <LabeledValue
+                label="Prelim. Statement Date"
+                value={formatYYYYMMDD(payment.preliminaryStatementDate)}
+              />
+            )}
+            {payment?.periodicStatementMonth && (
+              <LabeledValue label="Statement Month" value={payment.periodicStatementMonth} />
+            )}
           </CardContent>
         </Card>
 

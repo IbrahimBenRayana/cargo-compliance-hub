@@ -39,7 +39,10 @@ export interface AbiBond {
 
 export interface AbiPayment {
   typeCode: number;
-  preliminaryStatementDate: string;
+  /** Statement payments (types 2-8) only. */
+  preliminaryStatementDate?: string;
+  /** MM; periodic monthly statements (types 6-8) only. */
+  periodicStatementMonth?: string;
 }
 
 export interface AbiConsignee {
