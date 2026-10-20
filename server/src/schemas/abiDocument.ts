@@ -112,6 +112,19 @@ const abiPartySchema = z.object({
   pointOfContact: z.string().optional(),
 });
 
+const abiAdCvdCaseSchema = z
+  .object({
+    caseNumber: z.string().regex(/^[AC]-?\d{3}-?\d{3}-?\d{3}$/i, "Case number looks like A-570-967-000 (A antidumping, C countervailing)"),
+    bondOrCash: z.enum(['B', 'C']),
+    rateType: z.enum(['A', 'S']),
+    rate: z.number().nonnegative().max(99999),
+    quantity: z.number().positive().optional(),
+  })
+  .refine((c) => c.rateType === 'A' || c.quantity !== undefined, {
+    path: ['quantity'],
+    message: 'A specific (per-unit) rate needs the quantity',
+  });
+
 const abiItemSchema = z.object({
   sku: z.string().min(1).max(100),
   htsNumber: z.string().regex(/^\d{10}$/, 'HTS must be 10 digits'),
@@ -129,6 +142,8 @@ const abiItemSchema = z.object({
     .optional(),
   /** Trade agreement / special program claim (AE Table 8), e.g. 'S' for USMCA. */
   spiClaimCode: z.enum(SPI_CLAIM_CODES).optional(),
+  /** AD/CVD cases (entry type 03, usage note ff); a line carries at most two. */
+  adCvdCases: z.array(abiAdCvdCaseSchema).min(1).max(2).optional(),
   description: z.string().min(1).max(500),
   origin: z.object({ country: CountryCode }),
   values: z.object({
@@ -195,7 +210,7 @@ const abiManifestSchema = z.object({
 export const abiDocumentBodyBaseSchema = z.object({
   // 01 = consumption (formal), 11 = informal, 86 = de minimis (Section 321,
   // sub-$800 — cargo-release only, no formal entry summary).
-  entryType: z.enum(['01', '11', '86']),
+  entryType: z.enum(['01', '03', '11', '86']),
   modeOfTransport: TwoDigit,
   // Filer-assigned entry number. CBP / CustomsCity do NOT assign this —
   // the broker draws it from their pre-issued block (e.g. "S4G12580927" or
@@ -233,6 +248,16 @@ export const abiDocumentBodySchema = abiDocumentBodyBaseSchema.superRefine((b, c
     at('preliminaryStatementDate', 'Statement payment needs a preliminary statement date');
   } else if (b.dates.entryDate && preliminaryStatementDate < b.dates.entryDate) {
     at('preliminaryStatementDate', 'Preliminary Statement Date must be on or after the Entry Date');
+  }
+  // AD/CVD goods use the explicit AD/CVD type 03, which needs at least one
+  // case (usage note ff); other types cannot carry cases.
+  const items = b.manifest.flatMap((m) => m.invoices.flatMap((inv) => inv.items));
+  const withCases = items.some((it) => (it.adCvdCases?.length ?? 0) > 0);
+  if (b.entryType === '03' && !withCases) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['entryType'], message: 'Entry type 03 needs at least one AD/CVD case on a line' });
+  }
+  if (b.entryType !== '03' && withCases) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['entryType'], message: 'Lines with AD/CVD cases are filed as entry type 03' });
   }
   // Vessel entries carry the Schedule K foreign port of lading (ACE F429,
   // live CERT 004/007); goods exported from the US have none (CERT 042).

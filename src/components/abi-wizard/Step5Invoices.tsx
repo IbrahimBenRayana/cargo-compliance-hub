@@ -45,6 +45,7 @@ import {
   US_STATES,
 } from './shared';
 import { ImportLinesDialog } from './ImportLinesDialog';
+import { AdCvdCasesEditor } from './AdCvdCasesEditor';
 
 interface Props {
   value: ABIDocumentDraft;
@@ -548,6 +549,15 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                             />
                           </div>
                         </div>
+
+                        {value.entryType === '03' && (
+                          <AdCvdCasesEditor
+                            cases={item.adCvdCases}
+                            onChange={(adCvdCases) => updateItem(invIdx, itemIdx, { adCvdCases })}
+                            errors={errors}
+                            path={itemPath}
+                          />
+                        )}
 
                         {/* Parties per item */}
                         <div className="border-t pt-3">

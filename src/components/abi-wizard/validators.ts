@@ -186,9 +186,23 @@ export function validateStep5(d: ABIDocumentDraft): FieldErrors {
         if (!(it?.parties?.length)) {
           e[`${ip}.parties`] = 'Add at least one party';
         }
+        if (d.entryType === '03') {
+          (it?.adCvdCases ?? []).forEach((c, k) => {
+            const cp = `${ip}.adCvdCases.${k}`;
+            if (!/^[AC]-?\d{3}-?\d{3}-?\d{3}$/i.test(c.caseNumber || '')) e[`${cp}.caseNumber`] = 'Format A-570-967-000';
+            if (!(c.rate > 0)) e[`${cp}.rate`] = 'Required';
+            if (c.rateType === 'S' && !(c.quantity && c.quantity > 0)) e[`${cp}.quantity`] = 'Required for a specific rate';
+          });
+        }
       });
     }
   });
+
+  // Type 03 is the AD/CVD entry: at least one line carries a case.
+  if (d.entryType === '03') {
+    const hasCase = invoices.some((inv) => (inv?.items ?? []).some((it) => (it?.adCvdCases?.length ?? 0) > 0));
+    if (!hasCase) e['invoices.0.items.0.adCvdCases'] = 'Entry type 03 needs at least one AD/CVD case';
+  }
 
   return e;
 }

@@ -18,7 +18,7 @@ import {
   extractDenormFromPayload,
   extractCCErrorMessage,
   mapABIDocumentToCC,
-  hasCh99Claims,
+  hasNativeOnlyData,
   buildSendPayload,
   canonicaliseEntryNumber,
 } from './abiDocumentMapper.js';
@@ -187,12 +187,12 @@ export async function sendAbiDocumentToCBP(params: {
     return { httpStatus: 200, body: { data: updated, native: native.body } };
   }
 
-  // CustomsCity derives ch.99 numbers itself and has no field for ours, so
-  // claims the filer made would silently not reach CBP (audit MHT-06).
-  if (hasCh99Claims(bodyResult.data)) {
+  // CustomsCity has no fields for ch.99 numbers, trade program claims or
+  // AD/CVD cases, so they would silently not reach CBP (audit MHT-06).
+  if (hasNativeOnlyData(bodyResult.data)) {
     return {
       httpStatus: 422,
-      body: { error: 'The CustomsCity fallback cannot carry Chapter 99 claims. Transmit this entry through the native engine.', code: 'CH99_NATIVE_ONLY' },
+      body: { error: 'The CustomsCity fallback cannot carry Chapter 99, trade program or AD/CVD claims. Transmit this entry through the native engine.', code: 'NATIVE_ONLY_DATA' },
     };
   }
 

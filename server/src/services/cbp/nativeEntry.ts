@@ -33,8 +33,9 @@ import { cbpTransport, cbpTrafficConfig } from './transport.js';
 import { requireCbpSender } from './sender.js';
 
 const ACTION_CODE: Record<EntryAction, 'A' | 'R' | 'D'> = { ADD: 'A', REPLACE: 'R', DELETE: 'D' };
-/** Entry types whose AE is certified for cargo release (combined 3461+7501). */
-const RELEASE_ENTRY_TYPES = new Set(['01', '11']);
+/** Entry types whose AE is certified for cargo release (combined 3461+7501);
+ *  CATAIR note ee bars only 3x and 51, so 03 certifies like 01. */
+const RELEASE_ENTRY_TYPES = new Set(['01', '03', '11']);
 
 export interface EntryTransmitOutcome {
   httpStatus: number;
@@ -137,6 +138,24 @@ export async function buildNativeEntry(opts: {
     const priced = await enrichWithDuty(migrateV1ToV2(usdBody), new DbHtsRateSource(prisma.htsRateLine), { applicabilityDate });
     const input = toAeEntrySummaryInput(priced, ACTION_CODE[opts.action]);
     districtPort = input.districtPortOfEntry;
+
+    // Informal entries are limited to $2,500 (19 CFR 143.21(a)); chapter 98
+    // provisions carry their own limits (AE Table 9) and are left to ACE.
+    if (doc.entryType === '11') {
+      const lines = priced.entrySummary.lines;
+      const totalUsd = lines.reduce((sum, l) => sum + l.tariffs.reduce((t, x) => t + x.valueDollars, 0), 0);
+      const chapter98 = lines.some((l) => l.tariffs.some((t) => t.htsNumber.startsWith('98')));
+      if (totalUsd > 2500 && !chapter98) {
+        return {
+          ok: false,
+          httpStatus: 422,
+          body: {
+            error: `Informal entries are limited to $2,500 and this one totals $${totalUsd.toLocaleString('en-US')}. File it as a formal entry (01).`,
+            code: 'INFORMAL_VALUE_LIMIT',
+          },
+        };
+      }
+    }
 
     if (releaseRequested) {
       const [user, org] = await Promise.all([

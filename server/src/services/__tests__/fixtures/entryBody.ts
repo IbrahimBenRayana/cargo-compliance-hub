@@ -8,11 +8,13 @@ export interface EntryBodyOptions {
   quantity?: string;
   ch99?: string[];
   spi?: string;
+  entryType?: string;
+  adCvd?: Array<Record<string, unknown>>;
 }
 
 export function entryBody(opts: EntryBodyOptions = {}): AbiDocumentBody {
   return {
-    entryType: '01',
+    entryType: opts.entryType ?? '01',
     modeOfTransport: '11',
     entryNumber: 'SP7-1234567-0',
     dates: { entryDate: '20260820', importDate: '20260815', arrivalDate: '20260814' },
@@ -39,6 +41,7 @@ export function entryBody(opts: EntryBodyOptions = {}): AbiDocumentBody {
           origin: { country: opts.origin ?? 'CN' },
           ...(opts.ch99 ? { additionalHtsNumbers: opts.ch99 } : {}),
           ...(opts.spi ? { spiClaimCode: opts.spi } : {}),
+          ...(opts.adCvd ? { adCvdCases: opts.adCvd } : {}),
           values: { currency: 'USD', exchangeRate: 1, totalValueOfGoods: opts.value ?? 10000 },
           quantity1: opts.quantity ?? '500 NO', weight: { gross: '2646', uom: 'L' },
           parties: [

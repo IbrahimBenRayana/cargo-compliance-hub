@@ -18,7 +18,7 @@ const { prisma, abiGateway, mapper, schema, billing, entitlements } = vi.hoisted
   abiGateway: { createABIDocument: vi.fn(), sendABIDocument: vi.fn(), deleteABIDocument: vi.fn() },
   mapper: {
     mapABIDocumentToCC: vi.fn(() => ({})),
-    hasCh99Claims: vi.fn(() => false),
+    hasNativeOnlyData: vi.fn(() => false),
     buildSendPayload: vi.fn(() => ({})),
     canonicaliseEntryNumber: vi.fn((s: string) => s),
     extractCCErrorMessage: vi.fn(() => 'cc error'),

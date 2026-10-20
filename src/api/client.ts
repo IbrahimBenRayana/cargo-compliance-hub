@@ -1938,11 +1938,24 @@ export interface ABIParty {
   pointOfContact?: string;
 }
 
+/** An antidumping (A-) or countervailing (C-) duty case on a line. */
+export interface ABIAdCvdCase {
+  caseNumber: string;
+  bondOrCash: 'B' | 'C';
+  /** A = ad valorem percent; S = specific dollars per unit. */
+  rateType: 'A' | 'S';
+  rate: number;
+  /** Specific rates only. */
+  quantity?: number;
+}
+
 export interface ABIItem {
   sku: string;
   htsNumber: string;
   /** Trade agreement / special program claim (AE Table 8), e.g. 'S' for USMCA. */
   spiClaimCode?: string;
+  /** AD/CVD cases on this line (entry type 03), at most two. */
+  adCvdCases?: ABIAdCvdCase[];
   description: string;
   origin: { country: string };
   values: {
@@ -1993,7 +2006,7 @@ export interface ABIManifest {
  * with `Partial<ABIDocumentBody>` / DeepPartial while editing drafts.
  */
 export interface ABIDocumentBody {
-  entryType: '01' | '11' | '86'; // 86 = de minimis (Section 321), cargo-release only
+  entryType: '01' | '03' | '11' | '86'; // 03 = with AD/CVD; 86 = de minimis, suspended by CBP
   modeOfTransport: string;   // CATAIR AE Table 3, e.g. "11" vessel containerized, "40" air
   entryNumber: string;       // filer-assigned (not CBP-assigned)
   dates: ABIDates;

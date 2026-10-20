@@ -1,9 +1,8 @@
 /**
  * Step 1 — Entry & Shipment Info
  *
- * Supported entry types: "01" (Consumption Formal) and "86" (De Minimis,
- * Section 321). "11" Informal Entry is still rendered but gated via
- * `disabledValues` + a tooltip hint until its flow is validated.
+ * Entry types: 01 (consumption), 03 (consumption with AD/CVD cases) and
+ * 11 (informal). 86 (de minimis) stays listed but disabled: CBP suspended it.
  */
 import { useState } from 'react';
 import { Info, Loader2, Ship, Sparkles } from 'lucide-react';
@@ -88,10 +87,10 @@ export default function Step1EntryShipment({ value, onChange, errors = {} }: Ste
           label="Entry Type"
           required
           value={value.entryType || '01'}
-          onChange={(v) => onChange({ entryType: v as '01' | '11' | '86' })}
+          onChange={(v) => onChange({ entryType: v as '01' | '03' | '11' | '86' })}
           options={ENTRY_TYPES}
-          hint="CBP suspended de minimis (Type 86) entries; low-value shipments file as formal (01). Informal (11) is coming soon."
-          disabledValues={['11', '86']}
+          hint="Goods under an antidumping or countervailing duty order file as 03. CBP suspended de minimis (Type 86)."
+          disabledValues={['86']}
           error={errors.entryType}
         />
         <SelectField

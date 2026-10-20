@@ -64,6 +64,26 @@ describe('transmitEntryNative', () => {
     expect(out.httpStatus).toBe(202);
   });
 
+  it('certifies a type 03 (AD/CVD) entry for cargo release too (CATAIR note ee)', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DOC, entryType: '03' });
+    await transmitEntryNative(ARGS);
+    expect(engine.buildEntrySummary.mock.calls[0][0].cargoReleaseCertification).toBe(true);
+  });
+
+  it('refuses an informal entry over $2,500 before any claim', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DOC, entryType: '11' });
+    engine.enrichWithDuty.mockResolvedValueOnce({ entrySummary: { lines: [{ tariffs: [{ htsNumber: '8507600030', valueDollars: 2600 }] }] } });
+    const out = await transmitEntryNative(ARGS);
+    expect(out).toMatchObject({ httpStatus: 422, body: { code: 'INFORMAL_VALUE_LIMIT' } });
+    expect(prisma.abiDocument.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('accepts an informal entry at $2,500', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DOC, entryType: '11' });
+    engine.enrichWithDuty.mockResolvedValueOnce({ entrySummary: { lines: [{ tariffs: [{ htsNumber: '8507600030', valueDollars: 2500 }] }] } });
+    expect((await transmitEntryNative(ARGS)).httpStatus).toBe(202);
+  });
+
   it('refuses Type 86', async () => {
     prisma.abiDocument.findFirst.mockResolvedValue({ ...DOC, entryType: '86' });
     expect((await transmitEntryNative(ARGS)).body).toMatchObject({ code: 'entry_type_suspended' });

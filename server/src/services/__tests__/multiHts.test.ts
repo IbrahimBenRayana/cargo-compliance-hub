@@ -17,7 +17,7 @@ import { toAeEntrySummaryInput } from '../../abi-engine/payload/toAeInput.js';
 import { validateEntrySummary } from '../../abi-engine/validate/entrySummary.js';
 import { buildEntrySummary } from '../../abi-engine/ae/builder.js';
 import { RecordCodecError } from '../../abi-engine/records/codec.js';
-import { hasCh99Claims, mapABIDocumentToCC } from '../abiDocumentMapper.js';
+import { hasNativeOnlyData, mapABIDocumentToCC } from '../abiDocumentMapper.js';
 import { entryBody } from './fixtures/entryBody.js';
 
 const USITC = {
@@ -143,8 +143,8 @@ describe('ch.99 picker search', () => {
 
 describe('CustomsCity fallback', () => {
   it('never receives ch.99 claims', () => {
-    expect(hasCh99Claims(body({ ch99: ['99039106'] }) as never)).toBe(true);
-    expect(hasCh99Claims(body() as never)).toBe(false);
+    expect(hasNativeOnlyData(body({ ch99: ['99039106'] }) as never)).toBe(true);
+    expect(hasNativeOnlyData(body() as never)).toBe(false);
     expect(() => mapABIDocumentToCC({ payload: body({ ch99: ['99039106'] }) as never })).toThrow(/Chapter 99/);
     const item = mapABIDocumentToCC({ payload: body() as never }).body[0].manifest[0].invoices[0].items[0];
     expect(item).not.toHaveProperty('additionalHtsNumbers');

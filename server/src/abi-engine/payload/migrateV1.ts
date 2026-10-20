@@ -84,11 +84,35 @@ function migrateItem(item: AbiItem, invoice: AbiInvoice, foreignPortOfLading?: s
     // The engine prices the claim from the HTS Special column and applies
     // the program's MPF exemption (duty/engine.ts, fees.ts).
     spiClaimCode: item.spiClaimCode || undefined,
+    adCvdCases: item.adCvdCases?.length ? item.adCvdCases.map((c) => adCvdCase(c, item)) : undefined,
     foreignPortOfLading: foreignPortOfLading || undefined,
     grossWeightKg: toKilograms(item.weight.gross, item.weight.uom),
     descriptions: item.description ? [item.description.slice(0, 70)] : undefined,
     parties: parties.length > 0 ? parties : undefined,
     tariffs: buildTariffs(item, quantity),
+  };
+}
+
+/**
+ * An AD/CVD case for the 53-record with its estimated deposit (usage note
+ * ff): ad valorem on the line's entered value, specific on the case
+ * quantity. CERT 043: $68,707 x 3.80% = 2,610.87.
+ */
+function adCvdCase(c: NonNullable<AbiItem['adCvdCases']>[number], item: AbiItem): NonNullable<LineV2['adCvdCases']>[number] {
+  const valueDollars = Math.round(item.values.totalValueOfGoods);
+  const rateHundredths = Math.round(c.rate * 100);
+  if (c.rateType === 'S' && c.quantity === undefined) fail('adCvdCases.quantity', 'a specific AD/CVD rate needs the quantity');
+  return {
+    caseNumber: c.caseNumber.replace(/-/g, '').toUpperCase(),
+    bondCashClaimCode: c.bondOrCash,
+    depositRateHundredths: rateHundredths,
+    rateTypeQualifier: c.rateType,
+    valueOfGoodsDollars: valueDollars,
+    ...(c.rateType === 'S' && { quantityTenThousandths: Math.round(c.quantity! * 10_000) }),
+    dutyCents:
+      c.rateType === 'A'
+        ? Math.round((valueDollars * rateHundredths) / 100)
+        : Math.round(c.quantity! * rateHundredths),
   };
 }
 
