@@ -166,5 +166,23 @@ Source: `docs/audit/2026-10-platform-audit.md` (237 findings; ids below refer to
 - [x] 3.5 Wizard: edit keeps all lines/units; filer choice; bill type; STB bond; consignee number; party validation; multiple manufacturers; estimated lading date (exact deadline); container types aligned
 - [x] Details: confirm before transmit (+resubmit); CBP activity card replaces timers/CC checker for native
 
-### Phases 4-5
-Expanded when each starts, from the workstream table in the audit report (A4-A5, C, D).
+### Phase 4: native entries — IN PROGRESS
+- [x] 4.1 Entry lifecycle (summary and release separate) + transmitEntryNative (native default, CC fallback)
+- [x] 4.2 applyEntryVerdict for AX/SX; billing on the transition into ACCEPTED
+- [x] FX: CBP %R currency broadcasts captured (cbp_currency_rates); EUR converts, others fail closed until direction verified
+- [x] MID from the largest street number + transliteration (ENG-09)
+- [x] Preflight: POST /abi-documents/:id/preflight, shown in the review step (FNA-21, CAP-06)
+- [x] 4.3 SPI per line (ENG-M2); payment statement fields by type (FNA-02); 4-digit Schedule D ports (UFF-03);
+      vessel foreign port of lading (F429); AD/CVD type 03 with cases (ENG-M1); informal 11 with $2,500 limit;
+      STB amount (FNA-21); CC fallback refuses native-only data
+- [x] 4.4 ch.99 (workstream C): USITC-text semantics (add / replace / none / unknown) proven on every CERT golden;
+      8-digit, unit-less, deduped, CBP-ordered overlays; picker search fixed; wizard picker; per-tariff estimate,
+      PDF and import columns
+- [ ] 4.4 later: ch.99 determination (required numbers per origin/HTS, F771), 232 declarations (54-records),
+      dated rates (MHT-08), base second unit from refdata (MHT-03)
+- [ ] 4.5 Entry UI: replace/delete/PSC actions, CBP activity card for entries with decoded conditions,
+      FPR-01 autosave race
+- [ ] Live native entry on CERT (needs a non-S7P filer code or a CERT-only path)
+
+### Phase 5
+Expanded when it starts, from the workstream table in the audit report (A5, D).
