@@ -38,6 +38,9 @@ export interface DutyEstimateLine {
   /** 1-based entry summary line number. */
   lineNumber: number;
   htsNumbers: string[];
+  /** Each tariff in wire order (ch.99 numbers first), with its own duty;
+   *  a base replaced by a ch.99 rate shows 0 (audit MHT-09/10). */
+  tariffs: Array<{ htsNumber: string; valueDollars: number; dutyCents: number }>;
   valueDollars: number;
   dutyCents: number;
   mpfCents: number;
@@ -156,6 +159,7 @@ export async function estimateDutyForBody(
     const lines: DutyEstimateLine[] = es.lines.map((line, index) => ({
       lineNumber: index + 1,
       htsNumbers: line.tariffs.map((t) => t.htsNumber),
+      tariffs: line.tariffs.map((t) => ({ htsNumber: t.htsNumber, valueDollars: t.valueDollars, dutyCents: t.dutyCents ?? 0 })),
       valueDollars: line.tariffs.reduce((sum, t) => sum + t.valueDollars, 0),
       dutyCents: line.tariffs.reduce((sum, t) => sum + (t.dutyCents ?? 0), 0),
       mpfCents: (line.fees ?? []).filter((f) => f.classCode === '499').reduce((s, f) => s + f.amountCents, 0),

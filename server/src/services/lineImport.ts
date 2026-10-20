@@ -13,6 +13,7 @@
  * an XLSX parser dependency isn't worth its supply-chain surface.
  */
 import { z } from 'zod';
+import { SPI_CLAIM_CODES } from '../abi-engine/refdata/spiCodes.js';
 
 // ─── Public shapes ──────────────────────────────────────────────────
 
@@ -31,6 +32,10 @@ export interface LineImportItem {
   values: { currency: string; exchangeRate: number; totalValueOfGoods: number };
   quantity1: string;
   weight: { gross: string; uom: string };
+  /** Chapter 99 numbers, 8 digits each (optional column). */
+  additionalHtsNumbers?: string[];
+  /** Trade program claim, AE Table 8 (optional column). */
+  spiClaimCode?: string;
   parties: Array<{
     type: 'manufacturer' | 'buyer';
     name?: string;
@@ -71,12 +76,15 @@ const ALL_COLUMNS = [
   'manufacturer_city',
   'manufacturer_country',
   'buyer_tax_id',
+  'chapter99_numbers',
+  'spi_claim',
 ] as const;
 
 /** Downloadable template: header + one example row. */
 export const LINE_IMPORT_TEMPLATE = [
   ALL_COLUMNS.join(','),
-  'BAT-01,8507.60.0020,LITHIUM ION BATTERY PACKS,CN,10000,500 NO,2646,LB,USD,1,SHENZHEN BATTERY CO,,SHENZHEN,CN,26-164751100',
+  // The CN battery stack CERT accepted: 301 review, NT52 CN, 232 auto parts.
+  'BAT-01,8507.60.0030,LITHIUM ION BATTERY PACKS,CN,10000,500 NO,2646,LB,USD,1,SHENZHEN BATTERY CO,,SHENZHEN,CN,26-164751100,9903.91.06 9903.05.31 9903.94.06,',
 ].join('\n');
 
 // ─── CSV parsing (RFC-4180 quotes, CRLF-tolerant) ───────────────────
@@ -127,6 +135,12 @@ const importedItemSchema = z.object({
     uom: z.enum(['K', 'L'], { message: 'Weight unit must be KG or LB' }),
   }),
   parties: z.array(z.object({}).passthrough()).min(1),
+  additionalHtsNumbers: z
+    .array(z.string().regex(/^99\d{6}$/, 'Chapter 99 numbers are 8 digits starting with 99'))
+    .max(31)
+    .refine((l) => new Set(l).size === l.length, 'A chapter 99 number is listed twice')
+    .optional(),
+  spiClaimCode: z.enum(SPI_CLAIM_CODES, { message: 'Not a CBP trade program claim code (AE Table 8)' }).optional(),
 });
 
 /** Which template column produced a given schema path (for row errors). */
@@ -142,6 +156,8 @@ const FIELD_TO_COLUMN: Record<string, string> = {
   'weight.gross': 'gross_weight',
   'weight.uom': 'weight_uom',
   parties: 'manufacturer_name',
+  additionalHtsNumbers: 'chapter99_numbers',
+  spiClaimCode: 'spi_claim',
 };
 
 function parseNumber(raw: string): number {
@@ -231,6 +247,11 @@ export function parseLineImportCsv(text: string): LineImportResult {
       },
       parties,
     };
+    // Space, comma or semicolon separated; dots optional.
+    const ch99 = col('chapter99_numbers', raw).split(/[\s,;]+/).map((n) => n.replace(/\./g, '')).filter(Boolean);
+    if (ch99.length > 0) candidate.additionalHtsNumbers = ch99;
+    const spi = col('spi_claim', raw).toUpperCase();
+    if (spi) candidate.spiClaimCode = spi;
 
     const parsed = importedItemSchema.safeParse(candidate);
     if (!parsed.success) {
@@ -238,7 +259,7 @@ export function parseLineImportCsv(text: string): LineImportResult {
         const path = issue.path.join('.');
         errors.push({
           row: rowNumber,
-          field: FIELD_TO_COLUMN[path] ?? path,
+          field: FIELD_TO_COLUMN[path] ?? FIELD_TO_COLUMN[String(issue.path[0])] ?? path,
           message: issue.message,
         });
       }

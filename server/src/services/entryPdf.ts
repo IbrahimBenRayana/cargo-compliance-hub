@@ -57,11 +57,22 @@ function fmtDollars(dollars: number | null | undefined): string {
   return dollars.toLocaleString('en-US');
 }
 
-/** 8507600020 → 8507.60.0020 (display convention on the printed form). */
+/** 8507600020 → 8507.60.0020, 99038803 → 9903.88.03 (printed-form convention). */
 function fmtHts(hts: string): string {
   const flat = hts.replace(/\D/g, '');
-  if (flat.length !== 10) return hts;
+  if (flat.length !== 10 && flat.length !== 8) return hts;
   return `${flat.slice(0, 4)}.${flat.slice(4, 6)}.${flat.slice(6)}`;
+}
+
+/** USITC ch.99 wording shortened for the 44pt rate column: '+ 25%' for
+ *  'The duty provided in the applicable subheading + 25%', 'No addl.' for
+ *  the bare phrase or 'No change'. Plain rates print as given. */
+function printedRate(text: string): string {
+  const t = text.trim();
+  const plus = t.match(/^the duty provided in the applicable subheading\s*(?:\+|plus)\s*(.+)$/i);
+  if (plus) return `+ ${plus[1]}`;
+  if (/^the duty provided in the applicable subheading$/i.test(t) || /^no change$/i.test(t)) return 'No addl.';
+  return t;
 }
 
 // ─── Layout constants ───────────────────────────────────────────────
@@ -114,16 +125,20 @@ export async function renderEntry7501Pdf(args: RenderEntry7501Args): Promise<Buf
     }
   }
 
-  // Rate expression per distinct HTS (display column 33).
+  const estLines = est.estimable ? est.lines : [];
+
+  // Rate expression per distinct HTS, chapter 99 numbers included (column 33).
   const rateByHts = new Map<string, string>();
-  for (const { item } of items) {
-    const hts = (item.htsNumber ?? '').replace(/\D/g, '');
+  const allHts = [
+    ...items.map(({ item }) => (item.htsNumber ?? '').replace(/\D/g, '')),
+    ...items.flatMap(({ item }) => item.additionalHtsNumbers ?? []),
+  ];
+  for (const hts of allHts) {
     if (hts && !rateByHts.has(hts)) {
-      rateByHts.set(hts, (await args.rateText(hts)) ?? '—');
+      const text = await args.rateText(hts);
+      rateByHts.set(hts, text ? printedRate(text) : '—');
     }
   }
-
-  const estLines = est.estimable ? est.lines : [];
   const totals = est.estimable ? est.totals : null;
   // 38 Tax / 39 Other split: IR tax is "Tax"; everything that is neither
   // duty nor tax (MPF, HMF, informal fee, AD/CVD deposits…) lands in Other.
@@ -292,18 +307,24 @@ export async function renderEntry7501Pdf(args: RenderEntry7501Args): Promise<Buf
       drawLineTableHeader();
       pdf.font('Helvetica').fontSize(7).fillColor('#000000');
     }
-    const rowHeight = 22;
     const flatHts = (item.htsNumber ?? '').replace(/\D/g, '');
     const estLine = estLines[index];
+    // Every tariff on the line in filed order (ch.99 first, base last), each
+    // with its own rate and duty, so rate x value reconciles (audit MHT-10).
+    const tariffs = estLine?.tariffs ?? [
+      ...(item.additionalHtsNumbers ?? []).map((htsNumber) => ({ htsNumber, dutyCents: undefined as number | undefined })),
+      { htsNumber: flatHts, dutyCents: undefined as number | undefined },
+    ];
+    const rowHeight = Math.max(22, tariffs.length * 9 + 6);
     const cells = [
       String(index + 1).padStart(3, '0'),
       `${item.description ?? ''}\n${item.sku ? `SKU ${item.sku}` : ''} · Inv ${inv.invoiceNumber ?? '—'}`,
-      fmtHts(item.htsNumber ?? ''),
+      tariffs.map((t) => fmtHts(t.htsNumber)).join('\n'),
       `${item.weight?.gross ?? '—'} ${item.weight?.uom === 'L' ? 'LB' : 'KG'}`,
       `${item.quantity1 ?? '—'}`,
       fmtDollars(item.values?.totalValueOfGoods),
-      rateByHts.get(flatHts) ?? '—',
-      estLine ? fmtCents(estLine.dutyCents) : '—',
+      tariffs.map((t) => rateByHts.get(t.htsNumber) ?? '—').join('\n'),
+      tariffs.map((t) => (t.dutyCents === undefined ? '—' : fmtCents(t.dutyCents))).join('\n'),
     ];
     let x = PAGE_LEFT;
     pdf.rect(PAGE_LEFT, y, PAGE_WIDTH, rowHeight).lineWidth(0.25).strokeColor('#666666').stroke();

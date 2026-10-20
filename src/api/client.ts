@@ -1958,6 +1958,8 @@ export interface ABIItem {
   spiClaimCode?: string;
   /** AD/CVD cases on this line (entry type 03), at most two. */
   adCvdCases?: ABIAdCvdCase[];
+  /** Chapter 99 numbers (8 digits) claimed with the base classification. */
+  additionalHtsNumbers?: string[];
   description: string;
   origin: { country: string };
   values: {
@@ -2126,6 +2128,8 @@ export interface DutyEstimateFee {
 export interface DutyEstimateLine {
   lineNumber: number;
   htsNumbers: string[];
+  /** Each tariff in wire order (ch.99 first) with its own duty. */
+  tariffs: Array<{ htsNumber: string; valueDollars: number; dutyCents: number }>;
   valueDollars: number;
   dutyCents: number;
   mpfCents: number;

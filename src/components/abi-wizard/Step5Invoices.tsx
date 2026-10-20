@@ -46,6 +46,7 @@ import {
 } from './shared';
 import { ImportLinesDialog } from './ImportLinesDialog';
 import { AdCvdCasesEditor } from './AdCvdCasesEditor';
+import { Ch99Picker } from './Ch99Picker';
 
 interface Props {
   value: ABIDocumentDraft;
@@ -549,6 +550,12 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                             />
                           </div>
                         </div>
+
+                        <Ch99Picker
+                          value={item.additionalHtsNumbers}
+                          onChange={(additionalHtsNumbers) => updateItem(invIdx, itemIdx, { additionalHtsNumbers })}
+                          error={errors[`${itemPath}.additionalHtsNumbers`]}
+                        />
 
                         {value.entryType === '03' && (
                           <AdCvdCasesEditor

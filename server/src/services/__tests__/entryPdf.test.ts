@@ -133,6 +133,35 @@ describe('renderEntry7501Pdf', () => {
     expect(pdf).toContain('340.00');
   });
 
+  it('prints each chapter 99 number above the base with its own rate and duty (MHT-10)', async () => {
+    const body = completeBody();
+    body.manifest[0].invoices[0].items[0].additionalHtsNumbers = ['99030531', '99038803'];
+    const texts: Record<string, string> = {
+      '8507600020': '3.4%',
+      '99038803': 'The duty provided in the applicable subheading + 25%',
+      '99030531': 'The duty provided in the applicable subheading + 12.5%',
+    };
+    const estimate = await estimateDutyForBody(body, new StaticRateSource(texts));
+    const buffer = await renderEntry7501Pdf({
+      doc: { id: 'doc-1', status: 'ACCEPTED', entryNumber: 'SP7-2000001-0', sentAt: new Date('2026-08-20T12:00:00Z') },
+      body,
+      estimate,
+      rateText: async (hts) => texts[hts] ?? null,
+      orgName: 'US Imports Inc.',
+      compress: false,
+    });
+    const pdf = extractPdfText(buffer.toString('latin1'));
+    expect(pdf).toContain('9903.88.03');
+    expect(pdf).toContain('9903.05.31');
+    expect(pdf).toContain('+ 25%');
+    expect(pdf).toContain('2,500.00');
+    expect(pdf).toContain('1,250.00');
+    expect(pdf).toContain('340.00');
+    // 301 before NT52 before the base, whatever order they were entered in.
+    expect(pdf.indexOf('9903.88.03')).toBeLessThan(pdf.indexOf('9903.05.31'));
+    expect(pdf.indexOf('9903.05.31')).toBeLessThan(pdf.indexOf('8507.60.0020'));
+  });
+
   it('renders the fee summary (37-40) from the duty estimate', async () => {
     const pdf = await render('ACCEPTED');
     expect(pdf).toContain('34.64'); // MPF

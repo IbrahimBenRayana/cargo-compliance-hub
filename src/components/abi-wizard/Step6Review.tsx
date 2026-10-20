@@ -486,6 +486,11 @@ function DutyEstimateCard({ docId }: { docId?: string }) {
   );
 }
 
+/** 99038803 -> 9903.88.03; 8507600030 -> 8507.60.0030. */
+function fmtHtsNumber(n: string): string {
+  return `${n.slice(0, 4)}.${n.slice(4, 6)}.${n.slice(6)}`;
+}
+
 function DutyEstimateBody({ result }: { result: DutyEstimateResult }) {
   // Explicit comparison: the app tsconfig runs non-strict, where truthiness
   // checks don't narrow boolean-literal discriminants.
@@ -556,6 +561,26 @@ function DutyEstimateBody({ result }: { result: DutyEstimateResult }) {
           </div>
         )}
       </dl>
+      {result.lines.some((l) => l.tariffs.length > 1) && (
+        <details className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Duty by line and tariff number</summary>
+          <ul className="mt-2 space-y-2">
+            {result.lines.map((line) => (
+              <li key={line.lineNumber}>
+                <div className="text-xs text-muted-foreground">Line {line.lineNumber}</div>
+                <dl className="mt-0.5 space-y-0.5">
+                  {line.tariffs.map((t) => (
+                    <div key={t.htsNumber} className="flex items-center justify-between gap-3">
+                      <dt className="font-mono text-xs">{fmtHtsNumber(t.htsNumber)}</dt>
+                      <dd className="tabular-nums text-xs">{fmtCents(t.dutyCents)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       <div className="flex items-baseline justify-between border-t pt-2">
         <span className="text-sm font-semibold">Estimated total</span>
         <span className="text-2xl font-bold tabular-nums">

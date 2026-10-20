@@ -44,6 +44,17 @@ describe('parseLineImportCsv', () => {
     expect(result.items.length).toBeGreaterThan(0);
   });
 
+  it('reads chapter 99 numbers and the trade program claim', () => {
+    const result = parseLineImportCsv(`${HEADER},chapter99_numbers,spi_claim\n${GOOD_ROW},9903.91.06;99030531,s`);
+    expect(result.errors).toEqual([]);
+    expect(result.items[0]).toMatchObject({ additionalHtsNumbers: ['99039106', '99030531'], spiClaimCode: 'S' });
+  });
+
+  it('reports a bad chapter 99 number or claim against its column', () => {
+    const result = parseLineImportCsv(`${HEADER},chapter99_numbers,spi_claim\n${GOOD_ROW},8415.82,MX`);
+    expect(result.errors.map((e) => e.field).sort()).toEqual(['chapter99_numbers', 'spi_claim']);
+  });
+
   it('handles quoted fields containing commas', () => {
     const row = GOOD_ROW.replace(
       'LITHIUM ION BATTERY PACKS',
