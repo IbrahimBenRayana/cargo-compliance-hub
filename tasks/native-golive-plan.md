@@ -157,5 +157,14 @@ Source: `docs/audit/2026-10-platform-audit.md` (237 findings; ids below refer to
 - [ ] Platform admins must have MFA (BPR-11): blocked on the staging admin enrolling MFA first (asked Ibrahim)
 - [ ] Per-filing ISF filer choice in the wizard: with Phase 3
 
-### Phases 3-5
-Expanded when each starts, from the workstream table in the audit report (A3-A5, C, D).
+### Phase 3: native ISF — DONE 2026-10-20
+- [x] 3.1 Honest ISF mapper (no invented country/city/street/consignee; real importer ID types)
+- [x] 3.2 Lifecycle cbpState/pendingAction/isfFilerCode + house-bill SCAC
+- [x] 3.3 transmitIsfNative ADD/REPLACE/DELETE; native default, CC fallback; CC pollers skip native
+- [x] 3.4 applyIsfVerdict exactly once (status, notify, webhook, billing on first ADD)
+- [x] Live CERT chain with 57-123456789: ADD S7P-66857272823 -> REPLACE -> DELETE all accepted
+- [x] 3.5 Wizard: edit keeps all lines/units; filer choice; bill type; STB bond; consignee number; party validation; multiple manufacturers; estimated lading date (exact deadline); container types aligned
+- [x] Details: confirm before transmit (+resubmit); CBP activity card replaces timers/CC checker for native
+
+### Phases 4-5
+Expanded when each starts, from the workstream table in the audit report (A4-A5, C, D).
