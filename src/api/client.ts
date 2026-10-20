@@ -323,6 +323,43 @@ export interface FilingListParams {
   limit?: number;
 }
 
+/** A CBP condition as the server describes it (services/cbp/conditions). */
+export interface CbpConditionView {
+  source: string;
+  code: string;
+  severity?: string;
+  narrative: string;
+  explanation?: string;
+  blocking: boolean;
+  audience: 'filer' | 'operations';
+  pointers?: { type: string; text: string }[];
+}
+
+export interface CbpResponseSummary {
+  application: string;
+  verdict: 'ACCEPTED' | 'REJECTED' | 'CONDITIONAL' | 'INFO';
+  conditions: CbpConditionView[];
+  keys: { entryNumber?: string; isfTransactionNumber?: string };
+  narrative?: string;
+}
+
+export interface FilingCbpActivity {
+  filing: { id: string; status: string; cbpState: string; pendingAction: string | null; isfFilerCode: string | null; cbpTransactionId: string | null };
+  transmissions: Array<{
+    id: string;
+    environment: string;
+    action: string | null;
+    filerCode: string;
+    status: string;
+    sentAt: string | null;
+    respondedAt: string | null;
+    createdAt: string;
+    lastError: string | null;
+    isfTransactionNumber: string | null;
+    inbound: Array<{ id: string; application: string | null; receivedAt: string; parsed: CbpResponseSummary | null }>;
+  }>;
+}
+
 export const filingsApi = {
   list(params?: FilingListParams) {
     const query = new URLSearchParams();
@@ -394,6 +431,8 @@ export const filingsApi = {
       filing: Filing;
       ccFilingId: string | null;
       sendResponse?: { success?: boolean; 'Documents sent'?: number } & Record<string, unknown>;
+      /** Present when the org files through the native engine. */
+      native?: { transmissionId: string; outcome: 'SENT' | 'UNKNOWN'; filerCode: string; status: string; pendingAction: string | null };
     }>(`/api/v1/filings/${id}/submit`, { method: 'POST' });
   },
 
@@ -424,6 +463,11 @@ export const filingsApi = {
 
   validate(id: string) {
     return apiFetch<{ valid: boolean; errors: ValidationIssue[]; score: number; criticalCount: number; warningCount: number; infoCount: number }>(`/api/v1/filings/${id}/validate`, { method: 'POST' });
+  },
+
+  /** Native CBP activity: transmissions with CBP's decoded responses. */
+  cbpActivity(id: string) {
+    return apiFetch<FilingCbpActivity>(`/api/v1/filings/${id}/cbp`);
   },
 
   checkStatus(id: string) {

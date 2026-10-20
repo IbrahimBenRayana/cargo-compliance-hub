@@ -418,6 +418,30 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolle
   res.status(outcome.httpStatus).json(outcome.body);
 });
 
+// ─── GET /api/v1/filings/:id/cbp — native CBP activity for this filing ──
+// Every transmission (what was sent, when, its outcome) with CBP's decoded
+// responses (verdict, conditions in CBP's words). Drives the live timeline.
+router.get('/:id/cbp', async (req: AuthRequest, res: Response): Promise<void> => {
+  const filing = await prisma.filing.findFirst({
+    where: { id: paramId(req), orgId: req.user!.orgId },
+    select: { id: true, status: true, cbpState: true, pendingAction: true, isfFilerCode: true, cbpTransactionId: true },
+  });
+  if (!filing) {
+    res.status(404).json({ error: 'Filing not found' });
+    return;
+  }
+  const transmissions = await prisma.cbpTransmission.findMany({
+    where: { entityType: 'filing', entityId: filing.id, orgId: req.user!.orgId },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true, environment: true, action: true, filerCode: true, status: true,
+      sentAt: true, respondedAt: true, createdAt: true, lastError: true, isfTransactionNumber: true,
+      inbound: { orderBy: { receivedAt: 'asc' }, select: { id: true, application: true, receivedAt: true, parsed: true } },
+    },
+  });
+  res.json({ filing, transmissions });
+});
+
 // ─── POST /api/v1/filings/:id/amend — Submit amendment ─────
 router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const filing = await prisma.filing.findFirst({
