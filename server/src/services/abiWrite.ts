@@ -7,6 +7,7 @@
  * Covers CREATE (createAbiDocumentForOrg) and SEND (sendAbiDocumentToCBP).
  * The send path's polling subsystem lives in ./abiPolling.ts.
  */
+import { transmitEntryNative } from './cbp/nativeEntry.js';
 import { checkEntryFiler, loadOrgCbpConfig } from './cbp/filerIdentity.js';
 import type { z } from 'zod';
 import { prisma } from '../config/database.js';
@@ -171,6 +172,18 @@ export async function sendAbiDocumentToCBP(params: {
   }
   if (!denorm.entryNumber) {
     return { httpStatus: 400, body: { error: 'ABI document payload is missing filer-assigned entry number' } };
+  }
+
+  // Native gateway (the default): our own certified engine. CustomsCity
+  // remains only as a per-org fallback (OrgCbpConfig.gateway = 'CC').
+  if (((await loadOrgCbpConfig(orgId))?.gateway ?? 'NATIVE') === 'NATIVE') {
+    // Keep the list columns (entry number, MBOL, ports) in step with the payload.
+    await prisma.abiDocument.updateMany({ where: { id: doc.id, status: doc.status }, data: denorm });
+    const native = await transmitEntryNative({ docId: doc.id, orgId, userId, action: 'ADD' });
+    if (native.httpStatus >= 300) return { httpStatus: native.httpStatus, body: native.body };
+    const updated = await prisma.abiDocument.findUnique({ where: { id: doc.id } });
+    emitWebhook(orgId, 'entry.sent', { abiDocumentId: doc.id, entryNumber: doc.entryNumber, entryType: doc.entryType, mbolNumber: doc.mbolNumber });
+    return { httpStatus: 200, body: { data: updated, native: native.body } };
   }
 
   // Atomic DRAFT→SENDING (single UPDATE with a status predicate — exactly one

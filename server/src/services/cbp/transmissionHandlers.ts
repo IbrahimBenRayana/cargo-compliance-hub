@@ -15,6 +15,7 @@ import { prisma } from '../../config/database.js';
 import type { InboundHandler } from './dispatcher.js';
 import { summarizeResponse } from './responses.js';
 import { applyIsfVerdict } from './isfVerdicts.js';
+import { applyEntryVerdict } from './entryVerdicts.js';
 
 export const taggedTransmissionHandler: InboundHandler = async (row) => {
   if (!row.userDataTag?.startsWith('MCL')) return null;
@@ -34,6 +35,9 @@ export const taggedTransmissionHandler: InboundHandler = async (row) => {
     // The filing itself follows CBP's verdict (status, notify, webhook, billing).
     if (tx.entityType === 'filing' && tx.entityId) {
       await applyIsfVerdict({ filingId: tx.entityId, transmissionId: tx.id, filerCode: tx.filerCode, summary });
+    }
+    if (tx.entityType === 'abi_document' && tx.entityId) {
+      await applyEntryVerdict({ docId: tx.entityId, transmissionId: tx.id, summary });
     }
   }
   return {
@@ -55,6 +59,11 @@ export const businessKeyHandler: InboundHandler = async (row) => {
     orderBy: { createdAt: 'desc' },
   });
   if (!tx) return null;
+  // A cargo release response (SX) may come without our tag: it settles the
+  // entry's release by entry number. Other unsolicited messages are recorded only.
+  if (summary.application === 'SX' && tx.entityType === 'abi_document' && tx.entityId) {
+    await applyEntryVerdict({ docId: tx.entityId, transmissionId: tx.id, summary });
+  }
   return {
     entityType: tx.entityType ?? 'cbp_transmission',
     entityId: tx.entityId ?? tx.id,

@@ -13,6 +13,7 @@ vi.mock('../../../config/database.js', () => ({ prisma }));
 const { summary, applyIsf } = vi.hoisted(() => ({ summary: vi.fn(), applyIsf: vi.fn() }));
 vi.mock('../responses.js', () => ({ summarizeResponse: summary }));
 vi.mock('../isfVerdicts.js', () => ({ applyIsfVerdict: applyIsf }));
+vi.mock('../entryVerdicts.js', () => ({ applyEntryVerdict: vi.fn() }));
 
 import { taggedTransmissionHandler, businessKeyHandler } from '../transmissionHandlers.js';
 

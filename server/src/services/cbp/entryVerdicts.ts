@@ -1,0 +1,72 @@
+/**
+ * Apply CBP's entry responses (native go-live 4.2; audit D5).
+ *
+ * AX settles the entry summary (only for the transmission still pending);
+ * SX settles the certified cargo release. The entry's status is derived
+ * from both (entryLifecycle). Notification, webhook and billing fire only
+ * on the transition into ACCEPTED or REJECTED, and billing is idempotent at
+ * the database, so duplicate or late responses change nothing twice.
+ */
+import { prisma } from '../../config/database.js';
+import { notify } from '../notifications.js';
+import { emitWebhook } from '../webhooks.js';
+import { billShipment } from '../shipmentBilling.js';
+import { entryStateOnReleaseVerdict, entryStateOnSummaryVerdict } from './entryLifecycle.js';
+import type { ResponseSummary } from './responses.js';
+
+export async function applyEntryVerdict(opts: { docId: string; transmissionId: string; summary: ResponseSummary }): Promise<void> {
+  const { summary } = opts;
+  if (summary.verdict !== 'ACCEPTED' && summary.verdict !== 'REJECTED') return;
+  const isRelease = summary.application === 'SX';
+  if (!isRelease && summary.application !== 'AX') return;
+
+  const doc = await prisma.abiDocument.findUnique({ where: { id: opts.docId } });
+  if (!doc || doc.lastTransmissionId !== opts.transmissionId) return;
+  // The summary verdict only counts while that transaction is pending.
+  if (!isRelease && !doc.pendingAction) return;
+
+  const next = isRelease ? entryStateOnReleaseVerdict(doc, summary.verdict) : entryStateOnSummaryVerdict(doc, summary.verdict);
+  const reason = summary.verdict === 'REJECTED'
+    ? JSON.stringify({ summary: summary.narrative ?? 'Rejected by CBP', errors: summary.conditions })
+    : null;
+
+  const claimed = await prisma.abiDocument.updateMany({
+    where: isRelease
+      ? { id: doc.id, lastTransmissionId: opts.transmissionId, cargoReleaseStatus: doc.cargoReleaseStatus }
+      : { id: doc.id, lastTransmissionId: opts.transmissionId, pendingAction: doc.pendingAction },
+    data: {
+      status: next.status,
+      cbpState: next.cbpState,
+      pendingAction: next.pendingAction,
+      entrySummaryStatus: next.entrySummaryStatus,
+      cargoReleaseStatus: next.cargoReleaseStatus,
+      respondedAt: new Date(),
+      ...(reason && { lastError: reason }),
+    },
+  });
+  if (claimed.count === 0) return;
+
+  const becameTerminal = next.status !== doc.status && (next.status === 'ACCEPTED' || next.status === 'REJECTED');
+  if (!becameTerminal) return;
+
+  const ref = doc.entryNumber || doc.mbolNumber || doc.id.slice(0, 8);
+  const accepted = next.status === 'ACCEPTED';
+  await notify({
+    kind: accepted ? 'entry_accepted' : 'entry_rejected',
+    audience: { orgId: doc.orgId, roles: ['OPERATOR', 'ADMIN', 'OWNER'] },
+    title: accepted ? 'Entry Accepted by CBP' : 'Entry Rejected by CBP',
+    message: accepted
+      ? `Entry ${ref} has been accepted by CBP.`
+      : `Entry ${ref} was rejected by CBP: ${summary.conditions.map((c) => c.narrative).join('; ') || summary.narrative || 'see details'}.`,
+    linkUrl: `/abi-documents/${doc.id}`,
+    metadata: { entryNumber: ref, entryType: doc.entryType, mbolNumber: doc.mbolNumber },
+    abiDocumentId: doc.id,
+    dedupeKey: `abi_${doc.id}_${opts.transmissionId}_${next.status.toLowerCase()}`,
+  });
+  emitWebhook(doc.orgId, accepted ? 'entry.accepted' : 'entry.rejected', {
+    abiDocumentId: doc.id, entryNumber: doc.entryNumber, entryType: doc.entryType, mbolNumber: doc.mbolNumber,
+  });
+  if (accepted) {
+    await billShipment(doc.filingId ? { filingId: doc.filingId } : { abiDocumentId: doc.id }, doc.orgId);
+  }
+}

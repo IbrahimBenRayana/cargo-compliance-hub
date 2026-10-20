@@ -433,7 +433,7 @@ async function reapStuckAbiDocuments(): Promise<void> {
   try {
     const cutoff = new Date(Date.now() - ABI_SENDING_TIMEOUT_MS);
     const stuck = await prisma.abiDocument.findMany({
-      where: { status: 'SENDING', sentAt: { lt: cutoff } },
+      where: { status: 'SENDING', sentAt: { lt: cutoff }, lastTransmissionId: null },
       select: { id: true, orgId: true, ccDocumentId: true, sentAt: true },
     });
     if (stuck.length === 0) return;

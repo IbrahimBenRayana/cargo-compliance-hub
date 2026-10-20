@@ -34,6 +34,8 @@ const { prisma, abiGateway, mapper, schema, billing, entitlements } = vi.hoisted
 }));
 
 vi.mock('../../config/database.js', () => ({ prisma }));
+const { nativeEntry } = vi.hoisted(() => ({ nativeEntry: { transmitEntryNative: vi.fn() } }));
+vi.mock('../cbp/nativeEntry.js', () => nativeEntry);
 vi.mock('../abi/gateway.js', () => ({ abiGateway }));
 vi.mock('../abiDocumentMapper.js', () => mapper);
 vi.mock('../../schemas/abiDocument.js', () => schema);
@@ -50,7 +52,8 @@ const ARGS = { docId: 'd1', orgId: 'o1', userId: 'u1' };
 // ABC-1234567 with its CATAIR check digit; the org's approved CBP setup uses ABC.
 const VALID_ENTRY = 'ABC-1234567-6';
 const DRAFT = { id: 'd1', orgId: 'o1', status: 'DRAFT', payload: { entryNumber: VALID_ENTRY }, filingId: null, entryType: '01', entryNumber: 'ENT1', mbolNumber: 'MBOL1' };
-const APPROVED_CBP = { filerCode: 'ABC', isfFilerModeDefault: 'CLIENT', serviceCenterApprovedAt: new Date('2026-10-01'), gateway: 'NATIVE' };
+// These tests cover the CustomsCity fallback gateway; the native branch has its own test.
+const APPROVED_CBP = { filerCode: 'ABC', isfFilerModeDefault: 'CLIENT', serviceCenterApprovedAt: new Date('2026-10-01'), gateway: 'CC' };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -147,5 +150,14 @@ describe('sendAbiDocumentToCBP', () => {
     expect(prisma.abiDocument.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'DRAFT' }) }),
     );
+  });
+
+  it('native gateway: sends through our engine instead of CustomsCity', async () => {
+    prisma.orgCbpConfig.findUnique.mockResolvedValue({ ...APPROVED_CBP, gateway: 'NATIVE' });
+    nativeEntry.transmitEntryNative.mockResolvedValue({ httpStatus: 202, body: { transmissionId: 't1', outcome: 'SENT' } });
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(nativeEntry.transmitEntryNative).toHaveBeenCalledWith(expect.objectContaining({ action: 'ADD' }));
+    expect(abiGateway.createABIDocument).not.toHaveBeenCalled();
+    expect(out.httpStatus).toBe(200);
   });
 });
