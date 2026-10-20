@@ -88,6 +88,8 @@ export const createFilingSchema = z.object({
   foreignPortOfUnlading: z.string().max(10).optional(),
   placeOfDelivery: z.string().max(10).optional(),
   estimatedDeparture: z.string().optional(),
+  /** Estimated lading at the foreign port; makes the ISF deadline exact. */
+  estimatedLading: z.string().optional(),
   estimatedArrival: z.string().optional(),
 
   // Bond

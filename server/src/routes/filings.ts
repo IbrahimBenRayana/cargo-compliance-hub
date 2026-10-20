@@ -153,7 +153,7 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
       return;
     }
 
-    const filingDeadline: Date | null = shared.estimatedDeparture ? isfFilingDeadline(shared.estimatedDeparture) : null;
+    const filingDeadline: Date | null = shared.estimatedDeparture ? isfFilingDeadline(shared.estimatedDeparture, shared.estimatedLading) : null;
 
     const consolidationId = randomUUID();
 
@@ -204,6 +204,7 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
               placeOfDelivery: shared.placeOfDelivery,
               estimatedDeparture: shared.estimatedDeparture ? new Date(shared.estimatedDeparture) : undefined,
               estimatedArrival: shared.estimatedArrival ? new Date(shared.estimatedArrival) : undefined,
+              estimatedLading: shared.estimatedLading ? new Date(shared.estimatedLading) : undefined,
               filingDeadline: filingDeadline ?? undefined,
               bondType: shared.bondType,
               bondSuretyCode: shared.bondSuretyCode,
@@ -356,10 +357,11 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const data = createFilingSchema.partial().parse(req.body);
 
-    // Recalculate deadline if departure changed
+    // Recalculate deadline if departure or lading changed
     let filingDeadline = existing.filingDeadline;
-    if (data.estimatedDeparture) {
-      filingDeadline = isfFilingDeadline(data.estimatedDeparture);
+    if (data.estimatedDeparture || data.estimatedLading) {
+      const etd = data.estimatedDeparture ?? existing.estimatedDeparture;
+      if (etd) filingDeadline = isfFilingDeadline(etd, data.estimatedLading ?? existing.estimatedLading);
     }
 
     // Atomic org-scoped write (updateMany accepts the orgId in its where; the
@@ -370,6 +372,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
         ...data,
         estimatedDeparture: data.estimatedDeparture ? new Date(data.estimatedDeparture) : undefined,
         estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
+        estimatedLading: data.estimatedLading ? new Date(data.estimatedLading) : undefined,
         filingDeadline: filingDeadline ?? undefined,
       },
     });
@@ -475,7 +478,8 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
           ...u,
           estimatedDeparture: u.estimatedDeparture ? new Date(u.estimatedDeparture) : undefined,
           estimatedArrival: u.estimatedArrival ? new Date(u.estimatedArrival) : undefined,
-          filingDeadline: u.estimatedDeparture ? isfFilingDeadline(u.estimatedDeparture) : undefined,
+          estimatedLading: u.estimatedLading ? new Date(u.estimatedLading) : undefined,
+          filingDeadline: u.estimatedDeparture ? isfFilingDeadline(u.estimatedDeparture, u.estimatedLading ?? filing.estimatedLading) : undefined,
         } as never,
       });
     }
@@ -505,7 +509,7 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
     // Recalculate deadline if departure changed
     let filingDeadline = filing.filingDeadline;
     if (updates.estimatedDeparture) {
-      filingDeadline = isfFilingDeadline(updates.estimatedDeparture);
+      filingDeadline = isfFilingDeadline(updates.estimatedDeparture, updates.estimatedLading ?? filing.estimatedLading);
     }
 
     // Update the filing locally first
@@ -515,6 +519,7 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
         ...updates,
         estimatedDeparture: updates.estimatedDeparture ? new Date(updates.estimatedDeparture) : undefined,
         estimatedArrival: updates.estimatedArrival ? new Date(updates.estimatedArrival) : undefined,
+        estimatedLading: updates.estimatedLading ? new Date(updates.estimatedLading) : undefined,
         filingDeadline: filingDeadline ?? undefined,
         status: 'amended',
         amendedAt: new Date(),

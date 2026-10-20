@@ -306,6 +306,8 @@ model Filing {
   lastTransmissionId String? @map("last_transmission_id") @db.Uuid
   /** SCAC of the house-bill issuer (NVOCC); the carrier SCAC stays in scacCode (audit ENG-07). */
   houseBillScac      String? @map("house_bill_scac") @db.VarChar(4)
+  /** Estimated lading at the foreign port; the ISF deadline is 24h before it (19 CFR 149.2(b)). */
+  estimatedLading    DateTime? @map("estimated_lading") @db.Timestamptz()
   status           String  @default("draft") @db.VarChar(30)
   ccFilingId       String? @map("cc_filing_id") @db.VarChar(100)
   cbpTransactionId String? @map("cbp_transaction_id") @db.VarChar(100)

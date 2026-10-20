@@ -139,6 +139,7 @@ export interface Filing {
   bondSuretyCode?: string | null;
   bondReferenceNumber?: string | null;
   houseBillScac?: string | null;
+  estimatedLading?: string | null;
   /** Per-filing ISF filer: SIGMA (S7P) | CLIENT (own code); null = org default. */
   isfFilerMode?: 'SIGMA' | 'CLIENT' | null;
   /** What CBP holds: NOT_ON_FILE | ON_FILE | DELETED. */

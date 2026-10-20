@@ -181,6 +181,8 @@ interface ISFFormState {
   voyageNumber: string;
   foreignPortOfUnlading: string;
   estimatedDeparture: string;
+  /** Estimated lading at the foreign port: the ISF deadline is 24h before it. */
+  estimatedLading: string;
   estimatedArrival: string;
 
   // Cargo
@@ -250,6 +252,7 @@ const initialForm = (): ISFFormState => ({
   voyageNumber: '',
   foreignPortOfUnlading: '',
   estimatedDeparture: '',
+  estimatedLading: '',
   estimatedArrival: '',
   commodities: [emptyCommodity()],
   containers: [emptyContainer()],
@@ -573,6 +576,7 @@ export default function ShipmentWizard() {
       perHblOverrides: [{}],
       voyageNumber: '',
       estimatedDeparture: '',
+  estimatedLading: '',
       estimatedArrival: '',
       // Carry over reusable bond + party info.
       bondType: sourceFiling.bondType || 'continuous',
@@ -702,6 +706,7 @@ export default function ShipmentWizard() {
       voyageNumber: existing.voyageNumber || '',
       foreignPortOfUnlading: existing.foreignPortOfUnlading || '',
       estimatedDeparture: existing.estimatedDeparture ? existing.estimatedDeparture.split('T')[0] : '',
+      estimatedLading: existing.estimatedLading ? existing.estimatedLading.split('T')[0] : '',
       estimatedArrival: existing.estimatedArrival ? existing.estimatedArrival.split('T')[0] : '',
       commodities: toCommodityForms(existing.commodities, emptyCommodity),
       containers: toContainerForms(existing.containers, emptyContainer),
@@ -1023,6 +1028,7 @@ export default function ShipmentWizard() {
       voyageNumber: form.voyageNumber || undefined,
       foreignPortOfUnlading: form.foreignPortOfUnlading || undefined,
       estimatedDeparture: form.estimatedDeparture || undefined,
+      estimatedLading: form.estimatedLading || undefined,
       estimatedArrival: form.estimatedArrival || undefined,
       commodities,
       containers,
@@ -1734,6 +1740,10 @@ export default function ShipmentWizard() {
         <div className="space-y-1.5">
           <HintLabel label="Est. Departure Date" hint="When the vessel departs the foreign port" />
           <Input type="date" value={form.estimatedDeparture} onChange={e => set('estimatedDeparture', e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <HintLabel label="Est. Lading Date" hint="When the cargo is loaded at the foreign port. The ISF is due 24 hours before lading; without this date we estimate it conservatively from departure." />
+          <Input type="date" value={form.estimatedLading} onChange={e => set('estimatedLading', e.target.value)} />
         </div>
         <div className="space-y-1.5">
           <HintLabel label="Est. Arrival Date" required hint="When the vessel arrives at the US port" />

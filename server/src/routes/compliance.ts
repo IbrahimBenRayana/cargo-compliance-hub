@@ -65,6 +65,7 @@ router.get('/health-summary', async (req: AuthRequest, res: Response): Promise<v
         submittedAt: true,
         rejectedAt: true,
         estimatedDeparture: true,
+        estimatedLading: true,
       },
       orderBy: { createdAt: 'desc' },
     }),
@@ -123,7 +124,7 @@ router.get('/health-summary', async (req: AuthRequest, res: Response): Promise<v
   for (const f of recent) {
     if (!f.submittedAt || !f.estimatedDeparture) continue;
     trackable++;
-    const cutoff = isfFilingDeadline(f.estimatedDeparture);
+    const cutoff = isfFilingDeadline(f.estimatedDeparture, f.estimatedLading);
     if (f.submittedAt.getTime() <= cutoff.getTime()) onTime++;
   }
   const deadlineAdherence = trackable > 0 ? Math.round((onTime / trackable) * 100) : null;
@@ -296,6 +297,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       rejectedAt: true,
       rejectionReason: true,
       estimatedDeparture: true,
+        estimatedLading: true,
       manufacturer: true,
       seller: true,
       buyer: true,
@@ -425,7 +427,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
   for (const f of filings) {
     if (f.status !== 'draft') continue;
     if (!f.estimatedDeparture) continue;
-    const cutoff = isfFilingDeadline(f.estimatedDeparture).getTime();
+    const cutoff = isfFilingDeadline(f.estimatedDeparture, f.estimatedLading).getTime();
     const hoursToCutoff = (cutoff - now) / (60 * 60 * 1000);
     if (hoursToCutoff < -24 || hoursToCutoff > 72) continue;
     const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
