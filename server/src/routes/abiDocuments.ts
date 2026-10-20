@@ -26,7 +26,8 @@ import {
   extractDenormFromPayload,
 } from '../services/abiDocumentMapper.js';
 import { sanitizeErrorMessage } from '../services/errorTranslator.js';
-import { createAbiDocumentForOrg, sendAbiDocumentToCBP } from '../services/abiWrite.js';
+import { createAbiDocumentForOrg, sendAbiDocumentToCBP, isEntryEditable } from '../services/abiWrite.js';
+import { transmitEntryNative } from '../services/cbp/nativeEntry.js';
 import { notify } from '../services/notifications.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import logger from '../config/logger.js';
@@ -211,8 +212,12 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(404).json({ error: 'ABI document not found' });
     return;
   }
-  if (existing.status !== 'DRAFT') {
-    res.status(400).json({ error: `Cannot edit document in status ${existing.status}` });
+  if (!isEntryEditable(existing)) {
+    res.status(400).json({
+      error: existing.pendingAction
+        ? 'This entry is waiting for CBP; edit it once CBP has answered.'
+        : `Cannot edit document in status ${existing.status}`,
+    });
     return;
   }
 
@@ -521,6 +526,45 @@ router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled,
   res.status(outcome.httpStatus).json(outcome.body);
 });
 
+// ── POST /:id/cbp-action — Replace or delete the summary CBP holds ──
+//
+// Native entries only. REPLACE sends the entry's current data as an AE
+// replace; DELETE asks CBP to delete the summary. CBP's AX settles both.
+router.post('/:id/cbp-action', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
+  const action = req.body?.action;
+  if (action !== 'REPLACE' && action !== 'DELETE') {
+    res.status(400).json({ error: "action must be 'REPLACE' or 'DELETE'" });
+    return;
+  }
+  const outcome = await transmitEntryNative({ docId: String(req.params.id), orgId: req.user!.orgId, userId: req.user!.id, action });
+  res.status(outcome.httpStatus).json(outcome.body);
+});
+
+// ── GET /:id/cbp — Every transmission to CBP and CBP's answers ──
+router.get('/:id/cbp', async (req: AuthRequest, res: Response): Promise<void> => {
+  const entry = await prisma.abiDocument.findFirst({
+    where: { id: String(req.params.id), orgId: req.user!.orgId },
+    select: {
+      id: true, status: true, cbpState: true, pendingAction: true, entryNumber: true,
+      entrySummaryStatus: true, cargoReleaseStatus: true, releaseRequested: true,
+    },
+  });
+  if (!entry) {
+    res.status(404).json({ error: 'Entry not found' });
+    return;
+  }
+  const transmissions = await prisma.cbpTransmission.findMany({
+    where: { entityType: 'abi_document', entityId: entry.id, orgId: req.user!.orgId },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true, environment: true, application: true, action: true, filerCode: true, status: true,
+      sentAt: true, respondedAt: true, createdAt: true, lastError: true,
+      inbound: { orderBy: { receivedAt: 'asc' }, select: { id: true, application: true, receivedAt: true, parsed: true } },
+    },
+  });
+  res.json({ entry, transmissions });
+});
+
 // ── POST /:id/poll — Manual re-poll ────────────────────
 
 router.post('/:id/poll', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -534,6 +578,12 @@ router.post('/:id/poll', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled,
     return;
   }
 
+  // Native entries need no polling: CBP's answers arrive on our queue and
+  // settle the entry as they land (audit FNA-12).
+  if (doc.lastTransmissionId) {
+    res.status(400).json({ error: 'This entry updates automatically as CBP answers.', code: 'NATIVE_NO_POLL' });
+    return;
+  }
   if (doc.status !== 'SENT' && doc.status !== 'SENDING') {
     res.status(400).json({ error: `Cannot poll document in status ${doc.status}` });
     return;

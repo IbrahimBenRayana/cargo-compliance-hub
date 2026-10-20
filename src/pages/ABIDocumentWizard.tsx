@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { abiDocumentsApi } from '@/api/client';
 import type {
   ABIDocumentDraft,
   AbiDocument,
@@ -74,6 +75,7 @@ import Step4Manifest from '@/components/abi-wizard/Step4Manifest';
 import Step5Invoices from '@/components/abi-wizard/Step5Invoices';
 import Step6Review, { validateAbiDraft } from '@/components/abi-wizard/Step6Review';
 import { STEP_VALIDATORS } from '@/components/abi-wizard/validators';
+import { isEntryEditable, isNativeResendable, isOnFileAtCbp } from '@/lib/entryLifecycle';
 
 // ─── Step definitions ────────────────────────────────────────
 
@@ -159,12 +161,16 @@ export default function ABIDocumentWizard() {
     }
   }, [doc]);
 
-  // ── Route guard: never edit a non-DRAFT document via the wizard
+  // ── Route guard: only drafts, native entries CBP rejected, and native
+  // entries CBP holds (for a replacement) are editable here.
   useEffect(() => {
-    if (doc && doc.status !== 'DRAFT') {
+    if (doc && !isEntryEditable(doc)) {
       navigate(`/abi-documents/${doc.id}`, { replace: true });
     }
   }, [doc, navigate]);
+  const replacing = !!doc && isOnFileAtCbp(doc);
+  const resending = !!doc && isNativeResendable(doc);
+  const [replacePending, setReplacePending] = useState(false);
 
   // ── Stable onChange that merges + autosaves.
   // New-flow: if we don't have an id yet, lazy-create on first change.
@@ -227,22 +233,41 @@ export default function ABIDocumentWizard() {
 
   const handleTransmit = async () => {
     if (!docId) return;
-    // Flush pending autosave first so the server has the latest payload.
-    autosave.flush();
+    // CBP builds from the saved entry: every edit must be on the server
+    // before the send starts (audit FPR-01).
     try {
-      await sendMut.mutateAsync(docId);
-      toast.success('Filing transmitted to CBP. Tracking status…');
+      await autosave.flush();
+    } catch {
+      toast.error('Your latest changes are not saved yet, so nothing was sent. Check your connection and try again.');
+      setTransmitOpen(false);
+      return;
+    }
+    try {
+      if (replacing) {
+        setReplacePending(true);
+        await abiDocumentsApi.cbpAction(docId, 'REPLACE');
+        toast.success('Replacement sent to CBP.');
+      } else {
+        await sendMut.mutateAsync(docId);
+        toast.success('Filing transmitted to CBP. Tracking status…');
+      }
       navigate(`/abi-documents/${docId}`);
     } catch (err: any) {
       const msg = err?.message ?? 'Failed to transmit filing';
       toast.error(msg);
     } finally {
+      setReplacePending(false);
       setTransmitOpen(false);
     }
   };
 
-  const handleSaveDraft = () => {
-    autosave.flush();
+  const handleSaveDraft = async () => {
+    try {
+      await autosave.flush();
+    } catch {
+      toast.error('Your latest changes could not be saved. Check your connection and try again.');
+      return;
+    }
     if (docId) navigate(`/abi-documents/${docId}`);
     else navigate('/abi-documents');
   };
@@ -253,12 +278,18 @@ export default function ABIDocumentWizard() {
   // the inline errors for the current step (and stay put) so the user
   // sees what's missing — the older "disabled until valid" pattern just
   // left them staring at a greyed-out button with no guidance.
-  const goNext = () => {
+  const goNext = async () => {
     if (canAdvance) {
       const next = Math.min(step + 1, STEPS.length - 1);
-      // Entering Review: flush pending edits so the duty estimate (which
-      // prices the SAVED payload) reflects what the user just typed.
-      if (next === STEPS.length - 1) autosave.flush();
+      // Entering Review: save first so the estimate and preflight (which
+      // read the SAVED entry) reflect what the user just typed.
+      if (next === STEPS.length - 1) {
+        try {
+          await autosave.flush();
+        } catch {
+          toast.error('Your latest changes could not be saved. The review may not reflect them until they are.');
+        }
+      }
       setStep(next);
     } else {
       setErrorsShownForStep((prev) => ({ ...prev, [step]: true }));
@@ -314,6 +345,12 @@ export default function ABIDocumentWizard() {
               <Badge variant="outline" className="gap-1.5">
                 <Loader2 className="h-3 w-3 animate-spin" /> Saving…
               </Badge>
+            ) : autosave.error ? (
+              <button type="button" onClick={() => autosave.flush().catch(() => undefined)}>
+                <Badge variant="outline" className="gap-1.5 border-destructive/40 text-destructive">
+                  <AlertCircle className="h-3 w-3" /> Not saved, retry
+                </Badge>
+              </button>
             ) : docId ? (
               <Badge variant="outline" className="gap-1.5 text-muted-foreground">
                 <Check className="h-3 w-3" /> Saved
@@ -455,16 +492,17 @@ export default function ABIDocumentWizard() {
                 <AlertDialogTrigger asChild>
                   <Button
                     size="lg"
-                    disabled={!validation.valid || !docId || sendMut.isPending}
+                    disabled={!validation.valid || !docId || sendMut.isPending || replacePending || autosave.isSaving}
                     className="min-w-[200px]"
                   >
-                    {sendMut.isPending ? (
+                    {sendMut.isPending || replacePending ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Transmitting…
                       </>
                     ) : (
                       <>
-                        <Send className="h-4 w-4 mr-2" /> Transmit to CBP
+                        <Send className="h-4 w-4 mr-2" />
+                        {replacing ? 'Send replacement to CBP' : resending ? 'Send again to CBP' : 'Transmit to CBP'}
                       </>
                     )}
                   </Button>
@@ -473,7 +511,7 @@ export default function ABIDocumentWizard() {
                   <AlertDialogHeader>
                     <AlertDialogTitle className="flex items-center gap-2">
                       <CheckCircle2 className="h-5 w-5 text-primary" />
-                      Transmit Entry Summary to CBP?
+                      {replacing ? 'Send a replacement to CBP?' : 'Transmit Entry Summary to CBP?'}
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                       This filing will be submitted to U.S. Customs and Border Protection.
@@ -489,8 +527,9 @@ export default function ABIDocumentWizard() {
                           .
                         </>
                       )}{' '}
-                      Once transmitted, the document cannot be deleted — only amended via
-                      a replacement filing. Confirm the summary before continuing.
+                      {replacing
+                        ? 'CBP replaces the entry summary it holds with this version. If CBP rejects the replacement, the version on file stays.'
+                        : 'Once CBP accepts it, the entry can be corrected only by sending a replacement. Confirm the summary before continuing.'}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

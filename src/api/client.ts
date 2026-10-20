@@ -360,6 +360,17 @@ export interface FilingCbpActivity {
   }>;
 }
 
+/** One transmission to CBP and the messages CBP sent back for it. */
+export type CbpTransmissionView = FilingCbpActivity['transmissions'][number] & { application?: string };
+
+export interface EntryCbpActivity {
+  entry: {
+    id: string; status: string; cbpState: string; pendingAction: string | null; entryNumber: string | null;
+    entrySummaryStatus: string | null; cargoReleaseStatus: string | null; releaseRequested: boolean;
+  };
+  transmissions: CbpTransmissionView[];
+}
+
 export const filingsApi = {
   list(params?: FilingListParams) {
     const query = new URLSearchParams();
@@ -2048,6 +2059,12 @@ export interface AbiDocument {
   status: AbiDocumentStatus;
   entrySummaryStatus: string | null;
   cargoReleaseStatus: string | null;
+  /** Native lifecycle: what CBP holds, and what is waiting for its answer. */
+  cbpState?: 'NOT_ON_FILE' | 'ON_FILE' | 'DELETED';
+  pendingAction?: 'ADD' | 'REPLACE' | 'DELETE' | null;
+  /** Set once the entry went through the native engine. */
+  lastTransmissionId?: string | null;
+  releaseRequested?: boolean;
 
   entryType: string;
   modeOfTransport: string;
@@ -2170,6 +2187,19 @@ export const abiDocumentsApi = {
   /** Full native build + CBP-rule validation, without sending anything. */
   preflight(id: string) {
     return apiFetch<EntryPreflight>(`/api/v1/abi-documents/${id}/preflight`, { method: 'POST' });
+  },
+
+  /** Every transmission to CBP for this entry and CBP's answers. */
+  cbpActivity(id: string) {
+    return apiFetch<EntryCbpActivity>(`/api/v1/abi-documents/${id}/cbp`);
+  },
+
+  /** Replace or delete the entry summary CBP holds (native entries). */
+  cbpAction(id: string, action: 'REPLACE' | 'DELETE') {
+    return apiFetch<{ transmissionId: string; outcome: string }>(`/api/v1/abi-documents/${id}/cbp-action`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    });
   },
 
   list(params?: AbiDocumentListParams) {

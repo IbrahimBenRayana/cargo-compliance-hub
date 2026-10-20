@@ -102,6 +102,25 @@ export async function createAbiDocumentForOrg(params: {
 
 type AuditMeta = Record<string, unknown>;
 
+type EntryEditState = { status: string; lastTransmissionId: string | null; pendingAction: string | null; cbpState: string };
+
+/** A native entry CBP rejected, with nothing pending: correct it and resend. */
+export function isNativeResendable(doc: EntryEditState): boolean {
+  return doc.status === 'REJECTED' && doc.lastTransmissionId !== null && doc.pendingAction === null && doc.cbpState !== 'ON_FILE';
+}
+
+/**
+ * Whether the entry's data may be edited: any draft; a native entry CBP
+ * rejected (to resend it); or a native entry CBP holds, to send a
+ * replacement. Never while CBP's answer is pending.
+ */
+export function isEntryEditable(doc: EntryEditState): boolean {
+  if (doc.pendingAction) return false;
+  if (doc.status === 'DRAFT') return true;
+  if (doc.lastTransmissionId === null) return false;
+  return isNativeResendable(doc) || doc.cbpState === 'ON_FILE';
+}
+
 // ─── Send (transmit) an ABI Entry to CBP ───────────────────
 // Two-step CC flow (create document → send), with atomic DRAFT→SENDING claim,
 // duplicate cleanup-and-retry, billing on success, fire-and-forget polling, and
@@ -119,11 +138,14 @@ export async function sendAbiDocumentToCBP(params: {
     return { httpStatus: 404, body: { error: 'ABI document not found' } };
   }
 
+  // A native entry CBP rejected is corrected and sent again under the same
+  // entry number (audit FNA-12).
+  const nativeResend = isNativeResendable(doc);
   // Idempotency — already transmitted / in-flight → return current state.
-  if (doc.status === 'SENDING' || doc.status === 'SENT' || doc.status === 'ACCEPTED' || doc.status === 'REJECTED') {
+  if (!nativeResend && (doc.status === 'SENDING' || doc.status === 'SENT' || doc.status === 'ACCEPTED' || doc.status === 'REJECTED')) {
     return { httpStatus: 200, body: { data: doc, note: `Already in status ${doc.status}` } };
   }
-  if (doc.status !== 'DRAFT') {
+  if (doc.status !== 'DRAFT' && !nativeResend) {
     return { httpStatus: 400, body: { error: `Cannot send document in status ${doc.status}` } };
   }
 

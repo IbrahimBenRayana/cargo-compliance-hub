@@ -44,6 +44,9 @@ import {
   PAYMENT_TYPE_CODES,
   BILL_TYPES,
 } from '@/data/abiEnums';
+import { useQueryClient } from '@tanstack/react-query';
+import { EntryCbpTimeline } from '@/components/CbpTimeline';
+import { isNativeResendable, isOnFileAtCbp } from '@/lib/entryLifecycle';
 
 function lookupLabel(options: { value: string; label: string }[], value: string | null | undefined) {
   if (!value) return '—';
@@ -236,6 +239,9 @@ export default function ABIDocumentDetailPage() {
 
   const [showTransmitConfirm, setShowTransmitConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [cbpAction, setCbpAction] = useState<'REPLACE' | 'DELETE' | null>(null);
+  const [cbpActionPending, setCbpActionPending] = useState(false);
+  const queryClient = useQueryClient();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   if (isLoading) return <DetailSkeleton />;
@@ -335,12 +341,34 @@ export default function ABIDocumentDetailPage() {
   };
 
   const isDraft = doc.status === 'DRAFT';
-  const isSending = doc.status === 'SENDING';
+  // Native entries settle from CBP's own answers; CustomsCity-era entries
+  // keep their manual status refresh (audit FNA-12).
+  const isNative = !!doc.lastTransmissionId;
+  const isSending = doc.status === 'SENDING' && !isNative;
   const isTerminal =
-    doc.status === 'SENT' ||
-    doc.status === 'ACCEPTED' ||
-    doc.status === 'REJECTED';
+    !isNative &&
+    (doc.status === 'SENT' ||
+      doc.status === 'ACCEPTED' ||
+      doc.status === 'REJECTED');
   const isCancelled = doc.status === 'CANCELLED';
+  const canResend = isNativeResendable(doc);
+  const onFile = isNative && isOnFileAtCbp(doc);
+
+  const handleCbpAction = async () => {
+    if (!cbpAction) return;
+    setCbpActionPending(true);
+    try {
+      await abiDocumentsApi.cbpAction(doc.id, cbpAction);
+      toast.success(cbpAction === 'DELETE' ? 'Deletion sent to CBP.' : 'Replacement sent to CBP.');
+      setCbpAction(null);
+      queryClient.invalidateQueries({ queryKey: ['abi-documents', doc.id] });
+      queryClient.invalidateQueries({ queryKey: ['abi-document', doc.id, 'cbp'] });
+    } catch (err: any) {
+      toast.error(err?.body?.error || err?.message || 'Could not send to CBP');
+    } finally {
+      setCbpActionPending(false);
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
@@ -446,6 +474,51 @@ export default function ABIDocumentDetailPage() {
             </Button>
           )}
 
+          {canResend && (
+            <>
+              <Button
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => navigate(`/abi-documents/${doc.id}/edit`)}
+              >
+                <Pencil className="h-4 w-4" />
+                Correct
+              </Button>
+              <Button className="gap-1.5" onClick={() => setShowTransmitConfirm(true)}>
+                <Send className="h-4 w-4" />
+                Send again
+              </Button>
+            </>
+          )}
+
+          {onFile && (
+            <>
+              <Button
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => navigate(`/abi-documents/${doc.id}/edit`)}
+              >
+                <Pencil className="h-4 w-4" />
+                Edit and replace
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-1.5 text-destructive hover:text-destructive"
+                onClick={() => setCbpAction('DELETE')}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete at CBP
+              </Button>
+            </>
+          )}
+
+          {isNative && doc.pendingAction && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Waiting for CBP
+            </div>
+          )}
+
           {isCancelled && (
             <span className="text-xs text-muted-foreground italic">
               This entry has been cancelled.
@@ -491,8 +564,11 @@ export default function ABIDocumentDetailPage() {
         </Alert>
       )}
 
-      {/* Status timeline (non-DRAFT only) */}
-      {!isDraft && (
+      {/* Native entries: every transmission and CBP's answers, decoded. */}
+      {isNative && <EntryCbpTimeline entryId={doc.id} />}
+
+      {/* CustomsCity-era transmission details (non-DRAFT only) */}
+      {!isDraft && !isNative && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Transmission</CardTitle>
@@ -805,6 +881,36 @@ export default function ABIDocumentDetailPage() {
                   Transmit
                 </>
               )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Replace / delete at CBP */}
+      <AlertDialog open={cbpAction !== null} onOpenChange={(open) => !open && setCbpAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {cbpAction === 'DELETE' ? 'Delete this entry summary at CBP?' : 'Send a replacement to CBP?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {cbpAction === 'DELETE'
+                ? 'CBP is asked to delete the entry summary it holds for this entry number. CBP only allows this before the entry is scheduled for a statement or liquidation; if it refuses, the summary stays on file.'
+                : 'CBP replaces the entry summary it holds with the current version. If CBP rejects the replacement, the version on file stays.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cbpActionPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleCbpAction();
+              }}
+              disabled={cbpActionPending}
+              className={cbpAction === 'DELETE' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : undefined}
+            >
+              {cbpActionPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              {cbpAction === 'DELETE' ? 'Delete at CBP' : 'Send replacement'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

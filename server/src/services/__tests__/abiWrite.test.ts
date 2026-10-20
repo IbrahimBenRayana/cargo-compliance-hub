@@ -47,7 +47,7 @@ vi.mock('../auditLog.js', () => ({ writeAuditLog: vi.fn() }));
 vi.mock('../notifications.js', () => ({ notify: vi.fn(() => Promise.resolve()) }));
 vi.mock('../abiPolling.js', () => ({ pollABIDocumentStatus: vi.fn(() => Promise.resolve()) }));
 
-import { sendAbiDocumentToCBP } from '../abiWrite.js';
+import { sendAbiDocumentToCBP, isEntryEditable } from '../abiWrite.js';
 
 const ARGS = { docId: 'd1', orgId: 'o1', userId: 'u1' };
 // ABC-1234567 with its CATAIR check digit; the org's approved CBP setup uses ABC.
@@ -160,5 +160,34 @@ describe('sendAbiDocumentToCBP', () => {
     expect(nativeEntry.transmitEntryNative).toHaveBeenCalledWith(expect.objectContaining({ action: 'ADD' }));
     expect(abiGateway.createABIDocument).not.toHaveBeenCalled();
     expect(out.httpStatus).toBe(200);
+  });
+
+  it('native gateway: a rejected entry is corrected and sent again (FNA-12)', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DRAFT, status: 'REJECTED', lastTransmissionId: 't0', pendingAction: null, cbpState: 'NOT_ON_FILE' });
+    prisma.orgCbpConfig.findUnique.mockResolvedValue({ ...APPROVED_CBP, gateway: 'NATIVE' });
+    nativeEntry.transmitEntryNative.mockResolvedValue({ httpStatus: 202, body: { transmissionId: 't1', outcome: 'SENT' } });
+    await sendAbiDocumentToCBP(ARGS);
+    expect(nativeEntry.transmitEntryNative).toHaveBeenCalledWith(expect.objectContaining({ action: 'ADD' }));
+  });
+
+  it('a CustomsCity-era rejected entry is still not re-sent', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DRAFT, status: 'REJECTED', lastTransmissionId: null, pendingAction: null, cbpState: 'NOT_ON_FILE' });
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(out.body).toMatchObject({ note: 'Already in status REJECTED' });
+    expect(nativeEntry.transmitEntryNative).not.toHaveBeenCalled();
+  });
+});
+
+describe('isEntryEditable', () => {
+  const base = { status: 'DRAFT', lastTransmissionId: null, pendingAction: null, cbpState: 'NOT_ON_FILE' };
+  it.each([
+    ['a draft', base, true],
+    ['a native rejected entry', { ...base, status: 'REJECTED', lastTransmissionId: 't' }, true],
+    ['a native entry CBP holds (to replace it)', { ...base, status: 'ACCEPTED', lastTransmissionId: 't', cbpState: 'ON_FILE' }, true],
+    ['an entry waiting for CBP', { ...base, status: 'SENT', lastTransmissionId: 't', pendingAction: 'ADD' }, false],
+    ['a CustomsCity-era accepted entry', { ...base, status: 'ACCEPTED' }, false],
+    ['an entry deleted at CBP', { ...base, status: 'CANCELLED', lastTransmissionId: 't', cbpState: 'DELETED' }, false],
+  ])('%s: %s', (_label, doc, expected) => {
+    expect(isEntryEditable(doc)).toBe(expected);
   });
 });
