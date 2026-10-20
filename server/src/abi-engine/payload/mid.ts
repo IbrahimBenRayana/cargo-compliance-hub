@@ -51,9 +51,14 @@ export const CANADIAN_PROVINCE_MID_CODES: Record<string, string> = {
 
 const IGNORED_WORDS = new Set(['A', 'AN', 'AND', 'OF', 'THE']);
 
+/** Strip diacritics so 'MÜLLER' stays one word, MULLER (audit ENG-09). */
+function transliterate(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ß/g, 'SS');
+}
+
 /** Split a firm name into MID "words": initials runs merge, hyphens join. */
 function nameWords(name: string): string[] {
-  const cleaned = name
+  const cleaned = transliterate(name)
     .toUpperCase()
     .replace(/-/g, '') // hyphenated words are treated as a single word
     .replace(/[^A-Z0-9 ]/g, ' ')
@@ -115,15 +120,21 @@ export function deriveMid(party: MidParty): string {
   const namePart =
     words.length === 1 ? words[0].slice(0, 6) : words.slice(0, 2).map((w) => w.slice(0, 3)).join('');
 
+  // The first four digits of the LARGEST number on the street line
+  // (CBP MID rules: '232 Main Street, Suite 1234' -> 1234; '3F, No. 1288' -> 1288).
   let numberPart = '';
   if (party.address) {
-    const match = party.address.toUpperCase().match(/\d+/);
-    if (match) numberPart = match[0].slice(0, 4);
+    const numbers = party.address.match(/\d+/g) ?? [];
+    let largest: string | undefined;
+    for (const n of numbers) {
+      if (largest === undefined || Number(n) > Number(largest)) largest = n;
+    }
+    if (largest) numberPart = largest.slice(0, 4);
   }
 
   let cityPart = '';
   if (party.city) {
-    cityPart = party.city.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+    cityPart = transliterate(party.city).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
   }
 
   const mid = `${prefix}${namePart}${numberPart}${cityPart}`;
