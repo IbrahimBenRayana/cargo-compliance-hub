@@ -96,6 +96,9 @@ export interface AbiItemWeight {
 export interface AbiItem {
   sku: string;
   htsNumber: string;
+  /** Chapter 99 numbers claimed on this line (Section 301, 232, NT52 and
+   *  other programs), 8 digits each; native engine only (CC cannot carry them). */
+  additionalHtsNumbers?: string[];
   description: string;
   origin: { country: string };
   values: AbiItemValues;

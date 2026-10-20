@@ -7,10 +7,12 @@
  *   "2.6%"                       → ad valorem
  *   "$1.50/kg", "4.4¢/kg"        → specific (per unit of quantity 1)
  *   "4.4¢/kg + 4%"               → compound (sum of components)
- *   "The duty provided in the applicable subheading + 25%"
+ *   "The duty provided in the applicable subheading + 25%" (or "plus")
  *                                → ch.99 overlay surcharge (Section 301/232
  *                                  lines): ad valorem on the value of the
  *                                  ch.1–97 tariff(s) on the same line
+ *   "The duty provided in the applicable subheading", "No change"
+ *                                → nothing on the ch.99 line itself
  * Anything else throws — filer-computed duty must never be guessed.
  *
  * The "Special" column groups preference rates by SPI program, e.g.
@@ -66,11 +68,17 @@ export function parseRateExpression(expression: string): RateComponent[] {
   if (/^free$/i.test(text)) return [{ kind: 'free' }];
 
   // Ch.99 overlay wording (Section 301/232 additional-duty subheadings).
+  // USITC writes both '+ 25%' and 'plus 25%' (9903.88.01).
   const overlay = text.match(
-    /^the duty provided in the applicable subheading\s*\+\s*(\d+(?:\.\d+)?)\s*%$/i
+    /^the duty provided in the applicable subheading\s*(?:\+|plus)\s*(\d+(?:\.\d+)?)\s*%$/i
   );
   if (overlay) {
     return [{ kind: 'overlaySurcharge', perMillion: Math.round(Number(overlay[1]) * 10000) }];
+  }
+  // Exemption and no-change headings (9903.05.90, 9903.05.94, 9903.82.03):
+  // nothing on the ch.99 line, the base keeps its own duty (audit MHT-02).
+  if (/^the duty provided in the applicable subheading$/i.test(text) || /^no change$/i.test(text)) {
+    return [{ kind: 'free' }];
   }
 
   return text.split('+').map((part) => parseComponent(part, expression));
@@ -101,6 +109,34 @@ export function pickSpecialRate(specialExpression: string, spiCode: string): str
     }
   }
   return null;
+}
+
+/**
+ * How a ch.99 heading's General text relates to the base classification it
+ * is reported with (audit ENG-03, MHT-01/02), checked against every duty
+ * CERT accepted:
+ *   additional  'the duty provided in the applicable subheading + X%':
+ *               X% of the base value; the base keeps its column-1 duty
+ *               (301 lists, CN NT52, 232 content buckets: 013, 028, 059)
+ *   none        'the duty provided in the applicable subheading', 'No
+ *               change': 0 here, base unchanged (.05.90, .82.03)
+ *   replacement a plain rate ('12.5%', '15%', '40%', a 9902 'Free'): the
+ *               rate is the line's whole duty, so the base deposits 0;
+ *               any other 'Free' (9999 markers, exemptions) is 'none'
+ *               (ACE's '[base] replaced': 019, 023, 024, NT52 EU/JP/CH)
+ *   unknown     blank (quota and country-list sub-rows): never guessed
+ */
+export type Ch99Semantics = 'additional' | 'none' | 'replacement' | 'unknown';
+
+export function ch99Semantics(htsNumber: string, expression: string): Ch99Semantics {
+  const text = expression.trim();
+  if (/^the duty provided in the applicable subheading\s*(?:\+|plus)/i.test(text)) return 'additional';
+  if (/^the duty provided in the applicable subheading$/i.test(text) || /^no change$/i.test(text)) return 'none';
+  if (text === '') return 'unknown';
+  // A 9902 suspension's 'Free' replaces column 1; any other 'Free' (9999
+  // statistical markers, exemption rows) adds nothing.
+  if (/^free$/i.test(text)) return htsNumber.startsWith('9902') ? 'replacement' : 'none';
+  return 'replacement';
 }
 
 export interface DutyBasis {

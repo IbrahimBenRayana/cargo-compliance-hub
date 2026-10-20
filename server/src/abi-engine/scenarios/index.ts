@@ -50,6 +50,12 @@ const S301_REVIEW_BATT = 'The duty provided in the applicable subheading + 25%';
 const S232_AUTO_PARTS_SPECIAL = 'Free';
 const NT52_125 = 'The duty provided in the applicable subheading + 12.5%';
 const NT52_100 = 'The duty provided in the applicable subheading + 10%';
+// Verbatim USITC General texts (2026-aug-06 edition) for headings the
+// fixtures once hand-wrote as plain or 'Free' rates (audit MHT-01/02).
+const NO_ADDITIONAL = 'The duty provided in the applicable subheading';
+const S232_CONTENT_50 = 'The duty provided in the applicable subheading + 50%';
+const S232_DERIVATIVE_25 = 'The duty provided in the applicable subheading + 25%';
+const NT52_JP_125 = '12.5%';
 
 export const SCENARIOS: Scenario[] = [
   aeScenario('001', 'Singapore Free Trade Agreement', {
@@ -140,7 +146,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('003', 'Live Entry Indicator', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     mutate: (p) => {
       p.entrySummary.indicators = { ...p.entrySummary.indicators, liveEntry: true };
       const line = p.entrySummary.lines[0];
@@ -150,7 +156,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('004', 'Single Entry Bond with Surety and Bond Information', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
@@ -212,8 +218,8 @@ export const SCENARIOS: Scenario[] = [
         // Karl's 8/27 answer: 9903.05.90 IS the NT52-side 232 exclusion
         // (correct all along, just not alone) and 9903.82.10 is the steel
         // 232 number (15% per CERT — 'DER ALU & STL, COL 1 < 15%, NT16').
-        '99030590': 'Free',
-        '99038210': 'The duty provided in the applicable subheading + 15%',
+        '99030590': NO_ADDITIONAL,
+        '99038210': '15%',
         '8415820120': { general: '2.2%', special: 'Free (A,AU,B,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
       },
       mutate: (p) => {
@@ -236,8 +242,8 @@ export const SCENARIOS: Scenario[] = [
           // rate, and the 232 rate REPLACES column 1 (the ch.1-97 line
           // deposits zero) — the same 'replaced' semantics as 019/024.
           { htsNumber: '99030590', valueDollars: 0 },
-          { htsNumber: '99038210', valueDollars: 0, dutyCents: 2185230 },
-          { htsNumber: '8415820120', valueDollars: 145682, uomCode1: 'NO', quantity1Hundredths: 100, dutyCents: 0 },
+          { htsNumber: '99038210', valueDollars: 0 }, // computed: 15% x $145,682 = 21852.30
+          { htsNumber: '8415820120', valueDollars: 145682, uomCode1: 'NO', quantity1Hundredths: 100 },
         ];
         // Live F794 ADDTNL DEC TYPE RQRD FOR ARTICLE: A/C machines are 232
         // steel AND aluminum derivatives, so the line carries Importer's
@@ -564,7 +570,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('007', 'MOT/Port of Unlading', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K; export country CN)
@@ -694,7 +700,7 @@ export const SCENARIOS: Scenario[] = [
     rates: {
       '99039106': S301_REVIEW_BATT,
       '99030124': 'The duty provided in the applicable subheading + 10%', // CN/HK EO — 10% per CERT's own Feb view (as-of 020126 query, 8/27)
-      '99030133': 'Free',
+      '99030133': 'The duty provided in the applicable subheading',
       '99039405': 'The duty provided in the applicable subheading + 25%',
       '8507600030': '3.41%',
     },
@@ -779,7 +785,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('014', 'Airline Carrier Code', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     mutate: (p) => {
       // Air MOT: no foreign port of lading (F429 is vessel-only).
       const line = p.entrySummary.lines[0];
@@ -825,8 +831,8 @@ export const SCENARIOS: Scenario[] = [
     // routes via Hamburg 42876 (verified Apr-2026 Schedule K), satisfying
     // F429 on every line (live 8/28).
     rates: {
-      '99030574': NT52_125, // NT52 CH
-      '99030539': NT52_100, // NT52 EU (FR/IT lines)
+      '99030574': '12.5%', // NT52 CH
+      '99030539': '10%', // NT52 EU (FR/IT lines)
       '1902194000': '6.4%', '0712311000': '1.3¢/kg + 1.8%', '2002908020': '11.6%',
     },
     mutate: (p) => {
@@ -855,8 +861,8 @@ export const SCENARIOS: Scenario[] = [
             // '[1902194000] replaced' — the NT52 12.5% IS the header's whole
             // duty; the conventional 6.4% is REPLACED, not added. "Its just
             // 12.5% on 99030574."
-            { htsNumber: '99030574', valueDollars: 0, dutyCents: 62500 }, // NT52 CH on the set
-            { htsNumber: '1902194000', valueDollars: 5000, uomCode1: 'KG', quantity1Hundredths: 170000, dutyCents: 0 },
+            { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH on the set (computed 625.00)
+            { htsNumber: '1902194000', valueDollars: 5000, uomCode1: 'KG', quantity1Hundredths: 170000 },
           ],
         },
         {
@@ -966,7 +972,7 @@ export const SCENARIOS: Scenario[] = [
     // .82.02 (ALU/STL/COP + derivatives) carries the 50% steel rate (GB
     // alone gets .82.04 at 25%); .05.90 excludes the 232-covered article
     // from the NT52 country duty, so the KR NT52 deposits zero.
-    rates: { '99030590': 'Free', '99038202': '50%', '7222110006': 'Free' },
+    rates: { '99030590': NO_ADDITIONAL, '99038202': S232_CONTENT_50, '7222110006': 'Free' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'KR';
@@ -997,7 +1003,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('024', 'Additional Duty Reporting', {
-    rates: { '99034110': '40%', '99030549': NT52_125, '6403599045': '10%' },
+    rates: { '99034110': '40%', '99030549': NT52_JP_125, '6403599045': '10%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'JP';
@@ -1018,13 +1024,13 @@ export const SCENARIOS: Scenario[] = [
         // 9903.41.10 (Proclamation 5601 JP footwear) is an IN-LIEU rate —
         // the 40% REPLACES column 1, so the ch.64 line deposits zero
         // (40% + 12.5% + 10% drew F624 live 9/1).
-        { htsNumber: '6403599045', valueDollars: 12290, uomCode1: 'PRS', quantity1Hundredths: 260000, dutyCents: 0 },
+        { htsNumber: '6403599045', valueDollars: 12290, uomCode1: 'PRS', quantity1Hundredths: 260000 },
       ];
     },
   }),
 
   aeScenario('025', 'Full Bill Data for Rail AMS Shipment', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     mutate: (p) => {
       // Rail MOT: no foreign port of lading (F429 is vessel-only).
       const line = p.entrySummary.lines[0];
@@ -1065,7 +1071,7 @@ export const SCENARIOS: Scenario[] = [
     // happen (301 numbers are origin-enforced the same way). 9903.05.95
     // 'TEXT OR APPAREL, NTE 52' at 0% has NO W4 restriction and matches the
     // article exactly (9/2 CERT sweep).
-    rates: { '99030595': 'Free', '98235202': 'Free', '6203315020': '17.5%' },
+    rates: { '99030595': 'The duty provided in the applicable subheading', '98235202': 'Free', '6203315020': '17.5%' },
     mutate: (p, params) => {
       p.entrySummary.entryTypeCode = '02';
       const line = p.entrySummary.lines[0];
@@ -1219,8 +1225,8 @@ export const SCENARIOS: Scenario[] = [
     rates: {
       // Karl's 006 pattern for derivative steel, col1 < 15%: .05.90
       // excludes the NT52, .82.10 deposits flat 15%, ch.1-97 zeroes.
-      '99030590': 'Free',
-      '99038209': '25%',
+      '99030590': NO_ADDITIONAL,
+      '99038209': S232_DERIVATIVE_25,
       '8211100000': 'Free',
       '8211929045': '0.4¢ each + 6.1%',
       '8211930035': '3¢ each + 5.4%',
@@ -1267,7 +1273,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('033', 'Multiple Bonds', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
@@ -1286,7 +1292,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('034', 'Personal Shipment', {
-    rates: { '99030590': 'Free', '99038202': '50%', '7419803000': '3%' },
+    rates: { '99030590': NO_ADDITIONAL, '99038202': S232_CONTENT_50, '7419803000': '3%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '11';
       p.entrySummary.indicators = { ...p.entrySummary.indicators, shipmentUsageTypeCode: 'P' };
@@ -1314,7 +1320,7 @@ export const SCENARIOS: Scenario[] = [
 
   aeScenario('035', 'Civil Aircraft', {
     rates: {
-      '99038209': '25%',
+      '99038209': S232_DERIVATIVE_25,
       '8302496055': { general: '5.7%', special: 'Free (A*,AU,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
     },
     mutate: (p) => {
@@ -1352,7 +1358,7 @@ export const SCENARIOS: Scenario[] = [
     // listed country — JP apparel wants the country row, 12.5% stacked
     // (the accepted 024 JP-footwear treatment). .05.95 evidently belongs
     // to the TRQ/9823 world (027), not general apparel.
-    rates: { '99030549': NT52_125, '6205202016': '19.7%' },
+    rates: { '99030549': '12.5%', '6205202016': '19.7%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '11';
       p.entrySummary.indicators = { ...p.entrySummary.indicators, shipmentUsageTypeCode: 'X' };
@@ -1366,9 +1372,9 @@ export const SCENARIOS: Scenario[] = [
       line.tariffs = [
         // Karl's ESV trace 9/3: '[6205202016] replaced' — the NT52 12.5%
         // IS the line duty (28.125 → 28.13, half-up), conventional zero.
-        { htsNumber: '99030549', valueDollars: 0, dutyCents: 2813 }, // NT52 JP 12.5%
+        { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5% (computed 28.13)
         // Live F443: apparel reports DOZ + KG (the 027 lesson).
-        { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200, uomCode2: 'KG', quantity2Hundredths: 600, dutyCents: 0 },
+        { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200, uomCode2: 'KG', quantity2Hundredths: 600 },
       ];
       line.textileCategoryCode = '340';
     },
@@ -1388,7 +1394,7 @@ export const SCENARIOS: Scenario[] = [
     // NT52 CH 9903.05.74 (12.5%) computes on the combined constituent value
     // ($3,383,342). Export CH is landlocked — no Schedule K port; the
     // foreign port of lading stays unset (flagged for the client rep).
-    rates: { '99030574': NT52_125 },
+    rates: { '99030574': '12.5%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'CH';
@@ -1517,7 +1523,7 @@ export const SCENARIOS: Scenario[] = [
   aeScenario('042', 'Country of Export - US', {
     // Export country US: Schedule K lists FOREIGN ports only — the foreign
     // port of lading stays unset (flagged for the client rep).
-    rates: { '99030571': NT52_125, '6704190000': 'Free' },
+    rates: { '99030571': '12.5%', '6704190000': 'Free' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'KR';
@@ -1539,8 +1545,8 @@ export const SCENARIOS: Scenario[] = [
       // Modernized 9/4: the 9903.85 aluminum family is expired like the
       // .80 steel range — NT16 treatment instead (023 pattern): .05.90
       // excludes the EU NT52, .82.02 content bucket stacks on col 1.
-      '99030590': 'Free',
-      '99038202': '50%',
+      '99030590': NO_ADDITIONAL,
+      '99038202': S232_CONTENT_50,
       '7606123096': '3%',
     },
     mutate: (p, params) => {
@@ -1604,7 +1610,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('045', 'Currency Conversion', {
-    rates: { '99030539': NT52_100, '3103190000': 'Free' },
+    rates: { '99030539': '10%', '3103190000': 'Free' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'IT';
@@ -1627,7 +1633,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('046', 'Multiple Countries', {
-    rates: { '99030576': NT52_100, '99030571': NT52_125, '3103110000': 'Free' },
+    rates: { '99030576': '10%', '99030571': '12.5%', '3103110000': 'Free' },
     mutate: (p) => {
       const ior = p.entrySummary.importerOfRecord.number;
       const base = p.entrySummary.lines[0];
@@ -1695,7 +1701,7 @@ export const SCENARIOS: Scenario[] = [
     // the combined value of the other tariffs ($9,426) — whether NT52 should
     // instead apply only to the repair value under 9802 needs rep
     // confirmation (flagged).
-    rates: { '99030574': NT52_125 },
+    rates: { '99030574': '12.5%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'CH';
@@ -1731,7 +1737,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('049', 'Ruling Details', {
-    rates: { '99030549': NT52_125, '8536490055': '2.7%' },
+    rates: { '99030549': '12.5%', '8536490055': '2.7%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'JP';
@@ -1809,7 +1815,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('053', 'B-Record Application Type/Filer Authentication', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     // Fully valid block: B-record carries our own filer code and
     // application identifier AE (what buildBatch always emits) — the
     // scenario verifies the positive half of B-record authentication.
@@ -1823,7 +1829,7 @@ export const SCENARIOS: Scenario[] = [
 
   aeScenario('054', 'Korea Free Trade Agreement', {
     rates: {
-      '99030571': NT52_125,
+      '99030571': '12.5%',
       '4409106500': { general: '4.9%', special: 'Free (A+,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
     },
     mutate: (p) => {
@@ -1956,7 +1962,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('059', 'Prototypes', {
-    rates: { '98178501': 'Free', '99030549': NT52_125, '8703330145': '2.5%' },
+    rates: { '98178501': 'Free', '99030549': '12.5%', '8703330145': '2.5%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'JP';
@@ -2078,7 +2084,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('065', 'Deferred Tax', {
-    rates: { '99030539': NT52_100, '2208202000': 'Free' },
+    rates: { '99030539': '10%', '2208202000': 'Free' },
     mutate: (p) => {
       p.entrySummary.indicators = { ...p.entrySummary.indicators, deferredTaxPaymentCode: '2' };
       const line = p.entrySummary.lines[0];
@@ -2113,7 +2119,7 @@ export const SCENARIOS: Scenario[] = [
   // query at cert time \u2014 dry-run pins zero deposits; the 88-record emits on
   // case presence.
   aeScenario('067', 'Related Cases', {
-    rates: { '99030539': NT52_100, '1902192020': 'Free' },
+    rates: { '99030539': '10%', '1902192020': 'Free' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
@@ -2140,7 +2146,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('068', 'Case Status', {
-    rates: { '99030539': NT52_100, '1902192020': 'Free' },
+    rates: { '99030539': '10%', '1902192020': 'Free' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
@@ -2168,7 +2174,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('069', 'HTS Number and Case Number', {
-    rates: { '99030539': NT52_100, '3912390000': '4.2%' },
+    rates: { '99030539': '10%', '3912390000': '4.2%' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
@@ -2223,7 +2229,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('071', 'Case with Cash Deposit', {
-    rates: { '99030549': NT52_125, '1902192020': 'Free' },
+    rates: { '99030549': '12.5%', '1902192020': 'Free' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
@@ -2250,7 +2256,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('072', 'Case with Differing Values', {
-    rates: { '99030539': NT52_100, '1902192020': 'Free' },
+    rates: { '99030539': '10%', '1902192020': 'Free' },
     mutate: (p) => {
       p.entrySummary.entryTypeCode = '03';
       const line = p.entrySummary.lines[0];
@@ -2348,7 +2354,7 @@ export const SCENARIOS: Scenario[] = [
   // \u2500\u2500 PSC scenarios (075\u2013078): Replace of an accepted summary; statement
   // fields are banned in a PSC (ESF-184) so the baseline payment is removed.
   aeScenario('075', 'PSC with ES Header Change', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       // PSC replaces an EXISTING accepted type-01 summary — scenario 053's
@@ -2369,7 +2375,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('076', 'PSC with ES Line Change', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       // PSC target: scenario 013's accepted battery entry.
@@ -2393,7 +2399,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('077', 'PSC with Entry Type Change', {
-    rates: { '99030539': NT52_100, '1902192020': 'Free' },
+    rates: { '99030539': '10%', '1902192020': 'Free' },
     action: 'R',
     mutate: (p) => {
       // PSC target: the third paid entry (Christopher 9/15).
@@ -2427,7 +2433,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('078', "PSC for Another Filer's ES", {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     action: 'R',
     mutate: (p) => {
       p.entrySummary.payment = undefined;
@@ -2494,7 +2500,7 @@ export const SCENARIOS: Scenario[] = [
   , 'Extends the scenario-079 TIB summary (same entry sequence).'),
 
   aeScenario('081', 'In-Bond', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
@@ -2516,7 +2522,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('082', 'PMS Statement Designation', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
@@ -2535,8 +2541,8 @@ export const SCENARIOS: Scenario[] = [
   aeScenario('083', 'FDA Entry', {
     rates: {
       '99038815': 'The duty provided in the applicable subheading + 7.5%',
-      '99030590': 'Free',
-      '99038210': 'The duty provided in the applicable subheading + 15%',
+      '99030590': NO_ADDITIONAL,
+      '99038210': '15%',
       '8516710020': '3.7%',
     },
     mutate: (p) => {
@@ -2635,7 +2641,7 @@ export const SCENARIOS: Scenario[] = [
     // (G) row 9903.05.93 at 0% (mirrors the US-goods 9903.05.86 treatment)
     // — NEEDS LIVE VERIFICATION: the duty-bearing CA row 9903.05.29 (10%)
     // would apply if CERT refuses the subdivision claim.
-    rates: { '99030593': 'Free', '1004100000': 'Free' },
+    rates: { '99030593': 'The duty provided in the applicable subheading', '1004100000': 'Free' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'XC';
@@ -2663,7 +2669,7 @@ export const SCENARIOS: Scenario[] = [
     // Christopher's tables 9/15: this HTS pairs S301-FL-EU (.05.39 for
     // col 1 < 10% — the .38/.39 split is a threshold pair) with a
     // S232-ALSTCU-16 bucket (.82.10, col 1 < 15%). No .94 family.
-    rates: { '99030539': NT52_100, '99038210': 'The duty provided in the applicable subheading + 15%', '8703210130': '2.5%' },
+    rates: { '99030539': '10%', '99038210': '15%', '8703210130': '2.5%' },
     mutate: (p) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'DE';
@@ -2790,7 +2796,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('087', 'Multiple Bills of Lading', {
-    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': S232_AUTO_PARTS_SPECIAL, '8507600030': '3.41%' },
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
@@ -2812,7 +2818,7 @@ export const SCENARIOS: Scenario[] = [
   }),
 
   aeScenario('088', 'Aluminum Licensing', {
-    rates: { '99030590': 'Free', '99038202': '50%', '7601103000': '2.6%' },
+    rates: { '99030590': NO_ADDITIONAL, '99038202': S232_CONTENT_50, '7601103000': '2.6%' },
     mutate: (p, params) => {
       const line = p.entrySummary.lines[0];
       line.countryOfOrigin = 'KR';
@@ -2842,7 +2848,7 @@ export const SCENARIOS: Scenario[] = [
     rates: {
       '9102114510': 'Free', '9102114520': 'Free', '9102114530': 'Free', '9102114540': 'Free',
       '99038815': 'The duty provided in the applicable subheading + 7.5%',
-      '99030574': NT52_125, // NT52 CH lines
+      '99030574': '12.5%', // NT52 CH lines
       '99030531': NT52_125, // NT52 CN strap line — stacked with 301 9903.88.15; NEEDS LIVE VERIFICATION
     },
     mutate: (p) => {

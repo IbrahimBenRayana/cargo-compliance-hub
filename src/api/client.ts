@@ -2249,6 +2249,8 @@ export interface OverlayHts {
   htsNumber: string;
   /** General-column rate expression, e.g. "The duty provided in the applicable subheading + 25%". */
   rate: string;
+  /** How the heading relates to column 1: adds to it, replaces it, adds nothing, or cannot be priced. */
+  semantics: 'additional' | 'replacement' | 'none' | 'unknown';
   description: string;
 }
 

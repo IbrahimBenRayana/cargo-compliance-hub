@@ -1,5 +1,7 @@
 import { Router, type Response } from 'express';
 import { buildNativeEntry } from '../services/cbp/nativeEntry.js';
+import { ch99Semantics } from '../abi-engine/duty/rateExpression.js';
+import { ch99SearchWhere } from '../abi-engine/payload/ch99.js';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
@@ -125,7 +127,45 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   });
 });
 
-// ── GET /:id — Detail (org-scoped) ─────────────────────
+// ── GET /overlay-hts?q= — Chapter 99 overlay subheading lookup ─────
+//
+// Section 301/232/reciprocal duties are declared as a ch.99 subheading
+// alongside the base classification. This searches the ingested USITC
+// chapter-99 lines by code or description so a filer picks a real
+// subheading with its actual rate expression, instead of typing one from
+// memory.
+//
+// Deliberately NOT an "HTS 8507.60 from CN needs 9903.88.01" recommender:
+// that mapping lives in USTR action/exclusion lists we do not ingest, and
+// guessing it would be worse than useless on an entry summary.
+//
+// Registered BEFORE /:id so the static path isn't captured as an id.
+
+router.get('/overlay-hts', async (req: AuthRequest, res: Response): Promise<void> => {
+  const where = ch99SearchWhere(typeof req.query.q === 'string' ? req.query.q : '');
+  if (!where) {
+    res.json({ data: [] });
+    return;
+  }
+  const rows = await prisma.htsRateLine.findMany({
+    where,
+    select: { htsNumber: true, generalRate: true, description: true },
+    orderBy: { htsNumber: 'asc' },
+    take: 25,
+  });
+
+  res.json({
+    // 8-digit headings only: CERT accepts ch.99 numbers at 8 digits.
+    data: rows
+      .filter((r) => r.htsNumber.length === 8)
+      .map((r) => ({
+        htsNumber: r.htsNumber,
+        rate: r.generalRate,
+        semantics: ch99Semantics(r.htsNumber, r.generalRate),
+        description: r.description,
+      })),
+  });
+});
 
 // ── GET /line-import-template — CSV template for bulk line import ──
 // Registered BEFORE /:id so the static path isn't captured as an id.
@@ -136,6 +176,8 @@ router.get('/line-import-template', (_req: AuthRequest, res: Response): void => 
   // BOM so Excel opens it as UTF-8.
   res.send('﻿' + LINE_IMPORT_TEMPLATE);
 });
+
+// ── GET /:id — Detail (org-scoped) ─────────────────────
 
 router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;

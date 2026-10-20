@@ -39,10 +39,29 @@ export function canonicaliseEntryNumber(s: string): string {
   return stripped;
 }
 
+/** True when any line claims Chapter 99 numbers (native-only data). */
+export function hasCh99Claims(body: ABIDocumentBody): boolean {
+  return body.manifest.some((m) => m.invoices.some((inv) => inv.items.some((it) => (it.additionalHtsNumbers?.length ?? 0) > 0)));
+}
+
 export function mapABIDocumentToCC(
   doc: { payload: Prisma.JsonValue }
 ): CCABICreateDocumentPayload {
-  const body: ABIDocumentBody = abiDocumentBodySchema.parse(doc.payload);
+  const parsed: ABIDocumentBody = abiDocumentBodySchema.parse(doc.payload);
+  if (hasCh99Claims(parsed)) {
+    throw new Error('The CustomsCity fallback cannot carry Chapter 99 claims.');
+  }
+  // CC's item schema has no ch.99 field: never forward one (audit MHT-06).
+  const body: ABIDocumentBody = {
+    ...parsed,
+    manifest: parsed.manifest.map((m) => ({
+      ...m,
+      invoices: m.invoices.map((inv) => ({
+        ...inv,
+        items: inv.items.map(({ additionalHtsNumbers: _ch99, ...item }) => item),
+      })),
+    })),
+  };
 
   const normalised: ABIDocumentBody = {
     ...body,

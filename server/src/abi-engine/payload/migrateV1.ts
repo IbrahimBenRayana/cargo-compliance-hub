@@ -13,6 +13,7 @@ import { RecordCodecError, type CodecIssue } from '../records/codec.js';
 import type { AbiDocumentBody, AbiItem, AbiInvoice } from '../../services/abi/types.js';
 import { parseAbiPayloadV2, type AbiPayloadV2, type EntrySummaryV2, type LineV2 } from './schemaV2.js';
 import { deriveMid } from './mid.js';
+import { orderCh99 } from './ch99.js';
 
 function fail(field: string, message: string): never {
   const issue: CodecIssue = { record: 'PayloadV1', field, message };
@@ -83,16 +84,32 @@ function migrateItem(item: AbiItem, invoice: AbiInvoice): LineV2 {
     grossWeightKg: toKilograms(item.weight.gross, item.weight.uom),
     descriptions: item.description ? [item.description.slice(0, 70)] : undefined,
     parties: parties.length > 0 ? parties : undefined,
-    tariffs: [
-      {
-        htsNumber: item.htsNumber.replace(/\./g, ''),
-        // dutyCents deliberately absent — the duty engine computes it.
-        valueDollars: Math.round(item.values.totalValueOfGoods),
-        uomCode1: quantity.uom ?? 'NO',
-        quantity1Hundredths: quantity.hundredths,
-      },
-    ],
+    tariffs: buildTariffs(item, quantity),
   };
+}
+
+/**
+ * Build a line's tariff list: ch.99 overlays first, in CBP's program order
+ * and deduplicated (ch99.ts), then the base ch.1-97 classification.
+ *
+ * Value and quantity belong to the base. Each overlay is reported the way
+ * CERT accepted it: 8 digits, value 0, and no unit or quantity (a UOM on a
+ * zero-reporting-unit tariff draws F441/F442). The duty engine prices each
+ * overlay on the base value from its USITC rate text, and zeroes the base
+ * when the heading replaces column 1. dutyCents is deliberately absent.
+ */
+function buildTariffs(
+  item: AbiItem,
+  quantity: { hundredths?: number; uom?: string }
+): LineV2['tariffs'] {
+  const base = {
+    htsNumber: item.htsNumber.replace(/\./g, ''),
+    valueDollars: Math.round(item.values.totalValueOfGoods),
+    uomCode1: quantity.uom ?? 'NO',
+    quantity1Hundredths: quantity.hundredths,
+  };
+  const overlays = orderCh99(item.additionalHtsNumbers ?? []).map((htsNumber) => ({ htsNumber, valueDollars: 0 }));
+  return [...overlays, base];
 }
 
 /** Migrate a v1 CustomsCity-shaped payload to schema v2. Throws on unmappable data. */

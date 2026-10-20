@@ -18,6 +18,7 @@ import {
   extractDenormFromPayload,
   extractCCErrorMessage,
   mapABIDocumentToCC,
+  hasCh99Claims,
   buildSendPayload,
   canonicaliseEntryNumber,
 } from './abiDocumentMapper.js';
@@ -184,6 +185,15 @@ export async function sendAbiDocumentToCBP(params: {
     const updated = await prisma.abiDocument.findUnique({ where: { id: doc.id } });
     emitWebhook(orgId, 'entry.sent', { abiDocumentId: doc.id, entryNumber: doc.entryNumber, entryType: doc.entryType, mbolNumber: doc.mbolNumber });
     return { httpStatus: 200, body: { data: updated, native: native.body } };
+  }
+
+  // CustomsCity derives ch.99 numbers itself and has no field for ours, so
+  // claims the filer made would silently not reach CBP (audit MHT-06).
+  if (hasCh99Claims(bodyResult.data)) {
+    return {
+      httpStatus: 422,
+      body: { error: 'The CustomsCity fallback cannot carry Chapter 99 claims. Transmit this entry through the native engine.', code: 'CH99_NATIVE_ONLY' },
+    };
   }
 
   // Atomic DRAFT→SENDING (single UPDATE with a status predicate — exactly one

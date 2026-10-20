@@ -106,6 +106,18 @@ const abiPartySchema = z.object({
 const abiItemSchema = z.object({
   sku: z.string().min(1).max(100),
   htsNumber: z.string().regex(/^\d{10}$/, 'HTS must be 10 digits'),
+  /**
+   * Chapter 99 numbers (Section 301, 232, NT52 and other programs) claimed
+   * alongside the base classification above, 8 digits each. The migrator
+   * puts them in CBP's program order, ahead of the base; value and
+   * quantity stay on the base (abi-engine/payload/ch99.ts). Capped at 31 so
+   * a line stays within the engine's 32-tariff maximum.
+   */
+  additionalHtsNumbers: z
+    .array(z.string().regex(/^99\d{6}$/, 'Chapter 99 numbers are 8 digits starting with 99'))
+    .max(31)
+    .refine((list) => new Set(list).size === list.length, 'Each Chapter 99 number can be claimed once per line')
+    .optional(),
   description: z.string().min(1).max(500),
   origin: z.object({ country: CountryCode }),
   values: z.object({
