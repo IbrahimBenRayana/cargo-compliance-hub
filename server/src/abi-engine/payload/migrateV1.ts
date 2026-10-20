@@ -175,7 +175,14 @@ export function migrateV1ToV2(v1: AbiDocumentBody): AbiPayloadV2 {
     consigneeNumber: v1.entryConsignee.taxId || undefined,
     usStateOfDestination: v1.location.destinationStateUS || undefined,
     bonds: bondType
-      ? [{ bondTypeCode: bondType, designationTypeCode: 'B', suretyCompanyCode: v1.bond.suretyCode }]
+      ? [
+          {
+            bondTypeCode: bondType,
+            designationTypeCode: 'B',
+            suretyCompanyCode: v1.bond.suretyCode,
+            ...(bondType === '9' && v1.bond.stbAmount ? { stbAmountDollars: v1.bond.stbAmount } : {}),
+          },
+        ]
       : undefined,
     payment: {
       typeCode: paymentTypeCode as '1' | '2' | '3' | '5' | '6' | '7' | '8',

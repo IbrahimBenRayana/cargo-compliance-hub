@@ -35,6 +35,8 @@ export interface AbiBond {
   type: string;
   suretyCode: string;
   taxId: string;
+  /** Single transaction bond (type 9) amount, whole dollars. */
+  stbAmount?: number;
 }
 
 export interface AbiPayment {

@@ -52,6 +52,7 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
 
   if (!draft.bond?.type) missing.push('Bond Type');
   if (!draft.bond?.suretyCode) missing.push('Bond Surety Code');
+  if (draft.bond?.type === '9' && !draft.bond.stbAmount) missing.push('Single Transaction Bond Amount');
   if (!draft.bond?.taxId) missing.push('Bond Tax ID');
 
   if (draft.payment?.typeCode === undefined || draft.payment?.typeCode === null) {

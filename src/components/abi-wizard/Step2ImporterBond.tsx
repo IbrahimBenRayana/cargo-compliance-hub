@@ -79,9 +79,9 @@ export default function Step2ImporterBond({ value, onChange, errors = {} }: Prop
             label="Bond Type"
             required
             value={bond.type || ''}
-            onChange={(v) => setBond({ type: v as '8' | '9' })}
+            onChange={(v) => setBond({ type: v as '8' | '9', ...(v === '8' && { stbAmount: undefined }) })}
             options={BOND_TYPES}
-            hint="Single entry, continuous, or single transaction."
+            hint="Continuous (8) or single transaction (9)."
             error={errors['bond.type']}
           />
           <TextField
@@ -98,12 +98,23 @@ export default function Step2ImporterBond({ value, onChange, errors = {} }: Prop
             label="Surety Code"
             required
             value={bond.suretyCode || ''}
-            onChange={(v) => setBond({ suretyCode: v.toUpperCase() })}
+            onChange={(v) => setBond({ suretyCode: v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3) })}
             placeholder="e.g., 050, 211"
-            maxLength={10}
+            maxLength={3}
             hint="CBP-issued code identifying the surety company that backs this bond (different from your tax ID)."
             error={errors['bond.suretyCode']}
           />
+          {bond.type === '9' && (
+            <TextField
+              label="Bond Amount (USD)"
+              required
+              type="number"
+              value={bond.stbAmount ? String(bond.stbAmount) : ''}
+              onChange={(v) => setBond({ stbAmount: v === '' ? undefined : Math.round(Number(v)) })}
+              hint="The single transaction bond's amount, in whole dollars, as written by the surety."
+              error={errors['bond.stbAmount']}
+            />
+          )}
         </div>
       </div>
 

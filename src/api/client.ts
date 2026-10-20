@@ -1896,6 +1896,8 @@ export interface ABIBond {
   type: '8' | '9';   // "8" continuous, "9" single-transaction
   suretyCode: string; // CBP-issued surety company code (3 chars)
   taxId: string;
+  /** Single transaction bond (type 9) amount, whole dollars. */
+  stbAmount?: number;
 }
 
 export interface ABIPayment {

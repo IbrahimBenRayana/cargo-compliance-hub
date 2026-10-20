@@ -47,8 +47,10 @@ const abiBondSchema = z.object({
   type: z.enum(['8', '9']), // CC: only "8" continuous or "9" single-transaction
   // CBP-issued 3-character surety company code (e.g. "050", "211"). Distinct
   // from `taxId` which is the bond *holder*'s tax ID.
-  suretyCode: z.string().min(1).max(10),
+  suretyCode: z.string().regex(/^[A-Z0-9]{3}$/, 'Surety codes are 3 characters'),
   taxId: z.string().min(1).max(50),
+  /** Single transaction bond (type 9) amount in whole dollars (ESF-158). */
+  stbAmount: z.number().int().positive().max(9_999_999_999).optional(),
 });
 
 // Payment type (CATAIR ESF-31): 1 individual; 2/3/5 daily statement;
@@ -248,6 +250,14 @@ export const abiDocumentBodySchema = abiDocumentBodyBaseSchema.superRefine((b, c
     at('preliminaryStatementDate', 'Statement payment needs a preliminary statement date');
   } else if (b.dates.entryDate && preliminaryStatementDate < b.dates.entryDate) {
     at('preliminaryStatementDate', 'Preliminary Statement Date must be on or after the Entry Date');
+  }
+  // A single transaction bond states its amount; a continuous bond never
+  // does (ESF-157/158).
+  if (b.bond.type === '9' && !b.bond.stbAmount) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['bond', 'stbAmount'], message: 'A single transaction bond needs its amount' });
+  }
+  if (b.bond.type === '8' && b.bond.stbAmount) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['bond', 'stbAmount'], message: 'A continuous bond has no transaction amount' });
   }
   // AD/CVD goods use the explicit AD/CVD type 03, which needs at least one
   // case (usage note ff); other types cannot carry cases.

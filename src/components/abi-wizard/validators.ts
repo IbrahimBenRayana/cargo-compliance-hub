@@ -61,6 +61,8 @@ export function validateStep2(d: ABIDocumentDraft): FieldErrors {
 
   if (!d.bond?.type) e['bond.type'] = 'Required';
   if (!d.bond?.suretyCode) e['bond.suretyCode'] = 'Required';
+  else if (!/^[A-Z0-9]{3}$/.test(d.bond.suretyCode)) e['bond.suretyCode'] = 'Surety codes are 3 characters';
+  if (d.bond?.type === '9' && !(d.bond.stbAmount && d.bond.stbAmount > 0)) e['bond.stbAmount'] = 'Required for a single transaction bond';
   if (!d.bond?.taxId) e['bond.taxId'] = 'Required';
 
   if (d.payment?.typeCode === undefined || d.payment?.typeCode === null) {
