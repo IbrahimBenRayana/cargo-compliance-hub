@@ -14,7 +14,7 @@ import type {
   ABIParty,
   AbiDocument,
 } from '@/api/client';
-import { PARTY_TYPES, WEIGHT_UOM, YES_NO } from '@/data/abiEnums';
+import { PARTY_TYPES, SPI_CLAIM_CODES, WEIGHT_UOM, YES_NO } from '@/data/abiEnums';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -431,6 +431,16 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                             placeholder="Search countries…"
                             searchPlaceholder="Type a country, ISO code, or alias…"
                             error={errors[`${itemPath}.origin.country`]}
+                          />
+                          <SelectField
+                            label="Trade program claim"
+                            value={item.spiClaimCode || ''}
+                            onChange={(v) =>
+                              updateItem(invIdx, itemIdx, { spiClaimCode: v || undefined })
+                            }
+                            options={[{ value: '', label: 'None' }, ...SPI_CLAIM_CODES]}
+                            error={errors[`${itemPath}.spiClaimCode`]}
+                            hint="USMCA, FTA or other preference this line qualifies for. The duty uses the program's rate."
                           />
                           <SelectField
                             label="Item Currency"

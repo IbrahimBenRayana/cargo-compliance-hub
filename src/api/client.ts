@@ -1938,6 +1938,8 @@ export interface ABIParty {
 export interface ABIItem {
   sku: string;
   htsNumber: string;
+  /** Trade agreement / special program claim (AE Table 8), e.g. 'S' for USMCA. */
+  spiClaimCode?: string;
   description: string;
   origin: { country: string };
   values: {

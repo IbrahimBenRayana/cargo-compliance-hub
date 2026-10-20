@@ -81,6 +81,9 @@ function migrateItem(item: AbiItem, invoice: AbiInvoice): LineV2 {
     countryOfExport: invoice.countryOfExport || undefined,
     dateOfExportation: invoice.exportDate || undefined,
     relatedPartyIndicator: invoice.relatedParties,
+    // The engine prices the claim from the HTS Special column and applies
+    // the program's MPF exemption (duty/engine.ts, fees.ts).
+    spiClaimCode: item.spiClaimCode || undefined,
     grossWeightKg: toKilograms(item.weight.gross, item.weight.uom),
     descriptions: item.description ? [item.description.slice(0, 70)] : undefined,
     parties: parties.length > 0 ? parties : undefined,

@@ -99,6 +99,8 @@ export interface AbiItem {
   /** Chapter 99 numbers claimed on this line (Section 301, 232, NT52 and
    *  other programs), 8 digits each; native engine only (CC cannot carry them). */
   additionalHtsNumbers?: string[];
+  /** Trade agreement / special program claimed for this line (AE Table 8), e.g. 'S' for USMCA. */
+  spiClaimCode?: string;
   description: string;
   origin: { country: string };
   values: AbiItemValues;

@@ -190,7 +190,7 @@ describe('enrichWithDuty', () => {
   it('refuses unlisted SPI claims and unknown HTS numbers instead of guessing', async () => {
     const spi = unpriced();
     spi.entrySummary.lines[0].spiClaimCode = 'A';
-    await expect(enrichWithDuty(spi, RATES, { applicabilityDate: '20260820' })).rejects.toThrow(/SPI/);
+    await expect(enrichWithDuty(spi, RATES, { applicabilityDate: '20260820' })).rejects.toThrow(/trade program claim/);
 
     const unknown = unpriced();
     unknown.entrySummary.lines[0].tariffs[0].htsNumber = '9999999999';

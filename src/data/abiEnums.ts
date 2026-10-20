@@ -135,6 +135,46 @@ export const PAYMENT_TYPE_CODES: EnumOption[] = [
   { value: '8', label: '8 — Periodic monthly statement, by importer (no suffix)' },
 ];
 
+// ─── Trade Agreement / Special Program Claims (CATAIR AE Table 8) ──────────
+// Mirrors server/src/abi-engine/refdata/spiCodes.ts. Expired programs (NAFTA
+// CA/MX, ATPA J/J+) are left out; a '#' code adds the FTA MPF exemption.
+export const SPI_CLAIM_CODES: EnumOption[] = [
+  { value: 'S', label: 'S — USMCA' },
+  { value: 'S+', label: 'S+ — USMCA, qualifying commodities' },
+  { value: 'A', label: 'A — GSP' },
+  { value: 'AU', label: 'AU — Australia FTA' },
+  { value: 'BH', label: 'BH — Bahrain FTA' },
+  { value: 'CL', label: 'CL — Chile FTA' },
+  { value: 'CO', label: 'CO — Colombia TPA' },
+  { value: 'IL', label: 'IL — Israel FTA' },
+  { value: 'JO', label: 'JO — Jordan FTA' },
+  { value: 'JP', label: 'JP — U.S.-Japan Trade Agreement' },
+  { value: 'KR', label: 'KR — Korea FTA' },
+  { value: 'MA', label: 'MA — Morocco FTA' },
+  { value: 'OM', label: 'OM — Oman FTA' },
+  { value: 'P', label: 'P — CAFTA-DR, originating' },
+  { value: 'P+', label: 'P+ — CAFTA-DR, qualifying' },
+  { value: 'PA', label: 'PA — Panama TPA' },
+  { value: 'PE', label: 'PE — Peru TPA' },
+  { value: 'SG', label: 'SG — Singapore FTA' },
+  { value: 'D', label: 'D — AGOA' },
+  { value: 'E', label: 'E — Caribbean Basin Initiative (CBERA)' },
+  { value: 'R', label: 'R — Caribbean Basin Trade Partnership Act' },
+  { value: 'N', label: 'N — West Bank, Gaza, QIZ or Israel' },
+  { value: 'NP', label: 'NP — Nepal Preference Program' },
+  { value: 'W', label: 'W — Puerto Rico goods advanced in a CBERA country' },
+  { value: 'Y', label: 'Y — U.S. insular possession' },
+  { value: 'Z', label: 'Z — Freely Associated States' },
+  { value: 'B', label: 'B — Automotive Products Trade Act' },
+  { value: 'B#', label: 'B# — Automotive Products Trade Act + FTA MPF exemption' },
+  { value: 'C', label: 'C — Civil aircraft' },
+  { value: 'C#', label: 'C# — Civil aircraft + FTA MPF exemption' },
+  { value: 'K', label: 'K — Pharmaceutical products' },
+  { value: 'K#', label: 'K# — Pharmaceutical products + FTA MPF exemption' },
+  { value: 'L', label: 'L — Intermediate chemicals for dyes' },
+  { value: 'L#', label: 'L# — Intermediate chemicals for dyes + FTA MPF exemption' },
+];
+
 // ─── Bill of Lading Types ──────────────────────────────────────────────────
 export const BILL_TYPES: EnumOption<'M' | 'H'>[] = [
   { value: 'M', label: 'Master' },

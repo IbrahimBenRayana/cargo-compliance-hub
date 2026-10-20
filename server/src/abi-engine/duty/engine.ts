@@ -166,7 +166,7 @@ export async function enrichWithDuty(
             if (preferred === null && !generalFree && !tariff.htsNumber.startsWith('99')) {
               fail(
                 where,
-                `SPI '${line.spiClaimCode}' is not a listed program for ${tariff.htsNumber} — remove the claim or supply dutyCents explicitly`
+                `The trade program claim '${line.spiClaimCode}' does not apply to HTS ${tariff.htsNumber}: the HTS does not list that program among its special rates. Remove the claim or check the classification.`
               );
             }
             if (preferred !== null && !tariff.htsNumber.startsWith('99')) {

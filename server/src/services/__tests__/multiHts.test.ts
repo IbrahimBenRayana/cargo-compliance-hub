@@ -18,7 +18,7 @@ import { validateEntrySummary } from '../../abi-engine/validate/entrySummary.js'
 import { buildEntrySummary } from '../../abi-engine/ae/builder.js';
 import { RecordCodecError } from '../../abi-engine/records/codec.js';
 import { hasCh99Claims, mapABIDocumentToCC } from '../abiDocumentMapper.js';
-import type { AbiDocumentBody } from '../abi/types.js';
+import { entryBody } from './fixtures/entryBody.js';
 
 const USITC = {
   '8507600030': '3.4%',
@@ -36,45 +36,7 @@ const USITC = {
 };
 const RATES = new StaticRateSource(USITC);
 
-function body(opts: { hts?: string; origin?: string; value?: number; quantity?: string; ch99?: string[] } = {}): AbiDocumentBody {
-  return {
-    entryType: '01',
-    modeOfTransport: '11',
-    entryNumber: 'SP7-1234567-0',
-    dates: { entryDate: '20260820', importDate: '20260815', arrivalDate: '20260814' },
-    location: { portOfEntry: '2704', destinationStateUS: 'CA' },
-    ior: { number: '26-164751100', name: 'SIGMA TECHNOLOGY PARTNERS LLC' },
-    bond: { type: '8', suretyCode: '123', taxId: '26-164751100' },
-    payment: { typeCode: 2, preliminaryStatementDate: '20260901' },
-    firms: 'Y123',
-    entryConsignee: {
-      name: 'SIGMA TECHNOLOGY PARTNERS LLC', taxId: '26-164751100',
-      address: '1 MAIN ST', city: 'LOS ANGELES', state: 'CA', postalCode: '90001', country: 'US',
-    },
-    manifest: [{
-      bill: { type: 'M', mBOL: 'MAEU123456789012', hBOL: 'MAEU123456789012', groupBOL: 'N' },
-      carrier: { code: 'MAEU' },
-      ports: { portOfUnlading: '2704' },
-      quantity: '100', quantityUOM: 'CTNS',
-      invoices: [{
-        purchaseOrder: 'PO-1', invoiceNumber: 'INV-1', exportDate: '20260801',
-        relatedParties: 'N', countryOfExport: opts.origin ?? 'CN', currency: 'USD', exchangeRate: 1,
-        items: [{
-          sku: 'SKU-1', htsNumber: opts.hts ?? '8507600030',
-          description: 'LITHIUM ION BATTERY PACKS',
-          origin: { country: opts.origin ?? 'CN' },
-          ...(opts.ch99 ? { additionalHtsNumbers: opts.ch99 } : {}),
-          values: { currency: 'USD', exchangeRate: 1, totalValueOfGoods: opts.value ?? 10000 },
-          quantity1: opts.quantity ?? '500 NO', weight: { gross: '2646', uom: 'L' },
-          parties: [
-            { type: 'buyer', taxId: '26-164751100' },
-            { type: 'manufacturer', name: 'SHENZHEN BATTERY CO', address: '8 INDUSTRIAL RD', city: 'SHENZHEN', country: 'CN' },
-          ],
-        }],
-      }],
-    }],
-  } as unknown as AbiDocumentBody;
-}
+const body = entryBody;
 
 async function line(opts: Parameters<typeof body>[0]) {
   const priced = await enrichWithDuty(migrateV1ToV2(body(opts)), RATES, { applicabilityDate: '20260820' });

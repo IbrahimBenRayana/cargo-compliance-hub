@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SPI_CLAIM_CODES } from '../abi-engine/refdata/spiCodes.js';
 
 // ─── Primitive helpers ──────────────────────────────────────────────────
 
@@ -118,6 +119,8 @@ const abiItemSchema = z.object({
     .max(31)
     .refine((list) => new Set(list).size === list.length, 'Each Chapter 99 number can be claimed once per line')
     .optional(),
+  /** Trade agreement / special program claim (AE Table 8), e.g. 'S' for USMCA. */
+  spiClaimCode: z.enum(SPI_CLAIM_CODES).optional(),
   description: z.string().min(1).max(500),
   origin: z.object({ country: CountryCode }),
   values: z.object({
