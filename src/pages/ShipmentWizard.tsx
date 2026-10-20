@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo, useId, useRef } from 'react';
+import { CONTAINER_TYPES, toCommodityForms, toContainerForms } from '@/lib/isfForm';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useFiling, useCreateFiling, useCreateConsolidation, useUpdateFiling, useFilingAutosave } from '@/hooks/useFilings';
 import { useManifestQuery } from '@/hooks/useManifestQuery';
@@ -36,14 +37,6 @@ const BOND_TYPES = [
   { value: 'single', label: '9 — Single Transaction Bond' },
 ];
 
-const CONTAINER_TYPES = [
-  { value: 'CN', label: 'CN — Container' },
-  { value: 'NC', label: 'NC — No Container' },
-  { value: '20', label: '20 — 20ft Standard' },
-  { value: '40', label: '40 — 40ft Standard' },
-  { value: '40H', label: '40H — 40ft High Cube' },
-  { value: '45', label: '45 — 45ft High Cube' },
-];
 
 const WEIGHT_UOMS = [
   { value: 'K', label: 'KG — Kilograms' },
@@ -549,7 +542,6 @@ export default function ShipmentWizard() {
   useEffect(() => {
     if (isEdit) return; // editing path uses the other useEffect below
     if (!sourceFiling) return;
-    const c0 = sourceFiling.commodities?.[0];
     setForm({
       filingType: sourceFiling.filingType || 'ISF-10',
       // Identity fields blanked — user must supply per-shipment values.
@@ -577,15 +569,7 @@ export default function ShipmentWizard() {
       scacCode: sourceFiling.scacCode || '',
       vesselName: sourceFiling.vesselName || '',
       foreignPortOfUnlading: sourceFiling.foreignPortOfUnlading || '',
-      commodities: c0 ? [{
-        htsCode: c0.htsCode || '',
-        description: c0.description || '',
-        countryOfOrigin: c0.countryOfOrigin || '',
-        quantity: c0.quantity != null ? String(c0.quantity) : '',
-        quantityUOM: c0.quantityUOM || c0.weight?.unit === 'L' ? 'PCS' : 'PKG',
-        weight: c0.weight?.value != null ? String(c0.weight.value) : '',
-        weightUOM: c0.weight?.unit || 'K',
-      }] : [emptyCommodity()],
+      commodities: toCommodityForms(sourceFiling.commodities, emptyCommodity),
       // Containers blanked — different per shipment.
       containers: [emptyContainer()],
       isf5: sourceFiling.isf5Data ? {
@@ -662,8 +646,6 @@ export default function ShipmentWizard() {
   useEffect(() => {
     if (!existing) return;
     if (hydratedIdRef.current === existing.id) return;
-    const c0 = existing.commodities?.[0];
-    const ct0 = existing.containers?.[0];
     setForm({
       filingType: existing.filingType || 'ISF-10',
       masterBol: existing.masterBol || '',
@@ -690,16 +672,8 @@ export default function ShipmentWizard() {
       foreignPortOfUnlading: existing.foreignPortOfUnlading || '',
       estimatedDeparture: existing.estimatedDeparture ? existing.estimatedDeparture.split('T')[0] : '',
       estimatedArrival: existing.estimatedArrival ? existing.estimatedArrival.split('T')[0] : '',
-      commodities: c0 ? [{
-        htsCode: c0.htsCode || '',
-        description: c0.description || '',
-        countryOfOrigin: c0.countryOfOrigin || '',
-        quantity: c0.quantity != null ? String(c0.quantity) : '',
-        quantityUOM: c0.quantityUOM || c0.weight?.unit === 'L' ? 'PCS' : 'PKG',
-        weight: c0.weight?.value != null ? String(c0.weight.value) : '',
-        weightUOM: c0.weight?.unit || 'K',
-      }] : [emptyCommodity()],
-      containers: ct0 ? [{ number: ct0.number || '', type: ct0.type || 'CN' }] : [emptyContainer()],
+      commodities: toCommodityForms(existing.commodities, emptyCommodity),
+      containers: toContainerForms(existing.containers, emptyContainer),
       isf5: existing.isf5Data ? {
         bookingPartyName: existing.isf5Data.bookingPartyName || '',
         bookingPartyTaxID: existing.isf5Data.bookingPartyTaxID || '',

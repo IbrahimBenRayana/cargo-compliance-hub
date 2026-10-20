@@ -51,7 +51,7 @@ export const containerSchema = z.object({
   number: z.string().min(1).max(20, 'Container number must be 20 characters or fewer'),
   // CC container types (CN = standard, NC = none/no-container, 20/40/40HC = sizes).
   // Wizard defaults to 'CN' when type is missing — schema reflects that.
-  type: z.enum(['CN', 'NC', '20', '40', '40HC', '20GP', '40GP', 'TW', 'CL', 'R0']).optional(),
+  type: z.enum(['CN', 'NC', '20', '40', '40HC', '45HC', '20GP', '40GP', 'TW', 'CL', 'R0']).optional(),
   sealNumber: z.string().max(50).optional(),
 });
 
