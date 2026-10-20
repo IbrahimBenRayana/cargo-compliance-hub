@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SectionHeader } from './shared';
+import { CbpPreflightCard } from './CbpPreflightCard';
 
 export interface ValidationResult {
   valid: boolean;
@@ -199,6 +200,7 @@ export default function Step6Review({ value, doc }: Props) {
         title="Review & transmit"
         description="Verify the summary below, then save as draft or transmit to CBP."
       />
+      {doc?.id && <CbpPreflightCard docId={doc.id} />}
 
       {/* Totals grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

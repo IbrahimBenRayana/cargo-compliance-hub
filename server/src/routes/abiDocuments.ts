@@ -1,4 +1,5 @@
 import { Router, type Response } from 'express';
+import { buildNativeEntry } from '../services/cbp/nativeEntry.js';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
@@ -442,6 +443,29 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> =>
     logger.error({ err, docId: id }, '[AbiDocuments] 7501 PDF render failed');
     res.status(500).json({ error: 'Failed to generate the 7501 PDF' });
   }
+});
+
+// ─── POST /:id/preflight — would CBP accept this entry? ──────────
+// Runs the full native build (filer identity, currency conversion, CATAIR
+// build and the engine's validator) without claiming or sending anything,
+// so the review step can show every issue before the user transmits.
+router.post('/:id/preflight', async (req: AuthRequest, res: Response): Promise<void> => {
+  const doc = await prisma.abiDocument.findFirst({ where: { id: String(req.params.id), orgId: req.user!.orgId }, select: { cbpState: true } });
+  if (!doc) {
+    res.status(404).json({ error: 'Entry not found' });
+    return;
+  }
+  const built = await buildNativeEntry({
+    docId: String(req.params.id),
+    orgId: req.user!.orgId,
+    userId: req.user!.id,
+    action: doc.cbpState === 'ON_FILE' ? 'REPLACE' : 'ADD',
+  });
+  if (!built.ok) {
+    res.json({ ready: false, ...built.body });
+    return;
+  }
+  res.json({ ready: true, filerCode: built.filerCode, releaseRequested: built.releaseRequested, conversions: built.conversions });
 });
 
 router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {

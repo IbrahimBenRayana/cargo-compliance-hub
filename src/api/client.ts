@@ -2130,7 +2130,23 @@ export type DutyEstimateResult =
     }
   | { estimable: false; issues: DutyEstimateIssue[] };
 
+/** Result of the native preflight: what CBP would make of this entry. */
+export interface EntryPreflight {
+  ready: boolean;
+  error?: string;
+  code?: string;
+  issues?: Array<{ field?: string; record?: string; message: string }>;
+  filerCode?: string;
+  releaseRequested?: boolean;
+  conversions?: Array<{ currency: string; amount: number; usd: number; rate: number; rateDate: string }>;
+}
+
 export const abiDocumentsApi = {
+  /** Full native build + CBP-rule validation, without sending anything. */
+  preflight(id: string) {
+    return apiFetch<EntryPreflight>(`/api/v1/abi-documents/${id}/preflight`, { method: 'POST' });
+  },
+
   list(params?: AbiDocumentListParams) {
     const query = new URLSearchParams();
     if (params) {

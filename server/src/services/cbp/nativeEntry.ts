@@ -75,31 +75,47 @@ function releaseEntities(body: AbiDocumentBody): { entities: AeCargoEntity[] } |
   };
 }
 
-export async function transmitEntryNative(opts: {
+type BuildOutcome =
+  | {
+      ok: true;
+      doc: NonNullable<Awaited<ReturnType<typeof prisma.abiDocument.findFirst>>>;
+      body: AbiDocumentBody;
+      lines: string[];
+      districtPort: string;
+      filerCode: string;
+      releaseRequested: boolean;
+      conversions: CurrencyConversion[];
+    }
+  | { ok: false; httpStatus: number; body: Record<string, unknown> };
+
+/**
+ * Everything short of sending: lifecycle and filer checks, currency
+ * conversion, the full CATAIR build and the engine's validator. Used by the
+ * transmit and by the preflight that shows the filer every issue up front.
+ */
+export async function buildNativeEntry(opts: {
   docId: string;
   orgId: string;
   userId: string;
   action: EntryAction;
-}): Promise<EntryTransmitOutcome> {
-  if (cbpTrafficConfig.transport === 'mock' && env.NODE_ENV === 'production') {
-    return { httpStatus: 503, body: { error: 'This server is not connected to CBP yet.', code: 'CBP_NOT_CONNECTED' } };
-  }
+}): Promise<BuildOutcome> {
 
   const doc = await prisma.abiDocument.findFirst({ where: { id: opts.docId, orgId: opts.orgId } });
-  if (!doc) return { httpStatus: 404, body: { error: 'Entry not found' } };
+  if (!doc) return { ok: false, httpStatus: 404, body: { error: 'Entry not found' } };
   if (doc.entryType === '86') {
     return {
+      ok: false,
       httpStatus: 422,
       body: { error: 'CBP no longer accepts Type 86 (de minimis) entries. File this shipment as a formal (01) or informal (11) entry.', code: 'entry_type_suspended' },
     };
   }
 
   const allowed = canStartEntryAction(doc, opts.action);
-  if (!allowed.ok) return { httpStatus: 409, body: { error: allowed.reason, code: 'ENTRY_ACTION_NOT_ALLOWED' } };
+  if (!allowed.ok) return { ok: false, httpStatus: 409, body: { error: allowed.reason, code: 'ENTRY_ACTION_NOT_ALLOWED' } };
 
   const body = doc.payload as unknown as AbiDocumentBody;
   const filer = checkEntryFiler(await loadOrgCbpConfig(opts.orgId), String(body?.entryNumber ?? ''));
-  if (!filer.ok) return { httpStatus: 422, body: { error: filer.message, code: filer.code } };
+  if (!filer.ok) return { ok: false, httpStatus: 422, body: { error: filer.message, code: filer.code } };
 
   const releaseRequested = opts.action !== 'DELETE' && RELEASE_ENTRY_TYPES.has(doc.entryType);
   // Foreign invoice values become USD at CBP's certified rate (audit ENG-02).
@@ -109,7 +125,7 @@ export async function transmitEntryNative(opts: {
     ({ body: usdBody, conversions } = await convertInvoiceValuesToUsd(body));
   } catch (err) {
     if (err instanceof CurrencyConversionError) {
-      return { httpStatus: 422, body: { error: err.message, code: err.code } };
+      return { ok: false, httpStatus: 422, body: { error: err.message, code: err.code } };
     }
     throw err;
   }
@@ -131,6 +147,7 @@ export async function transmitEntryNative(opts: {
       const phone = (org?.phone ?? '').replace(/\D/g, '').slice(-10);
       if (!name || phone.length < 10) {
         return {
+          ok: false,
           httpStatus: 422,
           body: {
             error: 'CBP needs a contact name and a 10-digit phone number to certify an entry for cargo release. Add your organization phone number in Settings.',
@@ -139,7 +156,7 @@ export async function transmitEntryNative(opts: {
         };
       }
       const entities = releaseEntities(body);
-      if ('missing' in entities) return { httpStatus: 422, body: { error: entities.missing, code: 'ENTRY_DATA_INCOMPLETE' } };
+      if ('missing' in entities) return { ok: false, httpStatus: 422, body: { error: entities.missing, code: 'ENTRY_DATA_INCOMPLETE' } };
       input.cargoReleaseCertification = true;
       input.certifyContact = { name, phone };
       input.cargoEntities = entities.entities;
@@ -147,15 +164,32 @@ export async function transmitEntryNative(opts: {
 
     const issues = validateEntrySummary(input);
     if (issues.length > 0) {
-      return { httpStatus: 422, body: { error: 'This entry does not meet CBP rules yet.', code: 'ENTRY_DATA_INCOMPLETE', issues } };
+      return { ok: false, httpStatus: 422, body: { error: 'This entry does not meet CBP rules yet.', code: 'ENTRY_DATA_INCOMPLETE', issues } };
     }
     lines = buildEntrySummary(input);
   } catch (err) {
     if (err instanceof RecordCodecError) {
-      return { httpStatus: 422, body: { error: 'This entry is missing required information.', code: 'ENTRY_DATA_INCOMPLETE', issues: err.issues } };
+      return { ok: false, httpStatus: 422, body: { error: 'This entry is missing required information.', code: 'ENTRY_DATA_INCOMPLETE', issues: err.issues } };
     }
     throw err;
   }
+
+  return { ok: true, doc, body, lines, districtPort, filerCode: filer.filerCode, releaseRequested, conversions };
+}
+
+export async function transmitEntryNative(opts: {
+  docId: string;
+  orgId: string;
+  userId: string;
+  action: EntryAction;
+}): Promise<EntryTransmitOutcome> {
+  if (cbpTrafficConfig.transport === 'mock' && env.NODE_ENV === 'production') {
+    return { httpStatus: 503, body: { error: 'This server is not connected to CBP yet.', code: 'CBP_NOT_CONNECTED' } };
+  }
+  const built = await buildNativeEntry(opts);
+  if (!built.ok) return { httpStatus: built.httpStatus, body: built.body };
+  const { doc, body, lines, districtPort, releaseRequested, conversions } = built;
+  const filer = { filerCode: built.filerCode };
 
   const sender = requireCbpSender();
   const started = entryStateOnStart(doc, opts.action);
