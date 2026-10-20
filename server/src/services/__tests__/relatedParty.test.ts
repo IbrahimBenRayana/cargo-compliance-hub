@@ -35,7 +35,7 @@ function body(relatedParties: 'Y' | 'N'): AbiDocumentBody {
     manifest: [{
       bill: { type: 'M', mBOL: 'MAEU123456789012', hBOL: 'MAEU123456789012', groupBOL: 'N' },
       carrier: { code: 'MAEU' },
-      ports: { portOfUnlading: '2704' },
+      ports: { portOfUnlading: '2704', foreignPortOfLading: '57035' },
       quantity: '100',
       quantityUOM: 'CTNS',
       invoices: [{

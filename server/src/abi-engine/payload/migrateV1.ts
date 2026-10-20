@@ -53,7 +53,7 @@ function toKilograms(gross: string, uom: string): number | undefined {
   return uom === 'L' ? Math.round(value * 0.453592) : Math.round(value);
 }
 
-function migrateItem(item: AbiItem, invoice: AbiInvoice): LineV2 {
+function migrateItem(item: AbiItem, invoice: AbiInvoice, foreignPortOfLading?: string): LineV2 {
   const quantity = parseQuantity(item.quantity1);
   const parties: LineV2['parties'] = [];
   for (const party of item.parties) {
@@ -84,6 +84,7 @@ function migrateItem(item: AbiItem, invoice: AbiInvoice): LineV2 {
     // The engine prices the claim from the HTS Special column and applies
     // the program's MPF exemption (duty/engine.ts, fees.ts).
     spiClaimCode: item.spiClaimCode || undefined,
+    foreignPortOfLading: foreignPortOfLading || undefined,
     grossWeightKg: toKilograms(item.weight.gross, item.weight.uom),
     descriptions: item.description ? [item.description.slice(0, 70)] : undefined,
     parties: parties.length > 0 ? parties : undefined,
@@ -120,7 +121,9 @@ export function migrateV1ToV2(v1: AbiDocumentBody): AbiPayloadV2 {
   const { filerCode, entryNumber } = splitV1EntryNumber(v1.entryNumber);
   const firstManifest = v1.manifest[0];
 
-  const lines = v1.manifest.flatMap((m) => m.invoices.flatMap((inv) => inv.items.map((item) => migrateItem(item, inv))));
+  const lines = v1.manifest.flatMap((m) =>
+    m.invoices.flatMap((inv) => inv.items.map((item) => migrateItem(item, inv, m.ports.foreignPortOfLading)))
+  );
   if (lines.length === 0) fail('manifest.invoices.items', 'v1 document has no line items to migrate');
 
   const bondType = v1.bond.type === '8' || v1.bond.type === '9' ? v1.bond.type : undefined;

@@ -7,7 +7,8 @@
 import { Ship } from 'lucide-react';
 import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
 import { BILL_TYPES, QUANTITY_UOM, YES_NO } from '@/data/abiEnums';
-import { SCHEDULE_D_PORTS } from '@/data/schedule-d-ports';
+import { ENTRY_PORTS } from '@/data/schedule-d-ports';
+import { needsForeignPortOfLading } from './validators';
 import {
   ComboboxField,
   SectionHeader,
@@ -140,10 +141,25 @@ export default function Step4Manifest({ value, onChange, doc, errors = {} }: Pro
                 ports: { ...ports, portOfUnlading: v } as typeof ports,
               })
             }
-            options={SCHEDULE_D_PORTS}
+            options={ENTRY_PORTS}
             placeholder="Select port…"
             searchPlaceholder="Search by code or city…"
+            hint="CBP Schedule D port where the cargo is unladen (4 digits)."
             error={errors['ports.portOfUnlading']}
+          />
+          <TextField
+            label="Foreign Port of Lading"
+            required={needsForeignPortOfLading(value)}
+            value={ports.foreignPortOfLading || ''}
+            onChange={(v) =>
+              setManifest({
+                ports: { ...ports, foreignPortOfLading: v.replace(/\D/g, '').slice(0, 5) || undefined } as typeof ports,
+              })
+            }
+            placeholder="e.g., 57035"
+            maxLength={5}
+            hint="5-digit Schedule K code of the foreign port where the cargo was loaded. Required for vessel entries."
+            error={errors['ports.foreignPortOfLading']}
           />
           <div className="grid grid-cols-2 gap-3">
             <TextField

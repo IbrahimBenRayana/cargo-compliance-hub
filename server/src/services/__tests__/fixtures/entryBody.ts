@@ -28,7 +28,7 @@ export function entryBody(opts: EntryBodyOptions = {}): AbiDocumentBody {
     manifest: [{
       bill: { type: 'M', mBOL: 'MAEU123456789012', hBOL: 'MAEU123456789012', groupBOL: 'N' },
       carrier: { code: 'MAEU' },
-      ports: { portOfUnlading: '2704' },
+      ports: { portOfUnlading: '2704', foreignPortOfLading: '57035' },
       quantity: '100', quantityUOM: 'CTNS',
       invoices: [{
         purchaseOrder: 'PO-1', invoiceNumber: 'INV-1', exportDate: '20260801',

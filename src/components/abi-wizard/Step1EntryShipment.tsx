@@ -13,7 +13,7 @@ import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
 import { validateEntryNumberLocal } from '@/lib/entryNumber';
 import { Button } from '@/components/ui/button';
 import { ENTRY_TYPES, MODES_OF_TRANSPORT } from '@/data/abiEnums';
-import { CBP_PORTS_4DIGIT } from '@/data/schedule-d-ports';
+import { ENTRY_PORTS } from '@/data/schedule-d-ports';
 import {
   ComboboxField,
   DateField,
@@ -180,7 +180,7 @@ export default function Step1EntryShipment({ value, onChange, errors = {} }: Ste
           required
           value={location.portOfEntry || ''}
           onChange={(v) => setLocation({ portOfEntry: v })}
-          options={CBP_PORTS_4DIGIT}
+          options={ENTRY_PORTS}
           placeholder="Select port…"
           searchPlaceholder="Search by code or city…"
           hint="CBP Schedule D port code where goods enter the US."

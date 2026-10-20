@@ -2557,3 +2557,7 @@ export const CBP_PORTS_4DIGIT: { value: string; label: string }[] = [
   { value: '5584', label: '5584 — Harrisburg, PA' },
   { value: '5588', label: '5588 — Nashville, TN' },
 ];
+
+/** Schedule D ports for entry fields (port of entry, port of unlading):
+ *  the 4-digit list without the '0000' unknown placeholder. */
+export const ENTRY_PORTS = CBP_PORTS_4DIGIT.filter((p) => p.value !== '0000');

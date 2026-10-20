@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SectionHeader } from './shared';
 import { CbpPreflightCard } from './CbpPreflightCard';
+import { needsForeignPortOfLading } from './validators';
 
 export interface ValidationResult {
   valid: boolean;
@@ -99,6 +100,7 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
     if (!m.bill?.hBOL) missing.push('House BOL (use Master BOL value if no separate house bill)');
     if (!m.carrier?.code) missing.push('Carrier SCAC');
     if (!m.ports?.portOfUnlading) missing.push('Port of Unlading');
+    if (!m.ports?.foreignPortOfLading && needsForeignPortOfLading(draft)) missing.push('Foreign Port of Lading');
     if (!m.quantity) missing.push('Manifest Quantity');
     if (!m.quantityUOM) {
       missing.push('Manifest Quantity UOM');

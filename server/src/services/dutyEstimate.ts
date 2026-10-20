@@ -2,7 +2,7 @@
  * Duty estimate service — transmit-time duty & fee preview for entry drafts.
  *
  * Reuses the native ABI pipeline end-to-end instead of re-implementing any
- * fee math: validate the CC-shaped draft body (abiDocumentBodySchema) →
+ * fee math: validate the CC-shaped draft body (abiDocumentBodyBaseSchema) →
  * migrateV1ToV2 → enrichWithDuty (USITC rates + CATAIR fee rules) → shape
  * the priced payload for the UI. The same chain the Phase-5 shadow run
  * uses (services/abiShadow.ts), so the preview a filer sees on the Review
@@ -15,7 +15,7 @@
 import { RecordCodecError } from '../abi-engine/records/codec.js';
 import { migrateV1ToV2 } from '../abi-engine/payload/migrateV1.js';
 import { enrichWithDuty, type HtsRateSource } from '../abi-engine/duty/engine.js';
-import { abiDocumentBodySchema } from '../schemas/abiDocument.js';
+import { abiDocumentBodyBaseSchema } from '../schemas/abiDocument.js';
 import type { AbiDocumentBody } from './abi/types.js';
 import logger from '../config/logger.js';
 
@@ -110,8 +110,10 @@ export async function estimateDutyForBody(
   rateSource: HtsRateSource,
   options: DutyEstimateOptions = {}
 ): Promise<DutyEstimateResult> {
-  // 1. The draft must be a complete, valid v1 body before it can be priced.
-  const parsed = abiDocumentBodySchema.safeParse(body);
+  // 1. The draft must be a complete, well-formed v1 body before it can be
+  //    priced. Transmit-only rules (statement fields, lading port) do not
+  //    block an estimate.
+  const parsed = abiDocumentBodyBaseSchema.safeParse(body);
   if (!parsed.success) {
     return {
       estimable: false,

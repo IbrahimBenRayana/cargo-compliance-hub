@@ -7,6 +7,9 @@ const YYYYMMDD = z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD');
 const TwoDigit = z.string().regex(/^\d{2}$/);
 const CountryCode = z.string().regex(/^[A-Z]{2}$/, 'ISO-3166 alpha-2');
 const USState = z.string().regex(/^[A-Z]{2}$/);
+// Schedule D district/port: 4 digits, never the '0000' unknown placeholder
+// (the AE 10/20-records take exactly 4; audit UFF-03).
+const ScheduleDPort = z.string().regex(/^(?!0000)\d{4}$/, 'Use the 4-digit CBP Schedule D port code');
 
 // ─── ABI document sub-schemas ───────────────────────────────────────────
 
@@ -17,7 +20,7 @@ const abiDatesSchema = z.object({
 });
 
 const abiLocationSchema = z.object({
-  portOfEntry: z.string().min(1).max(4), // CC: must NOT be longer than 4 chars
+  portOfEntry: ScheduleDPort,
   destinationStateUS: USState,
 });
 
@@ -90,7 +93,8 @@ const abiCarrierSchema = z.object({
 });
 
 const abiPortsSchema = z.object({
-  portOfUnlading: z.string().min(1).max(10),
+  portOfUnlading: ScheduleDPort,
+  foreignPortOfLading: z.string().regex(/^\d{5}$/, 'Use the 5-digit Schedule K foreign port code').optional(),
 });
 
 const abiPartySchema = z.object({
@@ -186,7 +190,9 @@ const abiManifestSchema = z.object({
 // ─── Full ABI document body (the `body[0]` object in the CC payload) ────
 
 // Base schema (a plain ZodObject so it stays `.deepPartial()`-able).
-const abiDocumentBodyBaseSchema = z.object({
+/** Every field present and well-formed, without the transmit-time
+ *  cross-field rules: enough to price an entry (dutyEstimate). */
+export const abiDocumentBodyBaseSchema = z.object({
   // 01 = consumption (formal), 11 = informal, 86 = de minimis (Section 321,
   // sub-$800 — cargo-release only, no formal entry summary).
   entryType: z.enum(['01', '11', '86']),
@@ -227,6 +233,16 @@ export const abiDocumentBodySchema = abiDocumentBodyBaseSchema.superRefine((b, c
     at('preliminaryStatementDate', 'Statement payment needs a preliminary statement date');
   } else if (b.dates.entryDate && preliminaryStatementDate < b.dates.entryDate) {
     at('preliminaryStatementDate', 'Preliminary Statement Date must be on or after the Entry Date');
+  }
+  // Vessel entries carry the Schedule K foreign port of lading (ACE F429,
+  // live CERT 004/007); goods exported from the US have none (CERT 042).
+  if (b.modeOfTransport === '10' || b.modeOfTransport === '11') {
+    b.manifest.forEach((m, i) => {
+      const foreignExport = m.invoices.some((inv) => inv.countryOfExport !== 'US');
+      if (foreignExport && !m.ports.foreignPortOfLading) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['manifest', i, 'ports', 'foreignPortOfLading'], message: 'Vessel entries need the foreign port of lading (ACE F429)' });
+      }
+    });
   }
   const monthly = typeCode === 6 || typeCode === 7 || typeCode === 8;
   if (monthly && !periodicStatementMonth) at('periodicStatementMonth', 'Periodic monthly statement needs the statement month');

@@ -106,6 +106,15 @@ export function validateStep3(d: ABIDocumentDraft): FieldErrors {
 }
 
 // ─── Step 4 — Manifest (Bill + Carrier + Ports) ──────────────
+
+/** Vessel entries need the Schedule K foreign port of lading (ACE F429)
+ *  unless every invoice is exported from the US. */
+export function needsForeignPortOfLading(d: ABIDocumentDraft): boolean {
+  if (d.modeOfTransport !== '10' && d.modeOfTransport !== '11') return false;
+  const invoices = d.manifest?.[0]?.invoices ?? [];
+  return invoices.length === 0 || invoices.some((inv) => inv?.countryOfExport !== 'US');
+}
+
 export function validateStep4(d: ABIDocumentDraft): FieldErrors {
   const e: FieldErrors = {};
   const m = d.manifest?.[0];
@@ -114,6 +123,9 @@ export function validateStep4(d: ABIDocumentDraft): FieldErrors {
   if (!m?.bill?.hBOL) e['bill.hBOL'] = 'Required (use Master BOL if no separate house bill)';
   if (!m?.carrier?.code) e['carrier.code'] = 'Required';
   if (!m?.ports?.portOfUnlading) e['ports.portOfUnlading'] = 'Required';
+  const lading = m?.ports?.foreignPortOfLading;
+  if (lading && !/^\d{5}$/.test(lading)) e['ports.foreignPortOfLading'] = 'Use the 5-digit Schedule K code';
+  else if (!lading && needsForeignPortOfLading(d)) e['ports.foreignPortOfLading'] = 'Required for vessel entries';
   if (!m?.quantity) e.quantity = 'Required';
   if (!m?.quantityUOM) {
     e.quantityUOM = 'Required';

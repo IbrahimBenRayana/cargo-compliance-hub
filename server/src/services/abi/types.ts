@@ -68,6 +68,8 @@ export interface AbiCarrier {
 
 export interface AbiPorts {
   portOfUnlading: string;
+  /** 5-digit Schedule K foreign port where the cargo was laden; vessel entries. */
+  foreignPortOfLading?: string;
 }
 
 export interface AbiParty {

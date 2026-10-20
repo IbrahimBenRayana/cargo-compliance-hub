@@ -1980,7 +1980,8 @@ export interface ABIInvoice {
 export interface ABIManifest {
   bill: ABIBill;
   carrier: { code: string };
-  ports: { portOfUnlading: string };
+  /** Foreign port of lading: 5-digit Schedule K, required for vessel entries. */
+  ports: { portOfUnlading: string; foreignPortOfLading?: string };
   quantity: string;
   quantityUOM: string;
   invoices: ABIInvoice[];
