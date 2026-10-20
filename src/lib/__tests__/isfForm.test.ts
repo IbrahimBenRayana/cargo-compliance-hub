@@ -57,3 +57,10 @@ describe('isImporterIdentifier', () => {
     expect(isImporterIdentifier('12-34')).toBe(false);
   });
 });
+
+describe('manufacturer link (audit UFF-M2)', () => {
+  it('keeps which manufacturer each line belongs to', () => {
+    expect(toCommodityForm({ htsCode: '850650', manufacturerIndex: 1 }).manufacturerIndex).toBe(1);
+    expect(toCommodityForm({ htsCode: '850650' }).manufacturerIndex).toBeUndefined();
+  });
+});

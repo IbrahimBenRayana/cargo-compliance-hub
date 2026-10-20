@@ -86,6 +86,8 @@ interface PartyFormData {
 }
 
 interface CommodityFormData {
+  /** Which manufacturer produced this line: 0 = the main one, n = additional n-1. */
+  manufacturerIndex?: number;
   htsCode: string;
   description: string;
   countryOfOrigin: string;
@@ -172,6 +174,8 @@ interface ISFFormState {
   seller: PartyFormData;
   shipToParty: PartyFormData;
   manufacturer: PartyFormData;
+  /** ISF-10 shipments with more than one manufacturer (each HTS line names its own). */
+  additionalManufacturers: PartyFormData[];
   consolidator: PartyFormData;
   containerStuffingLocation: PartyFormData;
 
@@ -245,6 +249,7 @@ const initialForm = (): ISFFormState => ({
   seller: emptyParty(),
   shipToParty: emptyParty(),
   manufacturer: emptyParty(),
+  additionalManufacturers: [],
   consolidator: emptyParty(),
   containerStuffingLocation: emptyParty(),
   scacCode: '',
@@ -594,6 +599,7 @@ export default function ShipmentWizard() {
       seller: parseParty(sourceFiling.seller),
       shipToParty: parseParty(sourceFiling.shipToParty),
       manufacturer: parseParty(Array.isArray(sourceFiling.manufacturer) ? sourceFiling.manufacturer[0] : sourceFiling.manufacturer),
+      additionalManufacturers: Array.isArray(sourceFiling.manufacturer) ? (sourceFiling.manufacturer as unknown[]).slice(1).map(parseParty) : [],
       consolidator: parseParty(sourceFiling.consolidator),
       containerStuffingLocation: parseParty(sourceFiling.containerStuffingLocation),
       scacCode: sourceFiling.scacCode || '',
@@ -699,6 +705,7 @@ export default function ShipmentWizard() {
       seller: parseParty(existing.seller),
       shipToParty: parseParty(existing.shipToParty),
       manufacturer: parseParty(Array.isArray(existing.manufacturer) ? existing.manufacturer[0] : existing.manufacturer),
+      additionalManufacturers: Array.isArray(existing.manufacturer) ? (existing.manufacturer as unknown[]).slice(1).map(parseParty) : [],
       consolidator: parseParty(existing.consolidator),
       containerStuffingLocation: parseParty(existing.containerStuffingLocation),
       scacCode: existing.scacCode || '',
@@ -932,7 +939,8 @@ export default function ShipmentWizard() {
         ['manufacturer', form.manufacturer], ['consolidator', form.consolidator],
         ['containerStuffingLocation', form.containerStuffingLocation],
       ] as const;
-      for (const [key, p] of parties) {
+      const extra = form.additionalManufacturers.map((m, i) => [`additionalManufacturers.${i}`, m] as const);
+      for (const [key, p] of [...parties, ...extra]) {
         if (!p.name.trim()) e[`${key}.name`] = 'Name is required';
         if (!p.address1.trim()) e[`${key}.address1`] = 'Street address is required';
         if (!p.city.trim()) e[`${key}.city`] = 'City is required';
@@ -975,6 +983,23 @@ export default function ShipmentWizard() {
   }, []);
 
   // ─── Build payload ─────────────────
+  /**
+   * Manufacturers for the payload. With more than one, each carries the HTS
+   * lines it produced (items), which the native mapper files as its own MF
+   * group (audit UFF-M2); with one, it covers every line.
+   */
+  const buildManufacturers = () => {
+    if (!form.manufacturer.name.trim()) return undefined;
+    const all = [form.manufacturer, ...(form.filingType === 'ISF-10' ? form.additionalManufacturers : [])];
+    if (all.length === 1) return [partyObj(form.manufacturer)];
+    return all.map((m, idx) => ({
+      ...partyObj(m),
+      items: form.commodities
+        .filter((c) => c.htsCode.trim() && (c.manufacturerIndex ?? 0) === idx)
+        .map((c) => ({ htsCode: c.htsCode.replace(/[\.\-\s]/g, ''), countryOfOrigin: c.countryOfOrigin })),
+    }));
+  };
+
   const buildPayload = useCallback(() => {
     const commodities: CommodityInfo[] = form.commodities
       .filter(c => c.htsCode.trim())
@@ -985,6 +1010,7 @@ export default function ShipmentWizard() {
         // 10-digit code is preserved in our DB and is available for the
         // duty calculator's filing-prefill flow.
         htsCode: c.htsCode.replace(/[\.\-\s]/g, ''),
+        manufacturerIndex: form.additionalManufacturers.length > 0 ? (c.manufacturerIndex ?? 0) : undefined,
         description: c.description || undefined,
         countryOfOrigin: c.countryOfOrigin,
         quantity: c.quantity ? Number(c.quantity) : undefined,
@@ -1020,7 +1046,7 @@ export default function ShipmentWizard() {
       buyer: partyObj(form.buyer),
       seller: partyObj(form.seller),
       shipToParty: partyObj(form.shipToParty),
-      manufacturer: form.manufacturer.name.trim() ? [partyObj(form.manufacturer)] : undefined,
+      manufacturer: buildManufacturers(),
       consolidator: partyObj(form.consolidator),
       containerStuffingLocation: partyObj(form.containerStuffingLocation),
       scacCode: form.scacCode || undefined,
@@ -1613,7 +1639,43 @@ export default function ShipmentWizard() {
           <PartyCard title="Ship-To Party" icon={MapPin} party={form.shipToParty} onChange={p => setParty('shipToParty', p)} errors={partyErrors('shipToParty')} />
         )}
         {!isConsolidation && (
-          <PartyCard title="Manufacturer / Supplier" icon={Building2} party={form.manufacturer} onChange={p => setParty('manufacturer', p)} errors={partyErrors('manufacturer')} />
+          <PartyCard title={form.additionalManufacturers.length ? 'Manufacturer / Supplier 1' : 'Manufacturer / Supplier'} icon={Building2} party={form.manufacturer} onChange={p => setParty('manufacturer', p)} errors={partyErrors('manufacturer')} />
+        )}
+        {!isConsolidation && form.additionalManufacturers.map((m, i) => (
+          <div key={`mfr-${i}`} className="relative">
+            <PartyCard
+              title={`Manufacturer / Supplier ${i + 2}`}
+              icon={Building2}
+              party={m}
+              onChange={(p) => setForm((prev) => ({ ...prev, additionalManufacturers: prev.additionalManufacturers.map((x, k) => (k === i ? p : x)) }))}
+              errors={partyErrors(`additionalManufacturers.${i}`)}
+            />
+            <Button
+              type="button" variant="ghost" size="sm"
+              className="absolute right-3 top-3 h-7 px-2 text-destructive hover:text-destructive"
+              onClick={() => setForm((prev) => ({
+                ...prev,
+                additionalManufacturers: prev.additionalManufacturers.filter((_, k) => k !== i),
+                // Lines that pointed at the removed manufacturer go back to the first; later ones shift down.
+                commodities: prev.commodities.map((c) => {
+                  const idx = c.manufacturerIndex ?? 0;
+                  return { ...c, manufacturerIndex: idx === i + 1 ? 0 : idx > i + 1 ? idx - 1 : idx };
+                }),
+              }))}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+            </Button>
+          </div>
+        ))}
+        {!isConsolidation && form.filingType === 'ISF-10' && (
+          <div className="md:col-span-2">
+            <Button type="button" variant="outline" size="sm" className="gap-1.5"
+              onClick={() => setForm((prev) => ({ ...prev, additionalManufacturers: [...prev.additionalManufacturers, emptyParty()] }))}
+              disabled={form.additionalManufacturers.length >= 9}>
+              <Plus className="h-3.5 w-3.5" /> Add another manufacturer
+            </Button>
+            <p className="mt-1 text-xs text-muted-foreground">If the goods come from several manufacturers, add each one; you will link every HTS line to its manufacturer on the Cargo step.</p>
+          </div>
         )}
         <PartyCard title="Consolidator" icon={Container} party={form.consolidator} onChange={p => setParty('consolidator', p)} errors={partyErrors('consolidator')} />
         <PartyCard title="Container Stuffing Location" icon={Package} party={form.containerStuffingLocation} onChange={p => setParty('containerStuffingLocation', p)} errors={partyErrors('containerStuffingLocation')} />
@@ -1782,6 +1844,20 @@ export default function ShipmentWizard() {
                   </Button>
                 )}
               </div>
+              {errorPrefix === 'commodities' && form.additionalManufacturers.length > 0 && (
+                <div className="max-w-sm">
+                  <SelectField
+                    label="Manufacturer"
+                    required
+                    value={String(c.manufacturerIndex ?? 0)}
+                    onChange={(v) => onChange(commodities.map((x, idx) => (idx === i ? { ...x, manufacturerIndex: Number(v) } : x)))}
+                    options={[form.manufacturer, ...form.additionalManufacturers].map((m, k) => ({
+                      value: String(k),
+                      label: m.name.trim() || `Manufacturer ${k + 1}`,
+                    }))}
+                  />
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <TextField label="Description" value={c.description}
                   onChange={v => onChange(commodities.map((x, idx) => idx === i ? { ...x, description: v } : x))}
@@ -2156,6 +2232,7 @@ export default function ShipmentWizard() {
                 <PartyReview title="Seller" p={form.seller} />
                 <PartyReview title="Ship-To" p={form.shipToParty} />
                 <PartyReview title="Manufacturer" p={form.manufacturer} />
+                {form.additionalManufacturers.map((m, i) => <PartyReview key={i} title={`Manufacturer ${i + 2}`} p={m} />)}
                 <PartyReview title="Consolidator" p={form.consolidator} />
                 <PartyReview title="Container Stuffing" p={form.containerStuffingLocation} />
               </div>

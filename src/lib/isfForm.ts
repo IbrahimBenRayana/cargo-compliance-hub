@@ -6,6 +6,8 @@
  * and turned any stored quantity unit into PCS (an operator-precedence bug).
  */
 export interface CommodityForm {
+  /** Which manufacturer produced the line (0 = the first). */
+  manufacturerIndex?: number;
   htsCode: string;
   description: string;
   countryOfOrigin: string;
@@ -38,6 +40,7 @@ export function normalizeContainerType(type: string | null | undefined): string 
 }
 
 interface StoredCommodity {
+  manufacturerIndex?: number | null;
   htsCode?: string | null;
   description?: string | null;
   countryOfOrigin?: string | null;
@@ -48,6 +51,7 @@ interface StoredCommodity {
 
 export function toCommodityForm(c: StoredCommodity): CommodityForm {
   return {
+    ...(c.manufacturerIndex != null && { manufacturerIndex: c.manufacturerIndex }),
     htsCode: c.htsCode || '',
     description: c.description || '',
     countryOfOrigin: c.countryOfOrigin || '',

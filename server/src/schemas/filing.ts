@@ -23,6 +23,8 @@ export const addressSchema = z.object({
 }).or(z.string()); // Plain string accepted for legacy / partial drafts
 
 export const commoditySchema = z.object({
+  /** Which manufacturer produced this line when the ISF lists several (0 = the first). */
+  manufacturerIndex: z.number().int().min(0).max(49).optional(),
   // Wizard sends digits-only, max 6 chars (ISF requires HTS-6 prefix).
   // We accept 4-10 digits at the boundary so callers other than the wizard
   // (e.g., AI prefill, API) work too. Strict format check at /submit time.
