@@ -1,12 +1,14 @@
 import { Page, expect } from '@playwright/test';
+import { ACCOUNT, totpCode } from './env';
 
-export const DEMO = { email: 'demo@mycargolens.com', password: 'password123' };
+/** The account the suite logs in as (see env.ts); the local default is the seeded demo. */
+export const DEMO = ACCOUNT;
 
 /**
  * Fresh UI login. The access token lives in memory only, so we log in per
  * test rather than reusing a stored session (refresh tokens rotate single-use).
  */
-export async function login(page: Page, creds = DEMO) {
+export async function login(page: Page, creds: { email: string; password: string; totpSecret?: string } = DEMO) {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   // Already authenticated? /login bounces to the app — nothing to do.
   if (!new URL(page.url()).pathname.startsWith('/login')) return;
@@ -16,6 +18,13 @@ export async function login(page: Page, creds = DEMO) {
     await page.fill('#password', creds.password);
     await page.click('button[type=submit]');
     try {
+      // Accounts with MFA get a code challenge on the same page.
+      const otp = page.locator("input[autocomplete='one-time-code'], input[data-input-otp]").last();
+      const challenged = await otp.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false);
+      if (challenged) {
+        if (!creds.totpSecret) throw new Error('This account asks for an MFA code; set E2E_TOTP_SECRET.');
+        await otp.pressSequentially(await totpCode(creds.totpSecret), { delay: 40 });
+      }
       await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 20_000 });
       return;
     } catch {

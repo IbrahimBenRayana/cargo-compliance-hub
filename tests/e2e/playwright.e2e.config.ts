@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { BASE_URL } from './specs/env';
 
 // Standalone E2E config for MyCargoLens. Assumes the dev stack is already
 // running (frontend :8080, backend :3001). Start it with:  ./dev-start.sh
@@ -18,7 +19,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: [['list'], ['html', { outputFolder: 'report', open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:8080',
+    baseURL: BASE_URL,
     viewport: { width: 1440, height: 900 },
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',

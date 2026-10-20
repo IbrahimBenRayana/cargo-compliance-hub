@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { DEMO, login } from './helpers';
+import { BASE_URL } from './env';
 
 test.describe('Authentication', () => {
   test('login page renders with demo credentials hint', async ({ page }) => {
@@ -17,7 +18,7 @@ test.describe('Authentication', () => {
 
   test('valid credentials log in and land on the dashboard', async ({ page }) => {
     await login(page);
-    await expect(page).toHaveURL(/localhost:8080\/$/);
+    await expect(page).toHaveURL(new RegExp(`^${BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/$`));
     await expect(page.getByText(/shipments in flight/i)).toBeVisible();
   });
 

@@ -56,3 +56,6 @@ docs/abi-engine/CBP_MQIPT_Install-and-Run_Instructions.txt
 *.kdb
 *.sth
 *.TAB
+
+# Testing-week screen sweep output (screenshots + report.json)
+tests/e2e/sweep-output/

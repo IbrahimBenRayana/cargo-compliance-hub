@@ -66,3 +66,25 @@ RUN_CC_SUBMIT=1 npx playwright test --config tests/e2e/playwright.e2e.config.ts 
 `recon.mjs`, `net-audit.mjs`, `session-persist.mjs`, `repro-bounce.mjs`,
 `login-debug.mjs` are standalone `node` scripts used to map the app and
 reproduce issues. Run e.g. `node tests/e2e/recon.mjs`.
+
+## Running against staging (testing week)
+
+The base URL and account come from the environment (`specs/env.ts`); nothing
+secret is committed. Accounts with MFA need their authenticator secret.
+
+```sh
+E2E_BASE_URL=https://staging.mycargolens.com \
+E2E_EMAIL=<qa account> E2E_PASSWORD=<password> E2E_TOTP_SECRET=<base32 secret> \
+./node_modules/.bin/playwright test --config tests/e2e/playwright.e2e.config.ts
+```
+
+Screen sweep (every route at 1440 / 768 / 390 px, light and dark, with
+overflow, console-error, failed-request and axe checks):
+
+```sh
+E2E_SWEEP=1 E2E_SWEEP_LABEL=full-owner E2E_BASE_URL=... E2E_EMAIL=... E2E_PASSWORD=... E2E_TOTP_SECRET=... \
+./node_modules/.bin/playwright test --config tests/e2e/playwright.e2e.config.ts specs/sweep.spec.ts
+```
+
+Screenshots and `report.json` land in `tests/e2e/sweep-output/<label>/` (git-ignored).
+Specs that need local DB access (`mfa.spec.ts`) or send real email/CBP traffic stay opt-in.
