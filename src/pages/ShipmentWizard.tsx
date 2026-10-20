@@ -402,11 +402,12 @@ const PortSelectField = memo(function PortSelectField({
 // ─── Party Card Component ──────────────────────────────────
 
 const PartyCard = memo(function PartyCard({
-  title, icon: Icon, party, onChange, showTaxId, taxIdLabel, taxIdHint, nameMaxLen = 35,
+  title, icon: Icon, party, onChange, showTaxId, taxIdLabel, taxIdHint, nameMaxLen = 35, errors,
 }: {
   title: string; icon: React.ElementType; party: PartyFormData;
   onChange: (p: PartyFormData) => void; showTaxId?: boolean;
   taxIdLabel?: string; taxIdHint?: string; nameMaxLen?: number;
+  errors?: Partial<Record<'name' | 'address1' | 'city' | 'country', string>>;
 }) {
   const up = (field: keyof PartyFormData, val: string) => onChange({ ...party, [field]: val });
   return (
@@ -422,23 +423,23 @@ const PartyCard = memo(function PartyCard({
       <CardContent className="px-4 pb-4 space-y-3">
         <TextField label="Company / Name" required value={party.name} onChange={v => up('name', v)}
           maxLength={nameMaxLen} placeholder="Letters, numbers, spaces, dashes only"
-          hint={`Max ${nameMaxLen} chars. No periods or special characters.`} />
+          hint={`Max ${nameMaxLen} chars. No periods or special characters.`} error={errors?.name} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <TextField label="Address Line 1" required value={party.address1} onChange={v => up('address1', v)}
-            maxLength={35} placeholder="Street address" hint="Max 35 characters" />
+            maxLength={35} placeholder="Street address" hint="Max 35 characters" error={errors?.address1} />
           <TextField label="Address Line 2" value={party.address2} onChange={v => up('address2', v)}
             maxLength={35} placeholder="Suite, unit, floor" hint="Optional. Don't use a single period." />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <TextField label="City" required value={party.city} onChange={v => up('city', v)}
-            placeholder="City" maxLength={35} />
+            placeholder="City" maxLength={35} error={errors?.city} />
           <TextField label="State" value={party.state} onChange={v => up('state', v)}
             placeholder="ST" maxLength={4} />
           <TextField label="Postal Code" value={party.zip} onChange={v => up('zip', v)}
             placeholder="00000" maxLength={10} />
           <PortSelectField label="Country" required value={party.country} onChange={v => up('country', v)}
             options={ALL_COUNTRIES} placeholder="Search country…"
-            searchPlaceholder="Country, ISO code, or alias…" emptyMessage="No country found." />
+            searchPlaceholder="Country, ISO code, or alias…" emptyMessage="No country found." error={errors?.country} />
         </div>
       </CardContent>
     </Card>
@@ -918,6 +919,22 @@ export default function ShipmentWizard() {
     }
 
     // ISF-5 parties step: Ship-To & Manufacturer
+    // ISF-10: every trade party needs a name, street, city and country (SF30/35/36,
+    // ISF-28..35); the native mapper refuses to file without them.
+    if (stepId === 'parties' && form.filingType === 'ISF-10') {
+      const parties = [
+        ['buyer', form.buyer], ['seller', form.seller], ['shipToParty', form.shipToParty],
+        ['manufacturer', form.manufacturer], ['consolidator', form.consolidator],
+        ['containerStuffingLocation', form.containerStuffingLocation],
+      ] as const;
+      for (const [key, p] of parties) {
+        if (!p.name.trim()) e[`${key}.name`] = 'Name is required';
+        if (!p.address1.trim()) e[`${key}.address1`] = 'Street address is required';
+        if (!p.city.trim()) e[`${key}.city`] = 'City is required';
+        if (!p.country) e[`${key}.country`] = 'Country is required';
+      }
+    }
+
     if (stepId === 'parties' && form.filingType === 'ISF-5') {
       if (!form.shipToParty.name.trim()) e['shipToParty.name'] = 'Ship-To Party name is required';
       if (!form.manufacturer.name.trim()) e['manufacturer.name'] = 'Manufacturer name is required';
@@ -936,6 +953,11 @@ export default function ShipmentWizard() {
   }, [step, validateStep, STEPS]);
 
   const goBack = useCallback(() => { if (step > 0) setStep(step - 1); }, [step]);
+
+  const partyErrors = (key: string) => ({
+    name: errors[`${key}.name`], address1: errors[`${key}.address1`],
+    city: errors[`${key}.city`], country: errors[`${key}.country`],
+  });
 
   // Lifted out of buildPayload so the consolidation perHbl builder can
   // reuse it. Returns undefined for empty (name-less) parties.
@@ -1576,19 +1598,19 @@ export default function ShipmentWizard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Always shared: Consolidator + Container Stuffing Location. */}
         {!isLcl && (
-          <PartyCard title="Buyer" icon={Users} party={form.buyer} onChange={p => setParty('buyer', p)} />
+          <PartyCard title="Buyer" icon={Users} party={form.buyer} onChange={p => setParty('buyer', p)} errors={partyErrors('buyer')} />
         )}
         {!isConsolidation && (
-          <PartyCard title="Seller" icon={Users} party={form.seller} onChange={p => setParty('seller', p)} />
+          <PartyCard title="Seller" icon={Users} party={form.seller} onChange={p => setParty('seller', p)} errors={partyErrors('seller')} />
         )}
         {!isLcl && (
-          <PartyCard title="Ship-To Party" icon={MapPin} party={form.shipToParty} onChange={p => setParty('shipToParty', p)} />
+          <PartyCard title="Ship-To Party" icon={MapPin} party={form.shipToParty} onChange={p => setParty('shipToParty', p)} errors={partyErrors('shipToParty')} />
         )}
         {!isConsolidation && (
-          <PartyCard title="Manufacturer / Supplier" icon={Building2} party={form.manufacturer} onChange={p => setParty('manufacturer', p)} />
+          <PartyCard title="Manufacturer / Supplier" icon={Building2} party={form.manufacturer} onChange={p => setParty('manufacturer', p)} errors={partyErrors('manufacturer')} />
         )}
-        <PartyCard title="Consolidator" icon={Container} party={form.consolidator} onChange={p => setParty('consolidator', p)} />
-        <PartyCard title="Container Stuffing Location" icon={Package} party={form.containerStuffingLocation} onChange={p => setParty('containerStuffingLocation', p)} />
+        <PartyCard title="Consolidator" icon={Container} party={form.consolidator} onChange={p => setParty('consolidator', p)} errors={partyErrors('consolidator')} />
+        <PartyCard title="Container Stuffing Location" icon={Package} party={form.containerStuffingLocation} onChange={p => setParty('containerStuffingLocation', p)} errors={partyErrors('containerStuffingLocation')} />
       </div>
 
       {isConsolidation && perHblPartyKeys.length > 0 && (
