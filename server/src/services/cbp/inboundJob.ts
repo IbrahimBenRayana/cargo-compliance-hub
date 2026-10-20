@@ -11,6 +11,7 @@ import { pullInbound, type InboundEnvironment, type PullResult } from './inbound
 import { dispatchPending, type DispatchResult, type InboundHandler } from './dispatcher.js';
 import { certInboundHandler } from './certAttach.js';
 import { taggedTransmissionHandler, businessKeyHandler } from './transmissionHandlers.js';
+import { currencyRateHandler } from './currency.js';
 
 export function inboundEnvironment(): InboundEnvironment {
   if (cbpTrafficConfig.transport === 'mock') return 'MOCK';
@@ -24,8 +25,8 @@ export function inboundEnvironment(): InboundEnvironment {
  */
 function handlersFor(environment: InboundEnvironment): InboundHandler[] {
   return environment === 'PROD'
-    ? [taggedTransmissionHandler, businessKeyHandler]
-    : [taggedTransmissionHandler, certInboundHandler, businessKeyHandler];
+    ? [taggedTransmissionHandler, currencyRateHandler, businessKeyHandler]
+    : [taggedTransmissionHandler, certInboundHandler, currencyRateHandler, businessKeyHandler];
 }
 
 export interface InboundRun {

@@ -12,7 +12,7 @@ const { prisma, filer, engine, transmit, cfg } = vi.hoisted(() => ({
   engine: {
     migrateV1ToV2: vi.fn((x) => x), enrichWithDuty: vi.fn(async (x) => x),
     toAeEntrySummaryInput: vi.fn(() => ({ districtPortOfEntry: '2704' })),
-    validateEntrySummary: vi.fn(() => []), buildEntrySummary: vi.fn(() => ['AE10']),
+    validateEntrySummary: vi.fn((_input: unknown): unknown[] => []), buildEntrySummary: vi.fn((_input: any) => ['AE10']),
   },
   transmit: { transmitNative: vi.fn() },
   cfg: { transport: 'mqipt', environment: 'CERT' },
@@ -29,6 +29,10 @@ vi.mock('../nativeTransmit.js', () => transmit);
 vi.mock('../transport.js', () => ({ cbpTransport: {}, cbpTrafficConfig: cfg }));
 vi.mock('../sender.js', () => ({ requireCbpSender: () => ({ siteCode: '1303', idCode: 'S7P', password: 'X' }) }));
 vi.mock('../../auditLog.js', () => ({ writeAuditLog: vi.fn() }));
+vi.mock('../currency.js', async (orig) => ({
+  ...(await orig<typeof import('../currency.js')>()),
+  convertInvoiceValuesToUsd: vi.fn(async (body: unknown) => ({ body, conversions: [] })),
+}));
 
 import { transmitEntryNative } from '../nativeEntry.js';
 

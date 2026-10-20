@@ -1254,3 +1254,24 @@ model OrgCbpConfig {
 
   @@map("org_cbp_configs")
 }
+
+// ─── CBP certified currency rates (%R broadcasts; audit ENG-02, BNA-04) ──
+// Every rate CBP sends on our outbound queue. Foreign invoice values on
+// native entries are converted with these, never with a user-typed rate.
+model CbpCurrencyRate {
+  id               String   @id @default(uuid()) @db.Uuid
+  countryCode      String   @map("country_code") @db.VarChar(2)
+  currencyCode     String   @map("currency_code") @db.VarChar(3)
+  /** YYYY-MM-DD the rate applies to. */
+  rateDate         DateTime @map("rate_date") @db.Date
+  rate             Decimal  @db.Decimal(14, 6)
+  /** Q quarterly | D daily | N none published. */
+  indicator        String   @db.VarChar(1)
+  remarks          String?  @db.VarChar(50)
+  inboundMessageId String?  @map("inbound_message_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@unique([countryCode, currencyCode, rateDate, indicator])
+  @@index([currencyCode, rateDate])
+  @@map("cbp_currency_rates")
+}

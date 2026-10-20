@@ -28,6 +28,7 @@ import { writeAuditLog } from '../auditLog.js';
 import { canStartEntryAction, entryStateOnStart, type EntryAction } from './entryLifecycle.js';
 import { checkEntryFiler, loadOrgCbpConfig } from './filerIdentity.js';
 import { transmitNative } from './nativeTransmit.js';
+import { convertInvoiceValuesToUsd, CurrencyConversionError, type CurrencyConversion } from './currency.js';
 import { cbpTransport, cbpTrafficConfig } from './transport.js';
 import { requireCbpSender } from './sender.js';
 
@@ -101,12 +102,23 @@ export async function transmitEntryNative(opts: {
   if (!filer.ok) return { httpStatus: 422, body: { error: filer.message, code: filer.code } };
 
   const releaseRequested = opts.action !== 'DELETE' && RELEASE_ENTRY_TYPES.has(doc.entryType);
+  // Foreign invoice values become USD at CBP's certified rate (audit ENG-02).
+  let conversions: CurrencyConversion[] = [];
+  let usdBody: AbiDocumentBody;
+  try {
+    ({ body: usdBody, conversions } = await convertInvoiceValuesToUsd(body));
+  } catch (err) {
+    if (err instanceof CurrencyConversionError) {
+      return { httpStatus: 422, body: { error: err.message, code: err.code } };
+    }
+    throw err;
+  }
   let lines: string[];
   let districtPort: string;
   try {
     const now = new Date();
     const applicabilityDate = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')}`;
-    const priced = await enrichWithDuty(migrateV1ToV2(body), new DbHtsRateSource(prisma.htsRateLine), { applicabilityDate });
+    const priced = await enrichWithDuty(migrateV1ToV2(usdBody), new DbHtsRateSource(prisma.htsRateLine), { applicabilityDate });
     const input = toAeEntrySummaryInput(priced, ACTION_CODE[opts.action]);
     districtPort = input.districtPortOfEntry;
 
@@ -198,7 +210,7 @@ export async function transmitEntryNative(opts: {
   writeAuditLog({
     orgId: opts.orgId, userId: opts.userId,
     action: `entry.native_${opts.action.toLowerCase()}`, entityType: 'abi_document', entityId: doc.id,
-    newValue: { transmissionId: result.id, outcome: result.status, filerCode: filer.filerCode, releaseRequested },
+    newValue: { transmissionId: result.id, outcome: result.status, filerCode: filer.filerCode, releaseRequested, currencyConversions: conversions },
   });
   return {
     httpStatus: 202,
