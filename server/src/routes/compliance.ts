@@ -18,7 +18,7 @@ import { isfFilingDeadline } from '../services/isfDeadline.js';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
-import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest, requirePlatformAdmin } from '../middleware/auth.js';
 import { requireCapability } from '../middleware/requireCapability.js';
 import { CAPABILITIES } from '../config/plans.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
@@ -1327,16 +1327,18 @@ router.get('/health-narrative', async (req: AuthRequest, res: Response): Promise
 });
 
 // ─── Admin: ADD/CVD candidate review ─────────────────────────────────
-// Federal Register sync writes pending candidates; admins inspect, fill
+// The AD/CVD order table is shared by every org, so only platform admins
+// may change it (testing week BUG-001). Federal Register sync writes
+// pending candidates; admins inspect, fill
 // in case # + HTS prefixes, then promote to active (or dismiss).
 
-router.post('/admin/add-cvd/sync', requireRole('admin', 'owner'), async (_req: AuthRequest, res: Response): Promise<void> => {
+router.post('/admin/add-cvd/sync', requirePlatformAdmin, async (_req: AuthRequest, res: Response): Promise<void> => {
   const result = await syncFromFederalRegister();
   invalidateAddCvdCache();
   res.json(result);
 });
 
-router.get('/admin/add-cvd/pending', requireRole('admin', 'owner'), async (_req: AuthRequest, res: Response): Promise<void> => {
+router.get('/admin/add-cvd/pending', requirePlatformAdmin, async (_req: AuthRequest, res: Response): Promise<void> => {
   const rows = await prisma.addCvdOrder.findMany({
     where:   { status: 'pending' },
     orderBy: { sourceDate: 'desc' },
@@ -1350,7 +1352,7 @@ const promoteSchema = z.object({
   note:        z.string().max(500).optional(),
 });
 
-router.post('/admin/add-cvd/pending/:id/approve', requireRole('admin', 'owner'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/admin/add-cvd/pending/:id/approve', requirePlatformAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = typeof req.params.id === 'string' ? req.params.id : '';
   if (!/^[0-9a-f-]{36}$/i.test(id)) {
     res.status(400).json({ error: 'Invalid id' });
@@ -1374,7 +1376,7 @@ router.post('/admin/add-cvd/pending/:id/approve', requireRole('admin', 'owner'),
   res.json(updated);
 });
 
-router.post('/admin/add-cvd/pending/:id/dismiss', requireRole('admin', 'owner'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/admin/add-cvd/pending/:id/dismiss', requirePlatformAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = typeof req.params.id === 'string' ? req.params.id : '';
   if (!/^[0-9a-f-]{36}$/i.test(id)) {
     res.status(400).json({ error: 'Invalid id' });
