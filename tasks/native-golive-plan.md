@@ -180,8 +180,9 @@ Source: `docs/audit/2026-10-platform-audit.md` (237 findings; ids below refer to
       PDF and import columns
 - [ ] 4.4 later: ch.99 determination (required numbers per origin/HTS, F771), 232 declarations (54-records),
       dated rates (MHT-08), base second unit from refdata (MHT-03)
-- [ ] 4.5 Entry UI: replace/delete/PSC actions, CBP activity card for entries with decoded conditions,
-      FPR-01 autosave race
+- [x] 4.5 Entry UI: correct+resend rejected, edit+replace and delete-at-CBP for entries on file, CBP activity
+      card with decoded AX/SX conditions, no CC polling for native; FPR-01 autosave race fixed (ordered, awaited)
+- [ ] 4.5 later: PSC (post-summary correction) once the entry is past the replace window
 - [ ] Live native entry on CERT (needs a non-S7P filer code or a CERT-only path)
 
 ### Phase 5
