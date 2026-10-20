@@ -93,6 +93,10 @@ export interface PlatformIsfFiling {
   bondHolderID?: string | null;
   /** Needed only for single-transaction (type 9) ISF bonds. */
   suretyCode?: string | null;
+  /** The Filing column name for the surety code (the same value as suretyCode). */
+  bondSuretyCode?: string | null;
+  /** SCAC of the house-bill issuer (NVOCC), when it differs from the carrier. */
+  houseBillScac?: string | null;
   bondReferenceNumber?: string | null;
   /** JSONB blob backing the ISF-5 form (bookingParty*, ISFFiler*, ports). */
   isf5Data?: unknown;
@@ -289,10 +293,14 @@ function billNumberOf(raw: string | null | undefined, scac: string): string {
  */
 function buildBills(filing: PlatformIsfFiling, scac: string, references: IsfReference[]): IsfBill[] {
   const master = billNumberOf(filing.masterBol, scac);
-  const house = billNumberOf(filing.houseBol, scac);
+  // A house bill is issued by the NVOCC, whose SCAC can differ from the
+  // carrier's; the carrier SCAC stays on the master reference (audit ENG-07).
+  const houseScacRaw = str(filing.houseBillScac).toUpperCase().replace(/[^A-Z]/g, '');
+  const houseScac = /^[A-Z]{2,4}$/.test(houseScacRaw) ? houseScacRaw : scac;
+  const house = billNumberOf(filing.houseBol, houseScac);
   if (house) {
     if (master && master !== house) references.push({ qualifier: 'MB', value: `${scac}${master}` });
-    return [{ qualifier: 'BM', scac, billNumber: house }];
+    return [{ qualifier: 'BM', scac: houseScac, billNumber: house }];
   }
   if (!master) fail('masterBol', 'a master or house bill of lading number is required (SF15, ISF-7/9)');
   return [{ qualifier: 'OB', scac, billNumber: master }];
@@ -313,7 +321,7 @@ function buildBond(filing: PlatformIsfFiling, importerEin: string, references: I
   const holder = holderRaw ? normalizeEin(holderRaw, 'bondHolderID') : importerEin;
   const activityCode = str(filing.bondActivityCode) || (type === '9' ? '16' : '01');
   if (type === '9') {
-    const surety = str(filing.suretyCode).toUpperCase();
+    const surety = (str(filing.suretyCode) || str(filing.bondSuretyCode)).toUpperCase();
     const sbn = cleanAn(str(filing.bondReferenceNumber), 50);
     if (!surety || !sbn) {
       fail(

@@ -304,3 +304,15 @@ describe('importer identifier type (audit ENG-07)', () => {
     expect(imOf('12-3456789')).toMatchObject({ qualifier: 'EI' });
   });
 });
+
+describe('bills and bonds from the wizard fields (audit ENG-07, UFF-M3)', () => {
+  it('files the house bill under its own issuer SCAC and the master under the carrier', () => {
+    const input = mapFilingToIsfInput({ ...ISF10_FILING, houseBillScac: 'NVOC', houseBol: 'NVOC0001234', masterBol: 'MAEU123456789012' }, ADD);
+    expect(input.bills[0]).toMatchObject({ qualifier: 'BM', scac: 'NVOC', billNumber: '0001234' });
+  });
+
+  it('reads the single-transaction bond surety from the Filing column', () => {
+    const input = mapFilingToIsfInput({ ...ISF10_FILING, bondType: 'single', bondSuretyCode: '891', bondReferenceNumber: 'AB12345678' }, ADD);
+    expect(input.bond).toMatchObject({ type: '9' });
+  });
+});

@@ -347,6 +347,8 @@ model Filing {
   // Bond Info
   bondType       String? @map("bond_type") @db.VarChar(50)
   bondSuretyCode String? @map("bond_surety_code") @db.VarChar(10)
+  /** Single-transaction bond reference (SF20 SBN); required with bond type 9 (ISF-19 Note 7). */
+  bondReferenceNumber String? @map("bond_reference_number") @db.VarChar(35)
 
   // ISF-5 specific data (JSONB — booking party, ISF filer, etc.)
   isf5Data Json? @map("isf5_data")

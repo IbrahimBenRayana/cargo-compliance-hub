@@ -81,6 +81,8 @@ export const createFilingSchema = z.object({
   masterBol: z.string().max(100).optional(),
   houseBol: z.string().max(100).optional(),
   scacCode: z.string().max(10).optional(),
+  /** SCAC of the house-bill issuer (NVOCC), when it differs from the carrier (audit ENG-07). */
+  houseBillScac: z.string().trim().toUpperCase().regex(/^[A-Z]{2,4}$/, 'SCAC is 2-4 letters').optional().or(z.literal('')),
   vesselName: z.string().max(100).optional(),
   voyageNumber: z.string().max(50).optional(),
   foreignPortOfUnlading: z.string().max(10).optional(),
@@ -91,6 +93,11 @@ export const createFilingSchema = z.object({
   // Bond
   bondType: z.string().max(50).optional(),
   bondSuretyCode: z.string().max(10).optional(),
+  /** Single-transaction bond reference number (SF20 SBN), required with bond type 9. */
+  bondReferenceNumber: z.string().trim().max(35).optional(),
+
+  /** Who files this ISF: SIGMA (MyCargoLens under S7P) or CLIENT (the org's own code). Omit for the org default. */
+  isfFilerMode: z.enum(['SIGMA', 'CLIENT']).nullable().optional(),
 
   // ISF-5 specific data (JSONB) — kept loose since the shape is heterogeneous;
   // validateFiling() does the field-by-field checks at /submit.

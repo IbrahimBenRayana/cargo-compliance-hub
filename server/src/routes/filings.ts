@@ -207,6 +207,9 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
               filingDeadline: filingDeadline ?? undefined,
               bondType: shared.bondType,
               bondSuretyCode: shared.bondSuretyCode,
+              bondReferenceNumber: shared.bondReferenceNumber,
+              houseBillScac: shared.houseBillScac || undefined,
+              isfFilerMode: shared.isfFilerMode ?? undefined,
               isf5Data: shared.isf5Data ?? undefined,
               // ── Cargo (commodities per-HBL via PR 2 + containers optional) ──
               commodities: filingCommodities,
@@ -1170,6 +1173,9 @@ router.post('/:id/duplicate', filingMutationLimiter, async (req: AuthRequest, re
       placeOfDelivery: filing.placeOfDelivery,
       bondType: filing.bondType,
       bondSuretyCode: filing.bondSuretyCode,
+              bondReferenceNumber: filing.bondReferenceNumber,
+              houseBillScac: filing.houseBillScac || undefined,
+              isfFilerMode: filing.isfFilerMode ?? undefined,
       isf5Data: filing.isf5Data ?? undefined,
       commodities: filing.commodities as any ?? [],
       containers: [], // Different per shipment
@@ -1231,6 +1237,9 @@ router.post('/:id/save-template', filingMutationLimiter, async (req: AuthRequest
     placeOfDelivery: filing.placeOfDelivery,
     bondType: filing.bondType,
     bondSuretyCode: filing.bondSuretyCode,
+              bondReferenceNumber: filing.bondReferenceNumber,
+              houseBillScac: filing.houseBillScac || undefined,
+              isfFilerMode: filing.isfFilerMode ?? undefined,
     isf5Data: filing.isf5Data,
     commodities: filing.commodities,
   };
