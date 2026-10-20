@@ -137,6 +137,17 @@ export interface Filing {
 
   bondType?: string | null;
   bondSuretyCode?: string | null;
+  bondReferenceNumber?: string | null;
+  houseBillScac?: string | null;
+  /** Per-filing ISF filer: SIGMA (S7P) | CLIENT (own code); null = org default. */
+  isfFilerMode?: 'SIGMA' | 'CLIENT' | null;
+  /** What CBP holds: NOT_ON_FILE | ON_FILE | DELETED. */
+  cbpState?: string;
+  /** ISF transaction in flight: ADD | REPLACE | DELETE. */
+  pendingAction?: string | null;
+  /** Filer code CBP accepted the ISF under. */
+  isfFilerCode?: string | null;
+  lastTransmissionId?: string | null;
 
   // ISF-5 specific data
   isf5Data?: ISF5Data | null;

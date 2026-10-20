@@ -70,3 +70,18 @@ export function toCommodityForms(list: unknown, empty: () => CommodityForm): Com
 export function toContainerForms(list: unknown, empty: () => ContainerForm): ContainerForm[] {
   return Array.isArray(list) && list.length > 0 ? list.map((c) => toContainerForm(c as { number?: string })) : [empty()];
 }
+
+/**
+ * Importer / consignee numbers CBP accepts on an ISF (ISF-29), mirroring the
+ * server mapper: EIN (NN-NNNNNNN with optional 2-char suffix, or 9 digits),
+ * CBP-assigned (YYDDPP-NNNNN) or SSN written NNN-NN-NNNN.
+ */
+export function isImporterIdentifier(raw: string): boolean {
+  const v = raw.trim().toUpperCase();
+  return (
+    /^\d{2}-\d{7}([A-Z0-9]{2})?$/.test(v) ||
+    /^\d{9}([A-Z0-9]{2})?$/.test(v) ||
+    /^\d{6}-?[A-Z0-9]{5}$/.test(v) ||
+    /^\d{3}-\d{2}-\d{4}$/.test(v)
+  );
+}

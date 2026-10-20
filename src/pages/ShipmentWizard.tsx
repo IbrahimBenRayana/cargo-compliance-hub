@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo, useId, useRef } from 'react';
-import { CONTAINER_TYPES, toCommodityForms, toContainerForms } from '@/lib/isfForm';
+import { CONTAINER_TYPES, toCommodityForms, toContainerForms, isImporterIdentifier } from '@/lib/isfForm';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useFiling, useCreateFiling, useCreateConsolidation, useUpdateFiling, useFilingAutosave } from '@/hooks/useFilings';
 import { useManifestQuery } from '@/hooks/useManifestQuery';
@@ -29,6 +29,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { SCHEDULE_D_PORTS, CBP_PORTS_4DIGIT } from '@/data/schedule-d-ports';
 import { HTSAutocomplete } from '@/components/HTSAutocomplete';
+import { useQuery } from '@tanstack/react-query';
+import { organizationApi } from '@/api/client';
 
 // ─── Reference Data for Dropdowns ──────────────────────────
 
@@ -146,6 +148,15 @@ interface ISFFormState {
     containers?: ContainerFormData[];
   }>;
   bondType: string;
+  /** Single-transaction bond (type 9): surety code and bond reference (SF20 V1 / SBN). */
+  bondSuretyCode: string;
+  bondReferenceNumber: string;
+  /** REGULAR = straight/master bill only (SF15 OB); HOUSE = house bill (BM) under the master. */
+  billType: 'HOUSE' | 'REGULAR';
+  /** SCAC of the house-bill issuer (NVOCC); blank = the carrier SCAC. */
+  houseBillScac: string;
+  /** Who files this ISF: '' = org default, SIGMA = MyCargoLens under S7P, CLIENT = own code. */
+  isfFilerMode: '' | 'SIGMA' | 'CLIENT';
 
   // IOR & Filer
   importerName: string;
@@ -218,6 +229,11 @@ const initialForm = (): ISFFormState => ({
   consolidationMode: 'buyer',
   perHblOverrides: [{}],
   bondType: 'continuous',
+  bondSuretyCode: '',
+  bondReferenceNumber: '',
+  billType: 'HOUSE',
+  houseBillScac: '',
+  isfFilerMode: '',
   importerName: '',
   importerNumber: '',
   consigneeName: '',
@@ -467,6 +483,10 @@ export default function ShipmentWizard() {
   const isEdit = !!id;
 
   const { data: existing, isLoading: isLoadingFiling } = useFiling(id);
+  // The org's CBP identity: decides whether filing under its own code is available.
+  const { data: cbpData } = useQuery({ queryKey: ['org', 'cbp'], queryFn: () => organizationApi.cbpIdentity() });
+  const cbpIdentity = cbpData?.cbp;
+  const clientFilerReady = !!cbpIdentity?.filerCode && !!cbpIdentity?.serviceCenterApprovedAt;
   const createFiling = useCreateFiling();
   const createConsolidation = useCreateConsolidation();
   const updateFiling = useUpdateFiling();
@@ -555,6 +575,11 @@ export default function ShipmentWizard() {
       estimatedArrival: '',
       // Carry over reusable bond + party info.
       bondType: sourceFiling.bondType || 'continuous',
+      bondSuretyCode: sourceFiling.bondSuretyCode || '',
+      bondReferenceNumber: '',
+      billType: 'HOUSE',
+      houseBillScac: sourceFiling.houseBillScac || '',
+      isfFilerMode: sourceFiling.isfFilerMode || '',
       importerName: sourceFiling.importerName || '',
       importerNumber: sourceFiling.importerNumber || '',
       consigneeName: sourceFiling.consigneeName || '',
@@ -655,6 +680,11 @@ export default function ShipmentWizard() {
       consolidationMode: 'buyer',
       perHblOverrides: [{}],
       bondType: existing.bondType || 'continuous',
+      bondSuretyCode: existing.bondSuretyCode || '',
+      bondReferenceNumber: existing.bondReferenceNumber || '',
+      billType: existing.houseBol ? 'HOUSE' : 'REGULAR',
+      houseBillScac: existing.houseBillScac || '',
+      isfFilerMode: existing.isfFilerMode || '',
       importerName: existing.importerName || '',
       importerNumber: existing.importerNumber || '',
       consigneeName: existing.consigneeName || '',
@@ -807,7 +837,18 @@ export default function ShipmentWizard() {
     if (stepId === 'filing') {
       if (!form.masterBol.trim()) e.masterBol = 'Master BOL is required';
       // House BOL is only required for ISF-10; ISF-5 derives it from the master BOL
-      if (form.filingType === 'ISF-10' && !form.houseBol.trim()) e.houseBol = 'House BOL is required';
+      if (form.filingType === 'ISF-10' && form.billType === 'HOUSE') {
+        if (!form.houseBol.trim()) e.houseBol = 'House BOL is required for a house bill (or choose "Regular bill")';
+        else if (form.houseBol.trim().toUpperCase() === form.masterBol.trim().toUpperCase())
+          e.houseBol = 'The house BOL cannot be the same as the master BOL; choose "Regular bill" instead';
+        if (form.houseBillScac.trim() && !/^[A-Z]{2,4}$/i.test(form.houseBillScac.trim()))
+          e.houseBillScac = 'SCAC is 2 to 4 letters';
+      }
+      // A single-transaction ISF bond needs its surety and bond reference (ISF-19 Note 7).
+      if (form.bondType === 'single') {
+        if (!/^[A-Z0-9]{3}$/i.test(form.bondSuretyCode.trim())) e.bondSuretyCode = 'Surety code is 3 characters';
+        if (!form.bondReferenceNumber.trim()) e.bondReferenceNumber = 'Bond reference number is required';
+      }
 
       // Consolidation mode: validate each extra HBL + reject in-list dupes.
       // The primary houseBol is included in the seen-set so users can't enter
@@ -834,10 +875,14 @@ export default function ShipmentWizard() {
     // ISF-10: IOR & Consignee step
     if (stepId === 'importer') {
       if (!form.importerName.trim()) e.importerName = 'Importer name is required';
-      if (!form.importerNumber.trim()) e.importerNumber = 'IOR number is required (XX-XXXXXXXXX)';
-      else if (!/^\d{2}-[A-Z0-9]{7,9}$/i.test(form.importerNumber.trim()))
-        e.importerNumber = 'Format: XX-XXXXXXXXX (e.g., 20-493538700)';
+      if (!form.importerNumber.trim()) e.importerNumber = 'IOR number is required';
+      else if (!isImporterIdentifier(form.importerNumber))
+        e.importerNumber = 'Use an EIN (XX-XXXXXXXXX), CBP-assigned number (YYDDPP-NNNNN) or SSN (NNN-NN-NNNN)';
       if (!form.consigneeName.trim()) e.consigneeName = 'Consignee name is required';
+      // CBP needs the consignee number even when it is the importer's (ISF-28).
+      if (!form.consigneeNumber.trim()) e.consigneeNumber = 'Consignee number is required (repeat the IOR number if it is the same)';
+      else if (!isImporterIdentifier(form.consigneeNumber))
+        e.consigneeNumber = 'Use an EIN (XX-XXXXXXXXX), CBP-assigned number (YYDDPP-NNNNN) or SSN (NNN-NN-NNNN)';
     }
 
     // ISF-5: Filer & Booking Party step
@@ -926,8 +971,12 @@ export default function ShipmentWizard() {
     return {
       filingType: form.filingType,
       masterBol: form.masterBol || undefined,
-      houseBol: form.houseBol || undefined,
+      houseBol: form.billType === 'REGULAR' ? undefined : form.houseBol || undefined,
+      houseBillScac: form.billType === 'HOUSE' && form.houseBillScac.trim() ? form.houseBillScac.trim().toUpperCase() : undefined,
       bondType: form.bondType || undefined,
+      bondSuretyCode: form.bondType === 'single' ? form.bondSuretyCode.trim().toUpperCase() || undefined : undefined,
+      bondReferenceNumber: form.bondType === 'single' ? form.bondReferenceNumber.trim() || undefined : undefined,
+      isfFilerMode: form.isfFilerMode || null,
       importerName: form.importerName || undefined,
       importerNumber: form.importerNumber || undefined,
       consigneeName: form.consigneeName || undefined,
@@ -1108,19 +1157,86 @@ export default function ShipmentWizard() {
           onChange={v => set('bondType', v)} options={BOND_TYPES}
           hint="Continuous bond (type 8) covers multiple shipments; Single transaction (type 9) for one-time" />
       </div>
+      {form.filingType === 'ISF-10' && form.bondType === 'single' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <TextField label="Surety Code" required value={form.bondSuretyCode}
+            onChange={v => set('bondSuretyCode', v.toUpperCase())} placeholder="e.g., 891"
+            hint="3-character CBP surety code of the single-transaction bond" error={errors.bondSuretyCode} maxLength={3} />
+          <TextField label="Bond Reference Number" required value={form.bondReferenceNumber}
+            onChange={v => set('bondReferenceNumber', v)} placeholder="e.g., AB12345678"
+            hint="Reference number of the single-transaction bond" error={errors.bondReferenceNumber} maxLength={35} />
+        </div>
+      )}
+      {form.filingType === 'ISF-10' && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Who files this ISF with CBP?</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {([
+              { value: 'SIGMA', title: `MyCargoLens files as ISF filer (${cbpIdentity?.sigmaFilerCode ?? 'S7P'})`, desc: 'No filer code of your own needed.', disabled: false },
+              {
+                value: 'CLIENT',
+                title: `We file under our own code${cbpIdentity?.filerCode ? ` (${cbpIdentity.filerCode})` : ''}`,
+                desc: clientFilerReady ? 'Through our approved service-center queue.' : 'Available once your filer code is set up and CBP approves our queue.',
+                disabled: !clientFilerReady,
+              },
+            ] as const).map((opt) => {
+              const effective = form.isfFilerMode || cbpIdentity?.isfFilerModeDefault || 'SIGMA';
+              const selected = effective === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={opt.disabled}
+                  aria-pressed={selected}
+                  onClick={() => set('isfFilerMode', opt.value)}
+                  className={cn(
+                    'rounded-lg border p-3 text-left transition-colors',
+                    selected ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted/50',
+                    opt.disabled && 'cursor-not-allowed opacity-60 hover:bg-transparent',
+                  )}
+                >
+                  <div className="text-sm font-medium">{opt.title}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">{opt.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+          {!form.isfFilerMode && (
+            <p className="text-xs text-muted-foreground">Using your organization&apos;s default. You can change it in Settings, CBP identity.</p>
+          )}
+        </div>
+      )}
       <Separator />
       <div>
         <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
           <FileText className="h-4 w-4 text-primary" /> Bills of Lading
         </h3>
+        {form.filingType === 'ISF-10' && (
+          <div className="mb-4 max-w-md">
+            <SelectField label="Bill type" required value={form.billType}
+              onChange={v => set('billType', v as 'HOUSE' | 'REGULAR')}
+              options={[
+                { value: 'HOUSE', label: 'House bill (issued by a forwarder / NVOCC)' },
+                { value: 'REGULAR', label: 'Regular bill (straight master bill, no house bill)' },
+              ]}
+              hint="CBP files a house bill as BM and a regular bill as OB" />
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <TextField label="Master Bill of Lading" required value={form.masterBol}
             onChange={v => set('masterBol', v)} placeholder="e.g., MAEU1234567890"
             hint="Master BOL issued by the ocean carrier" error={errors.masterBol} maxLength={50} />
-          <TextField label="House Bill of Lading" required={form.filingType === 'ISF-10'} value={form.houseBol}
-            onChange={v => set('houseBol', v)} placeholder="e.g., HCLA12345678"
-            hint={form.filingType === 'ISF-5' ? 'Optional for ISF-5 — will be auto-derived from Master BOL if left blank.' : 'House BOL from your freight forwarder. This is used to send documents to CBP.'}
-            error={errors.houseBol} maxLength={50} />
+          {(form.filingType === 'ISF-5' || form.billType === 'HOUSE') && (
+            <TextField label="House Bill of Lading" required={form.filingType === 'ISF-10'} value={form.houseBol}
+              onChange={v => set('houseBol', v)} placeholder="e.g., HCLA12345678"
+              hint={form.filingType === 'ISF-5' ? 'Optional for ISF-5 — will be auto-derived from Master BOL if left blank.' : 'House BOL from your freight forwarder.'}
+              error={errors.houseBol} maxLength={50} />
+          )}
+          {form.filingType === 'ISF-10' && form.billType === 'HOUSE' && (
+            <TextField label="House bill issuer SCAC" value={form.houseBillScac}
+              onChange={v => set('houseBillScac', v.toUpperCase())} placeholder="e.g., NVOC"
+              hint="SCAC of the forwarder that issued the house bill. Leave blank if it is the carrier." error={errors.houseBillScac} maxLength={4} />
+          )}
         </div>
 
         {/* Multi-HBL consolidation editor. Hidden in edit mode (per-filing) and
@@ -1302,9 +1418,10 @@ export default function ShipmentWizard() {
             <TextField label="Consignee Name" required value={form.consigneeName}
               onChange={v => set('consigneeName', v)} maxLength={35} error={errors.consigneeName}
               placeholder="e.g., Acme Imports Inc" hint="Max 35 chars. No periods." />
-            <TextField label="Consignee Number (EIN)" value={form.consigneeNumber}
+            <TextField label="Consignee Number" required value={form.consigneeNumber}
               onChange={v => set('consigneeNumber', v)} placeholder="XX-XXXXXXXXX"
-              hint="EIN for the consignee. Same format as IOR." maxLength={12} />
+              hint="EIN, CBP-assigned number or SSN. Repeat the IOR number if the consignee is the importer."
+              error={errors.consigneeNumber} maxLength={14} />
           </div>
           <Separator className="my-2" />
           <p className="text-xs font-medium text-muted-foreground">Consignee Address</p>
@@ -1969,7 +2086,20 @@ export default function ShipmentWizard() {
         <Section title="Filing & BOL">
           <Item label="Filing Type" value={form.filingType} />
           <Item label="Master BOL" value={form.masterBol} />
-          <Item label="House BOL" value={form.houseBol} />
+          {form.filingType === 'ISF-10' && (
+            <Item label="Bill type" value={form.billType === 'HOUSE' ? 'House bill (BM)' : 'Regular bill (OB)'} />
+          )}
+          {form.billType === 'HOUSE' && <Item label="House BOL" value={form.houseBol} />}
+          {form.billType === 'HOUSE' && form.houseBillScac && <Item label="House bill SCAC" value={form.houseBillScac} />}
+          {form.filingType === 'ISF-10' && (
+            <Item
+              label="ISF filer"
+              value={(form.isfFilerMode || cbpIdentity?.isfFilerModeDefault || 'SIGMA') === 'CLIENT'
+                ? `Your filer code${cbpIdentity?.filerCode ? ` (${cbpIdentity.filerCode})` : ''}`
+                : `MyCargoLens (${cbpIdentity?.sigmaFilerCode ?? 'S7P'})`}
+            />
+          )}
+          {form.bondType === 'single' && <Item label="Surety / bond ref." value={`${form.bondSuretyCode} / ${form.bondReferenceNumber}`} />}
           <Item label="Bond Type" value={BOND_TYPES.find(b => b.value === form.bondType)?.label} />
         </Section>
 

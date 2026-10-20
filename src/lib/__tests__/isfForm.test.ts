@@ -42,3 +42,18 @@ describe('container types (audit FNA-14)', () => {
     expect(normalizeContainerType('20')).toBe('20');
   });
 });
+
+describe('isImporterIdentifier', () => {
+  it('accepts EIN, CBP-assigned and SSN forms', async () => {
+    const { isImporterIdentifier } = await import('../isfForm');
+    expect(isImporterIdentifier('57-123456789')).toBe(true);
+    expect(isImporterIdentifier('57-1234567')).toBe(true);
+    expect(isImporterIdentifier('261015-AB123')).toBe(true);
+    expect(isImporterIdentifier('123-45-6789')).toBe(true);
+  });
+  it('rejects anything else', async () => {
+    const { isImporterIdentifier } = await import('../isfForm');
+    expect(isImporterIdentifier('ACME')).toBe(false);
+    expect(isImporterIdentifier('12-34')).toBe(false);
+  });
+});
