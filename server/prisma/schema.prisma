@@ -826,6 +826,16 @@ model AbiDocument {
   nativeWireText   String? @map("native_wire_text") @db.Text
   nativeShadowNote String? @map("native_shadow_note") @db.Text
 
+  // ── Native lifecycle (native go-live Phase 4) ──
+  /** What CBP holds for the summary: NOT_ON_FILE | ON_FILE | DELETED. */
+  cbpState           String  @default("NOT_ON_FILE") @map("cbp_state") @db.VarChar(12)
+  /** The entry transaction in flight: ADD | REPLACE | DELETE; null when none. */
+  pendingAction      String? @map("pending_action") @db.VarChar(8)
+  /** The latest native transmission for this entry (cbp_transmissions). */
+  lastTransmissionId String? @map("last_transmission_id") @db.Uuid
+  /** True when this entry asked CBP to certify the summary for cargo release. */
+  releaseRequested   Boolean @default(false) @map("release_requested")
+
   // Parties denorm
   iorNumber     String? @map("ior_number") @db.VarChar(100)
   iorName       String? @map("ior_name") @db.VarChar(255)
