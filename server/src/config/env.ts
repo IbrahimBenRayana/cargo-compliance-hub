@@ -71,6 +71,8 @@ const envSchema = z.object({
   // classification makes up to three calls.
   HTS_AI_MODEL:             z.string().default(''),
   HTS_AI_DAILY_CALLS:       z.coerce.number().int().positive().default(450),
+  // Reasoning models only (o-series, GPT-5+): how hard each classifier call thinks.
+  HTS_AI_REASONING_EFFORT:  z.enum(['low', 'medium', 'high']).default('medium'),
   // When true, sets OpenAI's `store: false` flag so prompts can't enter
   // their training corpus (zero-retention policy for trade data).
   AI_DISABLE_TRAINING_DATA: z.coerce.boolean().default(true),

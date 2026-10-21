@@ -16,6 +16,7 @@ export async function askJson(userId: string, systemPrompt: string, userPrompt: 
     temperature: 0,
     maxTokens,
     json: true,
+    reasoningEffort: env.HTS_AI_REASONING_EFFORT,
     rateBucket: { key: 'hts', limit: env.HTS_AI_DAILY_CALLS },
   });
   try {
