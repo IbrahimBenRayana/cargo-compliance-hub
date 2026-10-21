@@ -90,4 +90,11 @@ describe('understandProduct', () => {
     const u = await understandProduct('hex bolts', 'u1');
     expect(u.searchTerms).toEqual(['hex bolts', 'screws and bolts']);
   });
+
+  it('returns short CROSS search queries, falling back to the product name', async () => {
+    reply({ product: 'cat toy launcher', facts: {}, sufficiency: 'enough', missing: [], questions: [], didYouMean: [], searchTerms: [], likelyHeadings: [], rulingQueries: ['cat toy', 'pet toy launcher', 'cat toy'] });
+    expect((await understandProduct('cat toy launcher with pom poms', 'u1')).rulingQueries).toEqual(['cat toy', 'pet toy launcher']);
+    reply({ product: 'stainless steel milk jug', facts: {}, sufficiency: 'enough', missing: [], questions: [], didYouMean: [], searchTerms: [], likelyHeadings: [] });
+    expect((await understandProduct('milk jug', 'u1')).rulingQueries).toEqual(['stainless steel milk jug']);
+  });
 });

@@ -6,11 +6,13 @@
  *
  * Runs every CBP CROSS ruling and every vague description through the real
  * classifier (live schedule + AI) and prints the scores the release gate uses.
- * Nothing is written to the audit log.
+ * Nothing is written to the audit log. Each case's own ruling (and any ruling
+ * citing it) is excluded from its precedent. Env: HTS_PRECEDENT=off for a run
+ * without precedent, EVAL_CONCURRENCY (default 4) cases at a time.
  */
 import { readFileSync } from 'node:fs';
-import { classifyProduct, type ClassifyResult } from './index.js';
-import { classifierModel } from './llm.js';
+import { classifyProduct, type ClassifyResult, type Debug } from './index.js';
+import { classifierModel, precedentEnabled, verifyModel } from './llm.js';
 
 interface Ruling { ruling: string; description: string; hts: string; heading: string; headingOnly?: boolean }
 interface Vague { description: string; expect: string }
@@ -20,30 +22,51 @@ const fixture = JSON.parse(readFileSync(0, 'utf8')) as { rulings: Ruling[]; vagu
 const ctx = { userId: `hts-eval-${classifierModel()}`, orgId: 'hts-eval', audit: false };
 const pct = (n: number, d: number) => (d ? `${((100 * n) / d).toFixed(1)}%` : 'n/a');
 
-async function timed(description: string): Promise<{ r: ClassifyResult | null; ms: number; err?: string; pool: string[]; suff?: string }> {
+interface Run { r: ClassifyResult | null; ms: number; err?: string; pool: string[]; suff?: string; debug: Debug }
+
+async function timed(description: string, exclude: string[] = []): Promise<Run> {
   const t = Date.now();
-  const debug: { candidates?: string[]; sufficiency?: string } = {};
+  const debug: Debug = {};
   try {
-    const r = await classifyProduct(description, { ...ctx, debug });
-    return { r, ms: Date.now() - t, pool: debug.candidates ?? [], suff: debug.sufficiency };
+    const r = await classifyProduct(description, { ...ctx, excludeRulings: exclude, debug });
+    return { r, ms: Date.now() - t, pool: debug.candidates ?? [], suff: debug.sufficiency, debug };
   } catch (e: any) {
-    return { r: null, ms: Date.now() - t, err: e?.message, pool: [] };
+    return { r: null, ms: Date.now() - t, err: e?.message, pool: [], debug };
   }
 }
 
+/** Runs every item, `limit` at a time, results in input order. */
+async function pooled<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  }));
+  return out;
+}
+const CONCURRENCY = Number(process.env.EVAL_CONCURRENCY) || 4;
+
 async function main(): Promise<void> {
   const times: number[] = [];
-  const s = { n: 0, heading1: 0, six1: 0, ten1: 0, ten3: 0, heading5: 0, needsDetail: 0, highWrong: 0, highTotal: 0, errors: 0, poolHasCode: 0, poolHasHeading: 0 };
+  const s = { n: 0, heading1: 0, six1: 0, ten1: 0, ten3: 0, heading5: 0, needsDetail: 0, highWrong: 0, highTotal: 0, errors: 0, poolHasCode: 0, poolHasHeading: 0, precedentFound: 0, precedentHasHeading: 0, headingsHaveRight: 0 };
   const lines: string[] = [];
 
-  for (const x of fixture.rulings) {
-    const { r, ms, err, pool, suff } = await timed(x.description);
+  const runs = await pooled(fixture.rulings, CONCURRENCY, (x) => timed(x.description, [x.ruling]));
+  fixture.rulings.forEach((x, i) => {
+    const { r, ms, err, pool, suff, debug } = runs[i];
+    const prec = debug.precedent ?? [];
+    s.precedentFound += +(prec.length > 0);
+    s.precedentHasHeading += +prec.some((p) => p.split(':')[1]?.split('/').some((c) => c.slice(0, 4) === x.heading));
+    s.headingsHaveRight += +(debug.headings ?? []).includes(x.heading);
     times.push(ms);
     s.n++;
     const inPool = pool.includes(x.hts);
     s.poolHasCode += +inPool;
     s.poolHasHeading += +pool.some((c) => c.slice(0, 4) === x.heading);
-    if (!r) { s.errors++; lines.push(`ERR  ${x.ruling} ${err}`); continue; }
+    if (!r) { s.errors++; lines.push(`ERR  ${x.ruling} ${err}`); return; }
     const codes = r.suggestions.map((g) => g.code);
     const top = codes[0] ?? '';
     const h1 = top.slice(0, 4) === x.heading;
@@ -58,18 +81,19 @@ async function main(): Promise<void> {
       const right = x.headingOnly ? h1 : t1;
       if (!right) s.highWrong++;
     }
-    lines.push(`${t1 ? 'OK10' : h1 ? 'OK4 ' : 'MISS'} ${x.ruling} want ${x.hts} got ${top || '-'} (${r.suggestions[0]?.confidence ?? r.status}) pool:${inPool ? 'code' : pool.some((c) => c.slice(0, 4) === x.heading) ? 'heading' : 'none'} suff:${suff} ${ms}ms`);
-  }
+    lines.push(`${t1 ? 'OK10' : h1 ? 'OK4 ' : 'MISS'} ${x.ruling} want ${x.hts} got ${top || '-'} (${r.suggestions[0]?.confidence ?? r.status}) pool:${inPool ? 'code' : pool.some((c) => c.slice(0, 4) === x.heading) ? 'heading' : 'none'} suff:${suff} prec:${prec.slice(0, 3).join(',') || '-'} ${ms}ms`);
+  });
 
   const vague = { n: 0, asked: 0 };
-  for (const v of fixture.vague) {
-    const { r, ms } = await timed(v.description);
+  const vagueRuns = await pooled(fixture.vague, CONCURRENCY, (v) => timed(v.description));
+  fixture.vague.forEach((v, i) => {
+    const { r, ms } = vagueRuns[i];
     times.push(ms);
     vague.n++;
     const asked = r?.status === 'needs_detail' && ((r.questions?.length ?? 0) > 0 || (r.didYouMean?.length ?? 0) > 0);
     vague.asked += +asked;
     lines.push(`${asked ? 'ASK ' : 'NOASK'} "${v.description}" -> ${r?.status ?? 'error'}`);
-  }
+  });
 
   times.sort((a, b) => a - b);
   const p = (q: number) => times[Math.min(times.length - 1, Math.floor(q * times.length))];
@@ -77,6 +101,10 @@ async function main(): Promise<void> {
   console.log(lines.join('\n'));
   console.log(JSON.stringify({
     model: classifierModel(),
+    verifyModel: verifyModel(),
+    reasoningEffort: process.env.HTS_AI_REASONING_EFFORT ?? 'default',
+    precedent: precedentEnabled() ? 'on (own ruling and citing rulings excluded)' : 'off',
+    concurrency: CONCURRENCY,
     rulings: s.n,
     headingTop1: pct(s.heading1, s.n),
     sixDigitTop1: pct(s.six1, scored),
@@ -85,6 +113,9 @@ async function main(): Promise<void> {
     headingInTop5: pct(s.heading5, s.n),
     poolHasRightCode: pct(s.poolHasCode, scored),
     poolHasRightHeading: pct(s.poolHasHeading, s.n),
+    candidateHeadingsHaveRight: pct(s.headingsHaveRight, s.n),
+    precedentFound: pct(s.precedentFound, s.n),
+    precedentHasRightHeading: pct(s.precedentHasHeading, s.n),
     returnedNeedsDetail: s.needsDetail,
     highConfidence: s.highTotal,
     highConfidenceWrong: s.highWrong,

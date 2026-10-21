@@ -1,10 +1,13 @@
 /**
  * Native HTS classifier (docs/specs/native-hts-classifier.md).
  *
- *   understand (AI) -> too vague? ask : candidate headings (our schedule)
- *   -> choose the heading (AI, GRI 1) -> every line of it -> pick a line (AI)
- *      and, in parallel, a blind second opinion from the same lines (AI)
- *   -> guard rails (code): labels, duty, spread warning, notice -> audit log
+ *   understand (AI) -> too vague? ask : CBP precedent rulings (CROSS)
+ *   -> candidate headings (our schedule + the precedent's headings)
+ *   -> choose the heading (AI, GRI 1, with the legal notes and precedent)
+ *   -> every line of it -> pick a line (AI) and, in parallel, a blind second
+ *      opinion from the same lines (AI, optionally another model)
+ *   -> a missing deciding fact? ask it -> guard rails (code): labels, duty,
+ *      spread warning, notice -> audit log
  *
  * Every suggested code is a real 10-digit line from hts_rate_lines; when the
  * AI is unavailable the user gets word matches, labelled as such.
@@ -14,9 +17,11 @@ import logger from '../../config/logger.js';
 import { isConfigured } from '../ai.js';
 import { buildIndex, candidateHeadings, linesOfHeading, retrieveCandidates, type Candidate, type ScheduleIndex, type ScheduleLine } from './retrieve.js';
 import { understandProduct, type Understanding } from './understand.js';
-import { classifyAmong, chooseHeadings } from './classify.js';
+import { classifyAmong, chooseHeadings, type PromptContext } from './classify.js';
 import { secondOpinion } from './verify.js';
-import { classifierModel } from './llm.js';
+import { classifierModel, precedentEnabled } from './llm.js';
+import { findPrecedents, formatPrecedents, precedentHeadings, type Precedent } from './precedent.js';
+import { headingNotes, lineNotes } from './notes.js';
 import { agreementOf, confidenceLabel, dutySpreadWarning, EXTRA_DUTY_NOTE, NOT_A_RULING, type ConfidenceLabel } from './guards.js';
 import { formatHts } from './format.js';
 
@@ -49,9 +54,13 @@ export interface ClassifyResult {
 
 export class ClassifyInputError extends Error {}
 
+export interface Debug { candidates?: string[]; sufficiency?: string; precedent?: string[]; headings?: string[] }
+
 const MAX_DESCRIPTION = 1000;
 const CANDIDATES = 60;
-const HEADINGS = 8;
+const HEADINGS = 10;
+// A deciding question is asked when the second-best line is this close.
+const DECIDING_GAP = 0.3;
 // A runner-up heading's lines are offered too when it is a real contender.
 const RUNNER_UP_MIN = 0.25;
 // Prompt budget: the biggest headings (e.g. 8708) have a few hundred lines.
@@ -116,7 +125,12 @@ function noMatch(u: Understanding | null, revision: string): ClassifyResult {
 
 export async function classifyProduct(
   rawDescription: string,
-  ctx: { userId: string; orgId: string; /** false for evaluation runs */ audit?: boolean; /** evaluation: report the candidate pool */ debug?: { candidates?: string[]; sufficiency?: string } },
+  ctx: {
+    userId: string; orgId: string;
+    /** false for evaluation runs */ audit?: boolean;
+    /** evaluation: the ruling being tested is not its own precedent */ excludeRulings?: string[];
+    /** evaluation: report the candidate pool */ debug?: Debug;
+  },
 ): Promise<ClassifyResult> {
   const description = rawDescription.trim();
   if (description.length < 2) throw new ClassifyInputError('Describe the product to classify.');
@@ -124,7 +138,7 @@ export async function classifyProduct(
 
   const started = Date.now();
   const { index, revision } = await schedule();
-  const result = await run(description, ctx.userId, index, revision, ctx.debug);
+  const result = await run(description, ctx.userId, index, revision, ctx.excludeRulings ?? [], ctx.debug);
 
   const latencyMs = Date.now() - started;
   logger.info({ status: result.status, suggestions: result.suggestions.length, latencyMs }, '[HTS] classified');
@@ -142,7 +156,7 @@ export async function classifyProduct(
 
 async function run(
   description: string, userId: string, index: ScheduleIndex, revision: string,
-  debug?: { candidates?: string[]; sufficiency?: string },
+  excludeRulings: string[], debug?: Debug,
 ): Promise<ClassifyResult> {
   if (!isConfigured()) {
     const candidates = retrieveCandidates(index, [description], KEYWORD_RESULTS);
@@ -165,13 +179,25 @@ async function run(
     };
   }
 
-  // Step 3: the headings worth deciding between (real schedule headings).
-  const headings = candidateHeadings(index, u.searchTerms, u.likelyHeadings, HEADINGS);
+  // Precedent: how CBP ruled on similar goods.
+  const precedent: Precedent[] = precedentEnabled() && u.rulingQueries.length
+    ? await findPrecedents(u.rulingQueries, { exclude: excludeRulings })
+    : [];
+  const precedentText = precedent.length ? formatPrecedents(precedent) : undefined;
+  if (debug) debug.precedent = precedent.map((p) => `${p.ruling}:${p.codes.join('/')}`);
+
+  // Step 3: the headings worth deciding between (real schedule headings),
+  // including those CBP chose for similar goods.
+  const likely = [...new Set([...u.likelyHeadings, ...precedentHeadings(precedent)])];
+  const headings = candidateHeadings(index, u.searchTerms, likely, HEADINGS);
   if (debug) debug.candidates = headings.flatMap((h) => linesOfHeading(index, h.heading).map((l) => l.code));
+  if (debug) debug.headings = headings.map((h) => h.heading);
   if (headings.length === 0) return noMatch(u, revision);
 
-  // Step 4a: heading first (GRI 1).
-  const chosen = await chooseHeadings(description, u, headings, userId);
+  // Step 4a: heading first (GRI 1), with the legal notes.
+  const chosen = await chooseHeadings(description, u, headings, userId, {
+    precedent: precedentText, notes: headingNotes(headings.map((h) => h.heading)),
+  });
   if (!chosen) {
     const pool = retrieveCandidates(index, u.searchTerms, CANDIDATES, u.likelyHeadings);
     return pool.length ? keywordOnly(pool, revision, 'The AI step could not finish.') : noMatch(u, revision);
@@ -183,9 +209,12 @@ async function run(
   if (debug) debug.candidates = lines.map((l) => l.code);
 
   // Step 4b + 5: pick a line, and independently, a blind second opinion.
+  const lineContext: PromptContext = {
+    precedent: precedentText, notes: lineNotes([...new Set(lines.map((l) => l.code.slice(0, 4)))]),
+  };
   const [cls, second] = await Promise.all([
-    classifyAmong(description, u, lines, userId),
-    secondOpinion(description, u, lines, userId),
+    classifyAmong(description, u, lines, userId, lineContext),
+    secondOpinion(description, u, lines, userId, lineContext),
   ]);
   if (!cls) return keywordOnly(lines.slice(0, KEYWORD_RESULTS), revision, 'The AI step could not finish.');
   if (cls.picks.length === 0) return noMatch(u, revision);
@@ -194,6 +223,10 @@ async function run(
   const byCode = new Map(lines.map((c) => [c.code, c]));
   const agreement = agreementOf(cls.picks[0].code, second?.code ?? null);
   const headingConfidence = chosen.find((h) => h.heading === cls.picks[0].code.slice(0, 4))?.confidence ?? 0;
+  // A fact the description doesn't state decides between close lines: ask it.
+  const gap = cls.picks[0].confidence - (cls.picks[1]?.confidence ?? 0);
+  const deciding = cls.decidingQuestion && (gap < DECIDING_GAP || agreement !== 'exact') ? cls.decidingQuestion : undefined;
+  const sufficiency = deciding ? 'heading_only' : u.sufficiency;
 
   const suggestions: Suggestion[] = cls.picks.map((p, rank) => {
     const c = byCode.get(p.code)!;
@@ -206,7 +239,7 @@ async function run(
       ...plainSuggestion(c),
       confidence: confidenceLabel({
         confidence: p.confidence, rank, nextConfidence: cls.picks[1]?.confidence ?? 0,
-        agreement: rank === 0 ? agreement : null, sufficiency: u.sufficiency, headingConfidence,
+        agreement: rank === 0 ? agreement : null, sufficiency, headingConfidence,
       }),
       score: p.confidence,
       reason: p.reason || undefined,
@@ -223,13 +256,16 @@ async function run(
     });
   }
 
-  const partial = u.sufficiency !== 'enough';
+  const partial = sufficiency !== 'enough';
+  const questions = [...new Set([...(deciding ? [deciding] : []), ...u.questions])].slice(0, 3);
   return {
     status: partial ? 'needs_detail' : 'ok',
-    message: partial
-      ? 'The heading looks clear, but some facts that decide the full code are missing. Answer the questions to be sure.'
-      : cls.concerns[0],
-    questions: partial ? u.questions : undefined,
+    message: deciding
+      ? 'More than one line fits what was described; one fact decides between them. Answer the question to be sure.'
+      : partial
+        ? 'The heading looks clear, but some facts that decide the full code are missing. Answer the questions to be sure.'
+        : cls.concerns[0],
+    questions: partial && questions.length ? questions : undefined,
     didYouMean: partial && u.didYouMean.length ? u.didYouMean : undefined,
     suggestions,
     dutySpreadWarning: dutySpreadWarning(suggestions.map((s) => s.generalRate)),

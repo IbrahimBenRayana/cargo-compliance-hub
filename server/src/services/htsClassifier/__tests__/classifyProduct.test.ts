@@ -13,7 +13,11 @@ const m = vi.hoisted(() => ({
   isConfigured: vi.fn(() => true),
   create: vi.fn(async () => ({})),
   findMany: vi.fn(),
+  findPrecedents: vi.fn(async () => [] as unknown[]),
+  precedentEnabled: vi.fn(() => true),
 }));
+vi.mock('../precedent.js', async (orig) => ({ ...(await orig<object>()), findPrecedents: m.findPrecedents }));
+vi.mock('../llm.js', () => ({ classifierModel: () => 'test-model', precedentEnabled: m.precedentEnabled }));
 vi.mock('../understand.js', () => ({ understandProduct: m.understandProduct }));
 vi.mock('../classify.js', () => ({ classifyAmong: m.classifyAmong, chooseHeadings: m.chooseHeadings }));
 vi.mock('../verify.js', () => ({ secondOpinion: m.secondOpinion }));
@@ -32,7 +36,7 @@ const ROWS: (ScheduleLine & { htsNumber: string; revision: string })[] = [
 
 const U = (over = {}) => ({
   product: 'li-ion e-bike battery', facts: {}, sufficiency: 'enough', missing: [], questions: [], didYouMean: [],
-  searchTerms: ['lithium-ion batteries', 'electrically powered vehicles'], likelyHeadings: ['8507'], ...over,
+  searchTerms: ['lithium-ion batteries', 'electrically powered vehicles'], likelyHeadings: ['8507'], rulingQueries: ['e-bike battery'], ...over,
 });
 const ctx = { userId: 'u1', orgId: 'o1' };
 
@@ -41,6 +45,8 @@ describe('classifyProduct', () => {
     vi.clearAllMocks();
     resetScheduleCache();
     m.isConfigured.mockReturnValue(true);
+    m.precedentEnabled.mockReturnValue(true);
+    m.findPrecedents.mockResolvedValue([]);
     m.findMany.mockResolvedValue(ROWS);
     m.chooseHeadings.mockResolvedValue([{ heading: '8507', confidence: 0.95, reason: 'storage battery' }]);
   });
@@ -135,5 +141,66 @@ describe('classifyProduct', () => {
   it('rejects descriptions that are empty or too long', async () => {
     await expect(classifyProduct('  ', ctx)).rejects.toThrow(/describe/i);
     await expect(classifyProduct('x'.repeat(1001), ctx)).rejects.toThrow(/1000/);
+  });
+
+  describe('v3: precedent, notes, deciding questions', () => {
+    const PICKS = (a: number, b: number) => ({ picks: [
+      { code: '8507600010', confidence: a, reason: 'r' }, { code: '8507600090', confidence: b, reason: 'r' },
+    ], noneFit: false, concerns: [], droppedInvented: 0 });
+
+    it('searches CROSS with the ruling queries, excluding what the caller excludes, and shares precedent and notes with every step', async () => {
+      m.understandProduct.mockResolvedValue(U({ likelyHeadings: [] }));
+      m.findPrecedents.mockResolvedValue([{ ruling: 'N311074', date: '2020-05-01', subject: 'e-bike from China', codes: ['8711600090'] }]);
+      m.classifyAmong.mockResolvedValue(PICKS(0.93, 0.1));
+      m.secondOpinion.mockResolvedValue({ code: '8507600010', reason: 'same' });
+      await classifyProduct('36V li-ion battery pack for e-bikes', { ...ctx, excludeRulings: ['N999999'] });
+      expect(m.findPrecedents).toHaveBeenCalledWith(['e-bike battery'], expect.objectContaining({ exclude: ['N999999'] }));
+      // the precedent's heading is among the headings to decide between
+      expect(m.chooseHeadings.mock.calls[0][2].map((h: { heading: string }) => h.heading)).toContain('8711');
+      const headingCtx = m.chooseHeadings.mock.calls[0][4];
+      expect(headingCtx.precedent).toContain('N311074');
+      expect(headingCtx.notes).toMatch(/Chapter 85 notes/);
+      expect(m.classifyAmong.mock.calls[0][4].notes).toMatch(/Chapter 85 notes/);
+      expect(m.secondOpinion.mock.calls[0][4].precedent).toContain('N311074');
+    });
+
+    it('runs without precedent when it is switched off', async () => {
+      m.precedentEnabled.mockReturnValue(false);
+      m.understandProduct.mockResolvedValue(U());
+      m.classifyAmong.mockResolvedValue(PICKS(0.93, 0.1));
+      m.secondOpinion.mockResolvedValue({ code: '8507600010', reason: 'same' });
+      await classifyProduct('e-bike battery', ctx);
+      expect(m.findPrecedents).not.toHaveBeenCalled();
+      expect(m.chooseHeadings.mock.calls[0][4].precedent).toBeFalsy();
+    });
+
+    it('asks the deciding question when a missing fact separates close lines, even if the description seemed enough', async () => {
+      m.understandProduct.mockResolvedValue(U());
+      m.classifyAmong.mockResolvedValue({ ...PICKS(0.55, 0.4), decidingQuestion: 'Is it the main power source of an electric vehicle?' });
+      m.secondOpinion.mockResolvedValue({ code: '8507600010', reason: 'same' });
+      const r = await classifyProduct('li-ion battery pack', ctx);
+      expect(r.status).toBe('needs_detail');
+      expect(r.questions?.[0]).toBe('Is it the main power source of an electric vehicle?');
+      expect(r.suggestions.length).toBeGreaterThan(0);
+      expect(r.suggestions[0].confidence).not.toBe('high');
+    });
+
+    it('asks the deciding question when the two checks disagree', async () => {
+      m.understandProduct.mockResolvedValue(U());
+      m.classifyAmong.mockResolvedValue({ ...PICKS(0.95, 0.05), decidingQuestion: 'Is it for a vehicle?' });
+      m.secondOpinion.mockResolvedValue({ code: '8507600090', reason: 'Not shown to be for a vehicle.' });
+      const r = await classifyProduct('li-ion battery pack', ctx);
+      expect(r.status).toBe('needs_detail');
+      expect(r.questions).toContain('Is it for a vehicle?');
+    });
+
+    it('does not ask when the pick is clear-cut and both checks agree', async () => {
+      m.understandProduct.mockResolvedValue(U());
+      m.classifyAmong.mockResolvedValue({ ...PICKS(0.93, 0.05), decidingQuestion: 'Is it for a vehicle?' });
+      m.secondOpinion.mockResolvedValue({ code: '8507600010', reason: 'same' });
+      const r = await classifyProduct('36V li-ion battery pack for e-bikes', ctx);
+      expect(r.status).toBe('ok');
+      expect(r.suggestions[0].confidence).toBe('high');
+    });
   });
 });

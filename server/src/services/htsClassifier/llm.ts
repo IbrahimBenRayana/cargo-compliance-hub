@@ -6,13 +6,17 @@ import { complete } from '../ai.js';
 import { env } from '../../config/env.js';
 
 export const classifierModel = (): string => env.HTS_AI_MODEL || env.AI_MODEL;
+export const verifyModel = (): string => env.HTS_AI_VERIFY_MODEL || classifierModel();
+export const precedentEnabled = (): boolean => env.HTS_PRECEDENT !== 'off';
 
-export async function askJson(userId: string, systemPrompt: string, userPrompt: string, maxTokens = 1200): Promise<unknown> {
+export async function askJson(
+  userId: string, systemPrompt: string, userPrompt: string, maxTokens = 1200, model = classifierModel(),
+): Promise<unknown> {
   const text = await complete({
     userId,
     systemPrompt,
     userPrompt,
-    model: classifierModel(),
+    model,
     temperature: 0,
     maxTokens,
     json: true,

@@ -73,6 +73,12 @@ const envSchema = z.object({
   HTS_AI_DAILY_CALLS:       z.coerce.number().int().positive().default(450),
   // Reasoning models only (o-series, GPT-5+): how hard each classifier call thinks.
   HTS_AI_REASONING_EFFORT:  z.enum(['low', 'medium', 'high']).default('medium'),
+  // Model for the blind second opinion (default: HTS_AI_MODEL). A different
+  // model means agreement is evidence from two models, not one model twice.
+  HTS_AI_VERIFY_MODEL:      z.string().default(''),
+  // CBP CROSS rulings as precedent in the classifier's prompts ('off' for
+  // evaluation runs without precedent).
+  HTS_PRECEDENT:            z.enum(['on', 'off']).default('on'),
   // When true, sets OpenAI's `store: false` flag so prompts can't enter
   // their training corpus (zero-retention policy for trade data).
   AI_DISABLE_TRAINING_DATA: z.coerce.boolean().default(true),

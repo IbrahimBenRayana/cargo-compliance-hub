@@ -8,6 +8,7 @@ const { complete } = vi.hoisted(() => ({ complete: vi.fn() }));
 vi.mock('../../ai.js', () => ({ complete }));
 vi.mock('../../../config/logger.js', () => ({ default: { warn: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 
+import { env } from '../../../config/env.js';
 import { classifyAmong, chooseHeadings } from '../classify.js';
 import { secondOpinion } from '../verify.js';
 import type { Candidate } from '../retrieve.js';
@@ -22,7 +23,7 @@ const CANDS = [
 ];
 const U: Understanding = {
   product: 'li-ion e-bike battery', facts: { use: 'powers e-bike motor' }, sufficiency: 'enough',
-  missing: [], questions: [], didYouMean: [], searchTerms: [], likelyHeadings: ['8507'],
+  missing: [], questions: [], didYouMean: [], searchTerms: [], likelyHeadings: ['8507'], rulingQueries: [],
 };
 
 describe('classifyAmong', () => {
@@ -60,6 +61,18 @@ describe('classifyAmong', () => {
     expect(await classifyAmong('x', U, CANDS, 'u1')).toBeNull();
   });
 
+  it('returns the deciding question when a missing fact separates the top lines', async () => {
+    reply({ picks: [{ code: '8507600010', confidence: 0.5, reason: 'r' }, { code: '8507600090', confidence: 0.45, reason: 'r' }], noneFit: false, concerns: [], decidingQuestion: 'Is the battery the main power source of an electric vehicle?' });
+    const r = (await classifyAmong('li-ion battery', U, CANDS, 'u1', { notes: 'Chapter 85 notes:\nStatistical notes:' }))!;
+    expect(r.decidingQuestion).toBe('Is the battery the main power source of an electric vehicle?');
+    expect(complete.mock.calls[0][0].userPrompt).toContain('Statistical notes');
+  });
+
+  it('has no deciding question when the reply gives none', async () => {
+    reply({ picks: [{ code: '8507600010', confidence: 0.9, reason: 'r' }], noneFit: false, concerns: [], decidingQuestion: '' });
+    expect((await classifyAmong('x', U, CANDS, 'u1'))!.decidingQuestion).toBeUndefined();
+  });
+
   it('clamps confidence into 0..1', async () => {
     reply({ picks: [{ code: '8507600090', confidence: 7, reason: 'r' }], noneFit: false, concerns: [] });
     expect((await classifyAmong('x', U, CANDS, 'u1'))!.picks[0].confidence).toBe(1);
@@ -87,6 +100,15 @@ describe('chooseHeadings', () => {
     complete.mockResolvedValueOnce('nope');
     expect(await chooseHeadings('x', U, HEADINGS, 'u1')).toBeNull();
   });
+
+  it('gives the AI the precedent rulings and the legal notes', async () => {
+    reply({ headings: [{ heading: '8507', confidence: 0.9, reason: 'r' }] });
+    await chooseHeadings('e-bike battery', U, HEADINGS, 'u1', { precedent: '1. N311074 (2020-05-01): e-bike battery -> 8507.60.0020', notes: 'Chapter 85 notes:\n1. This chapter does not cover:' });
+    const { userPrompt, systemPrompt } = complete.mock.calls[0][0];
+    expect(userPrompt).toContain('N311074');
+    expect(userPrompt).toContain('Chapter 85 notes');
+    expect(systemPrompt).toMatch(/renumbered/);
+  });
 });
 
 describe('secondOpinion', () => {
@@ -97,6 +119,19 @@ describe('secondOpinion', () => {
     expect(await secondOpinion('li-ion battery', U, CANDS, 'u1')).toEqual({ code: '8507600090', reason: 'Not shown to be for a vehicle' });
     // it is never told the first pick
     expect(complete.mock.calls[0][0].userPrompt).not.toMatch(/proposed|first pick/i);
+  });
+
+  it('runs on the verification model when one is set, so agreement spans two models', async () => {
+    const before = env.HTS_AI_VERIFY_MODEL;
+    env.HTS_AI_VERIFY_MODEL = 'gpt-4.1';
+    try {
+      reply({ code: '8507600090', reason: 'r' });
+      await secondOpinion('li-ion battery', U, CANDS, 'u1', { precedent: '1. N1 (2020-01-01): x -> 8507.60.0090' });
+      expect(complete.mock.calls[0][0].model).toBe('gpt-4.1');
+      expect(complete.mock.calls[0][0].userPrompt).toContain('N1 (2020-01-01)');
+    } finally {
+      env.HTS_AI_VERIFY_MODEL = before;
+    }
   });
 
   it('ignores a code outside the lines', async () => {

@@ -198,3 +198,55 @@ warnings.
 8. **Evaluation**: `scripts/htsEval.ts` over the CROSS fixture against staging data; tune
    prompts until the gate is met; record results here. Verify: report meets the gate.
 9. **Staging**: deploy, sweep, manual review by Ibrahim; tracker TOOL-02 and BUG-014.
+
+## v3: precedent rulings, legal notes, deciding-fact questions, cross-model check
+
+Status: direction approved by Ibrahim 2026-10-21. v2 on staging scored heading@1 77%,
+10-digit@1 63%, 10-digit top-3 68% (gpt-5.5, effort low), below the gate. The right heading was
+in the candidate headings ~91-94% of the time, but the chosen heading held the right code only
+~78-81%: the heading choice is the main error, and a same-model second opinion shares the first
+pick's blind spots.
+
+### 1. Precedent rulings (CBP CROSS)
+- `precedent.ts` searches the public CROSS API (`rulings.cbp.gov/api/search?term=`) with
+  2-3 short queries (the understand step's `rulingQueries`, e.g. "cat toy", "plastic jugs",
+  falling back to its product name). CROSS search ANDs the words, so queries stay short.
+- Results are merged (rulings found by several queries rank first, then by CROSS relevance),
+  revoked rulings and rulings without a tariff number are dropped, Chapter 99 numbers ignored.
+  The best 6 go to the prompts as subject + ruled code + date; the best 3 also get a short
+  excerpt of the ruling text (the goods and the holding sentences), fetched from
+  `api/ruling/{N}`.
+- Ruled codes are "as ruled at the time": they may have been renumbered, so precedent never
+  becomes a suggestion by itself. Precedent headings that exist in today's schedule join the
+  candidate headings (better recall), and the AI still picks only from real schedule lines.
+- Cached in memory (search and ruling text, 24 h, bounded size); 4 s timeout; any CROSS
+  failure means "no precedent", never an error. No new table (a persistent rulings cache
+  would be a schema change: ask first).
+- **Evaluation honesty:** the eval passes each case's own ruling number as `exclude`; a
+  ruling is dropped if it is that ruling, lists it among its related rulings, or cites it in
+  its text. The eval runs with and without precedent (`HTS_PRECEDENT=off`).
+
+### 2. Legal notes (USITC, public domain)
+- `server/scripts/gen-hts-notes.py` extracts the section and chapter notes (legal notes,
+  subheading notes, additional U.S. notes, statistical notes) from the USITC chapter PDFs into
+  a generated module `htsNotes.ts` (~0.5 MB, Revision 21 (2026)); re-run on a new revision.
+  Chosen over a DB ingest (no schema change, no runtime dependency on hts.usitc.gov).
+- Heading step: section + chapter legal notes for the candidate headings' chapters. Line
+  step and second opinion: all notes of the chosen heading's chapter and section. Long notes
+  are trimmed to the numbered notes that mention the candidate headings, within a budget.
+
+### 3. Deciding-fact questions
+The line-pick reply gains `decidingQuestion`: when the top lines differ by a fact the
+description does not state (fibre content, knit/woven, voltage, use, ...), that exact
+question. If it is present and the pick is not clear-cut (second pick within 0.3, or the
+second opinion disagrees), the result is `needs_detail` with that question and the
+suggestions, and the top pick cannot be labelled "Two independent checks agree".
+
+### 4. Cross-model second opinion
+`HTS_AI_VERIFY_MODEL` (default: the classifier model) runs the blind second opinion on a
+different model, so agreement is evidence from two models, not one model twice.
+Labels unchanged: "Two independent checks agree" / "Review before you file" /
+"Checks disagree: check carefully" / "Alternative".
+
+### v3 evaluation results
+(recorded below after the staging runs)
