@@ -24,6 +24,7 @@ import { useManifestQueries } from '@/hooks/useManifestQuery';
 import { Filing } from '@/types/shipment';
 import { useCurrentUser } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useBilling';
+import { acceptanceRate } from '@/lib/acceptanceRate';
 import { CAPABILITIES } from '@/lib/planMeta';
 import { CelebrationModal } from '@/components/CelebrationModal';
 import { Button } from '@/components/ui/button';
@@ -292,14 +293,14 @@ function ShipmentCard({ tile, delay }: { tile: ShipmentTile; delay: number }) {
             )}
           </div>
         </div>
-        <p className={cn(TYPE.meta, 'truncate text-muted-foreground/80')}>
+        <p className={cn(TYPE.meta, 'truncate text-muted-foreground')}>
           {tile.subRef}
         </p>
         <div className="mt-2.5 flex items-center justify-between gap-2 text-[11px]">
           <span className={cn('font-medium truncate', SEVERITY_LABEL_TINT[tile.severity])}>
             {tile.statusLabel}
           </span>
-          <span className="text-muted-foreground/70 tabular-nums shrink-0">
+          <span className="text-muted-foreground tabular-nums shrink-0">
             {relativeTime(tile.ageRef)}
           </span>
         </div>
@@ -553,7 +554,8 @@ function KpiCard({
   label, value, format = 'number', sub, tone, delay, pulse, series, delta,
 }: {
   label: string;
-  value: number;
+  /** null = nothing to measure yet; shown as a dash. */
+  value: number | null;
   format?: 'number' | 'percent';
   sub: string;
   tone: KpiTone;
@@ -562,8 +564,8 @@ function KpiCard({
   series?: number[];
   delta?: KpiDelta;
 }) {
-  const animated = useCountUp(value, 1000);
-  const display = format === 'percent' ? `${animated}%` : animated.toLocaleString();
+  const animated = useCountUp(value ?? 0, 1000);
+  const display = value === null ? '—' : format === 'percent' ? `${animated}%` : animated.toLocaleString();
   const tint = KPI_TINT[tone];
   return (
     <div
@@ -717,12 +719,7 @@ export default function Dashboard() {
     return abiDocs.filter(d => d.status === 'ACCEPTED' && new Date(d.updatedAt).getTime() >= monthStart).length;
   }, [abiDocs]);
 
-  const acceptanceRate = useMemo(() => {
-    const accepted = filings.filter(f => f.status === 'accepted').length;
-    const rejected = filings.filter(f => f.status === 'rejected').length;
-    const resolved = accepted + rejected;
-    return resolved === 0 ? 100 : Math.round((accepted / resolved) * 100);
-  }, [filings]);
+  const acceptance = useMemo(() => acceptanceRate(filings), [filings]);
 
   const inFlightStages =
     [byStage.isf.length > 0, byStage.manifest.length > 0, byStage.entry.length > 0]
@@ -954,9 +951,9 @@ export default function Dashboard() {
           />
           <KpiCard
             label="Acceptance Rate"
-            value={acceptanceRate}
+            value={acceptance}
             format="percent"
-            sub="ISFs accepted vs resolved"
+            sub={acceptance === null ? 'No ISFs accepted or rejected yet' : 'ISFs accepted vs resolved'}
             tone="violet"
             delay={270}
           />
