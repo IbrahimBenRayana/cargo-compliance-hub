@@ -367,7 +367,7 @@ export default function ABIDocumentWizard() {
             <p className="text-lg font-bold text-primary">{progress}%</p>
           </div>
           <div className="w-20">
-            <Progress value={progress} className="h-2" />
+            <Progress value={progress} className="h-2" aria-label="Form completion" />
           </div>
         </div>
       </div>
@@ -438,7 +438,7 @@ export default function ABIDocumentWizard() {
           })}
         </div>
         <div className="sm:hidden mt-2">
-          <Progress value={progress} className="h-1.5" />
+          <Progress value={progress} className="h-1.5" aria-label="Form completion" />
           <p className="text-xs text-muted-foreground mt-1 text-center">
             {progress}% complete
           </p>

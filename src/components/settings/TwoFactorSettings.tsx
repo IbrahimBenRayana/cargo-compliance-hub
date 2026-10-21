@@ -90,7 +90,7 @@ export function TwoFactorSettings() {
             </Button>
             <Button
               variant="outline"
-              className="cursor-pointer text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5"
+              className="cursor-pointer text-red-700 hover:text-red-700 dark:text-red-400 dark:hover:text-red-400 border-destructive/30 hover:bg-destructive/5"
               onClick={() => setDisableOpen(true)}
             >
               <ShieldX className="h-4 w-4 mr-2" />

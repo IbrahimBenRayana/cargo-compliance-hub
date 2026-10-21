@@ -184,7 +184,7 @@ export function AppSidebar() {
         {visibleSections.map((section) => (
           <SidebarGroup key={section.label}>
             {!collapsed && (
-              <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1 px-3">
+              <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/85 mb-1 px-3">
                 {section.label}
               </SidebarGroupLabel>
             )}

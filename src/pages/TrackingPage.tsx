@@ -81,7 +81,7 @@ function CreateTrackingCard() {
           <div className="space-y-1.5">
             <Label className="text-xs">Type</Label>
             <Select value={requestType} onValueChange={(v) => setRequestType(v as TrackedShipment['requestType'])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Tracking type"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="bill_of_lading">Bill of Lading</SelectItem>
                 <SelectItem value="booking_number">Booking Number</SelectItem>
@@ -163,7 +163,7 @@ function ListCard() {
               />
             </div>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[160px]" aria-label="Filter by status"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map((o) => (
                   <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>

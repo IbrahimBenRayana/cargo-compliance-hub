@@ -405,7 +405,7 @@ export default function InbondWizard() {
             <p className="text-lg font-bold text-primary">{progress}%</p>
           </div>
           <div className="w-20">
-            <Progress value={progress} className="h-2" />
+            <Progress value={progress} className="h-2" aria-label="Form completion" />
           </div>
         </div>
       </div>
@@ -465,7 +465,7 @@ export default function InbondWizard() {
           })}
         </div>
         <div className="sm:hidden mt-2">
-          <Progress value={progress} className="h-1.5" />
+          <Progress value={progress} className="h-1.5" aria-label="Form completion" />
           <p className="text-xs text-muted-foreground mt-1 text-center">{progress}% complete</p>
         </div>
       </div>
@@ -709,6 +709,7 @@ function MovementStep({
             </p>
           </div>
           <Switch
+            aria-label="FTZ / warehouse withdrawal"
             checked={isFtz}
             onCheckedChange={(checked) =>
               patch((d) => {
@@ -1074,6 +1075,7 @@ function BillCard({
               </p>
             </div>
             <Switch
+              aria-label="Bill already on file with CBP"
               checked={onFile}
               onCheckedChange={(checked) =>
                 patchBill((b) => {

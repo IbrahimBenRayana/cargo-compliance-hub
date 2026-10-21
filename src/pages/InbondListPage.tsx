@@ -214,7 +214,7 @@ export default function InbondListPage() {
                 value={statusParam ?? STATUS_ALL}
                 onValueChange={(value) => updateParam('status', value === STATUS_ALL ? null : value)}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

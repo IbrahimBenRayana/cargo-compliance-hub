@@ -706,12 +706,12 @@ export default function ShipmentsList() {
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                       <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors" asChild>
-                        <Link to={`/shipments/${f.id}`}><Eye className="h-4 w-4" /></Link>
+                        <Link to={`/shipments/${f.id}`} aria-label="View shipment"><Eye className="h-4 w-4" /></Link>
                       </Button>
                       {f.status === 'draft' && (
                         <>
                           <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors" asChild>
-                            <Link to={`/shipments/${f.id}/edit`}><Pencil className="h-4 w-4" /></Link>
+                            <Link to={`/shipments/${f.id}/edit`} aria-label="Edit shipment"><Pencil className="h-4 w-4" /></Link>
                           </Button>
                           <Button
                             variant="ghost" size="icon"

@@ -1800,16 +1800,16 @@ export default function ShipmentWizard() {
           onChange={v => set('foreignPortOfUnlading', v)} options={CBP_PORTS_4DIGIT}
           placeholder="Search ports…" hint="4-digit CBP port code for the US port of arrival." />
         <div className="space-y-1.5">
-          <HintLabel label="Est. Departure Date" hint="When the vessel departs the foreign port" />
-          <Input type="date" value={form.estimatedDeparture} onChange={e => set('estimatedDeparture', e.target.value)} />
+          <HintLabel label="Est. Departure Date" hint="When the vessel departs the foreign port" htmlFor="isf-est-departure" />
+          <Input id="isf-est-departure" type="date" value={form.estimatedDeparture} onChange={e => set('estimatedDeparture', e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <HintLabel label="Est. Lading Date" hint="When the cargo is loaded at the foreign port. The ISF is due 24 hours before lading; without this date we estimate it conservatively from departure." />
-          <Input type="date" value={form.estimatedLading} onChange={e => set('estimatedLading', e.target.value)} />
+          <HintLabel label="Est. Lading Date" hint="When the cargo is loaded at the foreign port. The ISF is due 24 hours before lading; without this date we estimate it conservatively from departure." htmlFor="isf-est-lading" />
+          <Input id="isf-est-lading" type="date" value={form.estimatedLading} onChange={e => set('estimatedLading', e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <HintLabel label="Est. Arrival Date" required hint="When the vessel arrives at the US port" />
-          <Input type="date" value={form.estimatedArrival} onChange={e => set('estimatedArrival', e.target.value)}
+          <HintLabel label="Est. Arrival Date" required hint="When the vessel arrives at the US port" htmlFor="isf-est-arrival" />
+          <Input id="isf-est-arrival" type="date" value={form.estimatedArrival} onChange={e => set('estimatedArrival', e.target.value)}
             className={cn(errors.estimatedArrival && 'border-red-500')} />
           {errors.estimatedArrival && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.estimatedArrival}</p>}
         </div>
@@ -2136,8 +2136,8 @@ export default function ShipmentWizard() {
         <CardContent className="px-4 pb-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <HintLabel label="Est. Arrival Date" required hint="When the shipment arrives at the US port" />
-              <Input type="date" value={form.estimatedArrival} onChange={e => set('estimatedArrival', e.target.value)} />
+              <HintLabel label="Est. Arrival Date" required hint="When the shipment arrives at the US port" htmlFor="isf5-est-arrival" />
+              <Input id="isf5-est-arrival" type="date" value={form.estimatedArrival} onChange={e => set('estimatedArrival', e.target.value)} />
             </div>
             <PortSelectField label="Foreign Port of Unlading" value={form.foreignPortOfUnlading}
               onChange={v => set('foreignPortOfUnlading', v)} options={SCHEDULE_D_PORTS}
@@ -2318,7 +2318,7 @@ export default function ShipmentWizard() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild className="shrink-0">
-          <Link to="/shipments"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link to="/shipments" aria-label="Back to shipments"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -2353,7 +2353,7 @@ export default function ShipmentWizard() {
             <p className="text-lg font-bold text-primary">{progress}%</p>
           </div>
           <div className="w-20">
-            <Progress value={progress} className="h-2" />
+            <Progress value={progress} className="h-2" aria-label="Form completion" />
           </div>
         </div>
       </div>
@@ -2436,7 +2436,7 @@ export default function ShipmentWizard() {
         </div>
         {/* Mobile progress */}
         <div className="sm:hidden mt-2">
-          <Progress value={progress} className="h-1.5" />
+          <Progress value={progress} className="h-1.5" aria-label="Form completion" />
           <p className="text-xs text-muted-foreground mt-1 text-center">{progress}% complete</p>
         </div>
       </div>

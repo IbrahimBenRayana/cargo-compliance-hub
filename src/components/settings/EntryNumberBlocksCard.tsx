@@ -237,7 +237,7 @@ function BlockRow({
         )}
       </div>
       <div className="flex items-center gap-3">
-        <Progress value={usedPct} className="h-1.5 flex-1" />
+        <Progress value={usedPct} className="h-1.5 flex-1" aria-label="Entry numbers used" />
         <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
           {block.used.toLocaleString('en-US')} used · {block.remaining.toLocaleString('en-US')} left
         </span>

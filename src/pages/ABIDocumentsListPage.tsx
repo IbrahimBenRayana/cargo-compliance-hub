@@ -185,7 +185,7 @@ export default function ABIDocumentsListPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Status</label>
               <Select value={statusParam ?? STATUS_ALL} onValueChange={handleStatusChange}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
