@@ -24,8 +24,17 @@ type Step = 'password' | 'scan' | 'recovery';
  *   password confirm → POST /mfa/setup  (pending secret + otpauth URI)
  *   scan QR + confirm code → POST /mfa/enable  (recovery codes)
  *   show recovery codes → onComplete
+ *
+ * onEnrollmentStart fires once the password is accepted, so a host page that
+ * redirects on "MFA is on" can hold off until the codes have been saved.
  */
-export function MfaEnrollment({ onComplete }: { onComplete: () => void }) {
+export function MfaEnrollment({
+  onComplete,
+  onEnrollmentStart,
+}: {
+  onComplete: () => void;
+  onEnrollmentStart?: () => void;
+}) {
   const [step, setStep] = useState<Step>('password');
 
   // Step (a)
@@ -53,6 +62,7 @@ export function MfaEnrollment({ onComplete }: { onComplete: () => void }) {
       const res = await setup.mutateAsync({ password });
       setOtpauthUri(res.otpauthUri);
       setSecretBase32(res.secretBase32);
+      onEnrollmentStart?.();
       setStep('scan');
     } catch (err: any) {
       // Account is already protected — the only way to be here is stale
