@@ -2,6 +2,7 @@
  * API Client — Typed fetch wrapper with auto-refresh JWT tokens
  */
 
+import type { HtsClassifyResult } from '@/types/htsClassify';
 import type { AuthSession, LoginResult, MfaMethod, User } from '@/types/auth';
 import type { Filing } from '@/types/shipment';
 
@@ -585,11 +586,7 @@ export const integrationsApi = {
   },
 
   classifyHTS(description: string) {
-    return apiFetch<{
-      suggestions: Array<{ hts: string; description: string; confidence?: number }>;
-      message?: string;
-      raw?: unknown;
-    }>('/api/v1/integrations/hts-classify', {
+    return apiFetch<HtsClassifyResult>('/api/v1/integrations/hts-classify', {
       method: 'POST',
       body: JSON.stringify({ description }),
     });
@@ -2694,14 +2691,6 @@ export interface ActionQueueResponse {
   counts: { total: number; critical: number; high: number; medium: number };
 }
 
-export interface HtsClassificationResponse {
-  matched: boolean;
-  message?: string;
-  primary: { hts: string; description: string } | null;
-  explanation: string | null;
-  alternatives: Array<{ hts: string; description: string }>;
-}
-
 export interface AddCvdOrder {
   case: string;
   type: 'AD' | 'CVD' | 'ADCVD';
@@ -2773,7 +2762,7 @@ export const complianceApi = {
     return apiFetch<ActionQueueResponse>('/api/v1/compliance/action-queue');
   },
   classifyHts(description: string) {
-    return apiFetch<HtsClassificationResponse>('/api/v1/compliance/classify-hts', {
+    return apiFetch<HtsClassifyResult>('/api/v1/compliance/classify-hts', {
       method: 'POST',
       body: JSON.stringify({ description }),
     });

@@ -1,35 +1,44 @@
 /**
- * HTSAutocomplete plan gating.
+ * HTS Code field + wand (native classifier).
  *
- * Regression for BUG-002 (testing week): the AI lookup button calls
- * /integrations/hts-classify, which the server gates on HTS_CLASSIFICATION
- * (Complete tier). On the ISF and entry plans it was shown anyway and every
- * use failed. Typing a code by hand must work on every plan.
+ * History: BUG-002 hid the wand on plans without HTS_CLASSIFICATION because
+ * the CustomsCity lookup failed there. Since 2026-10-21 the native classifier
+ * serves every plan, so the wand shows for all.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { HTSAutocomplete } from '../HTSAutocomplete';
 
-let capabilities: string[] = [];
-
-vi.mock('@/hooks/useBilling', () => ({
-  useCapabilities: () => ({ can: (cap: string) => capabilities.includes(cap) }),
-}));
+const { classifyHTS } = vi.hoisted(() => ({ classifyHTS: vi.fn() }));
+vi.mock('@/api/client', () => ({ integrationsApi: { classifyHTS } }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 describe('HTSAutocomplete', () => {
-  beforeEach(() => {
-    capabilities = [];
-  });
-
-  it('hides the AI lookup on plans without HTS classification, keeping the code field', () => {
+  it('shows the wand next to the code field on every plan', () => {
     render(<HTSAutocomplete value="" onChange={() => {}} />);
     expect(screen.getByPlaceholderText('e.g., 731815')).toBeInTheDocument();
-    expect(screen.queryByTitle('AI HTS Lookup')).not.toBeInTheDocument();
+    expect(screen.getByTitle('AI HTS Lookup')).toBeInTheDocument();
   });
 
-  it('shows the AI lookup on plans with HTS classification', () => {
-    capabilities = ['HTS_CLASSIFICATION'];
+  it('fills in the full 10-digit code the user picks', async () => {
+    classifyHTS.mockResolvedValue({
+      status: 'ok', dutyNote: '', notice: '', revision: 'r',
+      suggestions: [{ code: '8507600010', description: 'Batteries > Lithium-ion', confidence: 'high', score: 0.9, generalRate: '3.4%', units: [] }],
+    });
+    const onChange = vi.fn();
+    render(<HTSAutocomplete value="" onChange={onChange} description="li-ion e-bike battery pack" />);
+    fireEvent.click(screen.getByTitle('AI HTS Lookup'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Use' }));
+    expect(classifyHTS).toHaveBeenCalledWith('li-ion e-bike battery pack');
+    expect(onChange).toHaveBeenCalledWith('8507600010');
+  });
+
+  it('shows the server\'s reason when suggestions are unavailable', async () => {
+    classifyHTS.mockRejectedValue({ body: { error: 'Daily HTS suggestion limit reached. It resets at midnight UTC.' } });
     render(<HTSAutocomplete value="" onChange={() => {}} />);
-    expect(screen.getByTitle('AI HTS Lookup')).toBeInTheDocument();
+    fireEvent.click(screen.getByTitle('AI HTS Lookup'));
+    fireEvent.change(screen.getByLabelText('Product description'), { target: { value: 'steel hex bolts' } });
+    fireEvent.click(screen.getByRole('button', { name: /Suggest codes/ }));
+    await waitFor(() => expect(screen.getByText(/Daily HTS suggestion limit/)).toBeInTheDocument());
   });
 });

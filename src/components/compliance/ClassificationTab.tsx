@@ -5,7 +5,6 @@ import {
 } from 'lucide-react';
 import {
   complianceApi,
-  type HtsClassificationResponse,
   type AddCvdLookupResponse,
   type FtaPreferenceResponse,
 } from '@/api/client';
@@ -14,8 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { useCapabilities } from '@/hooks/useBilling';
-import { CAPABILITIES } from '@/lib/planMeta';
+import { toast } from 'sonner';
+import { HtsSuggestions } from '@/components/hts/HtsSuggestions';
+import { formatHtsCode } from '@/lib/htsFormat';
 
 /**
  * Classification & Rules tab — three importer-facing tools, all card-based
@@ -29,21 +29,12 @@ import { CAPABILITIES } from '@/lib/planMeta';
  * so a user can use one without scrolling past the others.
  */
 export function ClassificationTab() {
-  // The HTS Classifier hits POST /compliance/classify-hts, which the server
-  // gates on HTS_CLASSIFICATION (Complete tier). Hide the card for tiers that
-  // don't have it so it doesn't show only to 403 on use. ADD/CVD + FTA lookups
-  // are ungated, so they stay visible to every tier. `can` is false while
-  // entitlements load, so the card appears once confirmed rather than flashing
-  // then vanishing.
-  const { can } = useCapabilities();
-  const canClassify = can(CAPABILITIES.HTS_CLASSIFICATION);
+  // The HTS Classifier is on every plan for now (native classifier, 2026-10-21).
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {canClassify && (
-        <div className="lg:col-span-2">
-          <HtsClassifierCard />
-        </div>
-      )}
+      <div className="lg:col-span-2">
+        <HtsClassifierCard />
+      </div>
       <AddCvdLookupCard />
       <FtaPreferenceCard />
     </div>
@@ -63,6 +54,19 @@ function HtsClassifierCard() {
     const d = description.trim();
     if (d.length < 3 || classify.isPending) return;
     classify.mutate(d);
+  }
+
+  // A "did you mean" reading replaces the description and runs again.
+  function retry(d: string) {
+    setDescription(d);
+    classify.mutate(d);
+  }
+
+  function copyCode(code: string) {
+    void navigator.clipboard?.writeText(code).then(
+      () => toast.success(`Copied ${formatHtsCode(code)}`),
+      () => toast.error('Could not copy the code.'),
+    );
   }
 
   return (
@@ -86,7 +90,7 @@ function HtsClassifierCard() {
               HTS Classifier
             </h3>
             <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Describe the goods. The classifier returns the best 10-digit HTS match plus alternatives, with reasoning.
+              Describe the goods: what it is, what it's made of and what it's used for. You get the most likely 10-digit HTS codes with their duty rates, or the questions to answer first.
             </p>
           </div>
         </div>
@@ -117,73 +121,18 @@ function HtsClassifierCard() {
         </form>
 
         {/* Results */}
-        {classify.data && <ClassifierResult data={classify.data} />}
+        {classify.data && !classify.isPending && (
+          <div className="mt-4">
+            <HtsSuggestions result={classify.data} onPick={copyCode} pickLabel="Copy" onRetry={retry} />
+          </div>
+        )}
         {classify.isError && (
           <div className="mt-4 rounded-lg border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3.5 py-2.5 text-[12.5px] text-rose-700 dark:text-rose-300">
-            Classifier upstream failed. Please try again in a moment.
+            {(classify.error as any)?.body?.error ?? 'HTS suggestions are temporarily unavailable. Please try again in a moment.'}
           </div>
         )}
       </div>
     </article>
-  );
-}
-
-function ClassifierResult({ data }: { data: HtsClassificationResponse }) {
-  if (!data.matched) {
-    return (
-      <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-3.5 py-2.5 text-[12.5px] text-amber-800 dark:text-amber-300">
-        <strong className="font-semibold">Description too vague.</strong>{' '}
-        {data.message ?? 'Add material, function, or industry context and try again.'}
-      </div>
-    );
-  }
-  return (
-    <div className="mt-5 space-y-3">
-      {/* Primary HTS */}
-      {data.primary && (
-        <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-500/[0.06] p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-[0.08em] bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
-              Best match
-            </Badge>
-          </div>
-          <div className="flex items-baseline gap-3 flex-wrap">
-            <span className="text-[20px] font-semibold tabular-nums tracking-tight text-emerald-700 dark:text-emerald-300">
-              {formatHts(data.primary.hts)}
-            </span>
-            <span className="text-[13px] text-slate-700 dark:text-slate-200">
-              {data.primary.description}
-            </span>
-          </div>
-          {data.explanation && (
-            <p className="mt-2 text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
-              {data.explanation}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Alternatives */}
-      {data.alternatives.length > 0 && (
-        <div>
-          <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 mb-2">
-            Alternatives
-          </div>
-          <ul className="space-y-1.5">
-            {data.alternatives.map((alt, i) => (
-              <li key={i} className="flex items-baseline gap-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 px-3.5 py-2">
-                <span className="text-[13px] font-mono font-semibold tabular-nums text-slate-900 dark:text-slate-50 shrink-0">
-                  {formatHts(alt.hts)}
-                </span>
-                <span className="text-[12px] text-slate-600 dark:text-slate-400 truncate">
-                  {alt.description}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -387,15 +336,6 @@ function EmptyHint({ message }: { message: string }) {
       {message}
     </div>
   );
-}
-
-/** Format raw HTS digits as dotted: "8517620010" → "8517.62.00.10". */
-function formatHts(raw: string): string {
-  const d = raw.replace(/\D/g, '');
-  if (d.length < 4) return d;
-  if (d.length <= 6) return `${d.slice(0, 4)}.${d.slice(4)}`;
-  if (d.length <= 8) return `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6)}`;
-  return `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}.${d.slice(8, 10)}`;
 }
 
 function useDebounce<T>(value: T, ms: number): T {
