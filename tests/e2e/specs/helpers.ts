@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Page, expect, test } from '@playwright/test';
 import { ACCOUNT, totpCode } from './env';
 
 /** The account the suite logs in as (see env.ts); the local default is the seeded demo. */
@@ -23,7 +23,16 @@ export async function login(page: Page, creds: { email: string; password: string
       const challenged = await otp.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false);
       if (challenged) {
         if (!creds.totpSecret) throw new Error('This account asks for an MFA code; set E2E_TOTP_SECRET.');
-        await otp.pressSequentially(await totpCode(creds.totpSecret), { delay: 40 });
+        // The server refuses a code that was already used (replay guard), and
+        // parallel workers share one account; on refusal, use the next code.
+        for (let step = 0; step < 3; step++) {
+          await otp.pressSequentially(await totpCode(creds.totpSecret), { delay: 40 });
+          const left = await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 8_000 })
+            .then(() => true, () => false);
+          if (left) return;
+          await page.waitForTimeout(30_000 - (Date.now() % 30_000) + 1_000);
+          await otp.fill('').catch(() => {});
+        }
       }
       await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 20_000 });
       return;
@@ -82,6 +91,8 @@ export async function expectHeading(page: Page, text: string | RegExp) {
  * test drafts are easy to bulk-clean from the DB.
  */
 export async function fillIsf10(page: Page) {
+  // Six steps and six trade parties: more than the default 45s.
+  test.setTimeout(Math.max(test.info().timeout, 120_000));
   const next = () => page.getByRole('button', { name: /^Next/ }).click();
 
   // Step 1 — Filing Info
@@ -93,16 +104,45 @@ export async function fillIsf10(page: Page) {
   await page.getByLabel(/Importer Name/i).first().fill('Acme Imports LLC');
   await page.getByLabel(/IOR Number/i).first().fill('20-493538700');
   await page.getByLabel(/Consignee Name/i).first().fill('Acme Distribution Inc');
+  await page.getByLabel(/^Consignee Number/i).first().fill('20-493538700');
+  await page.getByLabel(/Address Line 1/i).first().fill('100 Harbor Blvd');
+  await page.getByLabel(/^City/i).first().fill('Long Beach');
+  await page.getByRole('combobox', { name: /^Country/i }).first().click();
+  await page.locator('[cmdk-input]').last().fill('United States');
+  await page.getByRole('option', { name: /United States/i }).first().click();
   await next();
 
-  // Step 3 — Trade Parties (no required fields for ISF-10)
+  // Step 3 — Trade Parties: every ISF-10 party needs a name and an address.
   await expect(page.getByText(/Trade Parties|Buyer|Seller/i).first()).toBeVisible();
+  const names = page.getByPlaceholder('Letters, numbers, spaces, dashes only');
+  const parties = await names.count();
+  for (let i = 0; i < parties; i++) {
+    await names.nth(i).fill(`QA Party ${i + 1} Co`);
+    await page.getByPlaceholder('Street address').nth(i).fill(`${100 + i} Harbor Rd`);
+    await page.getByPlaceholder('City').nth(i).fill('Shanghai');
+    const country = page.getByRole('combobox', { name: /^Country/i }).nth(i);
+    for (let tries = 0; tries < 2 && !/Chi/.test((await country.textContent()) ?? ''); tries++) {
+      await country.click();
+      await page.locator('[cmdk-input]').last().fill('China');
+      await page.getByRole('option', { name: /China/i }).first().click();
+      await expect(page.locator('[cmdk-input]')).toHaveCount(0); // picker closed
+    }
+  }
   await next();
 
   // Step 4 — Transport
   await page.getByLabel(/SCAC Code/i).fill('MAEU');
   await page.getByLabel(/Vessel Name/i).fill('EVER GIVEN');
-  await page.locator('input[type="date"]').nth(1).fill('2026-09-15'); // Est. Arrival
+  await page.getByRole('combobox', { name: /US Port of Arrival/i }).click();
+  await page.locator('[cmdk-input]').last().fill('Long Beach');
+  await page.getByRole('option', { name: /Long Beach/i }).first().click();
+  // Lading 30 days out, arrival 45 days out (ISF is filed before lading).
+  const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  // The date inputs aren't tied to their labels (BUG-010), so go by order:
+  // departure, lading, arrival.
+  const dates = page.locator('input[type="date"]');
+  await dates.nth(1).fill(day(30));
+  await dates.nth(2).fill(day(45));
   await next();
 
   // Step 5 — Cargo: one commodity (HTS + country of origin)

@@ -88,3 +88,13 @@ E2E_SWEEP=1 E2E_SWEEP_LABEL=full-owner E2E_BASE_URL=... E2E_EMAIL=... E2E_PASSWO
 
 Screenshots and `report.json` land in `tests/e2e/sweep-output/<label>/` (git-ignored).
 Specs that need local DB access (`mfa.spec.ts`) or send real email/CBP traffic stay opt-in.
+
+Account-dependent specs read these (defaults suit the local demo account):
+
+| Variable | Meaning |
+|---|---|
+| `E2E_TIER` | Plan of the run's account: `isf` (default) runs the capability-gate specs; set `full` to skip them. |
+| `E2E_PLATFORM_ADMIN=1` | The account is a platform admin; on a remote URL the `/admin` spec is skipped without it. |
+| `E2E_EMAIL_2` / `E2E_PASSWORD_2` / `E2E_TOTP_SECRET_2` | A second account in another org, for `session.spec.ts` (tabs and sign-out). |
+
+On a remote URL the demo-hint check and `mfa.spec.ts` (needs local DB access) are skipped.

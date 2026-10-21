@@ -1,9 +1,11 @@
 import { test, expect } from './fixtures';
 import { gotoAuthed } from './helpers';
+import { REMOTE } from './env';
 
 test.describe('Platform admin', () => {
 
   test('admin clients page loads for a platform admin', async ({ page }) => {
+    test.skip(REMOTE && process.env.E2E_PLATFORM_ADMIN !== '1', 'Needs a platform-admin account (E2E_PLATFORM_ADMIN=1)');
     await gotoAuthed(page, '/admin');
     await expect(page.getByRole('heading', { name: /clients/i }).first()).toBeVisible();
     await expect(page).not.toHaveURL(/\/login/);
