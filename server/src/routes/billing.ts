@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Request } from 'express';
 import Stripe from 'stripe';
 import { prisma } from '../config/database.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
 import { requireMfaEnrolled } from '../middleware/requireMfaEnrolled.js';
 import {
@@ -197,7 +197,7 @@ router.get('/config', (_req: AuthRequest, res: Response): void => {
 // POST /api/v1/billing/select-tier  { planId }
 // Choose / change the plan tier. No charge, no card re-entry — the new rate
 // applies to shipments accepted after the change. Self-serve tiers only.
-router.post('/select-tier', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/select-tier', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = z.object({ planId: z.string().min(1) }).safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -237,7 +237,7 @@ router.post('/select-tier', async (req: AuthRequest, res: Response): Promise<voi
 
 // POST /api/v1/billing/setup-intent → { clientSecret }
 // Starts saving a card. Requires a selected tier (so we have a billing row).
-router.post('/setup-intent', requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/setup-intent', requireRole('owner', 'admin'), requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   if (!stripeConfigured()) {
     res.status(503).json({ error: 'Billing not configured. Contact support.' });
     return;
@@ -260,7 +260,7 @@ router.post('/setup-intent', requireVerifiedEmail, requireMfaEnrolled, async (re
 // POST /api/v1/billing/card  { setupIntentId }
 // Confirm a saved card: set it as the default payment method, store the display
 // summary, and reattempt any unsettled charges (clearing delinquency on success).
-router.post('/card', requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/card', requireRole('owner', 'admin'), requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   if (!stripeConfigured()) {
     res.status(503).json({ error: 'Billing not configured' });
     return;
@@ -354,7 +354,7 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
 });
 
 // POST /api/v1/billing/portal-session → { url }  (manage card / receipts in Stripe)
-router.post('/portal-session', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/portal-session', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
   if (!stripeConfigured()) {
     res.status(503).json({ error: 'Billing not configured' });
     return;

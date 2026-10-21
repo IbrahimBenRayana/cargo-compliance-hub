@@ -59,3 +59,7 @@ docs/abi-engine/CBP_MQIPT_Install-and-Run_Instructions.txt
 
 # Testing-week screen sweep output (screenshots + report.json)
 tests/e2e/sweep-output/
+
+# Testing-week bot credentials (local only)
+tests/e2e/.env.staging
+tests/e2e/.qa/
