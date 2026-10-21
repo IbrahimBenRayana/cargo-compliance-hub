@@ -49,6 +49,12 @@ describe('findPrecedents', () => {
     expect(ps.find((p) => p.ruling === 'N111111')!.codes).toEqual(['6307907500']);
   });
 
+  it('prefers recent rulings, whose codes match today\'s schedule more often', async () => {
+    searches['cat toy'] = [hit('889270', '6405.90.9000', { rulingDate: '1993-05-01T00:00:00' }), hit('N350000', '6405.90.9000', { rulingDate: '2024-05-01T00:00:00' })];
+    const ps = await findPrecedents(['cat toy']);
+    expect(ps.map((p) => p.ruling)).toEqual(['N350000', '889270']);
+  });
+
   it('drops revoked rulings and rulings without a tariff number', async () => {
     searches['cat toy'] = [hit('N1', '6307.90.7500', { revokedBy: ['H2'] }), hit('N3', ''), hit('N4', '6307.90.7500', { operationallyRevoked: true }), hit('N5', '9503.00.0073')];
     const ps = await findPrecedents(['cat toy']);

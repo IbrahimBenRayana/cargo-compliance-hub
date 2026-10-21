@@ -24,6 +24,10 @@ const pct = (n: number, d: number) => (d ? `${((100 * n) / d).toFixed(1)}%` : 'n
 
 interface Run { r: ClassifyResult | null; ms: number; err?: string; pool: string[]; suff?: string; debug: Debug }
 
+// Out of API credit, every later case would fail too: stop, don't score it.
+let outOfCredit = false;
+let done = 0;
+
 async function timed(description: string, exclude: string[] = []): Promise<Run> {
   const t = Date.now();
   const debug: Debug = {};
@@ -31,7 +35,10 @@ async function timed(description: string, exclude: string[] = []): Promise<Run> 
     const r = await classifyProduct(description, { ...ctx, excludeRulings: exclude, debug });
     return { r, ms: Date.now() - t, pool: debug.candidates ?? [], suff: debug.sufficiency, debug };
   } catch (e: any) {
+    if (/no credits|quota/i.test(e?.message ?? '')) outOfCredit = true;
     return { r: null, ms: Date.now() - t, err: e?.message, pool: [], debug };
+  } finally {
+    process.stderr.write(`eval: ${++done} done\n`);
   }
 }
 
@@ -40,7 +47,7 @@ async function pooled<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R>)
   const out: R[] = new Array(items.length);
   let next = 0;
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
+    while (next < items.length && !outOfCredit) {
       const i = next++;
       out[i] = await fn(items[i]);
     }
@@ -55,6 +62,10 @@ async function main(): Promise<void> {
   const lines: string[] = [];
 
   const runs = await pooled(fixture.rulings, CONCURRENCY, (x) => timed(x.description, [x.ruling]));
+  if (outOfCredit) {
+    console.log('ABORTED: the AI account is out of credit; results would be meaningless.');
+    process.exit(2);
+  }
   fixture.rulings.forEach((x, i) => {
     const { r, ms, err, pool, suff, debug } = runs[i];
     const prec = debug.precedent ?? [];

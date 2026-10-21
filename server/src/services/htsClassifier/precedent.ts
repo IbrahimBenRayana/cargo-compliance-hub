@@ -126,7 +126,8 @@ export async function findPrecedents(
     return [] as CrossHit[];
   })));
 
-  // Rulings found by several queries first, then by CROSS relevance.
+  // Rulings found by several queries first, then by CROSS relevance, recent
+  // rulings ahead of old ones (their codes match today's schedule more often).
   const scored = new Map<string, { hit: CrossHit; score: number }>();
   for (const hits of results) {
     hits.forEach((hit, pos) => {
@@ -136,7 +137,9 @@ export async function findPrecedents(
       if ((hit.relatedRulings ?? []).some((r) => exclude.has(up(r)))) return;
       if (codesOf(hit.tariffs).length === 0) return;
       const prev = scored.get(n);
-      const s = 1 + 1 / (1 + pos);
+      const year = Number((hit.rulingDate ?? '').slice(0, 4)) || 0;
+      const recent = year >= 2015 ? 0.6 : year >= 2007 ? 0.3 : 0;
+      const s = 1 + 1 / (1 + pos) + (prev ? 0 : recent);
       scored.set(n, { hit, score: (prev?.score ?? 0) + s });
     });
   }
