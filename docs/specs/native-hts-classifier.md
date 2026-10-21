@@ -249,4 +249,22 @@ Labels unchanged: "Two independent checks agree" / "Review before you file" /
 "Checks disagree: check carefully" / "Alternative".
 
 ### v3 evaluation results
-(recorded below after the staging runs)
+
+**Run 1, 2026-10-21 (gpt-5.5, effort low, same-model second opinion): INCOMPLETE.** The
+OpenAI account ran out of credit (`credit_balance_exhausted`) about halfway through both runs
+(with and without precedent, run concurrently), so their totals are not valid. On the 49
+CROSS cases that completed cleanly in both runs:
+
+| | heading@1 | 10-digit@1 | wrong at "Two independent checks agree" |
+|---|---|---|---|
+| with precedent (own + citing rulings excluded) | 43/49 (88%) | 37/49 (76%) | 4 |
+| without precedent (notes + deciding questions only) | 43/49 (88%) | 34/49 (69%) | 4 |
+
+Small sample; indicative only. Precedent was found for ~2/3 of cases; many hits were 1990s
+rulings with renumbered codes (fixed: recent rulings now rank first). All 4 wrong
+"agree" labels had a same-model second opinion agreeing (shoe trees 3926 vs 3924, sweater
+6102 vs 6110, fibre content 6108.32 vs 6108.92, a 6307.90.98 suffix), which is what the
+cross-model check targets. Latency p50 ~16 s, p95 ~40 s (four cases at a time).
+The eval now aborts when the account is out of credit instead of scoring failures.
+Full runs pending credit: gpt-5.5 + precedent + o3 second opinion, and the same without
+precedent.
