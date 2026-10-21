@@ -14,6 +14,8 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Info, Search, Loader2, Sparkles, AlertCircle, X, Wand2 } from 'lucide-react';
 import { integrationsApi } from '@/api/client';
+import { useCapabilities } from '@/hooks/useBilling';
+import { CAPABILITIES } from '@/lib/planMeta';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -43,6 +45,10 @@ export const HTSAutocomplete = memo(function HTSAutocomplete({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  // The AI lookup hits /integrations/hts-classify, gated server-side on
+  // HTS_CLASSIFICATION (Complete tier). Other plans type the code by hand.
+  const { can } = useCapabilities();
+  const canClassify = can(CAPABILITIES.HTS_CLASSIFICATION);
 
   const handleClassify = useCallback(async () => {
     const query = description || searchQuery;
@@ -106,7 +112,8 @@ export const HTSAutocomplete = memo(function HTSAutocomplete({
               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs">
-              Harmonized Tariff Schedule — minimum 6 digits. Use the AI lookup button to find the right code based on your product description.
+              Harmonized Tariff Schedule — minimum 6 digits.
+              {canClassify && ' Use the AI lookup button to find the right code based on your product description.'}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -121,6 +128,7 @@ export const HTSAutocomplete = memo(function HTSAutocomplete({
           maxLength={maxLength}
           className={cn('flex-1', error && 'border-red-500 focus-visible:ring-red-500')}
         />
+        {canClassify && (
         <Popover open={showSuggestions} onOpenChange={setShowSuggestions}>
           <PopoverTrigger asChild>
             <Button
@@ -191,6 +199,7 @@ export const HTSAutocomplete = memo(function HTSAutocomplete({
             </div>
           </PopoverContent>
         </Popover>
+        )}
       </div>
 
       {error && (
