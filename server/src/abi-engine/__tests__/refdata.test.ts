@@ -41,6 +41,23 @@ describe('normalizeUsitcRows', () => {
     expect(liIon.generalRate).toBe('3.4%');
   });
 
+  it('records each line\'s full path: heading, subheading and grouping rows included', () => {
+    // The classifier needs the wording that only lives on the skipped rows
+    // ("Other lead-acid", "New:"); a leaf alone often just says "Other".
+    expect(lines.find((l) => l.htsNumber === '8507208031')!.pathText)
+      .toBe('Electric storage batteries… > Other lead-acid: > Other > For vehicles');
+    expect(lines.find((l) => l.htsNumber === '8507100030')!.pathText)
+      .toBe('Electric storage batteries… > Lead-acid, engine starting > New: > 12 V batteries');
+    expect(lines.find((l) => l.htsNumber === '85076000')!.pathText)
+      .toBe('Electric storage batteries… > Lithium-ion batteries');
+  });
+
+  it('a grouping row does not leak into a sibling subtree', () => {
+    // 8507.10.00.90 (indent 2) is a sibling of "New:" (indent 2), not its child.
+    expect(lines.find((l) => l.htsNumber === '8507100090')!.pathText)
+      .toBe('Electric storage batteries… > Lead-acid, engine starting > Other');
+  });
+
   it('a sibling subtree does not leak its rate (stack pops on indent)', () => {
     // 8507.20.80.31 must inherit 8507.20.80, not 8507.20.40.00.
     const row = lines.find((l) => l.htsNumber === '8507208031')!;

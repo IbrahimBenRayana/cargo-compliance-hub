@@ -33,6 +33,12 @@ export interface NormalizedHtsLine {
   specialRate: string;
   otherRate: string;
   units: string[];
+  /**
+   * Every ancestor's description down to this line, ' > '-joined: heading,
+   * subheading and unnumbered grouping rows included. Leaves often just say
+   * "Other"; the HTS classifier needs the wording that lives on the parents.
+   */
+  pathText: string;
 }
 
 const USITC_BASE = 'https://hts.usitc.gov/reststop/exportList';
@@ -56,6 +62,8 @@ export function normalizeUsitcRows(rows: UsitcRow[]): NormalizedHtsLine[] {
   const out: NormalizedHtsLine[] = [];
   // Stack of ancestors that carried rates: shallower indents first.
   const rateStack: { indent: number; general: string; special: string; other: string }[] = [];
+  // Stack of every ancestor row's description (rate line or not), same rule.
+  const pathStack: { indent: number; description: string }[] = [];
 
   for (const row of rows) {
     const indent = Number(row.indent);
@@ -63,6 +71,10 @@ export function normalizeUsitcRows(rows: UsitcRow[]): NormalizedHtsLine[] {
     while (rateStack.length > 0 && rateStack[rateStack.length - 1].indent >= indent) {
       rateStack.pop();
     }
+    while (pathStack.length > 0 && pathStack[pathStack.length - 1].indent >= indent) {
+      pathStack.pop();
+    }
+    pathStack.push({ indent, description: (row.description ?? '').trim() });
 
     const own = (row.general ?? '').trim();
     const isRateLine = own !== '';
@@ -83,6 +95,7 @@ export function normalizeUsitcRows(rows: UsitcRow[]): NormalizedHtsLine[] {
       specialRate: effective?.special ?? '',
       otherRate: effective?.other ?? '',
       units: row.units ?? [],
+      pathText: pathStack.map((p) => p.description).filter(Boolean).join(' > '),
     });
   }
 

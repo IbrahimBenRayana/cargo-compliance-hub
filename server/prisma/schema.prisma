@@ -38,6 +38,7 @@ model Organization {
   abiDocuments      AbiDocument[]
   trackedShipments  TrackedShipment[]
   apiKeys           ApiKey[]
+  htsClassifications HtsClassification[]
   webhookEndpoints  WebhookEndpoint[]
   chatConversations ChatConversation[]
   inbondFilings     InbondFiling[]
@@ -132,6 +133,7 @@ model User {
   mfaEmailCodes           MfaEmailCode[]
   trackedShipments        TrackedShipment[]
   apiKeys                 ApiKey[]                 @relation("ApiKeyCreator")
+  htsClassifications      HtsClassification[]
   chatConversations       ChatConversation[]       @relation("ChatUser")
   assignedChats           ChatConversation[]       @relation("ChatAgent")
   inbondFilings           InbondFiling[]           @relation("InbondCreator")
@@ -1132,6 +1134,9 @@ model HtsRateLine {
   specialRate String   @map("special_rate") @db.Text
   otherRate   String   @map("other_rate") @db.Text
   units       String[]
+  // Heading > subheading > grouping rows > this line, for the HTS classifier
+  // (leaves often just say "Other"). Empty until the next ingest run.
+  pathText    String   @default("") @map("path_text") @db.Text
   // USITC edition tag, e.g. '2026-rev-15' — supplied by the ingest run.
   revision    String   @db.VarChar(40)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
@@ -1274,4 +1279,31 @@ model CbpCurrencyRate {
   @@unique([countryCode, currencyCode, rateDate, indicator])
   @@index([currencyCode, rateDate])
   @@map("cbp_currency_rates")
+}
+
+// ─── HTS classifier audit log (spec docs/specs/native-hts-classifier.md) ──
+// Every classification request and what we showed, so an importer can see
+// why a code was suggested and we can measure accuracy on real traffic.
+model HtsClassification {
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  userId      String?   @map("user_id") @db.Uuid
+  description String    @db.Text
+  // ok | needs_detail | keyword_only | no_match | error
+  status      String    @db.VarChar(20)
+  // The full response shown to the user (suggestions, questions, warnings).
+  result      Json
+  model       String    @db.VarChar(80)
+  revision    String    @db.VarChar(40)
+  latencyMs   Int       @map("latency_ms")
+  // The code the user went on to pick, when the client reports it back.
+  pickedCode  String?   @map("picked_code") @db.VarChar(10)
+  pickedAt    DateTime? @map("picked_at") @db.Timestamptz()
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt])
+  @@map("hts_classifications")
 }
