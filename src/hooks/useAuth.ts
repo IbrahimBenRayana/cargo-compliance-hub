@@ -72,15 +72,23 @@ export function useRegister() {
 
 export function useLogout() {
   const logout = useAuthStore((s) => s.logout);
+  const queryClient = useQueryClient();
+  // Sign-out doesn't reload the page, so drop every cached query too: with a
+  // 30s staleTime the next user on this tab would otherwise see this user's data.
+  const signOutLocally = () => {
+    logout();
+    queryClient.clear();
+  };
   return useMutation({
     mutationFn: () => authApi.logout(),
-    onSuccess: logout,
-    onError: logout, // Logout locally even if API fails
+    onSuccess: signOutLocally,
+    onError: signOutLocally, // Logout locally even if API fails
   });
 }
 
 export function useCurrentUser() {
   const setUser = useAuthStore((s) => s.setUser);
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: ['currentUser'],
     queryFn: async () => {
@@ -99,6 +107,8 @@ export function useCurrentUser() {
         const isAuthFailure = status === 401 || status === 403;
         if (isAuthFailure) {
           setUser(null);
+          // Session gone: drop the old user's cached data too (see useLogout).
+          queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'currentUser' });
           return null;
         }
         // Re-throw so React Query knows the query failed and the caller
