@@ -66,6 +66,11 @@ const envSchema = z.object({
   AI_TEMPERATURE:           z.coerce.number().min(0).max(2).default(0.3),
   // Per-user daily call cap. Resets at UTC midnight.
   AI_RATE_LIMIT_PER_USER:   z.coerce.number().int().positive().default(50),
+  // Native HTS classifier (docs/specs/native-hts-classifier.md): its own
+  // model (empty = AI_MODEL) and its own daily call budget per user, since one
+  // classification makes up to three calls.
+  HTS_AI_MODEL:             z.string().default(''),
+  HTS_AI_DAILY_CALLS:       z.coerce.number().int().positive().default(450),
   // When true, sets OpenAI's `store: false` flag so prompts can't enter
   // their training corpus (zero-retention policy for trade data).
   AI_DISABLE_TRAINING_DATA: z.coerce.boolean().default(true),

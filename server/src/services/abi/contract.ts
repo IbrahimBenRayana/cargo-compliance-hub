@@ -30,8 +30,6 @@ import type {
   CCDocumentCreatePayload,
   CCDocumentResponse,
   CCListResponse,
-  // Tools
-  CCHTSClassifyResponse,
 } from '../customscity/isfTypes.js';
 import type {
   // Manifest query
@@ -85,7 +83,6 @@ export type ManifestQueryPayload = CCManifestQueryPayload;
 export type ManifestQueryCreateResponse = CCManifestQueryCreateResponse;
 export type ManifestQueryResult = CCManifestQueryResult;
 
-export type HtsClassifyResponse = CCHTSClassifyResponse;
 export type DutyCalcPayload = CCDutyCalcPayload;
 export type DutyCalcResponse = CCDutyCalcResponse;
 export type DutyCalcAIResponse = CCDutyCalcAIResponse;
@@ -116,7 +113,7 @@ export interface AbiGateway {
   getManifestQueryLatest(): Promise<GatewayResult<ManifestQueryResult>>;
 
   // ── Classification & duty tools ──
-  classifyHTS(description: string): Promise<GatewayResult<HtsClassifyResponse>>;
+  // (HTS classification is native: services/htsClassifier, not the gateway.)
   getMIDList(): Promise<GatewayResult<any>>;
   calculateDuty(payload: DutyCalcPayload): Promise<GatewayResult<DutyCalcResponse>>;
   calculateDutyAI(payload: DutyCalcPayload): Promise<GatewayResult<DutyCalcAIResponse>>;

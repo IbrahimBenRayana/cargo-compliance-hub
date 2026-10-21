@@ -15,13 +15,14 @@
  */
 
 import { isfFilingDeadline } from '../services/isfDeadline.js';
+import { classifyHandler } from '../services/htsClassifier/http.js';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest, requirePlatformAdmin } from '../middleware/auth.js';
 import { requireCapability } from '../middleware/requireCapability.js';
 import { CAPABILITIES } from '../config/plans.js';
-import { authLimiter } from '../middleware/rateLimiter.js';
+import { authLimiter, classifyLimiter } from '../middleware/rateLimiter.js';
 import * as ai from '../services/ai.js';
 import { lookupPgaFlags, lookupMetadata as pgaMeta } from '../services/compliance/pgaFlags.js';
 import { assessUflpaRisk } from '../services/compliance/uflpa.js';
@@ -966,59 +967,9 @@ Be concrete and brief. Refer to the filing's actual values when relevant ("Maste
 
 // ─── Classification tab endpoints ────────────────────────────────────
 
-// POST /classify-hts — standalone HTS classifier wrapper around CC's
-// /api/ht-classification. Takes a free-text product description, returns
-// the best HTS match + alternative suggestions + GRI-style explanation.
-const classifyHtsSchema = z.object({
-  description: z.string().min(3).max(500),
-});
-
-router.post('/classify-hts', authLimiter, requireCapability(CAPABILITIES.HTS_CLASSIFICATION), async (req: AuthRequest, res: Response): Promise<void> => {
-  const parsed = classifyHtsSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: 'Description must be 3-500 characters' });
-    return;
-  }
-  try {
-    const result = await abiGateway.classifyHTS(parsed.data.description.trim());
-    const raw = result.data as any;
-    const item = raw?.items?.[0];
-    if (!item) {
-      res.json({ matched: false, message: 'No classification returned. Try a more specific description.' });
-      return;
-    }
-    // Coherence check — CC flags vague inputs.
-    const coherence = item?.classifierResponse?.coherence_validation;
-    if (coherence && !coherence.is_coherent) {
-      res.json({
-        matched: false,
-        message: coherence.explanation || 'Description too vague — add material, function, or industry context.',
-      });
-      return;
-    }
-    // Primary recommendation.
-    const cr = item.classifierResponse ?? {};
-    const primaryHts: string | null = cr.selected_hts ?? item.classification?.hts ?? null;
-    const explanation: string | null = cr.explanation ?? null;
-    const alternatives: Array<{ hts: string; description: string }> =
-      Array.isArray(cr.hts_review_result?.recomendations)
-        ? cr.hts_review_result.recomendations
-            .filter((r: any) => r?.hts && r?.description)
-            .map((r: any) => ({ hts: String(r.hts), description: String(r.description) }))
-        : [];
-    res.json({
-      matched: !!primaryHts,
-      primary: primaryHts
-        ? { hts: primaryHts, description: item.classification?.name ?? item.description ?? '' }
-        : null,
-      explanation,
-      alternatives,
-    });
-  } catch (err: any) {
-    logger.error({ err: err?.message }, '[Compliance] classify-hts failed');
-    res.status(502).json({ error: 'Classifier upstream failed. Please try again.' });
-  }
-});
+// POST /classify-hts — HTS suggestions from a product description, from the
+// native classifier (services/htsClassifier); every plan, for now (2026-10-21).
+router.post('/classify-hts', classifyLimiter, classifyHandler);
 
 // GET /add-cvd-lookup?q=...  — seed-data lookup of active Commerce orders.
 const addCvdQuery = z.object({ q: z.string().min(1).max(100) });

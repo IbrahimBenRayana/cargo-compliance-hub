@@ -119,3 +119,12 @@ export const apiKeyLimiter = rateLimit({
     code: 'RATE_LIMIT_API_KEY',
   },
 });
+
+/** HTS classifier: each request can make several AI calls. */
+export const classifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many HTS suggestion requests. Please wait a minute.' },
+});

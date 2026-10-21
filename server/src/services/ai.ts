@@ -139,10 +139,18 @@ export interface CompleteOptions {
   temperature?: number;
   /** Override the default max tokens. */
   maxTokens?: number;
+  /** Ask the provider for a JSON object reply. */
+  json?: boolean;
+  /**
+   * A separate daily budget for this feature (e.g. the HTS classifier makes
+   * several calls per request); defaults to the shared per-user cap.
+   */
+  rateBucket?: { key: string; limit: number };
 }
 
 export async function complete(opts: CompleteOptions): Promise<string> {
-  ensureWithinLimit(opts.userId);
+  const rateKey = opts.rateBucket ? `${opts.userId}:${opts.rateBucket.key}` : opts.userId;
+  ensureWithinLimit(rateKey, opts.rateBucket?.limit);
   const client = getClient();
   const started = Date.now();
   try {
@@ -156,9 +164,10 @@ export async function complete(opts: CompleteOptions): Promise<string> {
       ],
       // Don't let the provider store prompts for training when configured.
       store: env.AI_DISABLE_TRAINING_DATA ? false : undefined,
+      ...(opts.json ? { response_format: { type: 'json_object' as const } } : {}),
     });
     const text = res.choices[0]?.message?.content ?? '';
-    recordCall(opts.userId);
+    recordCall(rateKey);
     logger.info({
       userId: opts.userId,
       provider: env.AI_PROVIDER,
