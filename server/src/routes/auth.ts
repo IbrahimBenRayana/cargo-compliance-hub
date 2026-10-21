@@ -372,7 +372,9 @@ router.post('/login', authLimiter, async (req: Request, res: Response): Promise<
       include: { organization: true },
     });
 
-    if (!user) {
+    // A removed member is deactivated, not deleted: answer as for an unknown
+    // email, so they get no session and the removal isn't revealed.
+    if (!user || !user.isActive) {
       res.status(401).json({ error: 'Invalid email or password' });
       return;
     }
