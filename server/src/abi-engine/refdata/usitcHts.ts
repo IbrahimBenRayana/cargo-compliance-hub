@@ -44,13 +44,26 @@ export interface NormalizedHtsLine {
 const USITC_BASE = 'https://hts.usitc.gov/reststop/exportList';
 
 /** Fetch raw USITC rows for a heading range (inclusive, e.g. '8507','8508'). */
-export async function fetchUsitcRows(from: string, to: string): Promise<UsitcRow[]> {
+export async function fetchUsitcRows(
+  from: string, to: string, opts: { attempts?: number; retryDelayMs?: number } = {},
+): Promise<UsitcRow[]> {
   const url = `${USITC_BASE}?from=${from}&to=${to}&format=JSON&styles=false`;
-  const res = await fetch(url, { headers: { accept: 'application/json' } });
-  if (!res.ok) {
-    throw new Error(`USITC export failed for ${from}-${to}: HTTP ${res.status}`);
+  const attempts = opts.attempts ?? 3;
+  const delay = opts.retryDelayMs ?? 3000;
+  // hts.usitc.gov drops the odd connection over a 99-chapter run; retry
+  // before failing (nothing is deleted until the fetch has succeeded).
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await fetch(url, { headers: { accept: 'application/json' } });
+      if (!res.ok) {
+        throw new Error(`USITC export failed for ${from}-${to}: HTTP ${res.status}`);
+      }
+      return (await res.json()) as UsitcRow[];
+    } catch (err) {
+      if (attempt >= attempts) throw err;
+      await new Promise((r) => setTimeout(r, delay * attempt));
+    }
   }
-  return (await res.json()) as UsitcRow[];
 }
 
 /**
