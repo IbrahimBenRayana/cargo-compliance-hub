@@ -23,8 +23,10 @@ describe('HtsSuggestions', () => {
   it('shows each code dotted, with its confidence, duty, reason and warnings', () => {
     render(<HtsSuggestions result={OK} onRetry={vi.fn()} />);
     expect(screen.getByText('8507.60.00.10')).toBeInTheDocument();
-    expect(screen.getByText('High confidence')).toBeInTheDocument();
-    expect(screen.getByText(/Low confidence: check before you file/)).toBeInTheDocument();
+    // the top pick says what the checks found; the rest are alternatives
+    expect(screen.getByText('Two independent checks agree')).toBeInTheDocument();
+    expect(screen.getByText('Alternative')).toBeInTheDocument();
+    expect(screen.queryByText(/confidence/i)).not.toBeInTheDocument();
     expect(screen.getByText('3.4%')).toBeInTheDocument();
     expect(screen.getByText('Li-ion; powers an e-bike')).toBeInTheDocument();
     expect(screen.getByText(/Second check disagrees/)).toBeInTheDocument();

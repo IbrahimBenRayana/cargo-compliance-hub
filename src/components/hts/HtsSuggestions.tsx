@@ -9,10 +9,12 @@ import { formatHtsCode } from '@/lib/htsFormat';
 import type { HtsClassifyResult, HtsConfidence, HtsSuggestion } from '@/types/htsClassify';
 
 
+// Labels say what the engine actually knows, not a promise: only the top pick
+// is checked twice, and no AI can guarantee a classification.
 const CONFIDENCE: Record<HtsConfidence, { label: string; cls: string }> = {
-  high: { label: 'High confidence', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' },
-  medium: { label: 'Medium confidence', cls: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30' },
-  low: { label: 'Low confidence: check before you file', cls: 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30' },
+  high: { label: 'Two independent checks agree', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' },
+  medium: { label: 'Review before you file', cls: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30' },
+  low: { label: 'Checks disagree: check carefully', cls: 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30' },
 };
 
 /** Last two levels in full, the rest as context. */
@@ -28,8 +30,10 @@ function PathText({ path }: { path: string }) {
   );
 }
 
-function SuggestionRow({ s, onPick, pickLabel }: { s: HtsSuggestion; onPick?: (code: string) => void; pickLabel: string }) {
-  const conf = s.confidence ? CONFIDENCE[s.confidence] : null;
+const ALTERNATIVE = { label: 'Alternative', cls: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700' };
+
+function SuggestionRow({ s, rank, onPick, pickLabel }: { s: HtsSuggestion; rank: number; onPick?: (code: string) => void; pickLabel: string }) {
+  const conf = rank > 0 ? (s.confidence ? ALTERNATIVE : null) : s.confidence ? CONFIDENCE[s.confidence] : null;
   return (
     <li className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-3 space-y-1.5">
       <div className="flex flex-wrap items-center gap-2">
@@ -121,7 +125,7 @@ export function HtsSuggestions({
 
       {result.suggestions.length > 0 && (
         <ul className="space-y-2">
-          {result.suggestions.map((s) => <SuggestionRow key={s.code} s={s} onPick={onPick} pickLabel={pickLabel} />)}
+          {result.suggestions.map((s, i) => <SuggestionRow key={s.code} s={s} rank={i} onPick={onPick} pickLabel={pickLabel} />)}
         </ul>
       )}
 
