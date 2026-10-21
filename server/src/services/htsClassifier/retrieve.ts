@@ -32,6 +32,15 @@ export interface ScheduleIndex {
   ownTokens: Set<string>[];
   /** per line: normalised path text for phrase matching */
   pathNorm: string[];
+  /** 4-digit heading -> its lines' indexes, in schedule order */
+  byHeading: Map<string, number[]>;
+}
+
+export interface HeadingChoice {
+  heading: string;
+  /** The heading's own wording (first level of its lines' path). */
+  text: string;
+  lineCount: number;
 }
 
 // Words that say nothing about what the goods are.
@@ -79,7 +88,12 @@ export function buildIndex(lines: ScheduleLine[]): ScheduleIndex {
   const pathTokens: Set<string>[] = [];
   const ownTokens: Set<string>[] = [];
   const pathNorm: string[] = [];
+  const byHeading = new Map<string, number[]>();
   lines.forEach((l, i) => {
+    const h = l.code.slice(0, 4);
+    const inHeading = byHeading.get(h);
+    if (inHeading) inHeading.push(i);
+    else byHeading.set(h, [i]);
     const toks = new Set(tokenize(l.pathText || l.description));
     pathTokens.push(toks);
     ownTokens.push(new Set(tokenize(l.description)));
@@ -90,7 +104,8 @@ export function buildIndex(lines: ScheduleLine[]): ScheduleIndex {
       else postings.set(t, [i]);
     }
   });
-  return { lines, postings, pathTokens, ownTokens, pathNorm };
+  for (const list of byHeading.values()) list.sort((a, b) => lines[a].code.localeCompare(lines[b].code));
+  return { lines, postings, pathTokens, ownTokens, pathNorm, byHeading };
 }
 
 const HEADINGS_KEPT = 15;
@@ -157,4 +172,26 @@ export function retrieveCandidates(
     .map((i) => ({ ...index.lines[i], score: Math.round((scores.get(i) ?? 0) * 100) / 100 }))
     .sort((a, b) => b.score - a.score || a.code.localeCompare(b.code))
     .slice(0, limit);
+}
+
+const headingText = (index: ScheduleIndex, h: string): string => {
+  const first = index.byHeading.get(h)?.[0];
+  return first === undefined ? '' : (index.lines[first].pathText || index.lines[first].description).split(' > ')[0];
+};
+
+/**
+ * Headings worth deciding between: the AI's likely headings first (when they
+ * exist in the schedule), then the headings of the best-matching lines.
+ */
+export function candidateHeadings(index: ScheduleIndex, terms: string[], likely: string[], max = 8): HeadingChoice[] {
+  const order: string[] = [];
+  const add = (h: string) => { if (index.byHeading.has(h) && !order.includes(h)) order.push(h); };
+  likely.forEach(add);
+  for (const c of retrieveCandidates(index, terms, 60, likely)) add(c.code.slice(0, 4));
+  return order.slice(0, max).map((h) => ({ heading: h, text: headingText(index, h), lineCount: index.byHeading.get(h)!.length }));
+}
+
+/** Every 10-digit line of a heading, in schedule order. */
+export function linesOfHeading(index: ScheduleIndex, heading: string): Candidate[] {
+  return (index.byHeading.get(heading) ?? []).map((i) => ({ ...index.lines[i], score: 0 }));
 }

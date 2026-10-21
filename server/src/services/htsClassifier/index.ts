@@ -1,8 +1,9 @@
 /**
  * Native HTS classifier (docs/specs/native-hts-classifier.md).
  *
- *   understand (AI) -> too vague? ask : retrieve real lines (our schedule)
- *   -> classify among them (AI, GRI order) -> verify the top pick (AI)
+ *   understand (AI) -> too vague? ask : candidate headings (our schedule)
+ *   -> choose the heading (AI, GRI 1) -> every line of it -> pick a line (AI)
+ *      and, in parallel, a blind second opinion from the same lines (AI)
  *   -> guard rails (code): labels, duty, spread warning, notice -> audit log
  *
  * Every suggested code is a real 10-digit line from hts_rate_lines; when the
@@ -11,12 +12,13 @@
 import { prisma } from '../../config/database.js';
 import logger from '../../config/logger.js';
 import { isConfigured } from '../ai.js';
-import { buildIndex, retrieveCandidates, type Candidate, type ScheduleIndex, type ScheduleLine } from './retrieve.js';
+import { buildIndex, candidateHeadings, linesOfHeading, retrieveCandidates, type Candidate, type ScheduleIndex, type ScheduleLine } from './retrieve.js';
 import { understandProduct, type Understanding } from './understand.js';
-import { classifyAmong } from './classify.js';
-import { verifyPick, type Verification } from './verify.js';
+import { classifyAmong, chooseHeadings } from './classify.js';
+import { secondOpinion } from './verify.js';
 import { classifierModel } from './llm.js';
-import { confidenceLabel, dutySpreadWarning, EXTRA_DUTY_NOTE, NOT_A_RULING, type ConfidenceLabel } from './guards.js';
+import { agreementOf, confidenceLabel, dutySpreadWarning, EXTRA_DUTY_NOTE, NOT_A_RULING, type ConfidenceLabel } from './guards.js';
+import { formatHts } from './format.js';
 
 export type ClassifyStatus = 'ok' | 'needs_detail' | 'keyword_only' | 'no_match';
 
@@ -49,6 +51,11 @@ export class ClassifyInputError extends Error {}
 
 const MAX_DESCRIPTION = 1000;
 const CANDIDATES = 60;
+const HEADINGS = 8;
+// A runner-up heading's lines are offered too when it is a real contender.
+const RUNNER_UP_MIN = 0.25;
+// Prompt budget: the biggest headings (e.g. 8708) have a few hundred lines.
+const MAX_LINES = 450;
 const KEYWORD_RESULTS = 5;
 
 // ─── Schedule cache ─────────────────────────────────────────────────
@@ -158,45 +165,63 @@ async function run(
     };
   }
 
-  // Step 3: real schedule lines only.
-  const candidates = retrieveCandidates(index, u.searchTerms, CANDIDATES, u.likelyHeadings);
-  if (debug) debug.candidates = candidates.map((c) => c.code);
-  if (candidates.length === 0) return noMatch(u, revision);
+  // Step 3: the headings worth deciding between (real schedule headings).
+  const headings = candidateHeadings(index, u.searchTerms, u.likelyHeadings, HEADINGS);
+  if (debug) debug.candidates = headings.flatMap((h) => linesOfHeading(index, h.heading).map((l) => l.code));
+  if (headings.length === 0) return noMatch(u, revision);
 
-  // Step 4: classify among them.
-  const cls = await classifyAmong(description, u, candidates, userId);
-  if (!cls) return keywordOnly(candidates, revision, 'The AI step could not finish.');
+  // Step 4a: heading first (GRI 1).
+  const chosen = await chooseHeadings(description, u, headings, userId);
+  if (!chosen) {
+    const pool = retrieveCandidates(index, u.searchTerms, CANDIDATES, u.likelyHeadings);
+    return pool.length ? keywordOnly(pool, revision, 'The AI step could not finish.') : noMatch(u, revision);
+  }
+  // Every line of the chosen heading (and of a close runner-up), not a keyword subset.
+  let lines = linesOfHeading(index, chosen[0].heading);
+  if (chosen[1] && chosen[1].confidence >= RUNNER_UP_MIN) lines = lines.concat(linesOfHeading(index, chosen[1].heading));
+  if (lines.length > MAX_LINES) lines = retrieveCandidates(index, u.searchTerms, MAX_LINES, chosen.slice(0, 2).map((h) => h.heading));
+  if (debug) debug.candidates = lines.map((l) => l.code);
+
+  // Step 4b + 5: pick a line, and independently, a blind second opinion.
+  const [cls, second] = await Promise.all([
+    classifyAmong(description, u, lines, userId),
+    secondOpinion(description, u, lines, userId),
+  ]);
+  if (!cls) return keywordOnly(lines.slice(0, KEYWORD_RESULTS), revision, 'The AI step could not finish.');
   if (cls.picks.length === 0) return noMatch(u, revision);
 
-  // Step 5: independent check of the top pick.
-  const byCode = new Map(candidates.map((c) => [c.code, c]));
-  const top = byCode.get(cls.picks[0].code)!;
-  const verification: Verification | null = await verifyPick(description, u, top, userId);
-
   // Step 6: guard rails.
+  const byCode = new Map(lines.map((c) => [c.code, c]));
+  const agreement = agreementOf(cls.picks[0].code, second?.code ?? null);
+  const headingConfidence = chosen.find((h) => h.heading === cls.picks[0].code.slice(0, 4))?.confidence ?? 0;
+
   const suggestions: Suggestion[] = cls.picks.map((p, rank) => {
     const c = byCode.get(p.code)!;
     const warnings: string[] = [];
-    if (rank === 0 && verification && !verification.fits) {
-      warnings.push(`Second check disagrees: ${verification.issue ?? 'the line wording may not cover these goods.'}`);
-    } else if (rank === 0 && verification?.issue) {
-      warnings.push(verification.issue);
+    if (rank === 0 && second && agreement !== 'exact') {
+      warnings.push(`A second, independent check chose ${formatHts(second.code)} instead${second.reason ? `: ${second.reason}` : '.'} Check the difference before you file.`);
     }
-    if (rank === 0 && !verification) warnings.push('The second check could not run; review this code carefully.');
+    if (rank === 0 && !second) warnings.push('The second check could not run; review this code carefully.');
     return {
       ...plainSuggestion(c),
       confidence: confidenceLabel({
-        confidence: p.confidence,
-        rank,
-        nextConfidence: cls.picks[1]?.confidence ?? 0,
-        verification: rank === 0 ? verification : null,
-        sufficiency: u.sufficiency,
+        confidence: p.confidence, rank, nextConfidence: cls.picks[1]?.confidence ?? 0,
+        agreement: rank === 0 ? agreement : null, sufficiency: u.sufficiency, headingConfidence,
       }),
       score: p.confidence,
       reason: p.reason || undefined,
       ...(warnings.length ? { warnings } : {}),
     };
   });
+  // The second opinion's own pick is always on the list for the user to compare.
+  if (second && !suggestions.some((s) => s.code === second.code)) {
+    suggestions.push({
+      ...plainSuggestion(byCode.get(second.code)!),
+      confidence: 'low',
+      score: null,
+      reason: second.reason ? `Second check's choice: ${second.reason}` : "Second check's choice.",
+    });
+  }
 
   const partial = u.sufficiency !== 'enough';
   return {

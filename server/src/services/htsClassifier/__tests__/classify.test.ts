@@ -8,8 +8,8 @@ const { complete } = vi.hoisted(() => ({ complete: vi.fn() }));
 vi.mock('../../ai.js', () => ({ complete }));
 vi.mock('../../../config/logger.js', () => ({ default: { warn: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 
-import { classifyAmong } from '../classify.js';
-import { verifyPick } from '../verify.js';
+import { classifyAmong, chooseHeadings } from '../classify.js';
+import { secondOpinion } from '../verify.js';
 import type { Candidate } from '../retrieve.js';
 import type { Understanding } from '../understand.js';
 
@@ -66,23 +66,46 @@ describe('classifyAmong', () => {
   });
 });
 
-describe('verifyPick', () => {
+describe('chooseHeadings', () => {
+  beforeEach(() => complete.mockReset());
+  const HEADINGS = [
+    { heading: '8507', text: 'Electric storage batteries', lineCount: 20 },
+    { heading: '8506', text: 'Primary cells and primary batteries', lineCount: 12 },
+  ];
+
+  it('returns the ranked headings from the list only', async () => {
+    reply({ headings: [
+      { heading: '8507', confidence: 0.9, reason: 'Rechargeable storage battery' },
+      { heading: '8599', confidence: 0.5, reason: 'invented' },
+      { heading: '8506', confidence: 0.1, reason: 'Only if not rechargeable' },
+    ] });
+    const r = (await chooseHeadings('e-bike battery', U, HEADINGS, 'u1'))!;
+    expect(r.map((h) => h.heading)).toEqual(['8507', '8506']);
+  });
+
+  it('returns null when the reply is unusable', async () => {
+    complete.mockResolvedValueOnce('nope');
+    expect(await chooseHeadings('x', U, HEADINGS, 'u1')).toBeNull();
+  });
+});
+
+describe('secondOpinion', () => {
   beforeEach(() => complete.mockReset());
 
-  it('passes through a confirmed pick', async () => {
-    reply({ fits: true, confidence: 0.9, issue: null });
-    expect(await verifyPick('e-bike battery', U, CANDS[0], 'u1')).toEqual({ fits: true, confidence: 0.9, issue: null });
+  it('returns its own independent pick from the same lines', async () => {
+    reply({ code: '8507600090', reason: 'Not shown to be for a vehicle' });
+    expect(await secondOpinion('li-ion battery', U, CANDS, 'u1')).toEqual({ code: '8507600090', reason: 'Not shown to be for a vehicle' });
+    // it is never told the first pick
+    expect(complete.mock.calls[0][0].userPrompt).not.toMatch(/proposed|first pick/i);
   });
 
-  it('reports a disagreement with its reason', async () => {
-    reply({ fits: false, confidence: 0.8, issue: 'Primary (non-rechargeable) cells belong in 8506 only if not rechargeable; this is rechargeable.' });
-    const v = await verifyPick('rechargeable battery', U, CANDS[2], 'u1');
-    expect(v).toMatchObject({ fits: false });
-    expect(v!.issue).toMatch(/rechargeable/);
+  it('ignores a code outside the lines', async () => {
+    reply({ code: '9999999999', reason: 'x' });
+    expect(await secondOpinion('x', U, CANDS, 'u1')).toBeNull();
   });
 
-  it('returns null when the check could not run', async () => {
+  it('returns null when it could not run', async () => {
     complete.mockRejectedValueOnce(new Error('timeout'));
-    expect(await verifyPick('x', U, CANDS[0], 'u1')).toBeNull();
+    expect(await secondOpinion('x', U, CANDS, 'u1')).toBeNull();
   });
 });

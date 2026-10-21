@@ -3,40 +3,53 @@
  * warning when the suggested codes carry different duty.
  */
 import { describe, it, expect } from 'vitest';
-import { confidenceLabel, dutySpreadWarning, parseAdValorem } from '../guards.js';
+import { agreementOf, confidenceLabel, dutySpreadWarning, parseAdValorem } from '../guards.js';
 
-const strong = { fits: true, confidence: 0.9, issue: null };
+const base = { confidence: 0.92, rank: 0, nextConfidence: 0.3, agreement: 'exact' as const, sufficiency: 'enough' as const, headingConfidence: 0.9 };
+
+describe('agreementOf', () => {
+  it('says how far two independent picks agree', () => {
+    expect(agreementOf('8507600010', '8507600010')).toBe('exact');
+    expect(agreementOf('8507600010', '8507600090')).toBe('subheading');
+    expect(agreementOf('8507600010', '8507208031')).toBe('heading');
+    expect(agreementOf('8507600010', '8711600010')).toBe('none');
+    expect(agreementOf('8507600010', null)).toBeNull();
+  });
+});
 
 describe('confidenceLabel (top pick)', () => {
-  it('is high only when sure, verified, complete and clearly ahead', () => {
-    expect(confidenceLabel({ confidence: 0.92, rank: 0, nextConfidence: 0.3, verification: strong, sufficiency: 'enough' })).toBe('high');
+  it('is high only when both independent picks match and every signal is strong', () => {
+    expect(confidenceLabel(base)).toBe('high');
   });
 
-  it('is not high without a successful second check', () => {
-    expect(confidenceLabel({ confidence: 0.95, rank: 0, nextConfidence: 0.1, verification: null, sufficiency: 'enough' })).toBe('medium');
+  it('is at most medium when the second opinion could not run', () => {
+    expect(confidenceLabel({ ...base, agreement: null })).toBe('medium');
   });
 
-  it('is low when the second check disagrees, however sure the first pass was', () => {
-    expect(confidenceLabel({ confidence: 0.97, rank: 0, nextConfidence: 0.1, verification: { fits: false, confidence: 0.8, issue: 'x' }, sufficiency: 'enough' })).toBe('low');
+  it('is medium when the picks agree only down to the subheading', () => {
+    expect(confidenceLabel({ ...base, agreement: 'subheading' })).toBe('medium');
   });
 
-  it('is not high when facts were missing', () => {
-    expect(confidenceLabel({ confidence: 0.92, rank: 0, nextConfidence: 0.2, verification: strong, sufficiency: 'heading_only' })).toBe('medium');
+  it('is low when the picks differ at the subheading or heading', () => {
+    expect(confidenceLabel({ ...base, agreement: 'heading' })).toBe('low');
+    expect(confidenceLabel({ ...base, agreement: 'none' })).toBe('low');
   });
 
-  it('is not high when the runner-up is close', () => {
-    expect(confidenceLabel({ confidence: 0.9, rank: 0, nextConfidence: 0.8, verification: strong, sufficiency: 'enough' })).toBe('medium');
+  it('is not high when facts were missing, the heading was uncertain or the runner-up is close', () => {
+    expect(confidenceLabel({ ...base, sufficiency: 'heading_only' })).toBe('medium');
+    expect(confidenceLabel({ ...base, headingConfidence: 0.6 })).toBe('medium');
+    expect(confidenceLabel({ ...base, nextConfidence: 0.8 })).toBe('medium');
   });
 
   it('is low under 0.55', () => {
-    expect(confidenceLabel({ confidence: 0.5, rank: 0, nextConfidence: 0, verification: strong, sufficiency: 'enough' })).toBe('low');
+    expect(confidenceLabel({ ...base, confidence: 0.5 })).toBe('low');
   });
 });
 
 describe('confidenceLabel (alternatives)', () => {
   it('is never high', () => {
-    expect(confidenceLabel({ confidence: 0.95, rank: 1, nextConfidence: 0, verification: null, sufficiency: 'enough' })).toBe('medium');
-    expect(confidenceLabel({ confidence: 0.3, rank: 2, nextConfidence: 0, verification: null, sufficiency: 'enough' })).toBe('low');
+    expect(confidenceLabel({ ...base, rank: 1, confidence: 0.95 })).toBe('medium');
+    expect(confidenceLabel({ ...base, rank: 2, confidence: 0.3 })).toBe('low');
   });
 });
 

@@ -71,3 +71,25 @@ describe('retrieveCandidates', () => {
     expect(retrieveCandidates(index, ['battery'], 2)).toHaveLength(2);
   });
 });
+
+describe('candidateHeadings / linesOfHeading', () => {
+  const index = buildIndex(SCHEDULE);
+
+  it('lists the headings in the pool with their tariff wording, AI-likely headings first', async () => {
+    const { candidateHeadings } = await import('../retrieve.js');
+    const hs = candidateHeadings(index, ['electric bicycle battery'], ['8714']);
+    expect(hs[0]).toMatchObject({ heading: '8714', text: 'Parts and accessories of vehicles of headings 8711 to 8713' });
+    expect(hs.map((h) => h.heading)).toEqual(expect.arrayContaining(['8507', '8711']));
+  });
+
+  it('caps the number of headings', async () => {
+    const { candidateHeadings } = await import('../retrieve.js');
+    expect(candidateHeadings(index, ['battery bicycle cotton bolt'], [], 2)).toHaveLength(2);
+  });
+
+  it('returns every 10-digit line of a heading, whatever its wording', async () => {
+    const { linesOfHeading } = await import('../retrieve.js');
+    expect(linesOfHeading(index, '8507').map((l) => l.code)).toEqual(['8507100030', '8507208031', '8507600010', '8507600090']);
+    expect(linesOfHeading(index, '0101')).toEqual([]);
+  });
+});

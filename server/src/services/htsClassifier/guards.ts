@@ -4,7 +4,6 @@
  * earned only when every signal agrees, and money differences are spelled out.
  */
 import type { Sufficiency } from './understand.js';
-import type { Verification } from './verify.js';
 
 export type ConfidenceLabel = 'high' | 'medium' | 'low';
 
@@ -15,23 +14,37 @@ export const EXTRA_DUTY_NOTE =
   'Rates shown are the General (column 1) rate only. Chapter 99 duties (e.g. Section 301 or 232) and AD/CVD can apply on top.';
 
 const HIGH_MIN = 0.85;
-const VERIFY_MIN = 0.8;
+const HEADING_MIN = 0.8;
 const LEAD_MIN = 0.25;
 const MEDIUM_MIN = 0.55;
+
+/** How far two independently chosen codes agree. */
+export type Agreement = 'exact' | 'subheading' | 'heading' | 'none';
+
+export function agreementOf(first: string, second: string | null): Agreement | null {
+  if (!second) return null;
+  if (first === second) return 'exact';
+  if (first.slice(0, 6) === second.slice(0, 6)) return 'subheading';
+  if (first.slice(0, 4) === second.slice(0, 4)) return 'heading';
+  return 'none';
+}
 
 export function confidenceLabel(p: {
   confidence: number;
   rank: number;
   nextConfidence: number;
-  verification: Verification | null;
+  /** Top pick vs. the blind second opinion (null: it could not run). */
+  agreement: Agreement | null;
   sufficiency: Sufficiency;
+  headingConfidence: number;
 }): ConfidenceLabel {
   if (p.rank > 0) return p.confidence >= MEDIUM_MIN ? 'medium' : 'low';
-  if (p.verification && !p.verification.fits) return 'low';
+  if (p.agreement === 'none' || p.agreement === 'heading') return 'low';
   if (p.confidence < MEDIUM_MIN) return 'low';
   const high =
+    p.agreement === 'exact' &&
     p.confidence >= HIGH_MIN &&
-    p.verification !== null && p.verification.confidence >= VERIFY_MIN &&
+    p.headingConfidence >= HEADING_MIN &&
     p.sufficiency === 'enough' &&
     p.confidence - p.nextConfidence >= LEAD_MIN;
   return high ? 'high' : 'medium';
