@@ -57,6 +57,26 @@ describe('understandProduct', () => {
     expect(u.likelyHeadings).toEqual(['8507', '9999', '0101']);
   });
 
+  it('accepts facts as a list (what gpt-4o actually returns) and keeps the rest of the answer', async () => {
+    reply({
+      product: 'battery', facts: ['rechargeable', 'lithium-ion'], sufficiency: 'too_vague',
+      missing: ['use'], questions: ['What is it used in?'], didYouMean: ['Li-ion e-bike battery pack'],
+      searchTerms: ['batteries'], likelyHeadings: ['8507'],
+    });
+    const u = await understandProduct('battery', 'u1');
+    expect(u.sufficiency).toBe('too_vague');
+    expect(u.questions).toEqual(['What is it used in?']);
+    expect(Object.values(u.facts)).toEqual(['rechargeable', 'lithium-ion']);
+  });
+
+  it('keeps every good field when one field has an unexpected shape', async () => {
+    reply({ product: 'p', facts: 'just a sentence', sufficiency: 'Enough', missing: 'none', questions: null, didYouMean: [], searchTerms: ['screws'], likelyHeadings: ['7318'] });
+    const u = await understandProduct('hex bolts', 'u1');
+    expect(u.sufficiency).toBe('enough');
+    expect(u.likelyHeadings).toEqual(['7318']);
+    expect(u.searchTerms).toEqual(['hex bolts', 'screws']);
+  });
+
   it('falls back to the raw description when the AI reply is not usable JSON', async () => {
     complete.mockResolvedValueOnce('Sorry, I cannot help with that.');
     const u = await understandProduct('steel hex bolts M8', 'u1');

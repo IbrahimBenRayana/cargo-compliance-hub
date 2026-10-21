@@ -109,7 +109,7 @@ function noMatch(u: Understanding | null, revision: string): ClassifyResult {
 
 export async function classifyProduct(
   rawDescription: string,
-  ctx: { userId: string; orgId: string; /** false for evaluation runs */ audit?: boolean },
+  ctx: { userId: string; orgId: string; /** false for evaluation runs */ audit?: boolean; /** evaluation: report the candidate pool */ debug?: { candidates?: string[]; sufficiency?: string } },
 ): Promise<ClassifyResult> {
   const description = rawDescription.trim();
   if (description.length < 2) throw new ClassifyInputError('Describe the product to classify.');
@@ -117,7 +117,7 @@ export async function classifyProduct(
 
   const started = Date.now();
   const { index, revision } = await schedule();
-  const result = await run(description, ctx.userId, index, revision);
+  const result = await run(description, ctx.userId, index, revision, ctx.debug);
 
   const latencyMs = Date.now() - started;
   logger.info({ status: result.status, suggestions: result.suggestions.length, latencyMs }, '[HTS] classified');
@@ -133,7 +133,10 @@ export async function classifyProduct(
   return result;
 }
 
-async function run(description: string, userId: string, index: ScheduleIndex, revision: string): Promise<ClassifyResult> {
+async function run(
+  description: string, userId: string, index: ScheduleIndex, revision: string,
+  debug?: { candidates?: string[]; sufficiency?: string },
+): Promise<ClassifyResult> {
   if (!isConfigured()) {
     const candidates = retrieveCandidates(index, [description], KEYWORD_RESULTS);
     return candidates.length ? keywordOnly(candidates, revision, 'AI suggestions are switched off.') : noMatch(null, revision);
@@ -141,6 +144,7 @@ async function run(description: string, userId: string, index: ScheduleIndex, re
 
   // Steps 1-2: understand; too vague means ask, not guess.
   const u = await understandProduct(description, userId);
+  if (debug) debug.sufficiency = u.sufficiency;
   if (u.sufficiency === 'too_vague') {
     return {
       status: 'needs_detail',
@@ -156,6 +160,7 @@ async function run(description: string, userId: string, index: ScheduleIndex, re
 
   // Step 3: real schedule lines only.
   const candidates = retrieveCandidates(index, u.searchTerms, CANDIDATES, u.likelyHeadings);
+  if (debug) debug.candidates = candidates.map((c) => c.code);
   if (candidates.length === 0) return noMatch(u, revision);
 
   // Step 4: classify among them.

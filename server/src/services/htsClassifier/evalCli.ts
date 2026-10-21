@@ -16,27 +16,33 @@ interface Ruling { ruling: string; description: string; hts: string; heading: st
 interface Vague { description: string; expect: string }
 
 const fixture = JSON.parse(readFileSync(0, 'utf8')) as { rulings: Ruling[]; vague: Vague[] };
-const ctx = { userId: 'hts-eval', orgId: 'hts-eval', audit: false };
+// Own AI budget per model so back-to-back runs don't share the daily cap.
+const ctx = { userId: `hts-eval-${classifierModel()}`, orgId: 'hts-eval', audit: false };
 const pct = (n: number, d: number) => (d ? `${((100 * n) / d).toFixed(1)}%` : 'n/a');
 
-async function timed(description: string): Promise<{ r: ClassifyResult | null; ms: number; err?: string }> {
+async function timed(description: string): Promise<{ r: ClassifyResult | null; ms: number; err?: string; pool: string[]; suff?: string }> {
   const t = Date.now();
+  const debug: { candidates?: string[]; sufficiency?: string } = {};
   try {
-    return { r: await classifyProduct(description, ctx), ms: Date.now() - t };
+    const r = await classifyProduct(description, { ...ctx, debug });
+    return { r, ms: Date.now() - t, pool: debug.candidates ?? [], suff: debug.sufficiency };
   } catch (e: any) {
-    return { r: null, ms: Date.now() - t, err: e?.message };
+    return { r: null, ms: Date.now() - t, err: e?.message, pool: [] };
   }
 }
 
 async function main(): Promise<void> {
   const times: number[] = [];
-  const s = { n: 0, heading1: 0, six1: 0, ten1: 0, ten3: 0, heading5: 0, needsDetail: 0, highWrong: 0, highTotal: 0, errors: 0 };
+  const s = { n: 0, heading1: 0, six1: 0, ten1: 0, ten3: 0, heading5: 0, needsDetail: 0, highWrong: 0, highTotal: 0, errors: 0, poolHasCode: 0, poolHasHeading: 0 };
   const lines: string[] = [];
 
   for (const x of fixture.rulings) {
-    const { r, ms, err } = await timed(x.description);
+    const { r, ms, err, pool, suff } = await timed(x.description);
     times.push(ms);
     s.n++;
+    const inPool = pool.includes(x.hts);
+    s.poolHasCode += +inPool;
+    s.poolHasHeading += +pool.some((c) => c.slice(0, 4) === x.heading);
     if (!r) { s.errors++; lines.push(`ERR  ${x.ruling} ${err}`); continue; }
     const codes = r.suggestions.map((g) => g.code);
     const top = codes[0] ?? '';
@@ -52,7 +58,7 @@ async function main(): Promise<void> {
       const right = x.headingOnly ? h1 : t1;
       if (!right) s.highWrong++;
     }
-    lines.push(`${t1 ? 'OK10' : h1 ? 'OK4 ' : 'MISS'} ${x.ruling} want ${x.hts} got ${top || '-'} (${r.suggestions[0]?.confidence ?? r.status}) ${ms}ms`);
+    lines.push(`${t1 ? 'OK10' : h1 ? 'OK4 ' : 'MISS'} ${x.ruling} want ${x.hts} got ${top || '-'} (${r.suggestions[0]?.confidence ?? r.status}) pool:${inPool ? 'code' : pool.some((c) => c.slice(0, 4) === x.heading) ? 'heading' : 'none'} suff:${suff} ${ms}ms`);
   }
 
   const vague = { n: 0, asked: 0 };
@@ -60,7 +66,7 @@ async function main(): Promise<void> {
     const { r, ms } = await timed(v.description);
     times.push(ms);
     vague.n++;
-    const asked = r?.status === 'needs_detail' && (r.questions?.length ?? 0) > 0;
+    const asked = r?.status === 'needs_detail' && ((r.questions?.length ?? 0) > 0 || (r.didYouMean?.length ?? 0) > 0);
     vague.asked += +asked;
     lines.push(`${asked ? 'ASK ' : 'NOASK'} "${v.description}" -> ${r?.status ?? 'error'}`);
   }
@@ -77,6 +83,8 @@ async function main(): Promise<void> {
     tenDigitTop1: pct(s.ten1, scored),
     tenDigitTop3: pct(s.ten3, scored),
     headingInTop5: pct(s.heading5, s.n),
+    poolHasRightCode: pct(s.poolHasCode, scored),
+    poolHasRightHeading: pct(s.poolHasHeading, s.n),
     returnedNeedsDetail: s.needsDetail,
     highConfidence: s.highTotal,
     highConfidenceWrong: s.highWrong,
