@@ -107,7 +107,10 @@ function noMatch(u: Understanding | null, revision: string): ClassifyResult {
 
 // ─── Entry point ────────────────────────────────────────────────────
 
-export async function classifyProduct(rawDescription: string, ctx: { userId: string; orgId: string }): Promise<ClassifyResult> {
+export async function classifyProduct(
+  rawDescription: string,
+  ctx: { userId: string; orgId: string; /** false for evaluation runs */ audit?: boolean },
+): Promise<ClassifyResult> {
   const description = rawDescription.trim();
   if (description.length < 2) throw new ClassifyInputError('Describe the product to classify.');
   if (description.length > MAX_DESCRIPTION) throw new ClassifyInputError(`Keep the description under ${MAX_DESCRIPTION} characters.`);
@@ -118,6 +121,7 @@ export async function classifyProduct(rawDescription: string, ctx: { userId: str
 
   const latencyMs = Date.now() - started;
   logger.info({ status: result.status, suggestions: result.suggestions.length, latencyMs }, '[HTS] classified');
+  if (ctx.audit === false) return result;
   prisma.htsClassification
     .create({
       data: {
