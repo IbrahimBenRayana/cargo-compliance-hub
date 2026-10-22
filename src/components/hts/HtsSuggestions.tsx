@@ -6,7 +6,7 @@
 import { AlertTriangle, HelpCircle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatHtsCode } from '@/lib/htsFormat';
-import type { HtsClassifyResult, HtsConfidence, HtsSuggestion } from '@/types/htsClassify';
+import type { HtsClassifyResult, HtsConfidence, HtsSuggestion, HtsUsage } from '@/types/htsClassify';
 
 
 // Labels say what the engine actually knows, not a promise: only the top pick
@@ -58,6 +58,16 @@ function SuggestionRow({ s, rank, onPick, pickLabel }: { s: HtsSuggestion; rank:
         </p>
       ))}
     </li>
+  );
+}
+
+const left = (u: { used: number; limit: number }) => Math.max(0, u.limit - u.used);
+
+function UsageLine({ usage }: { usage: HtsUsage }) {
+  return (
+    <span className="tabular-nums">
+      {left(usage.user)} of {usage.user.limit} classifications left today · {left(usage.organization)} of {usage.organization.limit} left this month for your organization.
+    </span>
   );
 }
 
@@ -132,6 +142,13 @@ export function HtsSuggestions({
       {result.suggestions.length > 0 && (
         <p className="text-[11px] leading-snug text-slate-600 dark:text-slate-400">
           {result.dutyNote} {result.notice} HTS edition {result.revision}.
+        </p>
+      )}
+
+      {(result.repeat || result.usage) && (
+        <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+          {result.repeat && 'The same description was classified in the last 24 hours, so this is that result; it did not use your allowance. '}
+          {result.usage && <UsageLine usage={result.usage} />}
         </p>
       )}
     </div>

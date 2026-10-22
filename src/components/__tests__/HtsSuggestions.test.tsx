@@ -54,4 +54,19 @@ describe('HtsSuggestions', () => {
     expect(onRetry).toHaveBeenCalledWith('Lithium-ion battery pack for electric bicycles');
     expect(screen.queryByText(/Not a binding/)).not.toBeInTheDocument();
   });
+
+  it('shows what is left of the allowance, so nobody is surprised by the limit', () => {
+    render(<HtsSuggestions result={{ ...OK, usage: {
+      user: { used: 3, limit: 25, period: 'day', resetsAt: '2026-10-23T00:00:00Z' },
+      organization: { used: 40, limit: 300, period: 'month', resetsAt: '2026-11-01T00:00:00Z' },
+    } }} onRetry={vi.fn()} />);
+    expect(screen.getByText(/22 of 25 classifications left today/)).toBeInTheDocument();
+    expect(screen.getByText(/260 of 300 left this month for your organization/)).toBeInTheDocument();
+  });
+
+  it('says when a repeat was answered from the earlier result, free', () => {
+    render(<HtsSuggestions result={{ ...OK, repeat: true }} onRetry={vi.fn()} />);
+    expect(screen.getByText(/same description was classified in the last 24 hours/i)).toBeInTheDocument();
+    expect(screen.getByText(/did not use your allowance/i)).toBeInTheDocument();
+  });
 });

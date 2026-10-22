@@ -23,4 +23,13 @@ export interface HtsClassifyResult {
   dutyNote: string;
   notice: string;
   revision: string;
+  /** Answered from the organization's result for the same description (last 24 h); free. */
+  repeat?: boolean;
+  /** What is left of the classifier allowance. */
+  usage?: HtsUsage;
+}
+
+export interface HtsUsage {
+  user: { used: number; limit: number; period: 'day'; resetsAt: string };
+  organization: { used: number; limit: number; period: 'month'; resetsAt: string };
 }

@@ -141,11 +141,11 @@ describe('classifyProduct', () => {
     expect(r).toMatchObject({ status: 'no_match', suggestions: [] });
   });
 
-  it('records every classification in the audit log', async () => {
+  it('records every classification in the audit log; a too-vague answer as such, so it is free', async () => {
     m.understandProduct.mockResolvedValue(U({ sufficiency: 'too_vague' }));
     await classifyProduct('battery', ctx);
     expect(m.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ orgId: 'o1', userId: 'u1', description: 'battery', status: 'needs_detail' }),
+      data: expect.objectContaining({ orgId: 'o1', userId: 'u1', description: 'battery', status: 'too_vague' }),
     }));
   });
 

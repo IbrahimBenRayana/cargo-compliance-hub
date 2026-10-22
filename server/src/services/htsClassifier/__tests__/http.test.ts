@@ -7,8 +7,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const m = vi.hoisted(() => {
   class AiRateLimitedError extends Error {}
   class ClassifyInputError extends Error {}
-  return { classifyProduct: vi.fn(), AiRateLimitedError, ClassifyInputError };
+  class HtsLimitError extends Error {
+    constructor(message: string, public scope: string, public resetsAt: Date) { super(message); }
+  }
+  return {
+    classifyProduct: vi.fn(), AiRateLimitedError, ClassifyInputError, HtsLimitError,
+    release: vi.fn(), reserve: vi.fn(), cachedResult: vi.fn(), recordRepeat: vi.fn(async () => {}),
+    usageFor: vi.fn(async () => ({ user: { used: 3, limit: 25, period: 'day' }, organization: { used: 40, limit: 300, period: 'month' } })),
+  };
 });
+vi.mock('../limits.js', () => ({
+  HtsLimitError: m.HtsLimitError, reserve: m.reserve, cachedResult: m.cachedResult, recordRepeat: m.recordRepeat, usageFor: m.usageFor,
+}));
 vi.mock('../index.js', () => ({ classifyProduct: m.classifyProduct, ClassifyInputError: m.ClassifyInputError }));
 vi.mock('../../ai.js', () => ({ AiRateLimitedError: m.AiRateLimitedError }));
 vi.mock('../../../config/logger.js', () => ({ default: { warn: vi.fn(), info: vi.fn(), error: vi.fn() } }));
@@ -21,7 +31,11 @@ function call(body: unknown) {
 }
 
 describe('classifyHandler', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    m.reserve.mockResolvedValue(m.release);
+    m.cachedResult.mockResolvedValue(null);
+  });
 
   it('returns the classifier result', async () => {
     m.classifyProduct.mockResolvedValue({ status: 'ok', suggestions: [{ code: '8507600010' }] });
@@ -29,6 +43,35 @@ describe('classifyHandler', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.suggestions[0].code).toBe('8507600010');
     expect(m.classifyProduct).toHaveBeenCalledWith('e-bike battery', { userId: 'u1', orgId: 'o1' });
+    // with what is left of the allowance, and the slot is freed
+    expect(res.body.usage.user).toMatchObject({ used: 3, limit: 25 });
+    expect(m.release).toHaveBeenCalled();
+  });
+
+  it('answers a repeat from the stored result without AI and without using the allowance', async () => {
+    m.cachedResult.mockResolvedValue({ status: 'ok', suggestions: [{ code: '8507600010' }] });
+    const res = await call({ description: 'e-bike battery' });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ repeat: true, suggestions: [{ code: '8507600010' }] });
+    expect(m.classifyProduct).not.toHaveBeenCalled();
+    expect(m.reserve).not.toHaveBeenCalled();
+    expect(m.recordRepeat).toHaveBeenCalled();
+  });
+
+  it('429s with the reason, when it resets, and the usage, when a limit is reached', async () => {
+    const resetsAt = new Date('2026-11-01T00:00:00Z');
+    m.reserve.mockRejectedValue(new m.HtsLimitError('Your organization has used its 300 HTS classifications for this month.', 'org_monthly', resetsAt));
+    const res = await call({ description: 'e-bike battery' });
+    expect(res.statusCode).toBe(429);
+    expect(res.body).toMatchObject({ error: expect.stringMatching(/organization/), limit: 'org_monthly', resetsAt: resetsAt.toISOString() });
+    expect(res.body.usage.organization.limit).toBe(300);
+    expect(m.classifyProduct).not.toHaveBeenCalled();
+  });
+
+  it('frees the slot when the classification fails', async () => {
+    m.classifyProduct.mockRejectedValue(new Error('db down'));
+    await call({ description: 'x y' });
+    expect(m.release).toHaveBeenCalled();
   });
 
   it('400s a missing description', async () => {

@@ -24,6 +24,7 @@ import { findPrecedents, formatPrecedents, precedentHeadings, type Precedent } f
 import { headingNotes, lineNotes } from './notes.js';
 import { agreementOf, confidenceLabel, dutySpreadWarning, EXTRA_DUTY_NOTE, NOT_A_RULING, type ConfidenceLabel } from './guards.js';
 import { formatHts } from './format.js';
+import { auditStatus } from './limits.js';
 
 export type ClassifyStatus = 'ok' | 'needs_detail' | 'keyword_only' | 'no_match';
 
@@ -144,14 +145,17 @@ export async function classifyProduct(
   const latencyMs = Date.now() - started;
   logger.info({ status: result.status, suggestions: result.suggestions.length, latencyMs }, '[HTS] classified');
   if (ctx.audit === false) return result;
-  prisma.htsClassification
-    .create({
+  // Awaited: usage limits count these rows, so the next request must see it.
+  try {
+    await prisma.htsClassification.create({
       data: {
-        orgId: ctx.orgId, userId: ctx.userId, description, status: result.status,
+        orgId: ctx.orgId, userId: ctx.userId, description, status: auditStatus(result),
         result: result as object, model: isConfigured() ? classifierModel() : 'none', revision, latencyMs,
       },
-    })
-    .catch((err: any) => logger.error({ err: err?.message }, '[HTS] audit log write failed'));
+    });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, '[HTS] audit log write failed');
+  }
   return result;
 }
 

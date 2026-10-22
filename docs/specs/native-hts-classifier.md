@@ -292,3 +292,39 @@ codes still got "Two independent checks agree". Of those, 4 are a wrong statisti
 ruling on similar goods has exactly the wrongly chosen code (CBP ruled differently this time,
 or the fixture summary lacks the deciding fact). Requiring precedent support for "agree"
 would leave 7 of 36 wrong, so no label rule built on these signals reaches zero.
+
+## Usage limits (decided 2026-10-22)
+
+Ibrahim: keep the current model (gpt-5.5 + o3 second opinion); users must not run the
+classifier without limit, since a full classification costs ~$0.12. How it is offered and
+limited per plan is a later marketing decision, so limits are env settings behind one seam
+(`limitsFor(orgId)`) that plans can drive later.
+
+**Unit:** one classification (what the user clicks), not AI calls.
+
+**What counts:** a classification that ran the AI to an answer (`ok`, `needs_detail` with
+suggestions, `no_match`). Free: a "too vague" answer (one cheap call; the user is asked to
+re-describe and shouldn't pay twice), word-match fallbacks (`keyword_only`, AI off or failed),
+and **repeats**: the same description (case-insensitive) in the same organization within 24 h
+returns the stored answer instantly, marked as such, without AI.
+
+**Limits** (defaults, env-configurable), checked in this order before any AI call:
+
+| scope | default | env | why |
+|---|---|---|---|
+| one at a time per user | 1 in flight | — | stops parallel clicks slipping past the counts |
+| per user per minute | 3 | `HTS_LIMIT_PER_MINUTE` | burst; counts free answers too |
+| per user per day (UTC) | 25 | `HTS_LIMIT_USER_DAILY` | ~$3/user/day worst case |
+| per organization per month (UTC) | 300 | `HTS_LIMIT_ORG_MONTHLY` | ~$36/org/month worst case; the number plans will set |
+| whole platform per day (UTC) | 500 | `HTS_LIMIT_GLOBAL_DAILY` | spend circuit-breaker, ~$60/day |
+
+Counts come from the audit table `hts_classifications` (durable across restarts; indexed on
+org + time), plus requests in flight. No schema change: the audit row's `status` records
+`too_vague` for free answers and `model` records `cache` for repeats. The per-call in-memory AI
+budget (`HTS_AI_DAILY_CALLS`) and the per-IP 20/min limiter stay as backstops. Evaluation
+runs call `classifyProduct` directly and are not limited.
+
+**User-facing:** every reply carries `usage` (used/limit today for the user, this month for
+the organization); the UI shows what is left. Over a limit: HTTP 429 with a plain sentence
+saying which limit, when it resets, and that repeats are free; the platform cap says only
+"busy, try later".
