@@ -295,8 +295,11 @@ would leave 7 of 36 wrong, so no label rule built on these signals reaches zero.
 
 ## Usage limits (decided 2026-10-22)
 
-Ibrahim: keep the current model (gpt-5.5 + o3 second opinion); users must not run the
-classifier without limit, since a full classification costs ~$0.12. How it is offered and
+Ibrahim: keep the model staging runs today, **gpt-4o** (app default `AI_MODEL`; no
+`HTS_AI_MODEL`/`HTS_AI_VERIFY_MODEL` set), for classification and second opinion. The v3 eval
+numbers above are for gpt-5.5 + o3 (~$0.12 per classification); gpt-4o is cheaper (~$0.07,
+estimated from token counts at $2.50/$10 per 1M) and less accurate (v2: heading 75%, 10-digit
+top-3 52%; v3 not measured on it). Users must not run the classifier without limit. How it is offered and
 limited per plan is a later marketing decision, so limits are env settings behind one seam
 (`limitsFor(orgId)`) that plans can drive later.
 
@@ -314,9 +317,9 @@ returns the stored answer instantly, marked as such, without AI.
 |---|---|---|---|
 | one at a time per user | 1 in flight | — | stops parallel clicks slipping past the counts |
 | per user per minute | 3 | `HTS_LIMIT_PER_MINUTE` | burst; counts free answers too |
-| per user per day (UTC) | 25 | `HTS_LIMIT_USER_DAILY` | ~$3/user/day worst case |
-| per organization per month (UTC) | 300 | `HTS_LIMIT_ORG_MONTHLY` | ~$36/org/month worst case; the number plans will set |
-| whole platform per day (UTC) | 500 | `HTS_LIMIT_GLOBAL_DAILY` | spend circuit-breaker, ~$60/day |
+| per user per day (UTC) | 25 | `HTS_LIMIT_USER_DAILY` | ~$2/user/day worst case on gpt-4o ($3 on gpt-5.5) |
+| per organization per month (UTC) | 300 | `HTS_LIMIT_ORG_MONTHLY` | ~$21/org/month worst case on gpt-4o ($36 on gpt-5.5); the number plans will set |
+| whole platform per day (UTC) | 500 | `HTS_LIMIT_GLOBAL_DAILY` | spend circuit-breaker, ~$35/day on gpt-4o ($60 on gpt-5.5) |
 
 Counts come from the audit table `hts_classifications` (durable across restarts; indexed on
 org + time), plus requests in flight. No schema change: the audit row's `status` records
@@ -328,3 +331,9 @@ runs call `classifyProduct` directly and are not limited.
 the organization); the UI shows what is left. Over a limit: HTTP 429 with a plain sentence
 saying which limit, when it resets, and that repeats are free; the platform cap says only
 "busy, try later".
+
+**Verified live on staging 2026-10-22** (81f9ffb, real DB + AI, QA Full Broker org; test rows
+removed afterwards): first classification counted (1/25, 1/300); the same description again,
+in different case, answered as a free repeat; "battery" answered too-vague and free; a second
+request while one was running got 429 `in_flight`; at the daily cap, 429 `user_daily` with the
+reset time and the free-repeat note.
