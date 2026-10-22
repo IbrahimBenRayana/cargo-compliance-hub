@@ -266,5 +266,29 @@ rulings with renumbered codes (fixed: recent rulings now rank first). All 4 wron
 6102 vs 6110, fibre content 6108.32 vs 6108.92, a 6307.90.98 suffix), which is what the
 cross-model check targets. Latency p50 ~16 s, p95 ~40 s (four cases at a time).
 The eval now aborts when the account is out of credit instead of scoring failures.
-Full runs pending credit: gpt-5.5 + precedent + o3 second opinion, and the same without
-precedent.
+
+**Full runs, 2026-10-22 (gpt-5.5 effort low, o3 second opinion, precedent on with own and
+citing rulings excluded; 101 rulings + 15 vague):**
+
+| run | heading@1 | 10-digit@1 | 10-digit top-3 | right heading among candidates | wrong at "agree" | vague asked |
+|---|---|---|---|---|---|---|
+| v2 baseline (same-model check) | 77% | 63% | 68% | ~91-94% | 10 | 15/15 |
+| v3 run A | 80.2% | 69.0% | 72.0% | 92.1% | 10 of 60 | 15/15 |
+| v3 run B (+ detailed descriptions no longer refused as "too vague") | **82.2%** | **73.0%** | **77.0%** | **97.0%** | **10 of 52** | 15/15 |
+| gate | ≥ 90% | | ≥ 85% | | 0 | all |
+
+**Gate: not met.** Run B (current staging code) is the best setup measured. Latency p50 ~26 s,
+p95 ~43 s (four cases at a time). Cost per classification ~$0.12 (gpt-5.5 $5/$30 per 1M
+tokens, o3 $2/$8): ~18k input tokens for gpt-5.5 and ~8.5k for o3; a full eval run is ~$13.5.
+The without-precedent full run was not repeated to save credit; the partial comparison above
+(+7 points at 10 digits on 49 cases) is the only ablation.
+
+What moved the numbers: precedent headings lifted candidate-heading recall from ~92% to 97%;
+refusing nothing that is described in 12+ words recovered 6 cases that were wrongly "too
+vague". What did not: the heading choice itself (the right heading is a candidate 97% of the
+time but chosen 82%), and the cross-model check: with o3 as the blind second opinion, 10 wrong
+codes still got "Two independent checks agree". Of those, 4 are a wrong statistical suffix or
+8-digit line inside the right heading, 6 a wrong heading or subheading, and in 7 a prior CBP
+ruling on similar goods has exactly the wrongly chosen code (CBP ruled differently this time,
+or the fixture summary lacks the deciding fact). Requiring precedent support for "agree"
+would leave 7 of 36 wrong, so no label rule built on these signals reaches zero.
