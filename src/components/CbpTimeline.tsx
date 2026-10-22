@@ -69,15 +69,21 @@ function CbpActivityCard({
   subject: (t: CbpTransmissionView) => string;
 }) {
   if (transmissions.length === 0) return null;
+  const noAnswer = transmissions.some((t) => t.overdue);
   return (
     <Card className="border-primary/20">
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="text-base font-semibold">CBP activity</CardTitle>
           {badges}
-          {pending && (
+          {pending && !noAnswer && (
             <Badge variant="secondary" className="text-[11px]">
               <Loader2 className="mr-1 h-3 w-3 animate-spin" /> Waiting for CBP
+            </Badge>
+          )}
+          {noAnswer && (
+            <Badge variant="outline" className="text-[11px] border-amber-300 text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="mr-1 h-3 w-3" /> No answer from CBP
             </Badge>
           )}
         </div>
@@ -102,6 +108,15 @@ function CbpActivityCard({
                   Filer {t.filerCode}{t.environment !== 'PROD' ? ` · CBP ${t.environment}` : ''}{t.sentAt ? ` · sent ${fmt(t.sentAt)}` : ''}
                 </div>
                 {t.lastError && t.status !== 'SENT' && <p className="mt-2 text-xs text-red-600">{t.lastError}</p>}
+                {t.overdue && (
+                  <div role="alert" className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+                    <p className="font-semibold">No answer from CBP yet. CBP normally answers within minutes.</p>
+                    <p className="mt-0.5">
+                      If you file under your own filer code, check with your CBP client representative that our queue is approved for filer code {t.filerCode}.
+                      MyCargoLens support has been alerted. Watch your ISF deadline.
+                    </p>
+                  </div>
+                )}
                 {responses.flatMap((m) => m.parsed!.conditions).length > 0 && (
                   <ul className="mt-3 space-y-2">
                     {responses.flatMap((m) => m.parsed!.conditions).map((c, i) => <Condition key={i} c={c} />)}

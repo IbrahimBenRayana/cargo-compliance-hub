@@ -1,4 +1,5 @@
 import { Router, type Response } from 'express';
+import { isOverdue } from '../services/cbp/unanswered.js';
 import { buildNativeEntry } from '../services/cbp/nativeEntry.js';
 import { ch99Semantics } from '../abi-engine/duty/rateExpression.js';
 import { ch99SearchWhere } from '../abi-engine/payload/ch99.js';
@@ -562,7 +563,7 @@ router.get('/:id/cbp', async (req: AuthRequest, res: Response): Promise<void> =>
       inbound: { orderBy: { receivedAt: 'asc' }, select: { id: true, application: true, receivedAt: true, parsed: true } },
     },
   });
-  res.json({ entry, transmissions });
+  res.json({ entry, transmissions: transmissions.map((t) => ({ ...t, overdue: isOverdue(t) })) });
 });
 
 // ── POST /:id/poll — Manual re-poll ────────────────────

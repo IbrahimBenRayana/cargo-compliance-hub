@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { withGuidance } from '../services/cbp/conditions.js';
+import { isOverdue } from '../services/cbp/unanswered.js';
 import { loadOrgCbpConfig } from '../services/cbp/filerIdentity.js';
 import { transmitIsfNative } from '../services/cbp/nativeIsf.js';
 import { canStartIsfAction } from '../services/cbp/isfLifecycle.js';
@@ -447,6 +448,7 @@ router.get('/:id/cbp', async (req: AuthRequest, res: Response): Promise<void> =>
     filing,
     transmissions: transmissions.map((t) => ({
       ...t,
+      overdue: isOverdue(t),
       inbound: t.inbound.map((m) => ({ ...m, parsed: m.parsed && withGuidance(m.parsed as any) })),
     })),
   });

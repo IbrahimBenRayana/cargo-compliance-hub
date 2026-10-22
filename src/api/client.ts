@@ -360,6 +360,8 @@ export interface FilingCbpActivity {
     lastError: string | null;
     isfTransactionNumber: string | null;
     inbound: Array<{ id: string; application: string | null; receivedAt: string; parsed: CbpResponseSummary | null }>;
+    /** Sent, and CBP hasn't answered within the expected time (BUG-022). */
+    overdue?: boolean;
   }>;
 }
 

@@ -34,6 +34,7 @@ import { pollSentAbiDocuments } from './abiPolling.js';
 import { withAdvisoryLock } from './distributedLock.js';
 import { env } from '../config/env.js';
 import { processInbound } from './cbp/inboundJob.js';
+import { flagUnansweredTransmissions } from './cbp/unanswered.js';
 
 // ─── Job State ─────────────────────────────────────────────
 
@@ -477,6 +478,7 @@ let addCvdSyncTask: ScheduledTask | null = null;
 let abiReaperTask: ScheduledTask | null = null;
 let abiStatusPollTask: ScheduledTask | null = null;
 let cbpInboundTask: ScheduledTask | null = null;
+let cbpNoAnswerTask: ScheduledTask | null = null;
 let chargeRetryTask: ScheduledTask | null = null;
 
 /** Retry per-shipment charges that failed, for every delinquent org. */
@@ -578,6 +580,15 @@ export function startBackgroundJobs(): void {
       }).catch(err => logger.error({ err }, '[Jobs:CbpInbound] Unhandled'));
     }, cronOpts);
     logger.info(`[Jobs] CBP inbound pull scheduled — every minute (${env.CBP_ENVIRONMENT})`);
+
+    // Transmissions CBP never answered: tell the org and operations (BUG-022).
+    cbpNoAnswerTask = cron.schedule(CRON.CBP_NO_ANSWER, () => {
+      withAdvisoryLock('jobs:cbp-no-answer', async () => {
+        const flagged = await flagUnansweredTransmissions();
+        if (flagged > 0) logger.warn({ flagged }, '[Jobs:CbpNoAnswer] Flagged unanswered CBP transmissions');
+      }).catch(err => logger.error({ err }, '[Jobs:CbpNoAnswer] Unhandled'));
+    }, cronOpts);
+    logger.info('[Jobs] CBP no-answer check scheduled — every 5 minutes (UTC)');
   }
 
   chargeRetryTask = cron.schedule(CRON.CHARGE_RETRY, () => {
@@ -603,6 +614,7 @@ export function stopBackgroundJobs(): void {
   abiReaperTask?.stop();
   abiStatusPollTask?.stop();
   cbpInboundTask?.stop();
+  cbpNoAnswerTask?.stop();
   chargeRetryTask?.stop();
   statusPollTask = null;
   deadlineTask = null;

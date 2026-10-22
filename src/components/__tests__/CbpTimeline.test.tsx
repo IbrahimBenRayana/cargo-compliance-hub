@@ -35,3 +35,18 @@ describe('CbpTimeline (ISF)', () => {
     expect(spy).not.toHaveBeenCalledWith({ queryKey: ['filing', 'f1'] });
   });
 });
+
+describe('CbpTimeline (ISF) when CBP never answers (BUG-022)', () => {
+  it('says CBP has not answered and what to check, instead of "waiting"', async () => {
+    const { findAllByText, findByText, queryByText } = await import('@testing-library/react').then((rtl) => {
+      cbpActivity.mockReset().mockResolvedValue({
+        filing: { id: 'f2', status: 'submitted', cbpState: 'NOT_ON_FILE', pendingAction: 'ADD', isfFilerCode: null, cbpTransactionId: null },
+        transmissions: [{ id: 't1', environment: 'CERT', action: 'A', filerCode: 'QA1', status: 'SENT', sentAt: '2026-10-22T15:10:55Z', respondedAt: null, createdAt: '2026-10-22T15:10:55Z', lastError: null, isfTransactionNumber: null, inbound: [], overdue: true }],
+      });
+      return rtl.render(<QueryClientProvider client={new QueryClient()}><CbpTimeline filingId="f2" /></QueryClientProvider>);
+    });
+    expect((await findAllByText(/No answer from CBP/)).length).toBe(2); // badge + warning
+    expect(await findByText(/approved for filer code QA1/i)).toBeInTheDocument();
+    expect(queryByText(/Waiting for CBP/)).not.toBeInTheDocument();
+  });
+});
