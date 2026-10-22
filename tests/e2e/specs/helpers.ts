@@ -90,7 +90,7 @@ export async function expectHeading(page: Page, text: string | RegExp) {
  * The caller clicks "Create ISF Filing". Importer is "Acme Imports LLC" so
  * test drafts are easy to bulk-clean from the DB.
  */
-export async function fillIsf10(page: Page, opts: { masterBol?: string; houseBol?: string } = {}) {
+export async function fillIsf10(page: Page, opts: { masterBol?: string; houseBol?: string; extraHouseBols?: string[] } = {}) {
   // Six steps and six trade parties: more than the default 45s.
   test.setTimeout(Math.max(test.info().timeout, 120_000));
   const next = () => page.getByRole('button', { name: /^Next/ }).click();
@@ -98,6 +98,11 @@ export async function fillIsf10(page: Page, opts: { masterBol?: string; houseBol
   // Step 1 — Filing Info
   await page.getByLabel(/Master Bill of Lading/i).fill(opts.masterBol ?? 'MAEU1234567890');
   await page.getByLabel(/House Bill of Lading/i).fill(opts.houseBol ?? 'HCLA12345678');
+  // Consolidation: more house bills under the same master (one ISF each).
+  for (const hbl of opts.extraHouseBols ?? []) {
+    await page.getByRole('button', { name: /Add another house bill under this Master BOL/ }).click();
+    await page.getByPlaceholder('e.g., HCLA12345679').last().fill(hbl);
+  }
   await next();
 
   // Step 2 — IOR & Consignee
@@ -114,18 +119,15 @@ export async function fillIsf10(page: Page, opts: { masterBol?: string; houseBol
 
   // Step 3 — Trade Parties: every ISF-10 party needs a name and an address.
   await expect(page.getByText(/Trade Parties|Buyer|Seller/i).first()).toBeVisible();
-  const names = page.getByPlaceholder('Letters, numbers, spaces, dashes only');
-  const parties = await names.count();
-  for (let i = 0; i < parties; i++) {
-    await names.nth(i).fill(`QA Party ${i + 1} Co`);
-    await page.getByPlaceholder('Street address').nth(i).fill(`${100 + i} Harbor Rd`);
-    await page.getByPlaceholder('City').nth(i).fill('Shanghai');
-    const country = page.getByRole('combobox', { name: /^Country/i }).nth(i);
-    for (let tries = 0; tries < 2 && !/Chi/.test((await country.textContent()) ?? ''); tries++) {
-      await country.click();
-      await page.locator('[cmdk-input]').last().fill('China');
-      await page.getByRole('option', { name: /China/i }).first().click();
-      await expect(page.locator('[cmdk-input]')).toHaveCount(0); // picker closed
+  await fillEmptyParties(page);
+  // Consolidation (buyer mode): seller and manufacturer are per house bill.
+  const hblTabs = page.getByRole('tab', { name: /^HBL \d+:/ });
+  for (let t = 0; t < await hblTabs.count(); t++) {
+    await hblTabs.nth(t).click();
+    const customize = page.getByRole('button', { name: 'Customize for this HBL' });
+    while (await customize.count() > 0) {
+      await customize.first().click();
+      await fillEmptyParties(page);
     }
   }
   await next();
@@ -151,4 +153,32 @@ export async function fillIsf10(page: Page, opts: { masterBol?: string; houseBol
   await page.getByPlaceholder(/Country, ISO code/i).fill('China');
   await page.getByRole('option').first().click();
   await next();
+}
+
+/** Fill every still-empty trade-party card (name, street, city, country). */
+export async function fillEmptyParties(page: Page) {
+  const names = page.getByPlaceholder('Letters, numbers, spaces, dashes only');
+  for (let i = 0; i < await names.count(); i++) {
+    const card = names.nth(i);
+    if (await card.inputValue()) continue;
+    await card.fill(`QA Party ${i + 1} Co`);
+  }
+  const streets = page.getByPlaceholder('Street address');
+  for (let i = 0; i < await streets.count(); i++) {
+    if (!(await streets.nth(i).inputValue())) await streets.nth(i).fill(`${100 + i} Harbor Rd`);
+  }
+  const cities = page.getByPlaceholder('City');
+  for (let i = 0; i < await cities.count(); i++) {
+    if (!(await cities.nth(i).inputValue())) await cities.nth(i).fill('Shanghai');
+  }
+  const countries = page.getByRole('combobox', { name: /^Country/i });
+  for (let i = 0; i < await countries.count(); i++) {
+    const country = countries.nth(i);
+    for (let tries = 0; tries < 2 && !/Chi|Uni|[A-Z]{2}/.test((await country.textContent()) ?? ''); tries++) {
+      await country.click();
+      await page.locator('[cmdk-input]').last().fill('China');
+      await page.getByRole('option', { name: /China/i }).first().click();
+      await expect(page.locator('[cmdk-input]')).toHaveCount(0);
+    }
+  }
 }
