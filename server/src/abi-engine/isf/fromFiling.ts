@@ -588,6 +588,12 @@ export function mapFilingToIsfInput(filing: PlatformIsfFiling, options: MapFilin
     return {
       ...common,
       submissionType: '2',
+      // The ISF-5 data set lists no bond element, so this once went without
+      // one; CBP CERT rejects that (135 MISSING BOND TYPE, 134 MISSING BOND
+      // ACTIVITY CODE, 121 MISSING BOND HOLDER, 2026-10-22). The filer's bond
+      // rides as on an ISF-10, with the same defaults and explicit overrides.
+      bond: buildBond(filing, importer.number, references),
+      references: references.length > 0 ? references : undefined,
       entities: [
         nameAddressEntity('BKP', bookingParty, 'isf5Data.bookingParty'),
         nameAddressEntity('ST', shipTo, 'shipToParty'),

@@ -223,13 +223,35 @@ describe('mapFilingToIsfInput — delete action', () => {
 // ── ISF-5 ──────────────────────────────────────────────────
 
 describe('mapFilingToIsfInput — ISF-5', () => {
+  it('carries the filer\'s bond (CBP CERT rejects an ISF-5 without one: 135/134/121)', () => {
+    const input = mapFilingToIsfInput(ISF5_FILING, ADD);
+    expect(input.bond).toEqual({ holder: input.importer.number, activityCode: '01', type: '8' });
+  });
+
+  it('honours an explicit bond on the ISF-5', () => {
+    const input = mapFilingToIsfInput({ ...ISF5_FILING, bondActivityCode: '03' }, ADD);
+    expect(input.bond).toMatchObject({ activityCode: '03', type: '8' });
+  });
+
+  it('keeps the master-bill reference when an ISF-5 has a house bill', () => {
+    const input = mapFilingToIsfInput({ ...ISF5_FILING, houseBol: 'SGPV12345678' }, ADD);
+    expect(input.references).toEqual([{ qualifier: 'MB', value: 'MAEU987654321098' }]);
+  });
+
+  it('builds an ISF-5 SF10 with the bond fields filled', () => {
+    const sf10 = buildIsf(mapFilingToIsfInput(ISF5_FILING, ADD)).find((l) => l.startsWith('SF10'))!;
+    // Same tail as the accepted ISF-10 header: bond holder, activity 01, type 8.
+    expect(sf10.trimEnd()).toMatch(/98-765432100\s+018$/);
+  });
+
   const input = mapFilingToIsfInput(ISF5_FILING, ADD);
   const lines = buildIsf(input);
 
   it('maps the filer EIN, BKP/ST entities, top-level tariffs and FROB routing', () => {
     expect(input.submissionType).toBe('2');
     expect(input.importer).toEqual({ qualifier: 'EI', number: '98-765432100' });
-    expect(input.bond).toBeUndefined(); // no bond element in the ISF-5 data set
+    // CBP CERT requires the filer's bond on an ISF-5 (2026-10-22), as on an ISF-10.
+    expect(input.bond).toEqual({ holder: '98-765432100', activityCode: '01', type: '8' });
     expect(input.entities.map((e) => e.code)).toEqual(['BKP', 'ST']);
     expect(input.tariffs).toEqual([
       { htsNumber: '850760', countryOfOrigin: undefined },
@@ -252,7 +274,7 @@ describe('mapFilingToIsfInput — ISF-5', () => {
     ]);
     const sf10 =
       'SF10' + '2' + '01' + 'A' + 'CT' + 'EI ' + '98-765432100' + sp(3) +
-      sp(8) + sp(2) + sp(15) + 'MAEU' + sp(15) + sp(2) + sp(1) + sp(3) + sp(2);
+      sp(8) + sp(2) + sp(15) + 'MAEU' + '98-765432100' + sp(3) + '01' + '8' + sp(3) + sp(2); // bond: holder, activity 01, type 8
     expect(lines[0]).toBe(sf10);
     expect(lines[8]).toBe('SF40' + '850760' + sp(4) + sp(2) + sp(64)); // origin not required for ISF-5
     expect(lines[9]).toBe('SF40' + '392690' + sp(4) + 'CN' + sp(64));

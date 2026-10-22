@@ -314,6 +314,10 @@ export function validateFiling(filing: any): ValidationResult {
     if (!isf5.bookingPartyCountry) {
       errors.push({ field: 'isf5Data.bookingPartyCountry', code: 'MISSING_FIELD', message: 'Booking Party country is required for ISF-5', severity: 'warning' });
     }
+    // The engine refuses a booking party without a street (SF35); say so up front.
+    if (!isf5.bookingPartyAddress1) {
+      errors.push({ field: 'isf5Data.bookingPartyAddress1', code: 'MISSING_FIELD', message: 'Booking Party street address is required for ISF-5', severity: 'critical' });
+    }
 
     // ISF Filer is required for ISF-5 (carrier/NVOCC)
     if (!isf5.ISFFilerName && !filing.importerName) {

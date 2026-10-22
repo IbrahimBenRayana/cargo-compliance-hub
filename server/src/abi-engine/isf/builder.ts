@@ -460,10 +460,10 @@ export function buildIsf(input: IsfInput): string[] {
 
   // Bond information is mandatory for all Add or Replace transactions when
   // the Shipment Type code = 01, 02, 07, 08 or 10 (ISF-19 Note 7).
-  // AMBIGUITY: ISF-5 forces shipment type 01, which read literally would
-  // always demand a bond, yet the ISF-5 data set (ISF-6) has no bond
-  // element and permits a SCAC-identified importer; we therefore apply the
-  // rule to ISF-10 submissions only.
+  // ISF-5 forces shipment type 01. The ISF-5 data set (ISF-6) lists no bond
+  // element, but CBP CERT rejects an ISF-5 without one (135/134/121,
+  // 2026-10-22), so fromFiling always supplies the filer's bond. The hard
+  // check stays ISF-10-only because an ISF-5 may name a SCAC importer.
   if (isIsf10 && BOND_MANDATORY_SHIPMENT_TYPES.has(input.shipmentTypeCode) && !input.bond) {
     fail('bond', `bond information is mandatory on Add/Replace for shipment type ${input.shipmentTypeCode} (ISF-19 Note 7)`);
   }
