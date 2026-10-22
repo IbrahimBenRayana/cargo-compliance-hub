@@ -35,6 +35,14 @@ import { parseRejectionReason } from '../services/errorTranslator.js';
 import { validateFiling } from '../services/validation.js';
 import logger from '../config/logger.js';
 
+/** Party name(s): manufacturers are stored as a list (an ISF can name several). */
+function partyNames(p: unknown): string {
+  if (!p) return '';
+  if (typeof p === 'string') return p;
+  if (Array.isArray(p)) return p.map(partyNames).filter(Boolean).join(', ');
+  return String((p as { name?: unknown }).name ?? '');
+}
+
 const router = Router();
 router.use(authMiddleware);
 
@@ -742,7 +750,7 @@ Filing context:
   • Master BOL: ${filing.masterBol ?? '—'}
   • House BOL:  ${filing.houseBol ?? '—'}
   • Consignee:  ${filing.consigneeName ?? '—'}
-  • Manufacturer: ${(filing.manufacturer as any)?.name ?? '—'}
+  • Manufacturer: ${partyNames(filing.manufacturer) || '—'}
   • Commodities: ${commoditiesSummary ?? '—'}
 
 Rejection details from CBP:
