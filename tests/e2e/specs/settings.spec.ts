@@ -91,9 +91,10 @@ test('SET-02 entry-number block: add one, then deactivate it', async ({ page }) 
 test('SET-01 regenerate recovery codes shows a new set', async ({ page }) => {
   await gotoAuthed(page, '/settings?tab=profile');
   await page.getByRole('button', { name: 'Regenerate recovery codes' }).click();
-  await page.getByPlaceholder(/password/i).last().fill(ACCOUNT.password);
-  await page.getByRole('button', { name: /Regenerate|Continue|Confirm/ }).last().click();
-  const codes = page.getByText(/^[A-Z0-9]{4,6}-[A-Z0-9]{4,6}$/);
+  const dialog = page.getByRole('dialog');
+  await dialog.getByPlaceholder('Enter your password').fill(ACCOUNT.password);
+  await dialog.getByRole('button', { name: 'Generate new codes' }).click();
+  const codes = dialog.getByText(/^[A-Z0-9]{4,6}-[A-Z0-9]{4,6}$/);
   await expect(codes.first()).toBeVisible({ timeout: 15_000 });
   expect(await codes.count()).toBeGreaterThanOrEqual(8);
   if (process.env.CODES_OUT) fs.writeFileSync(process.env.CODES_OUT, (await codes.allInnerTexts()).join(','));
