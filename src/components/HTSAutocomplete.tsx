@@ -118,9 +118,14 @@ export const HTSAutocomplete = memo(function HTSAutocomplete({
               {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[min(30rem,calc(100vw-2rem))] p-0" align="end">
+          {/* Never taller than the room on the side it opens; only the results scroll, so the description box stays on screen. */}
+          <PopoverContent
+            className="flex flex-col w-[min(30rem,calc(100vw-2rem))] max-h-[min(80vh,var(--radix-popover-content-available-height))] p-0"
+            align="end"
+            collisionPadding={16}
+          >
             <form
-              className="p-3 border-b bg-muted/30 space-y-2"
+              className="shrink-0 p-3 border-b bg-muted/30 space-y-2"
               onSubmit={(e) => { e.preventDefault(); void classify(query); }}
             >
               <div className="flex items-center gap-2">
@@ -144,7 +149,7 @@ export const HTSAutocomplete = memo(function HTSAutocomplete({
                 </Button>
               </div>
             </form>
-            <div className="max-h-[60vh] overflow-auto p-3">
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain p-3">
               {searching && (
                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading the description and checking the tariff…
