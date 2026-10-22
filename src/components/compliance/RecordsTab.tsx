@@ -461,7 +461,7 @@ function PipelineRow({ t }: { t: LiquidationTracked }) {
               style={{ left: `${pscMarker}%` }}
               title="PSC deadline (270d)"
             />
-            <div className="flex justify-between text-[10px] tabular-nums text-slate-400 dark:text-slate-500 mt-1">
+            <div className="flex justify-between text-[10px] tabular-nums text-slate-500 dark:text-slate-400 mt-1">
               <span>entry</span>
               <span style={{ marginLeft: `${pscMarker - 50}%` }}>PSC 270d</span>
               <span>liquidation 314d</span>
@@ -513,7 +513,7 @@ function DeadlineTile({
         {label}
       </span>
       <span className={cn('text-[12.5px] tabular-nums leading-tight', color)}>
-        {value} <span className="text-slate-400 dark:text-slate-500 font-normal">· {sub}</span>
+        {value} <span className="text-slate-500 dark:text-slate-400 font-normal">· {sub}</span>
       </span>
     </div>
   );

@@ -300,6 +300,7 @@ function StageCircle({ node }: { node: StageNode }) {
       <div
         className="relative h-12 w-12 rounded-full flex items-center justify-center text-white shadow-md transition-transform duration-300 group-hover:scale-105"
         style={{ background: colors.fill, boxShadow: `0 4px 14px -4px ${colors.glow}` }}
+        role="img"
         aria-label={`${node.title} done`}
       >
         <Check className="h-5 w-5" strokeWidth={3} />
@@ -312,6 +313,7 @@ function StageCircle({ node }: { node: StageNode }) {
       <div
         className="relative h-12 w-12 rounded-full flex items-center justify-center bg-card border-[2px] transition-all duration-300 group-hover:scale-105"
         style={{ borderColor: colors.fill, boxShadow: `0 0 0 4px ${colors.ring}` }}
+        role="img"
         aria-label={`${node.title} active`}
       >
         {/* inner pulsing dot */}
@@ -331,6 +333,7 @@ function StageCircle({ node }: { node: StageNode }) {
       <div
         className="relative h-12 w-12 rounded-full flex items-center justify-center bg-card border-[2px] border-red-500 text-red-600 dark:text-red-400 transition-transform duration-300 group-hover:scale-105"
         style={{ boxShadow: '0 0 0 4px hsl(0 84% 60% / 0.18)' }}
+        role="img"
         aria-label={`${node.title} blocked`}
       >
         <AlertTriangle className="h-5 w-5" strokeWidth={2.5} />
@@ -341,8 +344,9 @@ function StageCircle({ node }: { node: StageNode }) {
   // pending
   return (
     <div
-      className="relative h-12 w-12 rounded-full flex items-center justify-center bg-card border-[1.5px] border-dashed border-border text-muted-foreground/50 transition-transform duration-300 group-hover:scale-105"
-      aria-label={`${node.title} pending`}
+      className="relative h-12 w-12 rounded-full flex items-center justify-center bg-card border-[1.5px] border-dashed border-border text-muted-foreground transition-transform duration-300 group-hover:scale-105"
+      role="img"
+        aria-label={`${node.title} pending`}
     >
       <span className="text-[11px] font-mono font-semibold tabular-nums">{node.index}</span>
     </div>
@@ -473,7 +477,7 @@ export function LifecycleWidget({ filing, abiDocs = [], manifestQueries = [] }: 
                 <div className="mt-3 space-y-0.5 max-w-full">
                   <p className={cn(
                     'text-[10.5px] font-semibold uppercase tracking-[0.18em]',
-                    node.state === 'done' || node.state === 'active' ? STAGE_LABEL_TINT[node.stage] : 'text-muted-foreground/60',
+                    node.state === 'done' || node.state === 'active' ? STAGE_LABEL_TINT[node.stage] : 'text-muted-foreground',
                   )}>
                     {node.title}
                   </p>
@@ -481,11 +485,11 @@ export function LifecycleWidget({ filing, abiDocs = [], manifestQueries = [] }: 
                     text={node.detail}
                     className={cn(
                       'text-[12.5px] font-medium leading-snug px-1',
-                      node.state === 'pending' ? 'text-muted-foreground/60' : 'text-foreground',
+                      node.state === 'pending' ? 'text-muted-foreground' : 'text-foreground',
                     )}
                   />
                   {node.age && (
-                    <p className="text-[10.5px] text-muted-foreground/60 tabular-nums">
+                    <p className="text-[10.5px] text-muted-foreground tabular-nums">
                       {node.age}
                     </p>
                   )}

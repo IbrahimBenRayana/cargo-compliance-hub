@@ -46,7 +46,7 @@ const statusConfig: Record<ShipmentStatus, StatusConfig> = {
   amended: {
     label: 'Amended',
     dot: 'bg-amber-400',
-    className: 'bg-amber-400/10 text-amber-500 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50',
+    className: 'bg-amber-400/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50',
   },
 };
 

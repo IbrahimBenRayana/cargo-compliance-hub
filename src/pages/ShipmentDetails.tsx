@@ -879,7 +879,7 @@ export default function ShipmentDetails() {
       {/* Header */}
       <div className="flex items-center gap-3 opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
         <Button variant="ghost" size="icon" className="rounded-xl" asChild>
-          <Link to="/shipments"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link to="/shipments" aria-label="Back to shipments"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
@@ -973,7 +973,7 @@ export default function ShipmentDetails() {
           {/* More Actions Dropdown — Duplicate, Save Template, Cancel */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="shrink-0">
+              <Button variant="outline" size="icon" className="shrink-0" aria-label="More actions">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>

@@ -260,7 +260,7 @@ export default function IntegrationsApi() {
                         variant={cap.status === 'active' ? 'default' : 'secondary'}
                         className={cn(
                           'text-[9px] px-1.5 py-0 h-4 uppercase font-bold tracking-wider',
-                          cap.status === 'active' && 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20',
+                          cap.status === 'active' && 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20',
                         )}
                       >
                         {cap.status === 'active' ? 'Active' : 'Beta'}

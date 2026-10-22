@@ -105,7 +105,7 @@ function HtsClassifierCard() {
             maxLength={500}
           />
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 tabular-nums">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
               {description.length}/500
             </span>
             <Button
@@ -332,7 +332,7 @@ function FtaPreferenceCard() {
 
 function EmptyHint({ message }: { message: string }) {
   return (
-    <div className="flex items-center justify-center pt-12 text-[12px] text-slate-400 dark:text-slate-500">
+    <div className="flex items-center justify-center pt-12 text-[12px] text-slate-500 dark:text-slate-400">
       {message}
     </div>
   );

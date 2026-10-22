@@ -284,7 +284,7 @@ function ScoreHero({ data }: { data: ActionQueueResponse }) {
             >
               {data.score === null ? '—' : display}
             </span>
-            <span className="text-[20px] font-medium text-slate-400 dark:text-slate-500 tabular-nums">
+            <span className="text-[20px] font-medium text-slate-500 dark:text-slate-400 tabular-nums">
               / 100
             </span>
           </div>
