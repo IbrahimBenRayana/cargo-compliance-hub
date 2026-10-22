@@ -46,6 +46,7 @@ function Condition({ c }: { c: CbpConditionView }) {
             {c.narrative}
           </div>
           {c.explanation && <p className="mt-0.5 text-xs text-muted-foreground">{c.explanation}</p>}
+          {c.guidance && <p className="mt-1 text-xs text-foreground">{c.guidance}</p>}
           {c.audience === 'operations' && (
             <p className="mt-0.5 text-xs text-muted-foreground">This is about our connection, not your data. MyCargoLens has been alerted.</p>
           )}

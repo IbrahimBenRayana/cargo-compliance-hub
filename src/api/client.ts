@@ -331,6 +331,8 @@ export interface CbpConditionView {
   severity?: string;
   narrative: string;
   explanation?: string;
+  /** Plain-language "what this means / what to do". */
+  guidance?: string;
   blocking: boolean;
   audience: 'filer' | 'operations';
   pointers?: { type: string; text: string }[];

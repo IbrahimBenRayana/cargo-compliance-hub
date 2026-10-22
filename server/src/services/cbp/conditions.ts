@@ -30,11 +30,42 @@ export interface CbpConditionView {
   narrative: string;
   /** CBP's explanation of the rule, when published. */
   explanation?: string;
+  /** Plain-language "what this means for you / what to do", where we know it. */
+  guidance?: string;
   /** True when CBP will not accept the transaction until it is fixed. */
   blocking: boolean;
   /** Who acts on it: the filer (data) or our operations team (transmission/authorization). */
   audience: 'filer' | 'operations';
   reference: string;
+}
+
+// ISF bill-match advisories: CBP's wording doesn't say whether to act.
+const STILL_MISSING = (days: number) =>
+  `The carrier's bill still isn't on file ${days} days after you filed. Check the bill number with the carrier or forwarder, and amend the ISF if it changed.`;
+const BILL_TYPE = 'Your ISF gives this bill a different bill type (house or regular) from the carrier\'s manifest. Check the bill type and amend the ISF to match.';
+const ADVISORY_GUIDANCE: Record<string, string> = {
+  S1: 'CBP matched this ISF to the carrier\'s bill. Nothing to do.',
+  S2: 'Normal at this stage: the carrier hasn\'t sent its manifest for this bill yet, and CBP matches them automatically when it does. Nothing to do now.',
+  S3: STILL_MISSING(5),
+  S4: STILL_MISSING(20),
+  S5: STILL_MISSING(30),
+  S6: BILL_TYPE, SA: BILL_TYPE, SB: BILL_TYPE, SC: BILL_TYPE,
+  S7: 'Another filer has filed an ISF for this bill and importer. Check with your client or forwarder so only one ISF stands.',
+};
+
+/**
+ * Adds today's guidance to conditions stored before it existed (CBP's answers
+ * are summarised once, when they arrive).
+ */
+export function withGuidance<T extends { conditions?: Array<{ source?: string; code?: string; guidance?: string }> }>(parsed: T): T {
+  if (!parsed?.conditions) return parsed;
+  return {
+    ...parsed,
+    conditions: parsed.conditions.map((c) =>
+      c.source === 'isf-advisory' && !c.guidance && c.code && ADVISORY_GUIDANCE[c.code.toUpperCase()]
+        ? { ...c, guidance: ADVISORY_GUIDANCE[c.code.toUpperCase()] }
+        : c),
+  };
 }
 
 function normaliseAeCode(code: string): string {
@@ -94,6 +125,7 @@ export function describeCondition(input: {
         code,
         narrative: SA_DISPOSITION_CODES[code] ?? given ?? `Disposition ${code}`,
         explanation: given,
+        guidance: ADVISORY_GUIDANCE[code],
         blocking: false,
         audience: 'filer',
         reference: 'CBP ISF Status Advisory (SA) dispositions',

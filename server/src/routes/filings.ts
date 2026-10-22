@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { withGuidance } from '../services/cbp/conditions.js';
 import { loadOrgCbpConfig } from '../services/cbp/filerIdentity.js';
 import { transmitIsfNative } from '../services/cbp/nativeIsf.js';
 import { canStartIsfAction } from '../services/cbp/isfLifecycle.js';
@@ -442,7 +443,13 @@ router.get('/:id/cbp', async (req: AuthRequest, res: Response): Promise<void> =>
       inbound: { orderBy: { receivedAt: 'asc' }, select: { id: true, application: true, receivedAt: true, parsed: true } },
     },
   });
-  res.json({ filing, transmissions });
+  res.json({
+    filing,
+    transmissions: transmissions.map((t) => ({
+      ...t,
+      inbound: t.inbound.map((m) => ({ ...m, parsed: m.parsed && withGuidance(m.parsed as any) })),
+    })),
+  });
 });
 
 // ─── POST /api/v1/filings/:id/amend — Submit amendment ─────
