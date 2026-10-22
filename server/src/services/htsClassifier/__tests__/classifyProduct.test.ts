@@ -78,6 +78,17 @@ describe('classifyProduct', () => {
     expect(m.classifyAmong).not.toHaveBeenCalled();
   });
 
+  it('classifies a detailed description the AI wrongly called too vague, still asking its questions', async () => {
+    m.understandProduct.mockResolvedValue(U({ sufficiency: 'too_vague', questions: ['What chemistry?'] }));
+    m.classifyAmong.mockResolvedValue({ picks: [{ code: '8507600010', confidence: 0.9, reason: 'r' }], noneFit: false, concerns: [], droppedInvented: 0 });
+    m.secondOpinion.mockResolvedValue({ code: '8507600010', reason: 'same' });
+    const r = await classifyProduct('Rechargeable 36-volt lithium-ion battery pack with a battery management system, mounted on the down tube of electric bicycles', ctx);
+    expect(r.status).toBe('needs_detail');
+    expect(r.suggestions[0].code).toBe('8507600010');
+    expect(r.suggestions[0].confidence).not.toBe('high');
+    expect(r.questions).toEqual(['What chemistry?']);
+  });
+
   it('gives suggestions and questions together when only the heading is clear', async () => {
     m.understandProduct.mockResolvedValue(U({ sufficiency: 'heading_only', questions: ['Is it for an electric vehicle?'] }));
     m.classifyAmong.mockResolvedValue({ picks: [{ code: '8507600090', confidence: 0.9, reason: 'r' }], noneFit: false, concerns: [], droppedInvented: 0 });

@@ -66,6 +66,7 @@ const RUNNER_UP_MIN = 0.25;
 // Prompt budget: the biggest headings (e.g. 8708) have a few hundred lines.
 const MAX_LINES = 450;
 const KEYWORD_RESULTS = 5;
+const DETAILED_WORDS = 12;
 
 // ─── Schedule cache ─────────────────────────────────────────────────
 // ~20k lines, a few MB: loaded once and searched in memory. Reloaded every
@@ -164,7 +165,11 @@ async function run(
   }
 
   // Steps 1-2: understand; too vague means ask, not guess.
-  const u = await understandProduct(description, userId);
+  let u = await understandProduct(description, userId);
+  // A description this long names the goods; the AI still sometimes calls
+  // one "too vague" (6 of 101 CBP rulings in v3's eval). Classify it, and
+  // keep its questions, rather than refuse.
+  if (u.sufficiency === 'too_vague' && description.split(/\s+/).length >= DETAILED_WORDS) u = { ...u, sufficiency: 'heading_only' };
   if (debug) debug.sufficiency = u.sufficiency;
   if (u.sufficiency === 'too_vague') {
     return {
