@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo, useId, useRef } from 'react';
+import { billTypeOf } from '@/lib/isfBillType';
 import { CONTAINER_TYPES, toCommodityForms, toContainerForms, isImporterIdentifier } from '@/lib/isfForm';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useFiling, useCreateFiling, useCreateConsolidation, useUpdateFiling, useFilingAutosave } from '@/hooks/useFilings';
@@ -693,7 +694,7 @@ export default function ShipmentWizard() {
       bondType: existing.bondType || 'continuous',
       bondSuretyCode: existing.bondSuretyCode || '',
       bondReferenceNumber: existing.bondReferenceNumber || '',
-      billType: existing.houseBol ? 'HOUSE' : 'REGULAR',
+      billType: billTypeOf(existing),
       houseBillScac: existing.houseBillScac || '',
       isfFilerMode: existing.isfFilerMode || '',
       importerName: existing.importerName || '',
