@@ -1272,7 +1272,7 @@ export default function ShipmentDetails() {
               <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
                 <div>
                   <p className="text-sm font-medium">{c.description || 'No description'}</p>
-                  <p className="text-xs text-muted-foreground">HTS: {c.htsCode} \u00b7 Origin: {c.countryOfOrigin}</p>
+                  <p className="text-xs text-muted-foreground">HTS: {c.htsCode} · Origin: {c.countryOfOrigin}</p>
                 </div>
                 {c.quantity && <span className="text-sm text-muted-foreground tabular-nums">Qty: {c.quantity}</span>}
               </div>
@@ -1294,7 +1294,7 @@ export default function ShipmentDetails() {
             {filing.containers.map((c: any, i: number) => (
               <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
                 <p className="text-sm font-medium font-mono">{c.number}</p>
-                <p className="text-xs text-muted-foreground">{c.type} {c.sealNumber ? `\u00b7 Seal: ${c.sealNumber}` : ''}</p>
+                <p className="text-xs text-muted-foreground">{c.type} {c.sealNumber ? `· Seal: ${c.sealNumber}` : ''}</p>
               </div>
             ))}
           </CardContent>

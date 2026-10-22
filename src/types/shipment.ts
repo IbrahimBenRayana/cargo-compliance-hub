@@ -228,9 +228,11 @@ export interface ApiSubmissionLog {
 }
 
 // ─── Helpers ───────────────────────────────────────────────
-export function getPartyName(party: PartyInfo | string | null | undefined): string {
+/** A party's name; a list (an ISF can name several manufacturers) gives every name. */
+export function getPartyName(party: PartyInfo | PartyInfo[] | string | null | undefined): string {
   if (!party) return '';
   if (typeof party === 'string') return party;
+  if (Array.isArray(party)) return party.map((p) => getPartyName(p)).filter(Boolean).join(', ');
   return party.name || '';
 }
 
