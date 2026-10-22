@@ -90,14 +90,14 @@ export async function expectHeading(page: Page, text: string | RegExp) {
  * The caller clicks "Create ISF Filing". Importer is "Acme Imports LLC" so
  * test drafts are easy to bulk-clean from the DB.
  */
-export async function fillIsf10(page: Page) {
+export async function fillIsf10(page: Page, opts: { masterBol?: string; houseBol?: string } = {}) {
   // Six steps and six trade parties: more than the default 45s.
   test.setTimeout(Math.max(test.info().timeout, 120_000));
   const next = () => page.getByRole('button', { name: /^Next/ }).click();
 
   // Step 1 — Filing Info
-  await page.getByLabel(/Master Bill of Lading/i).fill('MAEU1234567890');
-  await page.getByLabel(/House Bill of Lading/i).fill('HCLA12345678');
+  await page.getByLabel(/Master Bill of Lading/i).fill(opts.masterBol ?? 'MAEU1234567890');
+  await page.getByLabel(/House Bill of Lading/i).fill(opts.houseBol ?? 'HCLA12345678');
   await next();
 
   // Step 2 — IOR & Consignee

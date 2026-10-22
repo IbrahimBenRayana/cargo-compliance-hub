@@ -137,6 +137,18 @@ export function CbpTimeline({ filingId }: { filingId: string }) {
     // Refresh only while CBP's answer is pending.
     refetchInterval: (q) => (q.state.data?.filing.pendingAction ? 10_000 : false),
   });
+  // When CBP's answer lands, refresh the shipment itself (status, lifecycle,
+  // actions) and the lists that show it, not just this card (BUG-020).
+  const queryClient = useQueryClient();
+  const wasPending = useRef(false);
+  const pendingNow = !!data?.filing.pendingAction;
+  useEffect(() => {
+    if (wasPending.current && !pendingNow) {
+      queryClient.invalidateQueries({ queryKey: ['filing', filingId] });
+      queryClient.invalidateQueries({ queryKey: ['filings'] });
+    }
+    wasPending.current = pendingNow;
+  }, [pendingNow, filingId, queryClient]);
   if (isLoading || !data) return <LoadingCard />;
   const { filing } = data;
   return (
