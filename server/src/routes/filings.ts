@@ -287,6 +287,9 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     where.OR = [
       { importerName: { contains: search, mode: 'insensitive' } },
       { masterBol: { contains: search, mode: 'insensitive' } },
+      // House bill = the shipment's heading; ISF ID = CBP's transaction number (BUG-028).
+      { houseBol: { contains: search, mode: 'insensitive' } },
+      { cbpTransactionId: { contains: search, mode: 'insensitive' } },
       { vesselName: { contains: search, mode: 'insensitive' } },
       { consigneeName: { contains: search, mode: 'insensitive' } },
     ];

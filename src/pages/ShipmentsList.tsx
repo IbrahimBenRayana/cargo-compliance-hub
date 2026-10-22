@@ -41,7 +41,7 @@ const countries = [
   { code: 'DE', label: 'Germany', flag: '🇩🇪' },
 ];
 
-const statusOptions: ShipmentStatus[] = ['draft', 'submitted', 'accepted', 'rejected'];
+const statusOptions: ShipmentStatus[] = ['draft', 'submitted', 'accepted', 'rejected', 'cancelled'];
 
 // Inline chip that opens a popover listing the sibling filings of a
 // consolidation. Renders only when the row has a consolidationId — the
@@ -390,7 +390,7 @@ export default function ShipmentsList() {
       </div>
 
       {/* Quick Status Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
         {statusOptions.map((status, i) => {
           const count = countByStatus(status);
           const isActive = selectedStatuses.includes(status);
@@ -399,12 +399,14 @@ export default function ShipmentsList() {
             submitted: 'border-primary/20 hover:border-primary/40',
             accepted: 'border-[hsl(var(--status-accepted))]/20 hover:border-[hsl(var(--status-accepted))]/40',
             rejected: 'border-destructive/20 hover:border-destructive/40',
+            cancelled: 'border-muted-foreground/20 hover:border-muted-foreground/40',
           };
           const activeBg: Record<string, string> = {
             draft: 'bg-muted-foreground/5 border-muted-foreground/40',
             submitted: 'bg-primary/5 border-primary/40',
             accepted: 'bg-[hsl(var(--status-accepted))]/5 border-[hsl(var(--status-accepted))]/40',
             rejected: 'bg-destructive/5 border-destructive/40',
+            cancelled: 'bg-muted-foreground/5 border-muted-foreground/40',
           };
           return (
             <button
@@ -430,7 +432,7 @@ export default function ShipmentsList() {
             <div className="relative flex-1 w-full md:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search BOL, importer, product, or ISF ID…"
+                placeholder="Search bill of lading, importer, vessel, or ISF ID…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-9 bg-secondary/50 border-transparent focus:bg-card focus:border-input transition-all duration-300"
@@ -569,7 +571,7 @@ export default function ShipmentsList() {
                 </AlertDialog>
               </>
             )}
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())} aria-label="Clear selection">
               <X className="h-3 w-3" />
             </Button>
           </div>

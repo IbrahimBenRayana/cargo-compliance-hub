@@ -29,7 +29,7 @@ test('status filter chips show only that status; search finds one bill', async (
   await expect(rows(page).first()).toBeVisible();
   for (const text of await rows(page).allInnerTexts()) expect(text).toMatch(/Rejected/);
   await page.getByRole('button', { name: /^Rejected \d+/ }).click(); // clear
-  await page.getByPlaceholder(/Search BOL/).fill(BOL);
+  await page.getByPlaceholder(/Search bill of lading/).fill(BOL);
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first()).toContainText(BOL);
 });
@@ -47,7 +47,7 @@ test('export CSV and summary PDF download real files', async ({ page }) => {
 
 test('duplicate, save as template, start from template, use as starting point', async ({ page }) => {
   await gotoAuthed(page, '/shipments');
-  await page.getByPlaceholder(/Search BOL/).fill(BOL);
+  await page.getByPlaceholder(/Search bill of lading/).fill(BOL);
   await rows(page).first().getByRole('link', { name: 'View shipment' }).click();
   await expect(page).toHaveURL(/\/shipments\/[0-9a-f-]{36}$/);
   const shipmentUrl = new URL(page.url()).pathname;
