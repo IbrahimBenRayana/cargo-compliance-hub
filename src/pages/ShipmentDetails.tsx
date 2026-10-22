@@ -1,5 +1,6 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { CbpTimeline } from '@/components/CbpTimeline';
+import { IsfRejectedChangesBanner } from '@/components/IsfRejectedChangesBanner';
 import { TransmitConfirmDialog } from '@/components/TransmitConfirmDialog';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFiling, useSubmitFiling, useAmendFiling, useCancelFiling, useValidateFiling, useCheckFilingStatus, useDuplicateFiling, useSaveFilingAsTemplate, useFilingDocuments, useUploadDocuments, useDownloadDocument, useDeleteDocument, useExportPdf, useConsolidationSiblings } from '@/hooks/useFilings';
@@ -1108,6 +1109,9 @@ export default function ShipmentDetails() {
           manifestQueries={((mqListData as any)?.data ?? []) as any}
         />
       </div>
+
+      {/* CBP rejected the last changes: what's shown is not what CBP has (BUG-015) */}
+      {filing.lastTransmissionId && <IsfRejectedChangesBanner filingId={filing.id} />}
 
       {/* Submission Pipeline — only for draft filings */}
       {filing.status === 'draft' && (
