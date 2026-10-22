@@ -82,7 +82,10 @@ router.patch('/profile', async (req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
-    const parsed = profileUpdateSchema.safeParse(req.body);
+    // The unchanged email may ride along (the page sends the whole form); it
+    // is not an update, so drop it before the strict schema (BUG-026).
+    const { email: _unchangedEmail, ...body } = (req.body ?? {}) as Record<string, unknown>;
+    const parsed = profileUpdateSchema.safeParse(body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
       return;

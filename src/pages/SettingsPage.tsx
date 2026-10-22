@@ -79,10 +79,10 @@ export default function SettingsPage() {
 
   const handleSaveProfile = async () => {
     try {
-      await updateProfile.mutateAsync({ firstName, lastName, email });
+      await updateProfile.mutateAsync({ firstName, lastName });
       toast.success('Profile updated');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update profile');
+      toast.error(err.body?.error || err.message || 'Failed to update profile');
     }
   };
 
@@ -225,7 +225,9 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="settings-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email Address</Label>
-                    <Input id="settings-email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@company.com" />
+                    {/* Email changes aren't supported here yet (server refuses them). */}
+                    <Input id="settings-email" value={email} readOnly aria-describedby="settings-email-hint" type="email" className="bg-muted/40" />
+                    <p id="settings-email-hint" className="text-xs text-muted-foreground">To change your email, contact support.</p>
                   </div>
                   <div className="flex items-center justify-between pt-2">
                     <p className="text-xs text-muted-foreground flex items-center gap-1.5">
