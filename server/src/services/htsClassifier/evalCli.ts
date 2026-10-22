@@ -61,7 +61,21 @@ async function main(): Promise<void> {
   const s = { n: 0, heading1: 0, six1: 0, ten1: 0, ten3: 0, heading5: 0, needsDetail: 0, highWrong: 0, highTotal: 0, errors: 0, poolHasCode: 0, poolHasHeading: 0, precedentFound: 0, precedentHasHeading: 0, headingsHaveRight: 0 };
   const lines: string[] = [];
 
-  const runs = await pooled(fixture.rulings, CONCURRENCY, (x) => timed(x.description, [x.ruling]));
+  // Each case is printed as it finishes ("CASE {json}"), so a run cut short
+  // (e.g. a deploy restarting the container) keeps what it paid for and can
+  // be resumed with the remaining cases only.
+  const runs = await pooled(fixture.rulings, CONCURRENCY, async (x) => {
+    const run = await timed(x.description, [x.ruling]);
+    if (!outOfCredit) {
+      console.log(`CASE ${JSON.stringify({
+        ruling: x.ruling, want: x.hts, heading: x.heading, headingOnly: !!x.headingOnly, ms: run.ms, err: run.err,
+        status: run.r?.status, codes: run.r?.suggestions.slice(0, 5).map((g) => g.code), label: run.r?.suggestions[0]?.confidence,
+        pool: run.pool.includes(x.hts) ? 'code' : run.pool.some((c) => c.slice(0, 4) === x.heading) ? 'heading' : 'none',
+        headings: run.debug.headings, precedent: run.debug.precedent,
+      })}`);
+    }
+    return run;
+  });
   if (outOfCredit) {
     console.log('ABORTED: the AI account is out of credit; results would be meaningless.');
     process.exit(2);
@@ -96,7 +110,11 @@ async function main(): Promise<void> {
   });
 
   const vague = { n: 0, asked: 0 };
-  const vagueRuns = await pooled(fixture.vague, CONCURRENCY, (v) => timed(v.description));
+  const vagueRuns = await pooled(fixture.vague, CONCURRENCY, async (v) => {
+    const run = await timed(v.description);
+    console.log(`VAGUE ${JSON.stringify({ description: v.description, status: run.r?.status, questions: run.r?.questions?.length ?? 0, didYouMean: run.r?.didYouMean?.length ?? 0, ms: run.ms })}`);
+    return run;
+  });
   fixture.vague.forEach((v, i) => {
     const { r, ms } = vagueRuns[i];
     times.push(ms);
