@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, memo, useId, useRef } from 'react';
 import { billTypeOf } from '@/lib/isfBillType';
+import { perHblPartyKeys, tradePartyErrors } from '@/lib/isfTradeParties';
 import { CONTAINER_TYPES, toCommodityForms, toContainerForms, isImporterIdentifier } from '@/lib/isfForm';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useFiling, useCreateFiling, useCreateConsolidation, useUpdateFiling, useFilingAutosave } from '@/hooks/useFilings';
@@ -844,6 +845,9 @@ export default function ShipmentWizard() {
   const isSaving = createFiling.isPending || createConsolidation.isPending || updateFiling.isPending;
 
   // ─── Validation per step ───────────
+  /** Which per-house-bill tab is open on Trade Parties; jumps to the first one with an error. */
+  const [partyHblTab, setPartyHblTab] = useState('hbl-0');
+
   const validateStep = useCallback((s: number): boolean => {
     const e: Record<string, string> = {};
     const stepId = STEPS[s]?.id;
@@ -935,18 +939,12 @@ export default function ShipmentWizard() {
     // ISF-10: every trade party needs a name, street, city and country (SF30/35/36,
     // ISF-28..35); the native mapper refuses to file without them.
     if (stepId === 'parties' && form.filingType === 'ISF-10') {
-      const parties = [
-        ['buyer', form.buyer], ['seller', form.seller], ['shipToParty', form.shipToParty],
-        ['manufacturer', form.manufacturer], ['consolidator', form.consolidator],
-        ['containerStuffingLocation', form.containerStuffingLocation],
-      ] as const;
-      const extra = form.additionalManufacturers.map((m, i) => [`additionalManufacturers.${i}`, m] as const);
-      for (const [key, p] of [...parties, ...extra]) {
-        if (!p.name.trim()) e[`${key}.name`] = 'Name is required';
-        if (!p.address1.trim()) e[`${key}.address1`] = 'Street address is required';
-        if (!p.city.trim()) e[`${key}.city`] = 'City is required';
-        if (!p.country) e[`${key}.country`] = 'Country is required';
-      }
+      const isConsolidation = !isEdit && form.additionalHouseBills.length > 0;
+      Object.assign(e, tradePartyErrors({
+        ...form,
+        consolidationMode: isConsolidation ? form.consolidationMode : null,
+        houseBillCount: isConsolidation ? 1 + form.additionalHouseBills.length : 0,
+      }));
     }
 
     if (stepId === 'parties' && form.filingType === 'ISF-5') {
@@ -956,8 +954,10 @@ export default function ShipmentWizard() {
     }
 
     setErrors(e);
+    const firstHbl = Object.keys(e).map((k) => /^perHbl\.(\d+)\./.exec(k)?.[1]).find(Boolean);
+    if (firstHbl !== undefined && !Object.keys(e).some((k) => !k.startsWith('perHbl.'))) setPartyHblTab(`hbl-${firstHbl}`);
     return Object.keys(e).length === 0;
-  }, [form, STEPS]);
+  }, [form, STEPS, isEdit]);
 
   const goNext = useCallback(() => {
     if (step < STEPS.length - 1) {
@@ -1620,11 +1620,8 @@ export default function ShipmentWizard() {
     //   Buyer mode: seller + manufacturer differ per HBL (Adnan's "vendors differ").
     //   LCL mode:   all of buyer + seller + shipToParty + manufacturer differ.
     // Consolidator + Container Stuffing Location are ALWAYS shared.
-    const perHblPartyKeys = isLcl
-      ? (['buyer', 'seller', 'shipToParty', 'manufacturer'] as const)
-      : isConsolidation
-        ? (['seller', 'manufacturer'] as const)
-        : ([] as const);
+    const perHblKeys = perHblPartyKeys(isConsolidation ? form.consolidationMode : null);
+    const hblHasError = (idx: number) => Object.keys(errors).some((k) => k.startsWith(`perHbl.${idx}.`));
 
     return (
     <div className="space-y-6">
@@ -1682,7 +1679,7 @@ export default function ShipmentWizard() {
         <PartyCard title="Container Stuffing Location" icon={Package} party={form.containerStuffingLocation} onChange={p => setParty('containerStuffingLocation', p)} errors={partyErrors('containerStuffingLocation')} />
       </div>
 
-      {isConsolidation && perHblPartyKeys.length > 0 && (
+      {isConsolidation && perHblKeys.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Layers className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
@@ -1696,13 +1693,16 @@ export default function ShipmentWizard() {
             </span>
           </div>
 
-          <Tabs defaultValue="hbl-0" className="w-full">
+          <Tabs value={partyHblTab} onValueChange={setPartyHblTab} className="w-full">
             <TabsList className="w-full justify-start h-auto flex-wrap gap-1 bg-muted/60 p-1">
               {allHouseBills.map((hbl, idx) => {
                 const o = form.perHblOverrides[idx];
-                const customCount = perHblPartyKeys.filter((k) => !!o?.[k]).length;
+                const customCount = perHblKeys.filter((k) => !!o?.[k]).length;
+                const hasError = hblHasError(idx);
                 return (
-                  <TabsTrigger key={idx} value={`hbl-${idx}`} className="text-xs">
+                  <TabsTrigger key={idx} value={`hbl-${idx}`} className={hasError ? 'text-xs text-red-600 dark:text-red-400' : 'text-xs'}
+                    aria-label={hasError ? `HBL ${idx + 1}: ${hbl}, has missing parties` : undefined}>
+                    {hasError && <AlertCircle className="h-3 w-3 mr-1" aria-hidden="true" />}
                     HBL {idx + 1}: {hbl.length > 14 ? hbl.slice(0, 14) + '…' : hbl}
                     {customCount > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">·{customCount}</span>}
                   </TabsTrigger>
@@ -1716,7 +1716,7 @@ export default function ShipmentWizard() {
                   "Customize for this HBL" to fill in a value just for this filing.
                 </p>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {perHblPartyKeys.map((field) => {
+                  {perHblKeys.map((field) => {
                     const labelMap: Record<typeof field, { title: string; icon: React.ElementType }> = {
                       buyer:       { title: 'Buyer',                    icon: Users },
                       seller:      { title: 'Seller',                   icon: Users },
@@ -1725,11 +1725,15 @@ export default function ShipmentWizard() {
                     };
                     const cfg = labelMap[field];
                     const override = form.perHblOverrides[idx]?.[field];
+                    const errKey = `perHbl.${idx}.${field}`;
                     if (!override) {
+                      // Missing card, or an inherited shared value that is incomplete.
+                      const cardError = errors[errKey]
+                        ?? (Object.keys(errors).some((k) => k.startsWith(`${errKey}.`)) ? `The shared ${cfg.title} is incomplete; customize it for this house bill` : undefined);
                       return (
                         <div
                           key={field}
-                          className="rounded-md border border-dashed border-border/60 px-3 py-4 flex flex-col items-start gap-2 bg-muted/20"
+                          className={`rounded-md border border-dashed px-3 py-4 flex flex-col items-start gap-2 bg-muted/20 ${cardError ? 'border-red-400' : 'border-border/60'}`}
                         >
                           <div className="flex items-center gap-1.5 text-xs font-semibold">
                             <cfg.icon className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1749,6 +1753,7 @@ export default function ShipmentWizard() {
                           >
                             Customize for this HBL
                           </Button>
+                          {cardError && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{cardError}</p>}
                         </div>
                       );
                     }
@@ -1759,6 +1764,7 @@ export default function ShipmentWizard() {
                           icon={cfg.icon}
                           party={override}
                           onChange={(p) => setHblField(idx, field, p)}
+                          errors={partyErrors(errKey)}
                         />
                         <Button
                           type="button"
