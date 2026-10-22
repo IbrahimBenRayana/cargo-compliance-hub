@@ -1290,7 +1290,7 @@ export default function ShipmentWizard() {
           {form.filingType === 'ISF-10' && form.billType === 'HOUSE' && (
             <TextField label="House bill issuer SCAC" value={form.houseBillScac}
               onChange={v => set('houseBillScac', v.toUpperCase())} placeholder="e.g., NVOC"
-              hint="SCAC of the forwarder that issued the house bill. Leave blank if it is the carrier." error={errors.houseBillScac} maxLength={4} />
+              hint="SCAC of the forwarder that issued the house bill. Leave blank if the house bill number already starts with it (e.g. HLCU1234567890) or if the carrier issued it." error={errors.houseBillScac} maxLength={4} />
           )}
         </div>
 

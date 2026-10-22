@@ -287,6 +287,14 @@ function billNumberOf(raw: string | null | undefined, scac: string): string {
   return cleaned;
 }
 
+// SF15: a bill is its issuer's 4-letter SCAC followed by at most 12 characters.
+const BILL_NUMBER_MAX = 12;
+function checkBillLength(field: string, number: string): void {
+  if (number.length > BILL_NUMBER_MAX) {
+    fail(field, `the bill number after the 4-letter SCAC can be at most ${BILL_NUMBER_MAX} characters; '${number}' has ${number.length}`);
+  }
+}
+
 /**
  * houseBol → BM house bill (plus an MB master-bill reference when the
  * master is also on file); otherwise masterBol → OB straight bill.
@@ -296,13 +304,23 @@ function buildBills(filing: PlatformIsfFiling, scac: string, references: IsfRefe
   // A house bill is issued by the NVOCC, whose SCAC can differ from the
   // carrier's; the carrier SCAC stays on the master reference (audit ENG-07).
   const houseScacRaw = str(filing.houseBillScac).toUpperCase().replace(/[^A-Z]/g, '');
-  const houseScac = /^[A-Z]{2,4}$/.test(houseScacRaw) ? houseScacRaw : scac;
+  const houseBolRaw = str(filing.houseBol).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // With no issuer SCAC entered, a house bill written the usual way
+  // (issuer SCAC + number, e.g. 'HLCU2684105560') names its own issuer;
+  // defaulting to the carrier sent 'MAEU' + a 14-char number, which CBP
+  // rejects (154 INVALID BILL OF LADING FORMAT, CERT 2026-10-22).
+  const prefix = /^[A-Z]{4}/.exec(houseBolRaw)?.[0];
+  const houseScac = /^[A-Z]{2,4}$/.test(houseScacRaw) ? houseScacRaw
+    : prefix && houseBolRaw.length > 4 ? prefix
+    : scac;
   const house = billNumberOf(filing.houseBol, houseScac);
   if (house) {
+    checkBillLength('houseBol', house);
     if (master && master !== house) references.push({ qualifier: 'MB', value: `${scac}${master}` });
     return [{ qualifier: 'BM', scac: houseScac, billNumber: house }];
   }
   if (!master) fail('masterBol', 'a master or house bill of lading number is required (SF15, ISF-7/9)');
+  checkBillLength('masterBol', master);
   return [{ qualifier: 'OB', scac, billNumber: master }];
 }
 

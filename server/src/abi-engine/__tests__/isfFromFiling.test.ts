@@ -162,6 +162,26 @@ describe('mapFilingToIsfInput — ISF-10 house bill variant', () => {
 });
 
 describe('mapFilingToIsfInput — single-transaction bond', () => {
+  it('takes the house bill issuer from the bill\'s own SCAC prefix (CERT 154 INVALID BILL OF LADING FORMAT)', () => {
+    // Found on CBP CERT Oct 22: 'HLCU2684105560' went out as issuer MAEU + a 14-char number.
+    const input = mapFilingToIsfInput({ ...ISF10_FILING, houseBol: 'HLCU2684105560' }, ADD);
+    expect(input.bills).toEqual([{ qualifier: 'BM', scac: 'HLCU', billNumber: '2684105560' }]);
+  });
+
+  it('uses the issuer SCAC the user entered and peels it off the number', () => {
+    const input = mapFilingToIsfInput({ ...ISF10_FILING, houseBol: 'SGPV12345678', houseBillScac: 'sgpv' }, ADD);
+    expect(input.bills).toEqual([{ qualifier: 'BM', scac: 'SGPV', billNumber: '12345678' }]);
+  });
+
+  it('keeps the carrier as issuer when the house bill repeats the master bill', () => {
+    const input = mapFilingToIsfInput({ ...ISF10_FILING, masterBol: 'MAEU26102210001', houseBol: 'MAEU26102210001' }, ADD);
+    expect(input.bills).toEqual([{ qualifier: 'BM', scac: 'MAEU', billNumber: '26102210001' }]);
+  });
+
+  it('refuses a house bill number longer than CBP allows instead of letting CBP reject it', () => {
+    expect(() => mapFilingToIsfInput({ ...ISF10_FILING, houseBol: '1234567890123' }, ADD)).toThrow(/12 characters/);
+  });
+
   it('maps bondType single to type 9 / activity 16 with V1 + SBN references', () => {
     const input = mapFilingToIsfInput(
       { ...ISF10_FILING, bondType: 'single', suretyCode: 'AB1', bondReferenceNumber: 'REF123' },
