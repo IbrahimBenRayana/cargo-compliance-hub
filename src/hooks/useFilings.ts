@@ -59,6 +59,8 @@ export function useConsolidationSiblings(consolidationId: string | null | undefi
 export function useUpdateFiling() {
   const queryClient = useQueryClient();
   return useMutation({
+    // Autosave: fail at once offline instead of pausing on "Saving...".
+    networkMode: 'always',
     mutationFn: ({ id, data }: { id: string; data: any }) => filingsApi.update(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['filings'] });

@@ -42,6 +42,9 @@ export function useCreateAbiDocument() {
 export function useUpdateAbiDocument() {
   const queryClient = useQueryClient();
   return useMutation({
+    // Offline, run (and fail) at once rather than pause: a paused save left
+    // the wizard on "Saving..." forever with no "Not saved, retry".
+    networkMode: 'always',
     mutationFn: ({
       id,
       payload,

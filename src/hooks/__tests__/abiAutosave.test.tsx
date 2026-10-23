@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 const update = vi.fn();
@@ -29,6 +29,25 @@ function deferred() {
 beforeEach(() => update.mockReset());
 
 describe('useAbiDocumentAutosave', () => {
+  // ENT-08 (testing week): offline, React Query paused the save instead of
+  // running it, so the wizard said "Saving..." forever and never offered
+  // "Not saved, retry".
+  it('fails an offline save at once instead of pausing it', async () => {
+    onlineManager.setOnline(false);
+    try {
+      update.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      const { result } = renderHook(() => useAbiDocumentAutosave('d1'), { wrapper });
+      act(() => result.current.save({ firms: 'Y123' }));
+      const outcome = await Promise.race([
+        result.current.flush().then(() => 'saved', () => 'failed'),
+        new Promise((r) => setTimeout(() => r('hung'), 300)),
+      ]);
+      expect(outcome).toBe('failed');
+    } finally {
+      onlineManager.setOnline(true);
+    }
+  });
+
   it('flush resolves only after the save reached the server', async () => {
     const call = deferred();
     update.mockReturnValueOnce(call.promise);
