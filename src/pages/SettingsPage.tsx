@@ -58,6 +58,7 @@ export default function SettingsPage() {
   const [orgName, setOrgName] = useState('');
   const [iorNumber, setIorNumber] = useState('');
   const [einNumber, setEinNumber] = useState('');
+  const [orgPhone, setOrgPhone] = useState('');
 
   // Connection test
 
@@ -74,6 +75,7 @@ export default function SettingsPage() {
       setOrgName(org.name || '');
       setIorNumber(org.iorNumber || '');
       setEinNumber(org.einNumber || '');
+      setOrgPhone(org.phone || '');
     }
   }, [org]);
 
@@ -88,7 +90,12 @@ export default function SettingsPage() {
 
   const handleSaveOrg = async () => {
     try {
-      await updateOrganization.mutateAsync({ name: orgName, iorNumber, einNumber });
+      const digits = orgPhone.replace(/\D/g, '');
+      if (digits && digits.length < 10) {
+        toast.error('Enter a 10-digit phone number, area code included');
+        return;
+      }
+      await updateOrganization.mutateAsync({ name: orgName, iorNumber, einNumber, phone: orgPhone.trim() });
       toast.success('Organization saved');
     } catch (err: any) {
       toast.error(err.message || 'Failed to update organization');
@@ -275,6 +282,12 @@ export default function SettingsPage() {
                       <Input id="settings-ein" value={einNumber} onChange={(e) => setEinNumber(e.target.value)} placeholder="XX-XXXXXXX" className="font-mono" />
                       <p className="text-[11px] text-muted-foreground">Employer Identification Number</p>
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-org-phone" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</Label>
+                    <Input id="settings-org-phone" type="tel" autoComplete="tel" value={orgPhone} onChange={(e) => setOrgPhone(e.target.value)}
+                      placeholder="(310) 555-0100" aria-describedby="settings-org-phone-hint" className="sm:max-w-xs" />
+                    <p id="settings-org-phone-hint" className="text-[11px] text-muted-foreground">10 digits. CBP needs a contact phone to release cargo on your entries.</p>
                   </div>
                   <div className="flex justify-end pt-2">
                     <Button onClick={handleSaveOrg} disabled={updateOrganization.isPending} className="cursor-pointer">

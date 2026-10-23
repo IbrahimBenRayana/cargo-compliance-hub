@@ -494,7 +494,7 @@ export function useOrganization() {
 export function useUpdateOrganization() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name?: string; iorNumber?: string; einNumber?: string; address?: any }) =>
+    mutationFn: (data: { name?: string; iorNumber?: string; einNumber?: string; address?: any; phone?: string }) =>
       settingsApi.updateOrganization(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings', 'organization'] });

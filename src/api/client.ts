@@ -693,6 +693,7 @@ export interface SettingsOrganization {
   einNumber: string | null;
   ccEnvironment: string;
   address: OrgAddress | null;
+  phone: string | null;
   createdAt: string;
   _count: { users: number; filings: number; filingTemplates: number };
 }
@@ -733,7 +734,7 @@ export const settingsApi = {
     return apiFetch<SettingsOrganization>('/api/v1/settings/organization');
   },
 
-  updateOrganization(data: { name?: string; iorNumber?: string; einNumber?: string; address?: OrgAddress }) {
+  updateOrganization(data: { name?: string; iorNumber?: string; einNumber?: string; address?: OrgAddress; phone?: string }) {
     return apiFetch<SettingsOrganization>('/api/v1/settings/organization', {
       method: 'PATCH',
       body: JSON.stringify(data),

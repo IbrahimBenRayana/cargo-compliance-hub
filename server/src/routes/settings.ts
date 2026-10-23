@@ -184,6 +184,7 @@ router.get('/organization', async (req: AuthRequest, res: Response): Promise<voi
         einNumber: true,
         ccEnvironment: true,
         address: true,
+        phone: true,
         createdAt: true,
         _count: {
           select: {
