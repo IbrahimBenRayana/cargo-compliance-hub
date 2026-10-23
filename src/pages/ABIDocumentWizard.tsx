@@ -210,10 +210,12 @@ export default function ABIDocumentWizard() {
                   break;
                 }
               }
+              // This wizard created the draft, so what is on screen is newer
+              // than any later fetch: skip hydration, and lay the server's
+              // prefill (manifestQueryId / filingId) under local edits.
+              hydratedRef.current = true;
               setDocId(newId);
-              // Seed draft from the server record so any prefill from
-              // manifestQueryId becomes visible.
-              if (res.data.payload) setDraft(res.data.payload);
+              if (res.data.payload) setDraft((prev) => mergeDraft(res.data.payload as ABIDocumentDraft, prev));
               navigate(`/abi-documents/${newId}/edit`, { replace: true });
             })
             .catch((err: any) => {
