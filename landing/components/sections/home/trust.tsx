@@ -37,7 +37,7 @@ type Rail = {
  */
 const RAILS: Rail[] = [
   { name: "CBP ACE", descriptor: "Every filing lands here" },
-  { name: "CustomsCity", descriptor: "Certified ABI gateway" },
+  { name: "ABI gateway", descriptor: "Certified filing partner" },
   { name: "REST API", descriptor: "For brokers & 3PLs" },
   { name: "Federal Register", descriptor: "Daily ADD/CVD sync" },
   { name: "FDA", descriptor: "PGA partner agency" },
