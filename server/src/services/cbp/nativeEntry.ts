@@ -95,6 +95,17 @@ type BuildOutcome =
  * conversion, the full CATAIR build and the engine's validator. Used by the
  * transmit and by the preflight that shows the filer every issue up front.
  */
+/** Line-party rules (ESF-134 matrix) in words a filer can act on. */
+const LINE_PARTY_WORDS: Record<string, string> = {
+  S: 'a Buyer party with its tax ID (CBP "sold to" party, required for this entry type)',
+  M: 'a Manufacturer party with its name, street, city and country (CBP builds the MID from it)',
+};
+function wordLinePartyIssue<T extends { field: string; message: string }>(issue: T): T {
+  const m = /^lines\[(\d+)\]\.parties\[([A-Z])\]$/.exec(issue.field);
+  const words = m && LINE_PARTY_WORDS[m[2]];
+  return words ? { ...issue, message: `Line ${Number(m[1]) + 1} needs ${words}.` } : issue;
+}
+
 export async function buildNativeEntry(opts: {
   docId: string;
   orgId: string;
@@ -199,7 +210,7 @@ export async function buildNativeEntry(opts: {
       input.cargoEntities = entities.entities;
     }
 
-    const issues = validateEntrySummary(input);
+    const issues = validateEntrySummary(input).map(wordLinePartyIssue);
     if (issues.length > 0) {
       return { ok: false, httpStatus: 422, body: { error: 'This entry does not meet CBP rules yet.', code: 'ENTRY_DATA_INCOMPLETE', issues } };
     }

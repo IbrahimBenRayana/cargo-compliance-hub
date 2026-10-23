@@ -209,6 +209,7 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
         <div className="text-sm text-muted-foreground">
           No invoices yet. Add the first invoice to begin entering line items.
         </div>
+        {errors.invoices && <p role="alert" className="text-xs text-red-500">{errors.invoices}</p>}
         <Button onClick={addInvoice}>
           <Plus className="h-4 w-4 mr-1.5" /> Add invoice
         </Button>
@@ -358,6 +359,9 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                     </Button>
                   </div>
                 </div>
+                {errors[`invoices.${invIdx}.items`] && (
+                  <p role="alert" className="text-xs text-red-500">{errors[`invoices.${invIdx}.items`]}</p>
+                )}
                 <div className="space-y-4">
                   {((inv.items || []) as PartialItem[]).map((item, itemIdx) => {
                     const hts = (item.htsNumber || '').replace(/\D/g, '');
@@ -581,6 +585,9 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                               <Plus className="h-3.5 w-3.5 mr-1" /> Add party
                             </Button>
                           </div>
+                          {errors[`${itemPath}.parties`] && (
+                            <p role="alert" className="text-xs text-red-500 mb-2">{errors[`${itemPath}.parties`]}</p>
+                          )}
                           <div className="space-y-3">
                             {((item.parties || []) as PartialParty[]).map(
                               (p, pIdx) => {

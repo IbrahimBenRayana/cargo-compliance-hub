@@ -187,6 +187,10 @@ export function validateStep5(d: ABIDocumentDraft): FieldErrors {
         if (!it?.weight?.gross) e[`${ip}.weight.gross`] = 'Required';
         if (!(it?.parties?.length)) {
           e[`${ip}.parties`] = 'Add at least one party';
+        } else if ((d.entryType === '01' || d.entryType === '03')
+          && !it.parties.some((p) => p?.type === 'buyer' && p.taxId?.trim())) {
+          // CBP's "sold to" party (ESF-134): mandatory on 01/03 lines.
+          e[`${ip}.parties`] = 'Add a Buyer party with its tax ID (CBP needs the "sold to" party on this entry type)';
         }
         if (d.entryType === '03') {
           (it?.adCvdCases ?? []).forEach((c, k) => {

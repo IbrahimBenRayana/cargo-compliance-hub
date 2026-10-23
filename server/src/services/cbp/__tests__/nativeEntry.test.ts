@@ -117,6 +117,14 @@ describe('transmitEntryNative', () => {
     expect(out).toMatchObject({ httpStatus: 422, body: { code: 'ENTRY_DATA_INCOMPLETE', error: 'A single transaction bond needs its amount' } });
   });
 
+  // ENT-01 (testing week): the wizard showed "lines[0].parties[S]mandatory for
+  // entry type 01 (ESF-134)", which no user can act on.
+  it('words line-party issues so a user can act on them', async () => {
+    engine.validateEntrySummary.mockReturnValue([{ severity: 'F', field: 'lines[0].parties[S]', message: 'mandatory for entry type 01 (ESF-134)' }]);
+    const out = await transmitEntryNative(ARGS);
+    expect((out.body as { issues: Array<{ message: string }> }).issues[0].message).toBe('Line 1 needs a Buyer party with its tax ID (CBP "sold to" party, required for this entry type).');
+  });
+
   it('returns CBP-rule issues from the engine validator before any claim', async () => {
     engine.validateEntrySummary.mockReturnValue([{ severity: 'F', field: 'payment', message: 'statement date on a holiday' }]);
     const out = await transmitEntryNative(ARGS);
