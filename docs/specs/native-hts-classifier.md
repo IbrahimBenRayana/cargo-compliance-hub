@@ -317,9 +317,10 @@ returns the stored answer instantly, marked as such, without AI.
 |---|---|---|---|
 | one at a time per user | 1 in flight | — | stops parallel clicks slipping past the counts |
 | per user per minute | 3 | `HTS_LIMIT_PER_MINUTE` | burst; counts free answers too |
-| per user per day (UTC) | 25 | `HTS_LIMIT_USER_DAILY` | ~$2/user/day worst case on gpt-4o ($3 on gpt-5.5) |
-| per organization per month (UTC) | 300 | `HTS_LIMIT_ORG_MONTHLY` | ~$21/org/month worst case on gpt-4o ($36 on gpt-5.5); the number plans will set |
-| whole platform per day (UTC) | 500 | `HTS_LIMIT_GLOBAL_DAILY` | spend circuit-breaker, ~$35/day on gpt-4o ($60 on gpt-5.5) |
+| per user per day (UTC) | 20 | `HTS_LIMIT_USER_DAILY` | ~$1.10/user/day worst case on gpt-4o |
+| per organization per month (UTC) | 100 | `HTS_LIMIT_ORG_MONTHLY` | ~$5.50/org/month worst case; the number plans will set |
+| whole platform per day (UTC) | 150 | `HTS_LIMIT_GLOBAL_DAILY` | one bad day can't eat the month (~$8) |
+| whole platform per month (UTC) | 900 | `HTS_LIMIT_GLOBAL_MONTHLY` | ~$50/month: classifier share of the $70/month OpenAI cap (2026-10-23) |
 
 Counts come from the audit table `hts_classifications` (durable across restarts; indexed on
 org + time), plus requests in flight. No schema change: the audit row's `status` records
@@ -337,3 +338,22 @@ removed afterwards): first classification counted (1/25, 1/300); the same descri
 in different case, answered as a free repeat; "battery" answered too-vague and free; a second
 request while one was running got 429 `in_flight`; at the daily cap, 429 `user_daily` with the
 reset time and the free-repeat note.
+
+### gpt-4o evaluation (2026-10-23, the model staging runs; v3 code, precedent on)
+
+| | heading@1 | 10-digit@1 | 10-digit top-3 | wrong at "agree" | "agree" shown | vague asked | p50 / p95 | cost |
+|---|---|---|---|---|---|---|---|---|
+| gpt-4o (classifier + second opinion) | 81.2% | 56.0% | 62.0% | **0** | 7 of 101 | 15/15 | 6.6 s / 11 s | $6.36 per run, ~$0.055 each |
+| gpt-5.5 + o3 (for comparison) | 82.2% | 73.0% | 77.0% | 10 | 52 of 101 | 15/15 | 26 s / 43 s | ~$0.12 each |
+
+gpt-4o finds the right heading as often as gpt-5.5 but the right 10-digit line much less
+often. It is cautious: it called 94 of 101 detailed CBP descriptions "heading only", so almost
+every answer carries questions and "Review before you file"; the green "Two independent checks
+agree" appeared 7 times, all correct. Safe to offer as a **beta assistant** (every result
+reviewed by the user, which the labels already demand), not as an answer to file on unreviewed.
+Known follow-up: gpt-4o over-asks; tune the sufficiency prompt for it (one eval, ~$6.40).
+
+**Budget rule (Ibrahim, 2026-10-23):** OpenAI spend must stay under $70/month. OpenAI billing
+(auto-recharge, budget alerts) is set by Ibrahim in the OpenAI dashboard; the app enforces
+the classifier's share with `HTS_LIMIT_GLOBAL_MONTHLY` (900 ≈ $50 at gpt-4o rates), leaving
+~$20 for the chat assistant and other AI features.

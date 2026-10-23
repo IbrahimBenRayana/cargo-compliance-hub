@@ -81,10 +81,12 @@ const envSchema = z.object({
   HTS_PRECEDENT:            z.enum(['on', 'off']).default('on'),
   // Usage limits, in classifications (~$0.12 of AI each). Plans will set the
   // organization allowance later; see docs/specs/native-hts-classifier.md.
+  // Defaults fit a ~$50/month classifier budget on gpt-4o (~$0.055 each).
   HTS_LIMIT_PER_MINUTE:     z.coerce.number().int().positive().default(3),
-  HTS_LIMIT_USER_DAILY:     z.coerce.number().int().positive().default(25),
-  HTS_LIMIT_ORG_MONTHLY:    z.coerce.number().int().positive().default(300),
-  HTS_LIMIT_GLOBAL_DAILY:   z.coerce.number().int().positive().default(500),
+  HTS_LIMIT_USER_DAILY:     z.coerce.number().int().positive().default(20),
+  HTS_LIMIT_ORG_MONTHLY:    z.coerce.number().int().positive().default(100),
+  HTS_LIMIT_GLOBAL_DAILY:   z.coerce.number().int().positive().default(150),
+  HTS_LIMIT_GLOBAL_MONTHLY: z.coerce.number().int().positive().default(900),
   // When true, sets OpenAI's `store: false` flag so prompts can't enter
   // their training corpus (zero-retention policy for trade data).
   AI_DISABLE_TRAINING_DATA: z.coerce.boolean().default(true),

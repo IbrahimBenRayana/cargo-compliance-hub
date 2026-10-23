@@ -15,17 +15,18 @@ const A = { userId: 'u1', orgId: 'o1' };
 const B = { userId: 'u2', orgId: 'o1' };
 
 /** Which window a count() asks about, from its where clause. */
-function scope(where: any): 'minute' | 'userDay' | 'orgMonth' | 'global' {
+function scope(where: any): 'minute' | 'userDay' | 'orgMonth' | 'global' | 'globalMonth' {
   if (where.userId) return Date.now() - where.createdAt.gte.getTime() < 120_000 ? 'minute' : 'userDay';
-  return where.orgId ? 'orgMonth' : 'global';
+  if (where.orgId) return 'orgMonth';
+  return where.createdAt.gte.getUTCDate() === 1 && where.createdAt.gte.getUTCDate() !== new Date().getUTCDate() ? 'globalMonth' : 'global';
 }
 let counts: Record<string, number>;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  counts = { minute: 0, userDay: 0, orgMonth: 0, global: 0 };
+  counts = { minute: 0, userDay: 0, orgMonth: 0, global: 0, globalMonth: 0 };
   m.count.mockImplementation(async ({ where }: any) => counts[scope(where)]);
-  Object.assign(env, { HTS_LIMIT_PER_MINUTE: 3, HTS_LIMIT_USER_DAILY: 25, HTS_LIMIT_ORG_MONTHLY: 300, HTS_LIMIT_GLOBAL_DAILY: 500 });
+  Object.assign(env, { HTS_LIMIT_PER_MINUTE: 3, HTS_LIMIT_USER_DAILY: 25, HTS_LIMIT_ORG_MONTHLY: 300, HTS_LIMIT_GLOBAL_DAILY: 500, HTS_LIMIT_GLOBAL_MONTHLY: 900 });
 });
 
 const limitError = async (p: Promise<unknown>) => {
@@ -82,6 +83,21 @@ describe('reserve', () => {
     expect(e.scope).toBe('global_daily');
     expect(e.message).not.toMatch(/500/);
     expect(e.message).toMatch(/try again later/i);
+  });
+
+  it('caps the whole platform per month (the AI budget), without exposing the number', async () => {
+    // a month-start window differs from today's only after the 1st
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-23T12:00:00Z'));
+    try {
+      counts.globalMonth = 900;
+      const e = await limitError(reserve(A));
+      expect(e.scope).toBe('global_monthly');
+      expect(e.message).not.toMatch(/900/);
+      expect(e.resetsAt.toISOString()).toBe('2026-11-01T00:00:00.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('counts only classifications that ran the AI to an answer', async () => {

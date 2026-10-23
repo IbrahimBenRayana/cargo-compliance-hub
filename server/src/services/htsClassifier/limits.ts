@@ -17,6 +17,8 @@ export interface HtsLimits {
   userDaily: number;
   orgMonthly: number;
   globalDaily: number;
+  /** Platform-wide per month: keeps classifier AI spend inside the monthly budget. */
+  globalMonthly: number;
 }
 
 /** The one place plans will set limits (pricing decision pending). */
@@ -26,10 +28,11 @@ export function limitsFor(_orgId: string): HtsLimits {
     userDaily: env.HTS_LIMIT_USER_DAILY,
     orgMonthly: env.HTS_LIMIT_ORG_MONTHLY,
     globalDaily: env.HTS_LIMIT_GLOBAL_DAILY,
+    globalMonthly: env.HTS_LIMIT_GLOBAL_MONTHLY,
   };
 }
 
-export type LimitScope = 'in_flight' | 'per_minute' | 'user_daily' | 'org_monthly' | 'global_daily';
+export type LimitScope = 'in_flight' | 'per_minute' | 'user_daily' | 'org_monthly' | 'global_daily' | 'global_monthly';
 
 export interface Usage {
   user: { used: number; limit: number; period: 'day'; resetsAt: string };
@@ -104,12 +107,13 @@ export async function reserve(who: Who): Promise<() => void> {
     running.total--;
   };
   try {
-    const [minute, userDay, orgMonth, global] = await Promise.all([
+    const [minute, userDay, orgMonth, global, globalMonth] = await Promise.all([
       // Bursts count free answers too: they still call the AI.
       prisma.htsClassification.count({ where: { orgId: who.orgId, userId: who.userId, model: { notIn: ['none', 'cache'] }, createdAt: { gte: new Date(now.getTime() - 60_000) } } }),
       count({ orgId: who.orgId, userId: who.userId, createdAt: { gte: dayStart(now) } }),
       count({ orgId: who.orgId, createdAt: { gte: monthStart(now) } }),
       count({ createdAt: { gte: dayStart(now) } }),
+      count({ createdAt: { gte: monthStart(now) } }),
     ]);
     // In-flight requests count against the shared limits (this one included).
     const orgRunning = (running.orgs.get(who.orgId) ?? 1) - 1;
@@ -132,6 +136,11 @@ export async function reserve(who: Who): Promise<() => void> {
     }
     if (global + allRunning >= limits.globalDaily) {
       throw new HtsLimitError('HTS suggestions are busy right now. Please try again later.', 'global_daily', nextDay(now));
+    }
+    if (globalMonth + allRunning >= limits.globalMonthly) {
+      // A month is too long for "try later": say when it comes back.
+      const back = nextMonth(now).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+      throw new HtsLimitError(`HTS suggestions have reached this month's capacity and return on ${back}. ${REPEATS_FREE}`, 'global_monthly', nextMonth(now));
     }
   } catch (err) {
     release();
