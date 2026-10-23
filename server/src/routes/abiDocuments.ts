@@ -2,7 +2,7 @@ import { Router, type Response } from 'express';
 import { isOverdue } from '../services/cbp/unanswered.js';
 import { buildNativeEntry } from '../services/cbp/nativeEntry.js';
 import { ch99Semantics } from '../abi-engine/duty/rateExpression.js';
-import { ch99SearchWhere } from '../abi-engine/payload/ch99.js';
+import { ch99SearchWhere, rankCh99Results } from '../abi-engine/payload/ch99.js';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
@@ -155,13 +155,12 @@ router.get('/overlay-hts', async (req: AuthRequest, res: Response): Promise<void
     where,
     select: { htsNumber: true, generalRate: true, description: true },
     orderBy: { htsNumber: 'asc' },
-    take: 25,
+    take: 500,
   });
 
   res.json({
     // 8-digit headings only: CERT accepts ch.99 numbers at 8 digits.
-    data: rows
-      .filter((r) => r.htsNumber.length === 8)
+    data: rankCh99Results(rows.filter((r) => r.htsNumber.length === 8), 25)
       .map((r) => ({
         htsNumber: r.htsNumber,
         rate: r.generalRate,

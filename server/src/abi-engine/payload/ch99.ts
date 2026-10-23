@@ -81,3 +81,16 @@ export function ch99SearchWhere(raw: string):
     ],
   };
 }
+
+/**
+ * Order picker results: 9903 trade-remedy headings (301, 232, IEEPA...) first,
+ * then 9902 temporary reductions and the rest, by number within each group,
+ * keeping the first `limit`. A word like "steel" otherwise listed only 9902
+ * lines, which sort first by number.
+ */
+export function rankCh99Results<T extends { htsNumber: string }>(rows: T[], limit: number): T[] {
+  const group = (n: string) => (n.startsWith('9903') ? 0 : 1);
+  return [...rows]
+    .sort((a, b) => group(a.htsNumber) - group(b.htsNumber) || a.htsNumber.localeCompare(b.htsNumber))
+    .slice(0, limit);
+}

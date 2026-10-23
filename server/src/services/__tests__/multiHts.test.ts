@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { abiDocumentBodySchema } from '../../schemas/abiDocument.js';
 import { migrateV1ToV2 } from '../../abi-engine/payload/migrateV1.js';
-import { orderCh99, ch99SearchWhere } from '../../abi-engine/payload/ch99.js';
+import { orderCh99, ch99SearchWhere, rankCh99Results } from '../../abi-engine/payload/ch99.js';
 import { enrichWithDuty, StaticRateSource } from '../../abi-engine/duty/engine.js';
 import { ch99Semantics, parseRateExpression } from '../../abi-engine/duty/rateExpression.js';
 import { toAeEntrySummaryInput } from '../../abi-engine/payload/toAeInput.js';
@@ -148,5 +148,14 @@ describe('CustomsCity fallback', () => {
     expect(() => mapABIDocumentToCC({ payload: body({ ch99: ['99039106'] }) as never })).toThrow(/Chapter 99/);
     const item = mapABIDocumentToCC({ payload: body() as never }).body[0].manifest[0].invoices[0].items[0];
     expect(item).not.toHaveProperty('additionalHtsNumbers');
+  });
+});
+
+// ENT-03 (testing week): a word search ("steel") listed only 9902 temporary
+// reductions; the 9903 trade-remedy lines sorted after the 25-row cut.
+describe('rankCh99Results', () => {
+  it('puts 9903 headings before 9902 ones and keeps number order within each', () => {
+    const rows = ['99021494', '99038101', '99021495', '99038002', '99020179'].map((htsNumber) => ({ htsNumber }));
+    expect(rankCh99Results(rows, 3).map((r) => r.htsNumber)).toEqual(['99038002', '99038101', '99020179']);
   });
 });
