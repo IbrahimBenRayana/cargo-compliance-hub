@@ -237,51 +237,52 @@ export const abiDocumentBodyBaseSchema = z.object({
 // that `.deepPartial()` can't survive (audit FNA-02, usage note y):
 // statement fields follow the payment type, and the statement date cannot
 // be earlier than the entry date.
-export const abiDocumentBodySchema = abiDocumentBodyBaseSchema.superRefine((b, ctx) => {
-  const { typeCode, preliminaryStatementDate, periodicStatementMonth } = b.payment;
-  const at = (field: string, message: string) =>
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['payment', field], message });
-  if (typeCode === 1) {
-    if (preliminaryStatementDate) at('preliminaryStatementDate', 'Individual payment (type 1) has no statement date');
-    if (periodicStatementMonth) at('periodicStatementMonth', 'Individual payment (type 1) has no statement month');
-    return;
+/**
+ * Entry rules beyond field shapes (payment statements, bond amount, AD/CVD vs
+ * type 03, vessel lading port). Shared by the schema below and the native
+ * send/preflight, which builds from a draft and must refuse the same things.
+ * Tolerates partial drafts: a missing section is not reported here.
+ */
+export function entryRuleIssues(b: any): Array<{ path: (string | number)[]; message: string }> {
+  const out: Array<{ path: (string | number)[]; message: string }> = [];
+  const at = (path: (string | number)[], message: string) => out.push({ path, message });
+  const p = b?.payment;
+  if (p?.typeCode !== undefined) {
+    const { typeCode, preliminaryStatementDate, periodicStatementMonth } = p;
+    if (typeCode === 1) {
+      if (preliminaryStatementDate) at(['payment', 'preliminaryStatementDate'], 'Individual payment (type 1) has no statement date');
+      if (periodicStatementMonth) at(['payment', 'periodicStatementMonth'], 'Individual payment (type 1) has no statement month');
+    } else {
+      if (!preliminaryStatementDate) {
+        at(['payment', 'preliminaryStatementDate'], 'Statement payment needs a preliminary statement date');
+      } else if (b.dates?.entryDate && preliminaryStatementDate < b.dates.entryDate) {
+        at(['payment', 'preliminaryStatementDate'], 'Preliminary Statement Date must be on or after the Entry Date');
+      }
+      const monthly = typeCode === 6 || typeCode === 7 || typeCode === 8;
+      if (monthly && !periodicStatementMonth) at(['payment', 'periodicStatementMonth'], 'Periodic monthly statement needs the statement month');
+      if (!monthly && periodicStatementMonth) at(['payment', 'periodicStatementMonth'], 'Only periodic monthly statements (types 6-8) have a statement month');
+    }
   }
-  if (!preliminaryStatementDate) {
-    at('preliminaryStatementDate', 'Statement payment needs a preliminary statement date');
-  } else if (b.dates.entryDate && preliminaryStatementDate < b.dates.entryDate) {
-    at('preliminaryStatementDate', 'Preliminary Statement Date must be on or after the Entry Date');
-  }
-  // A single transaction bond states its amount; a continuous bond never
-  // does (ESF-157/158).
-  if (b.bond.type === '9' && !b.bond.stbAmount) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['bond', 'stbAmount'], message: 'A single transaction bond needs its amount' });
-  }
-  if (b.bond.type === '8' && b.bond.stbAmount) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['bond', 'stbAmount'], message: 'A continuous bond has no transaction amount' });
-  }
-  // AD/CVD goods use the explicit AD/CVD type 03, which needs at least one
-  // case (usage note ff); other types cannot carry cases.
-  const items = b.manifest.flatMap((m) => m.invoices.flatMap((inv) => inv.items));
-  const withCases = items.some((it) => (it.adCvdCases?.length ?? 0) > 0);
-  if (b.entryType === '03' && !withCases) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['entryType'], message: 'Entry type 03 needs at least one AD/CVD case on a line' });
-  }
-  if (b.entryType !== '03' && withCases) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['entryType'], message: 'Lines with AD/CVD cases are filed as entry type 03' });
-  }
-  // Vessel entries carry the Schedule K foreign port of lading (ACE F429,
-  // live CERT 004/007); goods exported from the US have none (CERT 042).
-  if (b.modeOfTransport === '10' || b.modeOfTransport === '11') {
-    b.manifest.forEach((m, i) => {
-      const foreignExport = m.invoices.some((inv) => inv.countryOfExport !== 'US');
-      if (foreignExport && !m.ports.foreignPortOfLading) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['manifest', i, 'ports', 'foreignPortOfLading'], message: 'Vessel entries need the foreign port of lading (ACE F429)' });
+  if (b?.bond?.type === '9' && !b.bond.stbAmount) at(['bond', 'stbAmount'], 'A single transaction bond needs its amount');
+  if (b?.bond?.type === '8' && b.bond.stbAmount) at(['bond', 'stbAmount'], 'A continuous bond has no transaction amount');
+  const manifests: any[] = Array.isArray(b?.manifest) ? b.manifest : [];
+  const items = manifests.flatMap((m) => (m?.invoices ?? []).flatMap((inv: any) => inv?.items ?? []));
+  const withCases = items.some((it: any) => (it?.adCvdCases?.length ?? 0) > 0);
+  if (b?.entryType === '03' && !withCases) at(['entryType'], 'Entry type 03 needs at least one AD/CVD case on a line');
+  if (b?.entryType && b.entryType !== '03' && withCases) at(['entryType'], 'Lines with AD/CVD cases are filed as entry type 03');
+  if (b?.modeOfTransport === '10' || b?.modeOfTransport === '11') {
+    manifests.forEach((m, i) => {
+      const foreignExport = (m?.invoices ?? []).some((inv: any) => inv?.countryOfExport && inv.countryOfExport !== 'US');
+      if (foreignExport && !m?.ports?.foreignPortOfLading) {
+        at(['manifest', i, 'ports', 'foreignPortOfLading'], 'Vessel entries need the foreign port of lading (ACE F429)');
       }
     });
   }
-  const monthly = typeCode === 6 || typeCode === 7 || typeCode === 8;
-  if (monthly && !periodicStatementMonth) at('periodicStatementMonth', 'Periodic monthly statement needs the statement month');
-  if (!monthly && periodicStatementMonth) at('periodicStatementMonth', 'Only periodic monthly statements (types 6-8) have a statement month');
+  return out;
+}
+
+export const abiDocumentBodySchema = abiDocumentBodyBaseSchema.superRefine((b, ctx) => {
+  for (const issue of entryRuleIssues(b)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: issue.path, message: issue.message });
 });
 
 export type ABIDocumentBody = z.infer<typeof abiDocumentBodySchema>;

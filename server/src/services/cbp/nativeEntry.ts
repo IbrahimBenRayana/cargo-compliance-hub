@@ -13,6 +13,7 @@
  *   5. atomic claim, then transmitNative (row first; FAILED rolls back,
  *      UNKNOWN stays awaiting CBP); CBP's AX/SX settle it (entryVerdicts)
  */
+import { entryRuleIssues } from '../../schemas/abiDocument.js';
 import { prisma } from '../../config/database.js';
 import { env } from '../../config/env.js';
 import { migrateV1ToV2 } from '../../abi-engine/payload/migrateV1.js';
@@ -117,6 +118,23 @@ export async function buildNativeEntry(opts: {
   const body = doc.payload as unknown as AbiDocumentBody;
   const filer = checkEntryFiler(await loadOrgCbpConfig(opts.orgId), String(body?.entryNumber ?? ''));
   if (!filer.ok) return { ok: false, httpStatus: 422, body: { error: filer.message, code: filer.code } };
+
+  // The entry rules the schema enforces (lading port, bond amount, statement
+  // payment, AD/CVD vs type 03) apply to the native send too.
+  if (opts.action !== 'DELETE') {
+    const ruleIssues = entryRuleIssues(body);
+    if (ruleIssues.length > 0) {
+      return {
+        ok: false,
+        httpStatus: 422,
+        body: {
+          error: ruleIssues.length === 1 ? ruleIssues[0].message : 'This entry is missing required information.',
+          code: 'ENTRY_DATA_INCOMPLETE',
+          issues: ruleIssues.map((i) => ({ record: 'Entry', field: i.path.join('.'), message: i.message })),
+        },
+      };
+    }
+  }
 
   const releaseRequested = opts.action !== 'DELETE' && RELEASE_ENTRY_TYPES.has(doc.entryType);
   // Foreign invoice values become USD at CBP's certified rate (audit ENG-02).

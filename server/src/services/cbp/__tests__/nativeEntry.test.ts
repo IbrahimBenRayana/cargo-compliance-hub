@@ -100,6 +100,23 @@ describe('transmitEntryNative', () => {
     expect((await transmitEntryNative(ARGS)).body).toMatchObject({ code: 'CERTIFY_CONTACT_MISSING' });
   });
 
+  // ENT-04 (testing week): the entry rules in abiDocumentBodySchema were only
+  // enforced on the frozen legacy path; the native send skipped them.
+  it('refuses a vessel entry without the foreign port of lading before any claim', async () => {
+    const vessel = { ...PAYLOAD, modeOfTransport: '11', manifest: [{ ports: { portOfUnlading: '2704' }, invoices: [{ countryOfExport: 'CN', items: [{ parties: [SELLER] }] }] }] };
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DOC, payload: vessel });
+    const out = await transmitEntryNative(ARGS);
+    expect(out).toMatchObject({ httpStatus: 422, body: { code: 'ENTRY_DATA_INCOMPLETE' } });
+    expect(JSON.stringify(out.body)).toMatch(/foreign port of lading/);
+    expect(prisma.abiDocument.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('refuses a single transaction bond without its amount', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DOC, payload: { ...PAYLOAD, bond: { type: '9', suretyCode: '123', taxId: '57-123456789' } } });
+    const out = await transmitEntryNative(ARGS);
+    expect(out).toMatchObject({ httpStatus: 422, body: { code: 'ENTRY_DATA_INCOMPLETE', error: 'A single transaction bond needs its amount' } });
+  });
+
   it('returns CBP-rule issues from the engine validator before any claim', async () => {
     engine.validateEntrySummary.mockReturnValue([{ severity: 'F', field: 'payment', message: 'statement date on a holiday' }]);
     const out = await transmitEntryNative(ARGS);
