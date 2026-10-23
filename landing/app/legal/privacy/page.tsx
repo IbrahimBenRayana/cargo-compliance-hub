@@ -73,7 +73,7 @@ export default function PrivacyPolicyPage() {
         </p>
         <ul className="list-disc pl-5 space-y-1.5 mb-4">
           <li>
-            <strong>(a)</strong> CBP / U.S. Customs via our certified API partner CustomsCity, as
+            <strong>(a)</strong> CBP / U.S. Customs via our certified ABI gateway partner, as
             required for ISF filings and regulatory compliance.
           </li>
           <li>

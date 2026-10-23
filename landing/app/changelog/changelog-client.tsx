@@ -148,10 +148,10 @@ type FeedEntry = { date: string; title: string; kind: FeedKind };
 
 // The four launch nodes (index 0 = newest, at the top of the stream).
 const FEED_INITIAL: FeedEntry[] = [
-  { date: "AUG 6", title: "Type 86 entries", kind: "new" },
   { date: "JUL 22", title: "Public API v1", kind: "new" },
   { date: "JUL 8", title: "MFA for every account", kind: "new" },
   { date: "JUL 3", title: "Homepage rework", kind: "improved" },
+  { date: "JUN 29", title: "AI chat with human handoff", kind: "new" },
 ];
 
 // Deterministic pool cycled by index for the endless feed. No randomness —
