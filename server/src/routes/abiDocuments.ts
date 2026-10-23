@@ -35,6 +35,7 @@ import logger from '../config/logger.js';
 import { runSinglePoll, pollABIDocumentStatus } from '../services/abiPolling.js';
 import { estimateDutyForBody } from '../services/dutyEstimate.js';
 import { convertInvoiceValuesToUsd } from '../services/cbp/currency.js';
+import type { AbiDocumentBody } from '../services/abi/types.js';
 import { DbHtsRateSource } from '../abi-engine/refdata/dbRateSource.js';
 import {
   drawEntryNumber,
@@ -466,6 +467,12 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> =>
 
   try {
     const estimate = await estimateDutyForBody(doc.payload, new DbHtsRateSource(prisma.htsRateLine), { convertToUsd: convertInvoiceValuesToUsd });
+    // Block 32/35 show dollars: the same CBP-rate conversion the duty uses.
+    // A currency that cannot be converted prints as entered (the estimate
+    // then shows dashes and its issue).
+    const pdfBody = await convertInvoiceValuesToUsd(doc.payload as unknown as AbiDocumentBody)
+      .then((c) => c.body)
+      .catch(() => doc.payload);
     // Column 33 rate text: exact 10-digit rate line, falling back to the
     // 8-digit parent — same resolution DbHtsRateSource uses.
     const rateText = async (hts: string): Promise<string | null> => {
@@ -479,7 +486,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> =>
 
     const buffer = await renderEntry7501Pdf({
       doc: { id: doc.id, status: doc.status, entryNumber: doc.entryNumber, sentAt: doc.sentAt },
-      body: doc.payload,
+      body: pdfBody,
       estimate,
       rateText,
       orgName: doc.organization.name,

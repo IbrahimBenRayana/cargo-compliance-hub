@@ -90,8 +90,9 @@ function extractPdfText(raw: string): string {
   return out.join('\n');
 }
 
-async function render(status: string) {
+async function render(status: string, edit?: (b: AbiDocumentBody) => void) {
   const body = completeBody();
+  edit?.(body);
   const estimate = await estimateDutyForBody(body, RATES);
   const buffer = await renderEntry7501Pdf({
     doc: {
@@ -120,6 +121,17 @@ describe('renderEntry7501Pdf', () => {
     expect(pdf).toContain('01 - Consumption');
     expect(pdf).toContain('2704');
     expect(pdf).toContain('MAEU');
+  });
+
+  // ENT-07 (testing week): block 19 was always blank and type 03 had no name.
+  it('prints the foreign port of lading in block 19', async () => {
+    const pdf = await render('DRAFT', (b) => { b.manifest[0].ports.foreignPortOfLading = '57069'; });
+    expect(pdf).toContain('57069');
+  });
+
+  it('names entry type 03', async () => {
+    const pdf = await render('DRAFT', (b) => { b.entryType = '03'; });
+    expect(pdf).toContain('03 - AD/CVD');
   });
 
   it('renders line items with HTS, origin, value, rate, and duty', async () => {

@@ -38,6 +38,7 @@ export interface RenderEntry7501Args {
 
 const ENTRY_TYPE_LABELS: Record<string, string> = {
   '01': '01 - Consumption',
+  '03': '03 - AD/CVD',
   '11': '11 - Informal',
   '86': '86 - Sec. 321 De Minimis',
 };
@@ -241,7 +242,7 @@ export async function renderEntry7501Pdf(args: RenderEntry7501Args): Promise<Buf
     { n: '16', label: 'I.T. No.', value: '' },
     { n: '17', label: 'I.T. Date', value: '' },
     { n: '18', label: 'Missing Docs', value: '' },
-    { n: '19', label: 'Foreign Port of Lading', value: '', w: 1.3 },
+    { n: '19', label: 'Foreign Port of Lading', value: manifest?.ports?.foreignPortOfLading ?? '', w: 1.3 },
     { n: '20', label: 'U.S. Port of Unlading', value: manifest?.ports?.portOfUnlading ?? '', w: 1.3 },
   ]);
   drawCellRow([
