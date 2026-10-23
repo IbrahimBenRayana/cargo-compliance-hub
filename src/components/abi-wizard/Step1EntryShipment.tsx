@@ -5,7 +5,7 @@
  * 11 (informal). 86 (de minimis) stays listed but disabled: CBP suspended it.
  */
 import { useState } from 'react';
-import { Info, Loader2, Ship, Sparkles } from 'lucide-react';
+import { Loader2, Ship, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { abiDocumentsApi } from '@/api/client';
 import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
@@ -136,14 +136,6 @@ export default function Step1EntryShipment({ value, onChange, errors = {} }: Ste
               : 'Draws the next number from your filer block (configure blocks in Settings).'}
           </span>
         </div>
-      </div>
-
-      <div className="rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 text-xs text-amber-700 dark:text-amber-400 px-3 py-2 flex items-start gap-2">
-        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-        <span>
-          Phase 1 ships <strong>Consumption Entry (01)</strong> only. Informal
-          entries (11) will unlock in a later phase.
-        </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

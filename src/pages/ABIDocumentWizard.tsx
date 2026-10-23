@@ -175,6 +175,11 @@ export default function ABIDocumentWizard() {
   // ── Stable onChange that merges + autosaves.
   // New-flow: if we don't have an id yet, lazy-create on first change.
   const creatingRef = useRef(false);
+  // Edits made while the draft is being created. The new id swaps the route
+  // (/new -> /:id/edit), which remounts the wizard from the server copy, so
+  // these must reach the server first or they are lost (ENT-01: a drawn
+  // entry number vanished, burning a number from the block).
+  const pendingCreateRef = useRef<ABIDocumentDraft>({});
   const onChange = useCallback(
     (patch: ABIDocumentDraft) => {
       setDraft((prev) => {
@@ -182,7 +187,9 @@ export default function ABIDocumentWizard() {
 
         if (docId) {
           autosave.save(patch);
-        } else if (!creatingRef.current) {
+        } else if (creatingRef.current) {
+          pendingCreateRef.current = mergeDraft(pendingCreateRef.current, patch);
+        } else {
           creatingRef.current = true;
           createMut
             .mutateAsync({
@@ -190,8 +197,19 @@ export default function ABIDocumentWizard() {
               ...(fromManifest ? { manifestQueryId: fromManifest } : {}),
               ...(fromShipment ? { filingId: fromShipment } : {}),
             })
-            .then((res) => {
+            .then(async (res) => {
               const newId = res.data.id;
+              // Save what changed meanwhile (looping: more may arrive while saving).
+              while (Object.keys(pendingCreateRef.current).length > 0) {
+                const pending = pendingCreateRef.current;
+                pendingCreateRef.current = {};
+                try {
+                  await abiDocumentsApi.update(newId, { payload: pending });
+                } catch {
+                  toast.error('Some of your latest changes were not saved. Check this step before continuing.');
+                  break;
+                }
+              }
               setDocId(newId);
               // Seed draft from the server record so any prefill from
               // manifestQueryId becomes visible.
