@@ -14,7 +14,7 @@
  */
 import { prisma } from '../../config/database.js';
 import logger from '../../config/logger.js';
-import { isConfigured } from '../ai.js';
+import { AiRateLimitedError, isConfigured } from '../ai.js';
 import { buildIndex, candidateHeadings, linesOfHeading, retrieveCandidates, type Candidate, type ScheduleIndex, type ScheduleLine } from './retrieve.js';
 import { understandProduct, type Understanding } from './understand.js';
 import { classifyAmong, chooseHeadings, type PromptContext } from './classify.js';
@@ -169,7 +169,17 @@ async function run(
   }
 
   // Steps 1-2: understand; too vague means ask, not guess.
-  let u = await understandProduct(description, userId);
+  let u: Understanding;
+  try {
+    u = await understandProduct(description, userId);
+  } catch (err) {
+    // Our own budget is a limit the user should see; a provider failure (out
+    // of credit, outage) falls back to word matches, labelled as such.
+    if (err instanceof AiRateLimitedError) throw err;
+    logger.error({ err: (err as Error)?.message }, '[HTS] AI unavailable; word matches only');
+    const candidates = retrieveCandidates(index, [description], KEYWORD_RESULTS);
+    return candidates.length ? keywordOnly(candidates, revision, 'AI suggestions are unavailable right now.') : noMatch(null, revision);
+  }
   // A description this long names the goods; the AI still sometimes calls
   // one "too vague" (6 of 101 CBP rulings in v3's eval). Classify it, and
   // keep its questions, rather than refuse.
