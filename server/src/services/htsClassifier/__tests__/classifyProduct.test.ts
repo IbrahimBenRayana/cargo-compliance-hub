@@ -11,6 +11,7 @@ const m = vi.hoisted(() => ({
   chooseHeadings: vi.fn(),
   secondOpinion: vi.fn(),
   isConfigured: vi.fn(() => true),
+  AiRateLimitedError: class AiRateLimitedError extends Error {},
   create: vi.fn(async () => ({})),
   findMany: vi.fn(),
   findPrecedents: vi.fn(async () => [] as unknown[]),
@@ -21,7 +22,7 @@ vi.mock('../llm.js', () => ({ classifierModel: () => 'test-model', precedentEnab
 vi.mock('../understand.js', () => ({ understandProduct: m.understandProduct }));
 vi.mock('../classify.js', () => ({ classifyAmong: m.classifyAmong, chooseHeadings: m.chooseHeadings }));
 vi.mock('../verify.js', () => ({ secondOpinion: m.secondOpinion }));
-vi.mock('../../ai.js', () => ({ isConfigured: m.isConfigured, AiRateLimitedError: class extends Error {} }));
+vi.mock('../../ai.js', () => ({ isConfigured: m.isConfigured, AiRateLimitedError: m.AiRateLimitedError }));
 vi.mock('../../../config/database.js', () => ({ prisma: { htsRateLine: { findMany: m.findMany }, htsClassification: { create: m.create } } }));
 vi.mock('../../../config/logger.js', () => ({ default: { warn: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 
@@ -126,6 +127,20 @@ describe('classifyProduct', () => {
     expect(r.status).toBe('keyword_only');
     expect(r.suggestions[0]).toMatchObject({ code: '8507600010', confidence: null });
     expect(r.message).toMatch(/matching words only/);
+  });
+
+  it('falls back to word matching, labelled, when the AI provider fails (e.g. out of credit)', async () => {
+    m.understandProduct.mockRejectedValue(Object.assign(new Error('429 You have no credits remaining.'), { status: 429 }));
+    const r = await classifyProduct('lithium-ion batteries for electrically powered vehicles', ctx);
+    expect(r.status).toBe('keyword_only');
+    expect(r.suggestions[0]).toMatchObject({ code: '8507600010', confidence: null });
+    expect(r.message).toMatch(/AI suggestions are unavailable right now/);
+    expect(r.message).toMatch(/matching words only/);
+  });
+
+  it('still reports our own daily AI budget as a limit, not a fallback', async () => {
+    m.understandProduct.mockRejectedValue(new m.AiRateLimitedError('limit'));
+    await expect(classifyProduct('e-bike battery', ctx)).rejects.toBeInstanceOf(m.AiRateLimitedError);
   });
 
   it('falls back to word matching when the classify step fails', async () => {
