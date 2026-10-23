@@ -180,12 +180,16 @@ export default function ABIDocumentWizard() {
   // these must reach the server first or they are lost (ENT-01: a drawn
   // entry number vanished, burning a number from the block).
   const pendingCreateRef = useRef<ABIDocumentDraft>({});
+  // The current id, read at call time: a slow callback (the entry-number
+  // draw) may hold an onChange from before the draft existed.
+  const docIdRef = useRef(docId);
+  useEffect(() => { docIdRef.current = docId; }, [docId]);
   const onChange = useCallback(
     (patch: ABIDocumentDraft) => {
       setDraft((prev) => {
         const next = mergeDraft(prev, patch);
 
-        if (docId) {
+        if (docIdRef.current) {
           autosave.save(patch);
         } else if (creatingRef.current) {
           pendingCreateRef.current = mergeDraft(pendingCreateRef.current, patch);
@@ -214,6 +218,8 @@ export default function ABIDocumentWizard() {
               // than any later fetch: skip hydration, and lay the server's
               // prefill (manifestQueryId / filingId) under local edits.
               hydratedRef.current = true;
+              docIdRef.current = newId;
+              creatingRef.current = false;
               setDocId(newId);
               if (res.data.payload) setDraft((prev) => mergeDraft(res.data.payload as ABIDocumentDraft, prev));
               navigate(`/abi-documents/${newId}/edit`, { replace: true });
