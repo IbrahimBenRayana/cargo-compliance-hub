@@ -34,6 +34,7 @@ import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import logger from '../config/logger.js';
 import { runSinglePoll, pollABIDocumentStatus } from '../services/abiPolling.js';
 import { estimateDutyForBody } from '../services/dutyEstimate.js';
+import { convertInvoiceValuesToUsd } from '../services/cbp/currency.js';
 import { DbHtsRateSource } from '../abi-engine/refdata/dbRateSource.js';
 import {
   drawEntryNumber,
@@ -328,7 +329,8 @@ router.post('/:id/estimate-duty', async (req: AuthRequest, res: Response): Promi
 
   const result = await estimateDutyForBody(
     doc.payload,
-    new DbHtsRateSource(prisma.htsRateLine)
+    new DbHtsRateSource(prisma.htsRateLine),
+    { convertToUsd: convertInvoiceValuesToUsd },
   );
   res.json({ data: result });
 });
@@ -463,7 +465,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> =>
   }
 
   try {
-    const estimate = await estimateDutyForBody(doc.payload, new DbHtsRateSource(prisma.htsRateLine));
+    const estimate = await estimateDutyForBody(doc.payload, new DbHtsRateSource(prisma.htsRateLine), { convertToUsd: convertInvoiceValuesToUsd });
     // Column 33 rate text: exact 10-digit rate line, falling back to the
     // 8-digit parent — same resolution DbHtsRateSource uses.
     const rateText = async (hts: string): Promise<string | null> => {

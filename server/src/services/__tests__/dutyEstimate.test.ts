@@ -203,4 +203,30 @@ describe('estimateDutyForBody — incomplete or unpriceable drafts', () => {
     const result = await estimateDutyForBody({ hello: 'world' }, RATES);
     expect(result.estimable).toBe(false);
   });
+
+  // ENT-02 (testing week): a EUR invoice must be priced in dollars, at the
+  // same CBP-certified conversion the send path uses — not as raw euros.
+  it('prices a foreign-currency line on its converted dollar value', async () => {
+    const body = completeBody();
+    body.manifest[0].invoices[0].items[0].values = { currency: 'EUR', exchangeRate: 1, totalValueOfGoods: 10000 };
+    const toUsd = async (b: AbiDocumentBody) => {
+      const copy = structuredClone(b);
+      copy.manifest[0].invoices[0].items[0].values = { currency: 'USD', exchangeRate: 1, totalValueOfGoods: 11592 };
+      return { body: copy };
+    };
+    const result = await estimateDutyForBody(body, RATES, { convertToUsd: toUsd });
+    expect(result.estimable).toBe(true);
+    if (!result.estimable) return;
+    expect(result.lines[0].valueDollars).toBe(11592);
+  });
+
+  it('reports a currency that cannot be converted as an issue', async () => {
+    const body = completeBody();
+    body.manifest[0].invoices[0].items[0].values = { currency: 'GBP', exchangeRate: 1, totalValueOfGoods: 10000 };
+    const refuse = async () => { throw Object.assign(new Error('Invoices in GBP cannot be converted automatically yet; enter the value in US dollars.'), { code: 'CURRENCY_NOT_CONVERTIBLE' }); };
+    const result = await estimateDutyForBody(body, RATES, { convertToUsd: refuse });
+    expect(result.estimable).toBe(false);
+    if (result.estimable) return;
+    expect(result.issues[0].message).toMatch(/GBP cannot be converted/);
+  });
 });

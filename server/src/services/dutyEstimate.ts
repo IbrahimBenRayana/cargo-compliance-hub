@@ -102,6 +102,10 @@ export interface DutyEstimateOptions {
   /** Override the applicability date (YYYYMMDD). Defaults to the draft's
    *  entry date, falling back to today (UTC). */
   applicabilityDate?: string;
+  /** Turns foreign invoice values into USD before pricing — pass the send
+   *  path's converter (convertInvoiceValuesToUsd) so the estimate prices the
+   *  same dollars CBP gets. Its refusals come back as issues. */
+  convertToUsd?: (body: AbiDocumentBody) => Promise<{ body: AbiDocumentBody }>;
 }
 
 /**
@@ -134,7 +138,15 @@ export async function estimateDutyForBody(
   //    with RecordCodecError rather than degrading silently — surface those
   //    as issues.
   try {
-    const v2 = migrateV1ToV2(parsed.data as AbiDocumentBody);
+    let v1 = parsed.data as AbiDocumentBody;
+    if (options.convertToUsd) {
+      try {
+        ({ body: v1 } = await options.convertToUsd(v1));
+      } catch (err) {
+        return { estimable: false, issues: [{ field: 'values.currency', message: err instanceof Error ? err.message : String(err) }] };
+      }
+    }
+    const v2 = migrateV1ToV2(v1);
     const priced = await enrichWithDuty(v2, rateSource, { applicabilityDate });
     const es = priced.entrySummary;
 
