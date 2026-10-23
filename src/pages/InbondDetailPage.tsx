@@ -277,14 +277,14 @@ function RecordEventDialog({
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">
+            <Label htmlFor="inbond-event-1" className="text-xs font-medium">
               Action<span className="text-destructive ml-0.5">*</span>
             </Label>
             <Select
               value={form.action}
               onValueChange={(v) => set({ action: v as InbondEventAction })}
             >
-              <SelectTrigger>
+              <SelectTrigger id="inbond-event-1">
                 <SelectValue placeholder="What happened?" />
               </SelectTrigger>
               <SelectContent>
@@ -304,24 +304,24 @@ function RecordEventDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">
+              <Label htmlFor="inbond-event-2" className="text-xs font-medium">
                 Date occurred<span className="text-destructive ml-0.5">*</span>
               </Label>
-              <Input type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} />
+              <Input id="inbond-event-2" type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Time</Label>
-              <Input type="time" value={form.time} onChange={(e) => set({ time: e.target.value })} />
+              <Label htmlFor="inbond-event-3" className="text-xs font-medium">Time</Label>
+              <Input id="inbond-event-3" type="time" value={form.time} onChange={(e) => set({ time: e.target.value })} />
             </div>
           </div>
 
           {(isArrive || isDivert) && (
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">
+              <Label htmlFor="inbond-event-4" className="text-xs font-medium">
                 {isDivert ? 'New destination port' : 'Port of arrival'}
                 <span className="text-destructive ml-0.5">*</span>
               </Label>
-              <Input
+              <Input id="inbond-event-4"
                 className="font-mono"
                 placeholder="e.g. 2704"
                 maxLength={4}
@@ -338,10 +338,10 @@ function RecordEventDialog({
 
           {isArrive && (
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">
+              <Label htmlFor="inbond-event-5" className="text-xs font-medium">
                 FIRMS code<span className="text-destructive ml-0.5">*</span>
               </Label>
-              <Input
+              <Input id="inbond-event-5"
                 className="font-mono uppercase"
                 placeholder="e.g. E123"
                 value={form.firmsCode}
@@ -356,10 +356,10 @@ function RecordEventDialog({
           {needsBill && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">
+                <Label htmlFor="inbond-event-6" className="text-xs font-medium">
                   Bill issuer<span className="text-destructive ml-0.5">*</span>
                 </Label>
-                <Input
+                <Input id="inbond-event-6"
                   className="font-mono uppercase"
                   placeholder="SCAC"
                   value={form.billIssuerCode}
@@ -367,10 +367,10 @@ function RecordEventDialog({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">
+                <Label htmlFor="inbond-event-7" className="text-xs font-medium">
                   Bill number<span className="text-destructive ml-0.5">*</span>
                 </Label>
-                <Input
+                <Input id="inbond-event-7"
                   className="font-mono"
                   placeholder="Bill number"
                   value={form.billNumber}
@@ -382,10 +382,10 @@ function RecordEventDialog({
 
           {needsContainer && (
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">
+              <Label htmlFor="inbond-event-8" className="text-xs font-medium">
                 Container number<span className="text-destructive ml-0.5">*</span>
               </Label>
-              <Input
+              <Input id="inbond-event-8"
                 className="font-mono uppercase"
                 placeholder="e.g. MSKU1234567"
                 value={form.containerNumber}
@@ -398,10 +398,10 @@ function RecordEventDialog({
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">
+                  <Label htmlFor="inbond-event-9" className="text-xs font-medium">
                     New carrier (SCAC)<span className="text-destructive ml-0.5">*</span>
                   </Label>
-                  <Input
+                  <Input id="inbond-event-9"
                     className="font-mono uppercase"
                     placeholder="e.g. MAEU"
                     maxLength={4}
@@ -413,10 +413,10 @@ function RecordEventDialog({
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">
+                  <Label htmlFor="inbond-event-10" className="text-xs font-medium">
                     Bonded carrier ID<span className="text-destructive ml-0.5">*</span>
                   </Label>
-                  <Input
+                  <Input id="inbond-event-10"
                     className="font-mono"
                     placeholder="IRS / CBP number"
                     value={form.bondedCarrierId}
@@ -426,20 +426,20 @@ function RecordEventDialog({
               </div>
               <div className="grid grid-cols-[1fr_100px] gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">
+                  <Label htmlFor="inbond-event-11" className="text-xs font-medium">
                     City<span className="text-destructive ml-0.5">*</span>
                   </Label>
-                  <Input
+                  <Input id="inbond-event-11"
                     placeholder="Where the transfer occurs"
                     value={form.cityName}
                     onChange={(e) => set({ cityName: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">
+                  <Label htmlFor="inbond-event-12" className="text-xs font-medium">
                     State<span className="text-destructive ml-0.5">*</span>
                   </Label>
-                  <Input
+                  <Input id="inbond-event-12"
                     className="uppercase"
                     placeholder="e.g. CA"
                     maxLength={2}
@@ -453,10 +453,10 @@ function RecordEventDialog({
 
           {isDivert && (
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">
+              <Label htmlFor="inbond-event-13" className="text-xs font-medium">
                 Bonded carrier ID<span className="text-destructive ml-0.5">*</span>
               </Label>
-              <Input
+              <Input id="inbond-event-13"
                 className="font-mono"
                 placeholder="IRS / CBP number"
                 value={form.bondedCarrierId}
@@ -851,8 +851,8 @@ export default function InbondDetailPage() {
           )}
           <Separator className="my-3" />
           <p className="text-[11px] text-muted-foreground">
-            Events queue alongside the filing and transmit to CBP once the direct ABI
-            connection is live.
+            Events are saved with the filing. In-bond transmission to CBP needs its own
+            CBP certification and is not available yet.
           </p>
         </CardContent>
       </Card>

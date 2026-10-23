@@ -15,7 +15,7 @@
  *     back as structured 422 issues and are rendered above the buttons; on
  *     success the wire preview is shown and the filing is READY.
  */
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -179,29 +179,44 @@ function Field({
   className?: string;
   children: React.ReactNode;
 }) {
+  // Tie the label to its control (screen readers name the field): the id
+  // goes on an Input/NumberInput, or on a Select's trigger.
+  const id = React.useId();
+  const withId = (el: React.ReactNode): React.ReactNode => {
+    if (!React.isValidElement(el)) return el;
+    if (el.type === Select) {
+      return React.cloneElement(el as React.ReactElement<{ children?: React.ReactNode }>, {},
+        React.Children.map((el.props as { children?: React.ReactNode }).children, (c) =>
+          React.isValidElement(c) && c.type === SelectTrigger ? React.cloneElement(c as React.ReactElement<{ id?: string }>, { id }) : c));
+    }
+    return React.cloneElement(el as React.ReactElement<{ id?: string }>, { id });
+  };
   return (
     <div className={cn('space-y-1.5', className)}>
-      <Label className="text-xs font-medium">
+      <Label htmlFor={id} className="text-xs font-medium">
         {label}
         {required && <span className="text-destructive ml-0.5">*</span>}
       </Label>
-      {children}
+      {React.Children.count(children) === 1 ? withId(children) : children}
       {helper && <p className="text-[11px] text-muted-foreground leading-snug">{helper}</p>}
     </div>
   );
 }
 
 function NumberInput({
+  id,
   value,
   onChange,
   placeholder,
 }: {
+  id?: string;
   value: number | undefined;
   onChange: (v: number | undefined) => void;
   placeholder?: string;
 }) {
   return (
     <Input
+      id={id}
       type="number"
       min={1}
       step={1}
