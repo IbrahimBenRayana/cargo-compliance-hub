@@ -35,6 +35,7 @@ import { withAdvisoryLock } from './distributedLock.js';
 import { env } from '../config/env.js';
 import { processInbound } from './cbp/inboundJob.js';
 import { flagUnansweredTransmissions } from './cbp/unanswered.js';
+import { retryLeadNotifications } from './leads.js';
 
 // ─── Job State ─────────────────────────────────────────────
 
@@ -480,6 +481,7 @@ let abiStatusPollTask: ScheduledTask | null = null;
 let cbpInboundTask: ScheduledTask | null = null;
 let cbpNoAnswerTask: ScheduledTask | null = null;
 let chargeRetryTask: ScheduledTask | null = null;
+let leadNotifyRetryTask: ScheduledTask | null = null;
 
 /** Retry per-shipment charges that failed, for every delinquent org. */
 async function retryDelinquentCharges(): Promise<void> {
@@ -597,6 +599,12 @@ export function startBackgroundJobs(): void {
   }, cronOpts);
   logger.info('[Jobs] Failed-charge retry scheduled — hourly at :15 (UTC)');
 
+  leadNotifyRetryTask = cron.schedule(CRON.LEAD_NOTIFY_RETRY, () => {
+    withAdvisoryLock('jobs:lead-notify-retry', retryLeadNotifications)
+      .catch(err => logger.error({ err }, '[Jobs:LeadNotifyRetry] Unhandled'));
+  }, cronOpts);
+  logger.info('[Jobs] Lead-notification retry scheduled — every 10 minutes (UTC)');
+
   setTimeout(() => {
     checkDeadlines().catch(err => logger.error({ err }, '[Jobs:Deadlines] Initial check error'));
   }, 5000);
@@ -616,6 +624,7 @@ export function stopBackgroundJobs(): void {
   cbpInboundTask?.stop();
   cbpNoAnswerTask?.stop();
   chargeRetryTask?.stop();
+  leadNotifyRetryTask?.stop();
   statusPollTask = null;
   deadlineTask = null;
   staleCheckTask = null;
@@ -625,6 +634,7 @@ export function stopBackgroundJobs(): void {
   abiStatusPollTask = null;
   cbpInboundTask = null;
   chargeRetryTask = null;
+  leadNotifyRetryTask = null;
 }
 
 /**

@@ -25,6 +25,7 @@ import { issuePasswordSetupToken } from '../services/passwordSetup.js';
 import { sendAccountSetupEmail } from '../services/email.js';
 import { TIERS, tierById } from '../config/plans.js';
 import logger from '../config/logger.js';
+import { notifyLead } from '../services/leads.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -450,6 +451,46 @@ router.delete('/users/:id', async (req: AuthRequest, res: Response): Promise<voi
   });
   logger.info({ email: target.email, orgId: target.orgId }, '[Admin] User hard-deleted, email released');
   res.json({ success: true, releasedEmail: target.email });
+});
+
+// ─── Marketing leads (services/leads.ts) ────────────────────────────────
+// GET /api/v1/admin/leads?notification=failed&subject=demo&limit=50&before=<iso>
+// Newest first; page with `before` = the last row's createdAt.
+const leadListQuery = z.object({
+  notification: z.enum(['pending', 'sent', 'failed']).optional(),
+  subject: z.string().max(20).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  before: z.coerce.date().optional(),
+});
+
+router.get('/leads', async (req: AuthRequest, res: Response): Promise<void> => {
+  const q = leadListQuery.safeParse(req.query);
+  if (!q.success) {
+    res.status(400).json({ error: 'Invalid query', details: q.error.flatten() });
+    return;
+  }
+  const { notification, subject, limit, before } = q.data;
+  const where = {
+    ...(notification ? { notificationStatus: notification } : {}),
+    ...(subject ? { subject } : {}),
+    ...(before ? { createdAt: { lt: before } } : {}),
+  };
+  const [leads, failedCount] = await Promise.all([
+    prisma.lead.findMany({ where, orderBy: { createdAt: 'desc' }, take: limit }),
+    prisma.lead.count({ where: { notificationStatus: 'failed' } }),
+  ]);
+  res.json({ leads, failedCount });
+});
+
+// POST /api/v1/admin/leads/:id/notify — resend the team notification now.
+router.post('/leads/:id/notify', async (req: AuthRequest, res: Response): Promise<void> => {
+  const lead = await prisma.lead.findUnique({ where: { id: String(req.params.id) } }).catch(() => null);
+  if (!lead) {
+    res.status(404).json({ error: 'Lead not found' });
+    return;
+  }
+  const sent = await notifyLead(lead);
+  res.json({ success: sent });
 });
 
 export default router;

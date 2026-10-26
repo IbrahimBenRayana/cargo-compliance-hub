@@ -34,6 +34,8 @@ export const CRON = {
   CBP_NO_ANSWER: '4-59/5 * * * *',
   /** Hourly at :15 — retry per-shipment charges that failed (delinquent orgs). */
   CHARGE_RETRY: '15 * * * *',
+  /** Every 10 minutes — retry failed marketing-lead notifications. */
+  LEAD_NOTIFY_RETRY: '*/10 * * * *',
 } as const;
 
 /**

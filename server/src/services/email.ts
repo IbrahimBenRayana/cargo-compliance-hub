@@ -89,6 +89,7 @@ export async function verifyEmailConnection(): Promise<boolean> {
 interface SendMailOptions {
   to: string | string[];
   cc?: string | string[];
+  replyTo?: string;
   subject: string;
   html: string;
   text?: string;
@@ -112,6 +113,7 @@ async function sendMail(options: SendMailOptions): Promise<boolean> {
       from: `"${env.EMAIL_FROM_NAME}" <${env.EMAIL_FROM}>`,
       to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
       ...(options.cc ? { cc: Array.isArray(options.cc) ? options.cc.join(', ') : options.cc } : {}),
+      ...(options.replyTo ? { replyTo: options.replyTo } : {}),
       subject: options.subject,
       html: options.html,
       text: options.text ?? stripHtml(options.html),
