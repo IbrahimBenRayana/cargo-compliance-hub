@@ -1,29 +1,54 @@
-// Client-side Sentry init (audit Phase 10). Next.js picks this up
-// automatically as the browser bundle's entry; the dsn is baked in via
-// NEXT_PUBLIC_SENTRY_DSN at build time.
-import * as Sentry from "@sentry/nextjs";
+// Client-side Sentry entry (audit Phase 10). Next.js runs this before the
+// app hydrates; the dsn is baked in via NEXT_PUBLIC_SENTRY_DSN at build time.
+//
+// The SDK itself (lib/sentry-client.ts) is loaded lazily once the page is idle
+// so it stays out of first-load JS. Until then this shim buffers uncaught
+// errors and rejections from first paint, and the first one pulls the SDK in
+// immediately, so nothing is lost while it loads.
+type SentryClient = typeof import("./lib/sentry-client");
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
-if (dsn) {
-  Sentry.init({
-    dsn,
-    environment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT || "production",
-    release: process.env.NEXT_PUBLIC_SENTRY_RELEASE || undefined,
-    tracesSampleRate: 0.1,
-    // Replay sessions on errors only — landing has fewer interactions to
-    // record than the app, but a marketing-site crash is high-impact, so
-    // turning replay on gives us a free recording when one happens.
-    replaysOnErrorSampleRate: 1.0,
-    replaysSessionSampleRate: 0,
-    sendDefaultPii: false,
-    integrations: [
-      Sentry.replayIntegration({
-        maskAllText: false, // marketing copy is public
-        blockAllMedia: false,
-      }),
-    ],
+let sdk: SentryClient | undefined;
+let loading: Promise<void> | undefined;
+const early: Array<[unknown, "onerror" | "onunhandledrejection"]> = [];
+
+function onError(event: ErrorEvent) {
+  early.push([event.error ?? event.message, "onerror"]);
+  loadSentry();
+}
+
+function onRejection(event: PromiseRejectionEvent) {
+  early.push([event.reason, "onunhandledrejection"]);
+  loadSentry();
+}
+
+function loadSentry() {
+  if (!dsn || loading) return;
+  loading = import("./lib/sentry-client").then((client) => {
+    client.initSentry(dsn);
+    // Sentry.init installed its own global handlers synchronously above, so
+    // hand over in the same tick: no gap and no double reporting.
+    removeEventListener("error", onError);
+    removeEventListener("unhandledrejection", onRejection);
+    sdk = client;
+    for (const [error, type] of early.splice(0)) client.captureEarlyError(error, type);
   });
 }
 
-// Track router transitions in App Router pages.
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+if (dsn && typeof window !== "undefined") {
+  addEventListener("error", onError);
+  addEventListener("unhandledrejection", onRejection);
+
+  const whenIdle = () => {
+    if ("requestIdleCallback" in window) requestIdleCallback(loadSentry, { timeout: 3000 });
+    else setTimeout(loadSentry, 1000);
+  };
+  if (document.readyState === "complete") whenIdle();
+  else addEventListener("load", whenIdle, { once: true });
+}
+
+// Track router transitions in App Router pages (once the SDK is loaded; the
+// pageload span still covers the initial navigation).
+export function onRouterTransitionStart(href: string, navigationType: string) {
+  sdk?.onRouterTransitionStart(href, navigationType);
+}
