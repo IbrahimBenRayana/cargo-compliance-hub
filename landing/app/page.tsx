@@ -15,6 +15,7 @@ import { softwareApplication, type OfferInput } from "@/lib/schema";
 import { CTA, ROUTES, ctaHref } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import PersonaRouter, { type RouterCard } from "./home-client";
+import { articleHref, publishedArticles } from "./resources/_content/articles";
 
 /**
  * Home `/` (build plan T4). Copy: copy/home.md (verbatim). Rhythm:
@@ -276,6 +277,7 @@ function ProofChip({ value, label }: { value: string; label: string }) {
 /* ------------------------------------------------------------------ */
 
 export default function HomePage() {
+  const latestGuide = publishedArticles()[0];
   return (
     <>
       <JsonLd
@@ -529,15 +531,18 @@ export default function HomePage() {
       <Section tone="mesh" id="faq" width="narrow" aria-labelledby="s9-title">
         <SectionHeading id="s9-title" title="Straight answers." />
         <Faq className="mt-8" items={FAQ} />
-        <p className="mt-8 text-[14.5px] text-tone-muted">
-          Latest guide:{" "}
-          <Link
-            href={ROUTES.isfLateFilingPenalties.href}
-            className="font-semibold text-tone-fg underline decoration-current/30 underline-offset-4 hover:decoration-current"
-          >
-            {ROUTES.isfLateFilingPenalties.label}
-          </Link>
-        </p>
+        {/* Only a published guide: held-back articles are noindex and unlisted. */}
+        {latestGuide && (
+          <p className="mt-8 text-[14.5px] text-tone-muted">
+            Latest guide:{" "}
+            <Link
+              href={articleHref(latestGuide.slug)}
+              className="font-semibold text-tone-fg underline decoration-current/30 underline-offset-4 hover:decoration-current"
+            >
+              {latestGuide.shortTitle}
+            </Link>
+          </p>
+        )}
       </Section>
 
       {/* S10 · Final CTA band */}
