@@ -46,24 +46,22 @@ const nextConfig: NextConfig = {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
   async redirects() {
+    // site-architecture §3: every retired URL goes straight to its final URL
+    // (no chains). Next answers 308, which Google treats as a 301. Keep these
+    // for at least 12 months. Order matters: specific /features/* first.
     return [
-      // Phase 1 IA shift: /features/<slug> deep-pages move to /platform/<slug>.
-      // Keep /features as the overview hub.
-      {
-        source: "/features/isf-filing",
-        destination: "/platform/filings",
-        permanent: true,
-      },
-      {
-        source: "/features/compliance",
-        destination: "/platform/compliance",
-        permanent: true,
-      },
-      {
-        source: "/features/team",
-        destination: "/platform/automation#team",
-        permanent: true,
-      },
+      { source: "/features/isf-filing", destination: "/platform/isf-filing", permanent: true },
+      { source: "/features/compliance", destination: "/platform/compliance", permanent: true },
+      { source: "/features/team", destination: "/security", permanent: true },
+      { source: "/features/:path*", destination: "/platform", permanent: true },
+      { source: "/platform/filings", destination: "/platform/isf-filing", permanent: true },
+      { source: "/platform/ai", destination: "/platform/pre-filing-checks", permanent: true },
+      { source: "/platform/lifecycle", destination: "/platform/inbox", permanent: true },
+      { source: "/platform/automation", destination: "/platform/inbox", permanent: true },
+      { source: "/why-mycargolens", destination: "/compare", permanent: true },
+      { source: "/tools", destination: "/resources", permanent: true },
+      // Bylines are the company, not a person: author pages are retired.
+      { source: "/resources/authors/:slug*", destination: "/resources", permanent: true },
     ];
   },
 };

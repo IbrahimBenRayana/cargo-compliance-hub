@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* next-themes toggles a `.dark` class on <html>; make `dark:` follow it (not
+   the OS media query), and let a dark band (<Section tone="navy">) scope its
+   own subtree to dark tokens by carrying the same class. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
     /* Light — Tinted neutral + Deep Navy. Slightly darker than pure white so
@@ -31,6 +36,47 @@
     /* Logo (Focus Frame) — frame is navy on light; "Lens" word is dark-gold. */
     --logo-frame: 222 47% 22%;
     --logo-lens: 38 92% 44%;
+
+    /* ---- Site rebuild (Oct 2026): section tones + module accents ------
+       Source: wireframes README "Round 3". Every tone is one flat background
+       colour plus the text tokens that must sit on it. Light tones
+       get a dark-mode pair below that keeps the band's hue on a dark base.
+       navy / ink are always dark: <Section> adds `.dark` to them. */
+    --paper: 220 33% 99%;
+    /* Founder decision (Oct 26): flat colours only, no gradients or meshes.
+       The dot grid on hero/paper is a texture, kept subtle. */
+    --tone-hero-bg:
+      radial-gradient(hsl(222 47% 22% / 0.06) 1px, transparent 1.2px) 0 0 / 22px 22px,
+      hsl(var(--paper));
+    --tone-mesh-bg: hsl(205 50% 95%);
+    --tone-paper-bg:
+      radial-gradient(hsl(222 47% 22% / 0.05) 1px, transparent 1.2px) 0 0 / 22px 22px,
+      hsl(var(--paper));
+    --tone-cream-bg: hsl(40 82% 94%);
+    --tone-sky-bg: hsl(214 92% 95%);
+    --tone-mint-bg: hsl(166 50% 93%);
+    --tone-lilac-bg: hsl(253 78% 96%);
+    --tone-peach-bg: hsl(19 95% 95%);
+    --tone-footer-bg: hsl(221 39% 94%);
+    /* Text on light tones: navy ink headings, AA body, navy eyebrows. */
+    --tone-fg: 222 47% 11%;
+    --tone-muted: 220 18% 32%;
+    --tone-eyebrow: 222 35% 36%;
+    /* Surfaces that sit on a tone (cards, screenshot bezels). */
+    --surface: 0 0% 100% / 0.86;
+    --surface-border: 222 47% 22% / 0.09;
+    --surface-shadow: 0 1px 2px hsl(222 47% 20% / 0.05), 0 18px 40px -22px hsl(222 47% 20% / 0.28);
+
+    /* Module accents: hue (icon tiles, dots, borders), ink (text-safe AA on
+       light tones), soft (card tint). ISF/Entry follow the app's lifecycle. */
+    --isf: 221 83% 53%;        --isf-ink: 224 76% 42%;        --isf-soft: 214 95% 95%;
+    --entry: 262 62% 56%;      --entry-ink: 262 55% 45%;      --entry-soft: 258 85% 96%;
+    --inbox: 178 72% 32%;      --inbox-ink: 180 80% 24%;      --inbox-soft: 174 60% 93%;
+    --checks: 152 62% 36%;     --checks-ink: 155 70% 25%;     --checks-soft: 150 55% 93%;
+    --compliance: 14 80% 54%;  --compliance-ink: 12 72% 40%;  --compliance-soft: 18 95% 95%;
+    --api: 336 64% 50%;        --api-ink: 336 64% 38%;        --api-soft: 336 80% 96%;
+    /* Generic accent (navy) used when no module is set. */
+    --a: 222 47% 30%; --a-ink: 222 47% 22%; --a-soft: 220 40% 94%;
   }
   .dark {
     /* Dark — Obsidian + Amber Gold */
@@ -56,6 +102,38 @@
     /* Logo (Focus Frame) — frame is light-grey on dark; "Lens" word is bright gold. */
     --logo-frame: 222 30% 64%;
     --logo-lens: 43 96% 56%;
+
+    /* ---- Site rebuild: dark pairs. Same hue per band on a dark base;
+       text tokens lifted so body copy stays AA (>= 4.5:1). */
+    --paper: 222 47% 5%;
+    --tone-hero-bg:
+      radial-gradient(hsl(0 0% 100% / 0.045) 1px, transparent 1.2px) 0 0 / 22px 22px,
+      hsl(var(--paper));
+    --tone-mesh-bg: hsl(205 38% 9%);
+    --tone-paper-bg:
+      radial-gradient(hsl(0 0% 100% / 0.035) 1px, transparent 1.2px) 0 0 / 22px 22px,
+      hsl(var(--paper));
+    --tone-cream-bg: hsl(36 30% 10%);
+    --tone-sky-bg: hsl(215 46% 12%);
+    --tone-mint-bg: hsl(170 40% 9%);
+    --tone-lilac-bg: hsl(254 32% 12%);
+    --tone-peach-bg: hsl(18 34% 10%);
+    --tone-footer-bg: hsl(222 44% 7%);
+    --tone-fg: 210 40% 97%;
+    --tone-muted: 216 28% 76%;
+    --tone-eyebrow: 205 90% 78%;
+    --muted-foreground: 216 22% 70%;
+    --surface: 222 45% 14% / 0.72;
+    --surface-border: 0 0% 100% / 0.10;
+    --surface-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.06), 0 20px 40px -24px hsl(0 0% 0% / 0.6);
+
+    --isf: 217 91% 62%;        --isf-ink: 214 95% 78%;        --isf-soft: 221 50% 16%;
+    --entry: 262 75% 68%;      --entry-ink: 258 90% 82%;      --entry-soft: 262 35% 17%;
+    --inbox: 176 62% 45%;      --inbox-ink: 172 66% 70%;      --inbox-soft: 178 45% 12%;
+    --checks: 152 55% 48%;     --checks-ink: 150 60% 70%;     --checks-soft: 152 40% 12%;
+    --compliance: 14 85% 62%;  --compliance-ink: 18 95% 76%;  --compliance-soft: 14 40% 14%;
+    --api: 336 75% 62%;        --api-ink: 336 85% 80%;        --api-soft: 336 35% 15%;
+    --a: 215 30% 70%; --a-ink: 210 40% 92%; --a-soft: 222 40% 16%;
   }
 }
 
@@ -80,6 +158,17 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+
+
+  /* Module accent (set per element via .acc-<module>, see lib/accents.ts) */
+  --color-a: hsl(var(--a));
+  --color-a-ink: hsl(var(--a-ink));
+  --color-a-soft: hsl(var(--a-soft));
+  /* Text tokens of the surrounding <Section tone> */
+  --color-tone-fg: hsl(var(--tone-fg));
+  --color-tone-muted: hsl(var(--tone-muted));
+  --color-tone-eyebrow: hsl(var(--tone-eyebrow));
+  --color-navy: hsl(222 47% 22%);
 
   /* Gold palette */
   --color-gold: hsl(43 96% 56%);
@@ -217,6 +306,51 @@
   }
   :is(.dark) .text-gold-eyebrow {
     color: hsl(43 96% 62%);
+  }
+}
+
+
+/* ---- Section tones (used only through <Section tone=…>) ------------- */
+@layer components {
+  .tone-hero { background: var(--tone-hero-bg); }
+  .tone-mesh { background: var(--tone-mesh-bg); }
+  .tone-paper { background: var(--tone-paper-bg); }
+  .tone-cream { background: var(--tone-cream-bg); }
+  .tone-sky { background: var(--tone-sky-bg); }
+  .tone-mint { background: var(--tone-mint-bg); }
+  .tone-lilac { background: var(--tone-lilac-bg); }
+  .tone-peach { background: var(--tone-peach-bg); }
+  .tone-footer { background: var(--tone-footer-bg); }
+  .tone-navy { background: hsl(222 52% 11%); }
+  .tone-ink { background: hsl(224 50% 7%); }
+  /* Dark bands: README body text hsl(216 30% 78%) on navy (AA). */
+  .tone-navy, .tone-ink {
+    --tone-fg: 210 40% 97%;
+    --tone-muted: 216 30% 78%;
+    --tone-eyebrow: 205 90% 78%;
+    --muted-foreground: 216 30% 78%;
+    --border: 0 0% 100% / 0.12;
+    color: hsl(var(--tone-fg));
+  }
+  .tone-hero, .tone-mesh, .tone-paper, .tone-cream, .tone-sky, .tone-mint, .tone-lilac, .tone-peach, .tone-footer, .tone-navy, .tone-ink { color: hsl(var(--tone-fg)); }
+
+  /* Module accents: <el className={accentClass("isf")}> */
+  .acc-isf { --a: var(--isf); --a-ink: var(--isf-ink); --a-soft: var(--isf-soft); }
+  .acc-entry { --a: var(--entry); --a-ink: var(--entry-ink); --a-soft: var(--entry-soft); }
+  .acc-inbox { --a: var(--inbox); --a-ink: var(--inbox-ink); --a-soft: var(--inbox-soft); }
+  .acc-checks { --a: var(--checks); --a-ink: var(--checks-ink); --a-soft: var(--checks-soft); }
+  .acc-compliance { --a: var(--compliance); --a-ink: var(--compliance-ink); --a-soft: var(--compliance-soft); }
+  .acc-api { --a: var(--api); --a-ink: var(--api-ink); --a-soft: var(--api-soft); }
+  /* A module page tints its eyebrows with its accent ink (light tones). */
+  .acc-isf, .acc-entry, .acc-inbox, .acc-checks, .acc-compliance, .acc-api { --tone-eyebrow: var(--a-ink); }
+  .tone-navy:is(.acc-isf, .acc-entry, .acc-inbox, .acc-checks, .acc-compliance, .acc-api),
+  .tone-ink:is(.acc-isf, .acc-entry, .acc-inbox, .acc-checks, .acc-compliance, .acc-api) { --tone-eyebrow: 205 90% 78%; }
+
+  /* Card surface that reads on every tone, light or dark. */
+  .site-surface {
+    background: hsl(var(--surface));
+    border: 1px solid hsl(var(--surface-border));
+    box-shadow: var(--surface-shadow);
   }
 }
 
