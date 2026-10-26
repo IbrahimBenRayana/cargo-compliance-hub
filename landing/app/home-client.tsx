@@ -13,7 +13,7 @@ import { ClosingCta } from "@/components/sections/closing-cta";
  * passages (the 1998 contrast band and the closing CTA) so the page
  * itself argues the product thesis: one calm surface.
  *
- * 1. Hero — the inbox itself in the first viewport, on every device.
+ * 1. Hero — the 3D hero (the inbox rising from the sea).
  * 2. Contrast — customs software stuck in 1998, then the calm queue.
  * 3. Workflow — file / triage / fix inside one product window.
  * 4. Watchtower — HTS, ADD/CVD, UFLPA, PGA + the automation strip.
