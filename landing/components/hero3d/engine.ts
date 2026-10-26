@@ -178,7 +178,7 @@ function createWorld(canvas: HTMLCanvasElement, opts: WorldOpts = {}) {
   const rim = new THREE.DirectionalLight("#FFD98A", dark ? 1.4 : 0.9); rim.position.set(6, 5, -9); scene.add(rim);
 
   // shadow catcher floor (transparent, only the shadow shows)
-  const floorMat = new THREE.ShadowMaterial({ opacity: dark ? 0.45 : 0.16 });
+  const floorMat = new THREE.ShadowMaterial({ opacity: dark ? 0.6 : 0.16 });
   const floorR = opts.floorR || 9;
   floorMat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader.replace("void main() {", "varying vec2 vFl;\nvoid main() {\n vFl = position.xy;");
@@ -186,18 +186,29 @@ function createWorld(canvas: HTMLCanvasElement, opts: WorldOpts = {}) {
   };
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(floorR * 2, floorR * 2), floorMat);
   floor.rotation.x = -Math.PI / 2; floor.position.y = opts.floorY ?? -0.01; floor.receiveShadow = true; scene.add(floor);
+  // Dark theme: a black shadow on a near-black page is invisible, so the
+  // diorama sits on a faint pool of cool light that the shadows darken.
+  if (dark) {
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(floorR * 1.7, floorR * 1.7), new THREE.MeshBasicMaterial({ map: glowTex(), color: "#5E78A8", transparent: true, opacity: 0.2, depthWrite: false, toneMapped: false }));
+    pool.rotation.x = -Math.PI / 2; pool.position.y = floor.position.y - 0.005; pool.renderOrder = -1; scene.add(pool);
+  }
 
   // ---------------- material library
   const std = (color: THREE.ColorRepresentation, o: THREE.MeshStandardMaterialParameters = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05, ...o });
   const M = {
     navy: std(C.navy, { roughness: 0.45 }), navyDeep: std(C.navyDeep, { roughness: 0.4 }),
-    steel: std(C.steel), denim: std(C.denim), slate: std(C.slate), mist: std(C.mist),
-    porcelain: std(C.porcelain, { roughness: 0.6 }), paper: std(C.paper, { roughness: 0.7 }),
+    steel: std(C.steel), denim: std(C.denim), slate: std(C.slate), mist: dark ? std("#3A4A6E") : std(C.mist),
+    // plinths and quays: porcelain on the light page, a raised navy-slate on the dark one
+    porcelain: dark ? std("#2A3958", { roughness: 0.5, metalness: 0.15 }) : std(C.porcelain, { roughness: 0.6 }),
+    paper: std(C.paper, { roughness: 0.7 }),
+    // ship bridges, truck cabs, trolleys: stay white in both themes
+    white: std(C.porcelain, { roughness: 0.6 }),
     gold: std(C.gold, { roughness: 0.28, metalness: 0.55, emissive: C.goldDark, emissiveIntensity: 0.18 }),
-    goldGlow: std(C.gold, { roughness: 0.3, metalness: 0.2, emissive: C.gold, emissiveIntensity: 0.7 }),
-    emerald: std(C.emerald, { emissive: C.emerald, emissiveIntensity: 0.35 }),
-    rose: std(C.rose, { emissive: C.rose, emissiveIntensity: 0.35 }),
-    amber: std(C.amber, { emissive: C.amber, emissiveIntensity: 0.3 }),
+    // emissives read hotter against a dark page: pull them back there
+    goldGlow: std(C.gold, { roughness: 0.3, metalness: 0.2, emissive: C.gold, emissiveIntensity: dark ? 0.5 : 0.7 }),
+    emerald: std(C.emerald, { emissive: C.emerald, emissiveIntensity: dark ? 0.25 : 0.35 }),
+    rose: std(C.rose, { emissive: C.rose, emissiveIntensity: dark ? 0.25 : 0.35 }),
+    amber: std(C.amber, { emissive: C.amber, emissiveIntensity: dark ? 0.22 : 0.3 }),
     glass: new THREE.MeshPhysicalMaterial({ color: "#DCE8FA", roughness: 0.04, metalness: 0, clearcoat: 1, transparent: true, opacity: 0.22, depthWrite: false, envMapIntensity: 1.6 }),
   };
 
@@ -257,8 +268,8 @@ function createWorld(canvas: HTMLCanvasElement, opts: WorldOpts = {}) {
     // superstructure (bridge) at the stern
     const bx = xs + 0.75;
     const bridge = new THREE.Group();
-    const b1 = mesh(rbox(1.1, 2.7, B * 0.8, 0.06), M.porcelain); b1.position.set(0, 1.35, 0); bridge.add(b1);
-    const b2 = mesh(rbox(1.25, 0.38, B * 1.02, 0.05), M.porcelain); b2.position.set(0.05, 2.86, 0); bridge.add(b2);
+    const b1 = mesh(rbox(1.1, 2.7, B * 0.8, 0.06), M.white); b1.position.set(0, 1.35, 0); bridge.add(b1);
+    const b2 = mesh(rbox(1.25, 0.38, B * 1.02, 0.05), M.white); b2.position.set(0.05, 2.86, 0); bridge.add(b2);
     const win1 = mesh(rbox(0.02, 0.12, B * 0.96, 0.01), M.navyDeep, false); win1.position.set(0.68, 2.88, 0); bridge.add(win1);
     const fun = mesh(rbox(0.42, 0.7, 0.5, 0.08), M.navy); fun.position.set(-0.32, 3.3, 0); bridge.add(fun);
     const band = mesh(rbox(0.44, 0.1, 0.52, 0.04), M.gold); band.position.set(-0.32, 3.48, 0); bridge.add(band);
@@ -393,9 +404,11 @@ function createWorld(canvas: HTMLCanvasElement, opts: WorldOpts = {}) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color, transparent: true, opacity, depthWrite: false, blending: dark ? THREE.AdditiveBlending : THREE.NormalBlending }));
     s.scale.set(size, size, 1); return s;
   }
+  // Pill labels follow the theme unless a scene sets its own colours
+  const pillDefaults = (o: PillOpts): PillOpts => (dark && !o.bg ? { bg: "#16233F", color: "#F3F5F9", border: "rgba(140,153,184,.4)", ...o } : o);
   // Billboard pill label
   function pill(text: string, o: PillOpts = {}) {
-    const t = tex(pillTex(text, o)), h = o.h || 0.42;
+    const t = tex(pillTex(text, pillDefaults(o))), h = o.h || 0.42;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(h * t.userData.aspect, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, toneMapped: false, depthWrite: false }));
     m.renderOrder = 10; m.userData.billboard = true; m.userData.tex = t; return m;
   }
@@ -429,7 +442,7 @@ function createWorld(canvas: HTMLCanvasElement, opts: WorldOpts = {}) {
     for (const sx of [-1, 1]) { const tie = mesh(rbox(0.14, 0.14, span + 0.16, 0.04), mat); tie.position.set(sx * 0.5, h * 0.55, 0); g.add(tie); }
     const boom = mesh(rbox(o.reach || 7, 0.22, 0.5, 0.05), mat); boom.position.set((o.reach || 7) / 2 - 1.6, h + 0.1, 0); g.add(boom);
     const cab = mesh(rbox(0.5, 0.4, 0.55, 0.06), M.gold); cab.position.set(0, h - 0.2, 0); g.add(cab);
-    const trolley = mesh(rbox(0.42, 0.18, 0.56, 0.04), M.porcelain); trolley.position.set(2, h - 0.05, 0); g.add(trolley);
+    const trolley = mesh(rbox(0.42, 0.18, 0.56, 0.04), M.white); trolley.position.set(2, h - 0.05, 0); g.add(trolley);
     g.userData.trolley = trolley; return shadowed(g);
   }
 
@@ -445,7 +458,7 @@ function createWorld(canvas: HTMLCanvasElement, opts: WorldOpts = {}) {
   function truck(o: { cabMat?: THREE.Material; container?: boolean; color?: string } = {}) {
     const g = new THREE.Group();
     const ch = mesh(rbox(3.0, 0.14, 0.86, 0.05), M.navyDeep); ch.position.set(-0.2, 0.42, 0); g.add(ch);
-    const cab = mesh(rbox(0.9, 1.0, 0.96, 0.12), o.cabMat || M.porcelain); cab.position.set(1.65, 0.92, 0); g.add(cab);
+    const cab = mesh(rbox(0.9, 1.0, 0.96, 0.12), o.cabMat || M.white); cab.position.set(1.65, 0.92, 0); g.add(cab);
     const ws = mesh(rbox(0.04, 0.34, 0.84, 0.02), M.navyDeep, false); ws.position.set(2.1, 1.15, 0); g.add(ws);
     const stripe = mesh(rbox(0.92, 0.08, 0.98, 0.03), M.gold, false); stripe.position.set(1.65, 0.62, 0); g.add(stripe);
     const wg = cached("wheel", () => { const w = new THREE.CylinderGeometry(0.24, 0.24, 0.2, 24); w.rotateX(Math.PI / 2); return w; });
@@ -494,7 +507,7 @@ function createWorld(canvas: HTMLCanvasElement, opts: WorldOpts = {}) {
   const api = { THREE, scene, camera, renderer, C, M, E, lerp, clamp, win, env, rng, TAU, lite, dark,
     container, containerField, ship, sea, wake, slab, card, fadeCard, focusFrame, glow, pill, clockRing, packet, tube, crane,
     // canvasTex / cardFace / pillTex are registered so dispose() frees them
-    cardFace: (o: CardFaceOpts) => tex(cardFace(o)), pillTex: (text: string, o?: PillOpts) => tex(pillTex(text, o)), canvasTex: ctex,
+    cardFace: (o: CardFaceOpts) => tex(cardFace(o)), pillTex: (text: string, o: PillOpts = {}) => tex(pillTex(text, pillDefaults(o))), canvasTex: ctex,
     rr, get FONT() { return FONT; }, MONO, rbox, mesh, shadowed, faceCam, clip, cyl, truck, tileTex, key, rim, hemi, floor, camPos, camTarget,
     add<O extends THREE.Object3D>(o: O) { scene.add(o); o.traverse((c) => { if (c.userData && c.userData.billboard) billboards.push(c); }); return o; },
     billboard<O extends THREE.Object3D>(o: O) { billboards.push(o); return o; },
@@ -513,6 +526,8 @@ export interface MountOpts {
   lite: boolean;
   /** called after the first live frame has been drawn */
   onReady?: () => void;
+  /** draw this one moment (seconds) and stop: used to render the posters */
+  still?: number;
 }
 
 // Mount a hero on a canvas: run loop, camera fit, pointer parallax, pause when
@@ -582,6 +597,7 @@ export function mountHero(canvas: HTMLCanvasElement, sceneDef: SceneDef, opts: M
   // multi-second long task on low-end phones.
   W.renderer.compileAsync(W.scene, W.camera).catch(() => {}).then(() => {
     if (disposed) return;
+    if (opts.still !== undefined) { frame(opts.still); opts.onReady?.(); return; }
     io.observe(canvas);
     document.addEventListener("visibilitychange", onVis);
     loop();

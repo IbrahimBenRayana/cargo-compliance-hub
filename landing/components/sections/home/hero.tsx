@@ -3,13 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Magnetic } from "@/components/ui/magnetic";
-import { Donut } from "@/components/ui/donut";
-import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
-import { MacWindow } from "@/components/ui/mac-window";
 import { HeroBackground } from "@/components/sections/hero-background";
 import { Hero3D } from "@/components/hero3d/Hero3D";
 import { cn } from "@/lib/utils";
@@ -25,62 +21,9 @@ const STATS: { value: string; label: string }[] = [
   { value: "314-day", label: "clocks tracked" },
 ];
 
-type QueueRow = {
-  id: string;
-  title: string;
-  meta: string;
-  score: number;
-  tone: "rose" | "amber" | "emerald";
-  pill: string;
-  pillTone: Severity;
-  /** Hidden on small screens to keep the mobile hero compact. */
-  desktopOnly?: boolean;
-};
-
-const QUEUE: QueueRow[] = [
-  {
-    id: "INV-4421",
-    title: "CBP rejected — INV-4421",
-    meta: "Manufacturer party missing tax ID · Open AI coach to fix",
-    score: 42,
-    tone: "rose",
-    pill: "Rejected",
-    pillTone: "rose",
-  },
-  {
-    id: "INV-4502",
-    title: "ISF-10 deadline in 4h — INV-4502",
-    meta: "MBOL MAEU9381-2 · Vessel arriving Long Beach 18:30",
-    score: 78,
-    tone: "amber",
-    pill: "4h",
-    pillTone: "amber",
-  },
-  {
-    id: "Entry-230-1148293-5",
-    title: "PSC window closing — Entry 230-1148293-5",
-    meta: "11 days to PSC · 53 days to liquidation",
-    score: 88,
-    tone: "amber",
-    pill: "PSC",
-    pillTone: "amber",
-    desktopOnly: true,
-  },
-  {
-    id: "drafts-3",
-    title: "3 drafts ready for review",
-    meta: "Templates · AI pre-flight available · Bulk submit",
-    score: 96,
-    tone: "emerald",
-    pill: "Ready",
-    pillTone: "emerald",
-  },
-];
-
 /**
- * Homepage hero. The 3D hero (the inbox rising from the sea) fills the
- * visual slot; the inbox itself sits directly under the hero row so the
- * "an inbox, not a dashboard" claim is still shown, not just told.
+ * Homepage hero. The visual slot is the 3D hero (the inbox rising from the
+ * sea); real product screenshots belong in the page content below.
  */
 export function Hero() {
   return (
@@ -184,111 +127,6 @@ export function Hero() {
             <Hero3D scene="home" />
           </div>
         </div>
-
-        {/* The inbox itself, directly under the hero */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.25, ease: EASE_OUT_EXPO }}
-          className="relative mx-auto mt-12 min-w-0 max-w-3xl md:mt-16"
-        >
-          {/* Soft gold halo behind the window */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -inset-x-8 -top-10 bottom-0"
-            style={{
-              background:
-                "radial-gradient(ellipse 60% 55% at 55% 30%, hsl(43 96% 56% / 0.14) 0%, transparent 70%)",
-            }}
-          />
-          <MacWindow
-            urlBar="app.mycargolens.com/compliance"
-            className="relative"
-            contentClassName="p-4 sm:p-5"
-          >
-            {/* Today's brief */}
-            <div className="mb-4 flex items-center gap-4">
-              <Donut value={86} tone="gold" size={56} strokeWidth={3.5} showLabel delay={1} />
-              <div className="min-w-0 flex-1">
-                <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  <Sparkles size={12} className="text-gold-dark dark:text-gold" aria-hidden />
-                  Today&apos;s brief
-                </div>
-                <p className="truncate text-[13px] font-medium leading-snug text-foreground sm:whitespace-normal">
-                  3 drafts waiting on you. One rejection blocking re-file —
-                  open the coach first.
-                </p>
-              </div>
-            </div>
-
-            {/* Queue header */}
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="relative flex size-1.5">
-                  <span
-                    aria-hidden
-                    className="absolute inline-flex size-full rounded-full bg-emerald-500/60 motion-safe:animate-ping"
-                  />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-                </span>
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Action queue
-                </span>
-              </div>
-              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
-                ranked by urgency
-              </span>
-            </div>
-
-            {/* Queue rows */}
-            <motion.ul
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: {},
-                visible: {
-                  transition: { staggerChildren: 0.07, delayChildren: 0.75 },
-                },
-              }}
-              className="flex flex-col gap-2"
-            >
-              {QUEUE.map((row) => (
-                <motion.li
-                  key={row.id}
-                  variants={{
-                    hidden: { opacity: 0, x: -10 },
-                    visible: {
-                      opacity: 1,
-                      x: 0,
-                      transition: { duration: 0.45, ease: EASE_OUT_QUART },
-                    },
-                  }}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 p-2.5 sm:p-3",
-                    row.desktopOnly && "hidden sm:flex",
-                  )}
-                >
-                  <Donut value={row.score} tone={row.tone} size={30} delay={1.2} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[12.5px] font-semibold text-foreground">
-                      {row.title}
-                    </div>
-                    <div className="truncate text-[11px] text-muted-foreground">
-                      {row.meta}
-                    </div>
-                  </div>
-                  <SeverityPill tone={row.pillTone}>{row.pill}</SeverityPill>
-                </motion.li>
-              ))}
-            </motion.ul>
-
-            {/* Live footer strip */}
-            <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2.5 font-mono text-[10px] tabular-nums text-muted-foreground">
-              <span>Polling CBP every 5 minutes</span>
-              <span className="hidden sm:inline">Last ping: 14s ago</span>
-            </div>
-          </MacWindow>
-        </motion.div>
       </Container>
     </section>
   );

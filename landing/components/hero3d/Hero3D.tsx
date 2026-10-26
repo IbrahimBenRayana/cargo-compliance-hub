@@ -35,11 +35,8 @@ export const HERO_SCENES = {
 
 export type HeroSlug = keyof typeof HERO_SCENES;
 
-/** Scenes drawn for a dark stage only; they use the same poster in both themes. */
-const DARK_ONLY: ReadonlySet<HeroSlug> = new Set(["api"]);
-
 // Poster files in /public/hero: 1512x1240 desktop and 780x720 mobile (both 2x),
-// transparent, light + dark. Re-rendered from the prototypes at the scene's poster time.
+// transparent, light + dark, rendered from this engine at the scene's poster time.
 const DESKTOP = { width: 1512, height: 1240 };
 const MOBILE = { width: 780, height: 720 };
 const MOBILE_MQ = "(max-width: 767px)";
@@ -107,8 +104,8 @@ export function Hero3D({ scene, className }: Props) {
   const [live, setLive] = React.useState(false);
   const { resolvedTheme, systemTheme } = useTheme();
   const reduceMotion = useReducedMotion();
-  const darkOnly = DARK_ONLY.has(scene);
-  const dark = darkOnly || resolvedTheme === "dark";
+  // every scene follows the site theme (engine dark lighting + dark posters)
+  const dark = resolvedTheme === "dark";
   // Before hydration the poster follows the OS colour scheme; once the
   // resolved theme is known, a manual toggle that disagrees wins.
   const themeOverride =
@@ -160,7 +157,7 @@ export function Hero3D({ scene, className }: Props) {
         });
         stage.appendChild(canvas);
         const c = canvas;
-        handle = mountHero(c, { ...def, dark: def.dark || dark }, {
+        handle = mountHero(c, { ...def, dark }, {
           lite: isLite(),
           onReady: () => {
             if (cancelled) return;
@@ -184,8 +181,8 @@ export function Hero3D({ scene, className }: Props) {
     };
   }, [scene, dark, reduceMotion]);
 
-  const light = darkOnly ? `${scene}` : scene;
-  const darkName = darkOnly ? `${scene}` : `${scene}-dark`;
+  const light = scene;
+  const darkName = `${scene}-dark`;
   const src = (name: string, mobile: boolean) =>
     getImageProps({
       src: `/hero/${name}${mobile ? "-m" : ""}.webp`,
@@ -218,7 +215,7 @@ export function Hero3D({ scene, className }: Props) {
       />
       <div ref={stageRef} className="absolute inset-0">
         <picture>
-          {themeOverride === null && !darkOnly && (
+          {themeOverride === null && (
             <>
               <source media={`${DARK_MQ} and ${MOBILE_MQ}`} srcSet={src(darkName, true)} {...MOBILE} />
               <source media={DARK_MQ} srcSet={src(darkName, false)} {...DESKTOP} />

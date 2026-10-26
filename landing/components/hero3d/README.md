@@ -31,6 +31,6 @@ The scene is loaded with a plain `import()` inside the effect, not with `next/dy
 
 `/public/hero/<slug>.webp` is the desktop poster (1512×1240, 2x) and `<slug>-m.webp` is the mobile one (780×720, 2x). Each has a `-dark` variant. They have transparent backgrounds, so the page background and the CSS gold glow show through, and they are rendered at the scene's `poster:` time.
 
-`api` is dark-only and uses the same file in both themes.
+Every scene follows the site theme: the engine's `dark` flag switches the light rig, plinth and label colours, emissive levels and adds a light pool under the diorama so contact shadows read on the dark page.
 
-After you change a scene, re-render its posters from the prototype pages with the marketing `render.mjs`. Set `deviceScaleFactor: 2`, render with transparent backgrounds, and render a dark pass with `dark: true`.
+The posters are rendered from this engine, not from the prototypes. After you change the engine or a scene, re-render them: bundle `engine.ts` and the scenes with esbuild into a small page, call `mountHero(canvas, { ...scene, dark }, { lite, still: scene.poster })` in headless Chromium at 756×620 (desktop, full tier) and 390×360 (mobile, lite tier), both at `deviceScaleFactor: 2`, and screenshot with a transparent background. Then convert with `cwebp -q 82 -alpha_q 90`. The harness used for this PR is in the hero-3d side-session notes (`hero3d-poster-harness/`).

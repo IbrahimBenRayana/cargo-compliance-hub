@@ -1,15 +1,20 @@
-// API · "An ISF API your TMS can file through" (dark)
+// API · "An ISF API your TMS can file through"
 // Your TMS on the left, MyCargoLens on the right. JSON requests travel over on the top lane,
 // signed webhooks come back gold on the lower lane when CBP answers.
 import type { SceneDef } from "../engine";
 
 export const scene: SceneDef = {
-  dark: true, loop: 12, poster: 5.4, radius: 6.2, exposure: 1.05,
+  loop: 12, poster: 5.4, radius: 6.2, exposure: 1.05,
   camera: { pos: [6, 6.5, 14], target: [0, 2.2, 0], fov: 26 },
   build(W) {
     const { THREE, C, M, E, win, env, lerp, TAU } = W;
     // glowing floor grid that fades out
-    const grid = new THREE.GridHelper(22, 44, '#3D5A8A', '#22355C'); grid.material.transparent = true; grid.material.opacity = .35; W.add(grid);
+    const grid = new THREE.GridHelper(16, 32, W.dark ? '#3D5A8A' : '#AEBAD2', W.dark ? '#22355C' : '#C9D1E3'); grid.material.transparent = true; grid.material.opacity = W.dark ? .35 : .5; W.add(grid);
+    // fade the grid out radially so it never ends in a hard edge
+    grid.material.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying vec2 vG;\nvoid main() {\n vG = position.xz;');
+      sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'varying vec2 vG;\nvoid main() {').replace('#include <fog_fragment>', '#include <fog_fragment>\n gl_FragColor.a *= 1.0 - smoothstep(3.0, 7.5, length(vG));');
+    };
     const plate = W.add(W.slab(12, .2, 6, new THREE.MeshStandardMaterial({ color: '#111D36', roughness: .35, metalness: .3 }), .1));
     // TMS block
     const codeTex = W.canvasTex(640, 800, (g) => {
