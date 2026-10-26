@@ -273,7 +273,7 @@ export default function ApiPage() {
       {/* S8 Final CTA band */}
       <CtaBand
         title="Bring your developer and your ops lead"
-        sub="Book a 30-minute API walkthrough. We'll show a filing created, submitted and answered over the API, and the webhook landing on the other side."
+        sub="Book a 20-minute API walkthrough. We'll show a filing created, submitted and answered over the API, and the webhook landing on the other side."
         cta="apiWalkthrough"
         persona="developer"
         src={SRC}

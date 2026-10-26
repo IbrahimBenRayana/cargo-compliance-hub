@@ -150,6 +150,7 @@ export default function CustomsEntryPage() {
               <p className="text-[14px] font-medium text-tone-fg">
                 Suggestions, not rulings. We don&apos;t publish an accuracy figure.
               </p>
+              <p className="text-[13.5px]">HTS suggestions are on every plan. The duty calculator is on the Complete plan.</p>
             </>
           }
         />

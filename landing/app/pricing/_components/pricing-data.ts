@@ -67,15 +67,14 @@ export const TIERS: Tier[] = [
     name: "Complete",
     price: 280,
     accent: "compliance",
-    who: "You also want container tracking, duty estimates and HTS help in the same place.",
+    who: "You also want container tracking and duty estimates in the same place.",
     includes: [
       "Everything in ISF + Entry",
       "Container tracking with vessel ETAs and last free day",
       "Duty calculator",
-      "HTS suggestions with reasoning",
       "Priority support",
     ],
-    md: "Adds container tracking, duty calculator, HTS suggestions.",
+    md: "Adds container tracking and the duty calculator.",
   },
 ];
 
@@ -86,7 +85,7 @@ export const UNDER_CARDS =
 
 export const ON_EVERY_PLAN = [
   "The inbox: open work ranked by urgency",
-  "Rule checks on every draft, and an AI review on any draft",
+  "Rule checks on every draft, an AI review on any draft, and HTS suggestions with reasoning",
   "CBP rejections in plain English with numbered fix steps",
   "CBP responses picked up every minute",
   "ADD/CVD orders pulled daily; UFLPA and PGA flags",
@@ -147,10 +146,10 @@ export const FAQ = [
   },
   {
     q: "Is $180 cheaper than my broker?",
-    a: "Often it's about the same as a typical broker fee. What changes is that you see and check every filing under your name, a linked ISF and entry is billed once, and rejected filings are never charged.",
+    a: "Often it's about the same as a typical broker fee. What changes is that you see and check every ISF and entry you file, a linked ISF and entry is billed once, and rejected filings are never charged.",
   },
   {
-    q: "Is there a monthly fee or setup fee?",
+    q: "Is there a monthly fee?",
     a: "There's no monthly fee on the ISF Filing, ISF + Entry or Complete plans.",
   },
   {
@@ -179,9 +178,13 @@ export const FAQ = [
 export function pricingMarkdown(): string {
   return [
     "# MyCargoLens pricing",
+    "",
     "Per shipment, charged when CBP accepts the shipment. Card on file. No monthly fee on public plans.",
+    "",
     ...TIERS.map((t) => `- ${t.name}: ${usd(t.price)} ${PER}. ${t.md}`),
-    "Not charged: drafts, manifest queries, rejected filings, resubmits and amendments.",
+    "",
+    "On every plan: HTS suggestions with reasoning, rule checks and an AI review on any draft, and CBP rejections in plain English.",
+    "Not charged: drafts, manifest queries and rejected filings. Resubmits and amendments never charge a shipment twice.",
     "Volume and API pricing for NVOCCs, forwarders and customs brokers: on request (book a demo).",
     "MyCargoLens is software, not a licensed customs broker.",
     "",

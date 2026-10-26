@@ -170,10 +170,13 @@ export default function CompliancePage() {
           eyebrow="Classification help"
           title="HTS suggestions with the reasoning shown"
           body={
-            <p>
-              Describe the goods. MyCargoLens suggests an HTS code, a few alternatives, and why each one might fit. Your
-              team or your broker picks the code.
-            </p>
+            <>
+              <p>
+                Describe the goods. MyCargoLens suggests an HTS code, a few alternatives, and why each one might fit. Your
+                team or your broker picks the code.
+              </p>
+              <p className="text-[13.5px]">HTS suggestions are on every plan.</p>
+            </>
           }
           actions={
             <p className="rounded-2xl border border-[hsl(var(--a)/0.3)] bg-a-soft px-4 py-3 text-[15px] leading-relaxed text-tone-fg">

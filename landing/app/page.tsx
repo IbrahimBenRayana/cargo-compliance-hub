@@ -71,7 +71,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "If something goes wrong, who is liable?",
-    a: "The importer of record, whoever transmits the filing. That's why it helps to see and check every filing under your name before it goes to CBP.",
+    a: "The importer of record, whoever transmits the filing. That's why it helps to see and check every ISF and entry you file before it goes to CBP.",
   },
   {
     q: "What does it cost?",

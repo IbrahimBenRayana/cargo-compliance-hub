@@ -30,7 +30,7 @@ export const HERO: Record<DemoPersona, { title: string; sub: string }> = {
   },
   nvocc: {
     title: "Talk to us about volume pricing.",
-    sub: "30 minutes on your house bills: the deadline clock on every ISF, bulk submit and the API. We put volume terms in writing.",
+    sub: "20 minutes on your house bills: the deadline clock on every ISF, bulk submit and the API. We put volume terms in writing.",
   },
   broker: {
     title: "Talk to us about a pilot.",
@@ -38,7 +38,7 @@ export const HERO: Record<DemoPersona, { title: string; sub: string }> = {
   },
   developer: {
     title: "Book an API walkthrough.",
-    sub: "30 minutes with the people who built the API: auth, payloads, JSON or XML, and signed webhooks.",
+    sub: "20 minutes with the people who built the API: auth, payloads, JSON or XML, and signed webhooks.",
   },
   other: {
     title: "Tell us what you need.",

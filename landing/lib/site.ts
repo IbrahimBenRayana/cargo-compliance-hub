@@ -530,7 +530,7 @@ export const CTA_BANDS: Record<CtaBandVariant, CtaBandCopy> = {
   },
   developer: {
     title: "See the API with the people who built it.",
-    sub: "REST or XML, scoped keys and HMAC-signed webhooks. 30 minutes.",
+    sub: "REST or XML, scoped keys and HMAC-signed webhooks. 20 minutes.",
     cta: "apiWalkthrough",
     persona: "developer",
     pricingLink: false,
