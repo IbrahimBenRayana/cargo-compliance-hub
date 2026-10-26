@@ -37,6 +37,8 @@ export default function NotFound() {
       scene="not-found"
     >
       <div className="mx-auto max-w-[720px] text-left">
+        {/* The sub already introduces the cards; the h2 keeps headings in order (h1 > h2 > h3). */}
+        <h2 className="sr-only">Popular pages</h2>
         <CardGrid columns={2} items={CARDS} />
         <div className="mt-8 flex flex-col items-center gap-4 text-center">
           <DemoButton location="section" src="404" size="lg" />
