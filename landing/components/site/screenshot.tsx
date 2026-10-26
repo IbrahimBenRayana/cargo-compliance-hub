@@ -1,6 +1,5 @@
 import * as React from "react";
 import Image from "next/image";
-import { ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SCREENS, type ScreenKey } from "@/lib/screens";
 
@@ -10,12 +9,13 @@ type CommonProps = {
   className?: string;
 };
 
-export type ScreenshotProps = CommonProps &
-  (
-    | {
+/**
+ * Real captures only. There is deliberately no placeholder variant: a visible
+ * "coming soon" frame reads as "not built". With no capture, drop the visual.
+ */
+export type ScreenshotProps = CommonProps & {
         /** Key in lib/screens.ts (file in /public/screens). */
         screen: ScreenKey;
-        placeholder?: never;
         /** Override the default alt text. Use "" only when the copy beside it says the same. */
         alt?: string;
         /** URL-bar text. Defaults to app.mycargolens.com + the screen's route. */
@@ -26,19 +26,7 @@ export type ScreenshotProps = CommonProps &
         eager?: boolean;
         /** Crop to an aspect ratio (top-left anchored), e.g. "16/10". */
         aspect?: string;
-      }
-    | {
-        screen?: never;
-        /** "Not captured" surface: what the screen will show. */
-        placeholder: string;
-        alt?: never;
-        url?: string;
-        sizes?: never;
-        eager?: never;
-        /** Aspect of the placeholder surface. Default "16/10". */
-        aspect?: string;
-      }
-  );
+      };
 
 const BEZEL =
   "rounded-[22px] p-1.5 bg-[hsl(var(--card)/0.6)] ring-1 ring-[hsl(var(--surface-border))] shadow-[0_2px_4px_hsl(222_47%_20%/0.06),0_24px_60px_-24px_hsl(222_47%_20%/0.45)] dark:shadow-[0_40px_90px_-30px_hsl(0_0%_0%/0.7)]";
@@ -51,7 +39,7 @@ const BEZEL =
  */
 export function Screenshot(props: ScreenshotProps) {
   const { caption, className } = props;
-  const meta = props.screen ? SCREENS[props.screen] : null;
+  const meta = SCREENS[props.screen];
   const isPhone = meta && "phone" in meta && meta.phone;
 
   let body: React.ReactNode;
@@ -79,26 +67,6 @@ export function Screenshot(props: ScreenshotProps) {
           <WindowBar url={props.url ?? `app.mycargolens.com${meta.route === "/" ? "" : meta.route}`} />
           <div className="overflow-hidden" style={props.aspect ? { aspectRatio: props.aspect } : undefined}>
             {img}
-          </div>
-        </div>
-      </div>
-    );
-  } else {
-    body = (
-      <div className={BEZEL}>
-        <div className="overflow-hidden rounded-[17px] bg-[hsl(var(--card))] ring-1 ring-[hsl(var(--surface-border))]">
-          <WindowBar url={props.url ?? "app.mycargolens.com"} />
-          <div
-            role="img"
-            aria-label={`Screen not captured yet: ${props.placeholder}`}
-            className="grid place-items-center bg-[radial-gradient(hsl(var(--foreground)/0.08)_1px,transparent_1.2px)] bg-[length:18px_18px] p-6 text-center"
-            style={{ aspectRatio: props.aspect ?? "16/10" }}
-          >
-            <div className="max-w-xs">
-              <ImageOff aria-hidden className="mx-auto size-6 text-muted-foreground" />
-              <p className="mt-3 text-[14px] font-semibold text-foreground">{props.placeholder}</p>
-              <p className="mt-1 text-[12.5px] text-muted-foreground">Screen coming soon.</p>
-            </div>
           </div>
         </div>
       </div>

@@ -137,10 +137,6 @@ export default function PreFilingChecksPage() {
               </p>
             </>
           }
-          screenshot={{
-            placeholder: "AI review of a draft: two findings, each with Apply and Dismiss",
-            url: "app.mycargolens.com/shipments",
-          }}
         />
       </Section>
 
@@ -161,10 +157,6 @@ export default function PreFilingChecksPage() {
               </p>
             </>
           }
-          screenshot={{
-            placeholder: "A CBP rejection in plain English, with numbered fix steps",
-            url: "app.mycargolens.com/shipments",
-          }}
         />
       </Section>
 

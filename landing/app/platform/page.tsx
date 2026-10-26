@@ -140,11 +140,7 @@ export default function PlatformPage() {
               title: "Start from what you filed last time",
               body: "Reuse saved parties, ports, HTS codes and bond details from a template, or clone any past filing. Group house bills under one master for a consolidation, and submit up to 20 drafts at once. When the ISF is accepted, the entry starts prefilled from it with the bond carried over.",
               media: (
-                <Screenshot
-                  placeholder="Template picker"
-                  url="app.mycargolens.com/shipments/new"
-                  aspect="16/10"
-                />
+                <Screenshot screen="app-isf-consolidation" aspect="16/10" sizes="(min-width: 1024px) 260px, 100vw" />
               ),
             },
             {

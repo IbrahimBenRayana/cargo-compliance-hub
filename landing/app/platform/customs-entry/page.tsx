@@ -151,10 +151,6 @@ export default function CustomsEntryPage() {
               </p>
             </>
           }
-          screenshot={{
-            placeholder: "HTS suggestions: one suggested code and two alternatives, each with its reasoning",
-            url: "app.mycargolens.com/abi-documents",
-          }}
         />
       </Section>
 

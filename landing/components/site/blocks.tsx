@@ -44,9 +44,17 @@ export function FeatureSplit({
   as: H = "h2",
   className,
 }: FeatureSplitProps) {
+  // No visual: one readable column instead of an empty half (never a placeholder).
+  const hasVisual = Boolean(screenshot || media);
   return (
-    <div className={cn("grid items-center gap-10 lg:grid-cols-2 lg:gap-16", accentClass(accent), className)}>
-      <div className={cn("min-w-0", reverse && "lg:order-2")}>
+    <div
+      className={cn(
+        hasVisual ? "grid items-center gap-10 lg:grid-cols-2 lg:gap-16" : "max-w-3xl",
+        accentClass(accent),
+        className,
+      )}
+    >
+      <div className={cn("min-w-0", hasVisual && reverse && "lg:order-2")}>
         {eyebrow && <Eyebrow className="mb-3">{eyebrow}</Eyebrow>}
         <H className="text-[26px] font-semibold leading-[1.12] tracking-[-0.028em] text-tone-fg sm:text-[32px] md:text-[36px]">
           {title}
@@ -55,9 +63,11 @@ export function FeatureSplit({
         {bullets && bullets.length > 0 && <CheckList items={bullets} className="mt-6" />}
         {actions && <div className="mt-8 flex flex-wrap items-center gap-3">{actions}</div>}
       </div>
-      <div className={cn("min-w-0", reverse && "lg:order-1")}>
-        {screenshot ? <Screenshot {...screenshot} /> : media}
-      </div>
+      {hasVisual && (
+        <div className={cn("min-w-0", reverse && "lg:order-1")}>
+          {screenshot ? <Screenshot {...screenshot} /> : media}
+        </div>
+      )}
     </div>
   );
 }

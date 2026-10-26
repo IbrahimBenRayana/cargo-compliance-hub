@@ -125,10 +125,6 @@ export default function CompliancePage() {
               false alarm on your entry.
             </p>
           }
-          screenshot={{
-            placeholder: "Recent ADD/CVD updates, each marked reviewed",
-            url: "app.mycargolens.com/compliance",
-          }}
         />
       </Section>
 
@@ -184,10 +180,6 @@ export default function CompliancePage() {
               code you haven&apos;t checked.
             </p>
           }
-          screenshot={{
-            placeholder: "HTS suggestion: one suggested code and two alternatives, each with its reasoning",
-            url: "app.mycargolens.com/compliance",
-          }}
         />
       </Section>
 
@@ -207,10 +199,6 @@ export default function CompliancePage() {
             </>
           }
           actions={<InlineLink href={ROUTES.customsEntry.href}>File the entry with these numbers</InlineLink>}
-          screenshot={{
-            placeholder: "Duty calculator result: rate, MPF, HMF and total for one line",
-            url: "app.mycargolens.com/compliance",
-          }}
         />
       </Section>
 
