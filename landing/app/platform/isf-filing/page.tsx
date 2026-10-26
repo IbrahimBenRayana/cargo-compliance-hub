@@ -4,7 +4,6 @@ import { FeatureSplit } from "@/components/site/blocks";
 import { Screenshot } from "@/components/site/screenshot";
 import { ROUTES } from "@/lib/site";
 import {
-  CloseBand,
   CodeBlock,
   FaqSection,
   ModuleHero,
@@ -14,6 +13,7 @@ import {
   TextLinks,
   pageMetadata,
 } from "../_components/module-page";
+import { CtaBand, PRICING_LINK } from "@/components/site/cta-band";
 import { DeadlineChips } from "./_components/deadline-chips";
 
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/platform-isf-filing.md
@@ -284,10 +284,11 @@ Authorization: Bearer mcl_live_…
         ]}
       />
 
-      <CloseBand
+      <CtaBand
         title="See your own ISFs on the clock"
-        body="Book a 20-minute demo. Bring a recent house bill and we'll file a sample ISF in a demo account while you watch."
+        sub="Book a 20-minute demo. Bring a recent house bill and we'll file a sample ISF in a demo account while you watch."
         src={SRC}
+        links={[PRICING_LINK]}
       />
     </>
   );

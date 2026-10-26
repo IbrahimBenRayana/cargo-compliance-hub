@@ -4,7 +4,6 @@ import { FeatureSplit } from "@/components/site/blocks";
 import { SecondaryCta } from "@/components/site/cta";
 import { ROUTES } from "@/lib/site";
 import {
-  CloseBand,
   FaqSection,
   ModuleHero,
   PageSchema,
@@ -12,6 +11,7 @@ import {
   TextLinks,
   pageMetadata,
 } from "../_components/module-page";
+import { CtaBand, PRICING_LINK } from "@/components/site/cta-band";
 
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/platform-customs-entry.md
 const PATH = ROUTES.customsEntry.href;
@@ -212,10 +212,11 @@ export default function CustomsEntryPage() {
 
       <FaqSection title="Questions about filing entries" items={FAQ} accent="entry" />
 
-      <CloseBand
+      <CtaBand
         title="See an entry built from your own ISF"
-        body="Book a 20-minute demo. We'll file a sample ISF and entry in a demo account, on shipments like yours."
+        sub="Book a 20-minute demo. We'll file a sample ISF and entry in a demo account, on shipments like yours."
         src={SRC}
+        links={[PRICING_LINK]}
       />
     </>
   );

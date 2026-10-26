@@ -11,7 +11,8 @@ import { JsonLd } from "@/components/site/json-ld";
 import { Button } from "@/components/ui/button";
 import { webPage } from "@/lib/schema";
 import { ROUTES } from "@/lib/site";
-import { InlineLink, ModuleCloseBand } from "../pre-filing-checks/_components/module-close-band";
+import { CtaBand } from "@/components/site/cta-band";
+import { InlineLink } from "../pre-filing-checks/_components/module-links";
 import { CodePanel } from "./_components/code-panel";
 import { EndpointTable } from "./_components/endpoint-table";
 import { KeyList } from "./_components/key-list";
@@ -270,13 +271,13 @@ export default function ApiPage() {
       </Section>
 
       {/* S8 Final CTA band */}
-      <ModuleCloseBand
+      <CtaBand
         title="Bring your developer and your ops lead"
-        body="Book a 30-minute API walkthrough. We'll show a filing created, submitted and answered over the API, and the webhook landing on the other side."
+        sub="Book a 30-minute API walkthrough. We'll show a filing created, submitted and answered over the API, and the webhook landing on the other side."
         cta="apiWalkthrough"
         persona="developer"
         src={SRC}
-        link={{ label: "Volume and API pricing", href: VOLUME }}
+        links={[{ label: "Volume and API pricing", href: VOLUME, id: "see_pricing" }]}
       />
     </>
   );

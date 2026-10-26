@@ -10,7 +10,7 @@ import { JsonLd } from "@/components/site/json-ld";
 import { graph, organization, webPage, ORG_ID } from "@/lib/schema";
 import { ACCENTS, accentClass } from "@/lib/accents";
 import { COMPANY, ROUTES } from "@/lib/site";
-import { CloseBand } from "./_components/close-band";
+import { CtaBand } from "@/components/site/cta-band";
 
 const TITLE = "About us: ISF and customs entry software";
 const DESCRIPTION =
@@ -241,7 +241,7 @@ export default function AboutPage() {
       </Section>
 
       {/* 9. Close */}
-      <CloseBand
+      <CtaBand
         title="Meet us on a 20-minute demo."
         sub="We'll look at how you file today, show you the inbox on shipments like yours, and tell you what it would cost. If it fits, we set up your team."
         src="about-close"

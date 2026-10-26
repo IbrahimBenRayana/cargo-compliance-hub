@@ -22,7 +22,7 @@ import { JsonLd } from "@/components/site/json-ld";
 import { Button } from "@/components/ui/button";
 import { webPage } from "@/lib/schema";
 import { ROUTES } from "@/lib/site";
-import { CloseBand } from "../about/_components/close-band";
+import { CtaBand } from "@/components/site/cta-band";
 
 const TITLE = "Security and data handling";
 const DESCRIPTION =
@@ -399,11 +399,11 @@ export default function SecurityPage() {
       </Section>
 
       {/* 11. Close */}
-      <CloseBand
+      <CtaBand
         title="Have a security review to run? Start with a demo."
         sub="We'll show you roles, MFA and the CBP submission log in the product, and answer your questionnaire after."
         src="security-close"
-        link={{ label: "Email our security answers request", href: QUESTIONNAIRE_MAILTO }}
+        links={[{ label: "Email our security answers request", href: QUESTIONNAIRE_MAILTO }]}
       />
     </>
   );

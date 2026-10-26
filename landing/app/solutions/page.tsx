@@ -10,7 +10,8 @@ import { Faq, type FaqItem } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
 import { webPage } from "@/lib/schema";
 import { ROUTES, ctaHref } from "@/lib/site";
-import { ClosingBand, PriceLine, pageMetadata } from "./_components/page-bits";
+import { CtaBand, PRICING_LINK } from "@/components/site/cta-band";
+import { PriceLine, pageMetadata } from "./_components/page-bits";
 
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/solutions.md
 const PATH = ROUTES.solutions.href;
@@ -161,11 +162,11 @@ export default function SolutionsPage() {
         <Faq className="mt-8" items={FAQ} />
       </Section>
 
-      <ClosingBand
+      <CtaBand
         title="Twenty minutes, your filings, your price."
         sub="Tell us how you file today. We'll show you the parts that matter and what it would cost."
         src="solutions-close"
-        links={[{ label: "See pricing", href: ROUTES.pricing.href }]}
+        links={[PRICING_LINK]}
         micro="Pay per shipment, only when CBP accepts. No monthly fee on the public plans."
       />
     </>

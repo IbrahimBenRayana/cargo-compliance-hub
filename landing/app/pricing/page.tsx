@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Section, SectionHeading, Eyebrow } from "@/components/site/section";
+import { CtaBand } from "@/components/site/cta-band";
 import { PageHero } from "@/components/site/page-hero";
 import { DemoButton } from "@/components/site/cta";
 import { CheckList } from "@/components/site/blocks";
@@ -266,36 +267,20 @@ export default function PricingPage() {
         <Faq className="mt-8" items={FAQ} />
       </Section>
 
-      {/* S9 · Final CTA band (pricing copy; the shared CtaBand has no custom-copy slot) */}
-      <Section tone="navy" id="book-a-demo-band" data-cta-band="" aria-labelledby="cta-band-title" className="text-center">
-        <div className="mx-auto max-w-2xl">
-          <Eyebrow>Book a demo</Eyebrow>
-          <h2
-            id="cta-band-title"
-            className="mt-3 text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] text-tone-fg sm:text-[40px]"
-          >
-            Find out which plan fits in 20 minutes.
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-[16px] leading-relaxed text-tone-muted sm:text-[17px]">
-            Tell us what you ship and how you file today. We&apos;ll show you the inbox on shipments like yours and set
-            your team up on the right plan.
-          </p>
-          <div className="mt-8 flex flex-col items-center gap-4">
-            <DemoButton src="pricing-close" location="close" size="lg" />
-            <p className="text-[13px] text-tone-muted">
-              Pay per shipment, only when CBP accepts. No monthly fee on the public plans.
-            </p>
-            <Link
-              href={ctaHref({ persona: "nvocc", src: "pricing-close" })}
-              data-cta-id={CTA.volumePricing.id}
-              data-location="close"
-              className={cn(textLink, "text-[14px]")}
-            >
-              Filing at volume? Talk to us about volume pricing →
-            </Link>
-          </div>
-        </div>
-      </Section>
+      {/* S9 · Final CTA band */}
+      <CtaBand
+        title="Find out which plan fits in 20 minutes."
+        sub="Tell us what you ship and how you file today. We'll show you the inbox on shipments like yours and set your team up on the right plan."
+        src="pricing-close"
+        links={[
+          {
+            label: "Filing at volume? Talk to us about volume pricing →",
+            href: ctaHref({ persona: "nvocc", src: "pricing-close" }),
+            id: CTA.volumePricing.id,
+          },
+        ]}
+        micro="Pay per shipment, only when CBP accepts. No monthly fee on the public plans."
+      />
 
       <StickyDemoBar persona="importer" src="pricing-sticky" />
     </>

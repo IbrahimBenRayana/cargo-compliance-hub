@@ -10,7 +10,8 @@ import { JsonLd } from "@/components/site/json-ld";
 import { StickyDemoBar } from "@/components/site/sticky-demo-bar";
 import { webPage } from "@/lib/schema";
 import { ROUTES } from "@/lib/site";
-import { ArrowLink, ClosingBand, DashList, OutlineLink, TrustPill, pageMetadata } from "../_components/page-bits";
+import { CtaBand } from "@/components/site/cta-band";
+import { ArrowLink, DashList, OutlineLink, TrustPill, pageMetadata } from "../_components/page-bits";
 import { HouseBillsIllustration } from "../_components/house-bills";
 
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/solutions-nvocc-forwarders.md
@@ -326,7 +327,7 @@ export default function NvoccForwardersPage() {
         <Faq className="mt-8" items={FAQ} />
       </Section>
 
-      <ClosingBand
+      <CtaBand
         title="Bring a week of house bills."
         sub="In 20 minutes we'll show your kind of consolidations in the inbox, how your TMS could file through the API, and how our design-partner program works. Then we set your team up."
         persona="nvocc"

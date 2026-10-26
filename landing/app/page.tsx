@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
-import { Section, SectionHeading, Eyebrow } from "@/components/site/section";
+import { Section, SectionHeading } from "@/components/site/section";
+import { CtaBand } from "@/components/site/cta-band";
 import { PageHero } from "@/components/site/page-hero";
 import { DemoButton, SecondaryCta } from "@/components/site/cta";
 import { CertBadge } from "@/components/site/cert-badge";
@@ -267,34 +268,6 @@ function ProofChip({ value, label }: { value: string; label: string }) {
       </p>
       <p className="text-[14.5px] leading-snug text-tone-muted">{label}</p>
     </div>
-  );
-}
-
-/** Home S10 close band: same anatomy as <CtaBand>, home-specific copy (copy/home.md S10). */
-function HomeCloseBand() {
-  return (
-    <Section tone="navy" id="book-a-demo-band" data-cta-band="" aria-labelledby="cta-band-title" className="text-center">
-      <div className="mx-auto max-w-2xl">
-        <Eyebrow>Book a demo</Eyebrow>
-        <h2
-          id="cta-band-title"
-          className="mt-3 text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] text-tone-fg sm:text-[40px]"
-        >
-          See how your shipments would run through the inbox.
-        </h2>
-        <p className="mx-auto mt-4 max-w-xl text-[16px] leading-relaxed text-tone-muted sm:text-[17px]">
-          Book a 20-minute demo. We&apos;ll walk through how you file today, show you the parts that matter and tell you
-          what it costs.
-        </p>
-        <div className="mt-8 flex justify-center">
-          <DemoButton src="home-close" location="close" size="lg" />
-        </div>
-        <p className="mt-5 text-[13px] text-tone-muted">
-          Pay per shipment, only when CBP accepts. No monthly fee on the public plans.
-        </p>
-        <p className="mt-2 text-[12.5px] font-medium text-tone-muted">CBP ABI certified · Software, not a customs broker</p>
-      </div>
-    </Section>
   );
 }
 
@@ -568,7 +541,13 @@ export default function HomePage() {
       </Section>
 
       {/* S10 · Final CTA band */}
-      <HomeCloseBand />
+      <CtaBand
+        title="See how your shipments would run through the inbox."
+        sub="Book a 20-minute demo. We'll walk through how you file today, show you the parts that matter and tell you what it costs."
+        src="home-close"
+        micro="Pay per shipment, only when CBP accepts. No monthly fee on the public plans."
+        note="CBP ABI certified · Software, not a customs broker"
+      />
     </>
   );
 }

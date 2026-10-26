@@ -9,7 +9,8 @@ import { Faq, type FaqItem } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
 import { webPage } from "@/lib/schema";
 import { ROUTES } from "@/lib/site";
-import { ArrowLink, ClosingBand, DashList, PriceLine, pageMetadata } from "../solutions/_components/page-bits";
+import { CtaBand } from "@/components/site/cta-band";
+import { ArrowLink, DashList, PriceLine, pageMetadata } from "../solutions/_components/page-bits";
 
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/compare.md
 const PATH = ROUTES.compare.href;
@@ -481,7 +482,7 @@ export default function ComparePage() {
         <Faq className="mt-8" items={FAQ} />
       </Section>
 
-      <ClosingBand
+      <CtaBand
         title="Compare it on your own filings."
         sub="In 20 minutes we'll look at how you file today and show you where MyCargoLens would and wouldn't fit."
         src="compare-close"

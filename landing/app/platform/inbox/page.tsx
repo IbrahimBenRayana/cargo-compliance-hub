@@ -4,13 +4,13 @@ import { Section, SectionHeading } from "@/components/site/section";
 import { CardGrid, FeatureSplit } from "@/components/site/blocks";
 import { ROUTES } from "@/lib/site";
 import {
-  CloseBand,
   FaqSection,
   ModuleHero,
   PageSchema,
   TextLinks,
   pageMetadata,
 } from "../_components/module-page";
+import { CtaBand, PRICING_LINK } from "@/components/site/cta-band";
 
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/platform-inbox.md
 const PATH = ROUTES.inbox.href;
@@ -217,10 +217,11 @@ export default function InboxPage() {
         related={[{ label: "Liquidation and PSC tracking after entry", href: ROUTES.compliance.href }]}
       />
 
-      <CloseBand
+      <CtaBand
         title="See your own filings ranked"
-        body="Book a 20-minute demo. We'll load shipments like yours into a demo account and show you what the inbox would put first."
+        sub="Book a 20-minute demo. We'll load shipments like yours into a demo account and show you what the inbox would put first."
         src={SRC}
+        links={[PRICING_LINK]}
       />
     </>
   );

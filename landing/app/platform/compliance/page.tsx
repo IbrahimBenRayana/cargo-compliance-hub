@@ -8,7 +8,8 @@ import { Faq } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
 import { webPage } from "@/lib/schema";
 import { ROUTES } from "@/lib/site";
-import { InlineLink, ModuleCloseBand, SourceNote } from "../pre-filing-checks/_components/module-close-band";
+import { CtaBand, PRICING_LINK } from "@/components/site/cta-band";
+import { InlineLink, SourceNote } from "../pre-filing-checks/_components/module-links";
 import { ClockStrip } from "./_components/clock-strip";
 
 const PATH = ROUTES.compliance.href;
@@ -220,12 +221,12 @@ export default function CompliancePage() {
       </Section>
 
       {/* S8 Final CTA band */}
-      <ModuleCloseBand
+      <CtaBand
         title="See your entries on the clock"
-        body="Book a 20-minute demo. We'll show the liquidation clock, the PSC deadline and the flags on entries like yours."
+        sub="Book a 20-minute demo. We'll show the liquidation clock, the PSC deadline and the flags on entries like yours."
         persona="importer"
         src={SRC}
-        link={{ label: "See pricing", href: ROUTES.pricing.href }}
+        links={[PRICING_LINK]}
       />
     </>
   );

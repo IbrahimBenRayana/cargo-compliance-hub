@@ -9,7 +9,6 @@ import { accentClass, type ModuleKey } from "@/lib/accents";
 import { ROUTES, type SiteRoute } from "@/lib/site";
 import type { ScreenKey } from "@/lib/screens";
 import {
-  CloseBand,
   FaqSection,
   ModuleHero,
   PageSchema,
@@ -18,6 +17,7 @@ import {
   TextLinks,
   pageMetadata,
 } from "./_components/module-page";
+import { CtaBand, PRICING_LINK } from "@/components/site/cta-band";
 
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/platform.md
 const PATH = ROUTES.platform.href;
@@ -280,11 +280,12 @@ export default function PlatformPage() {
 
       <FaqSection title="Questions about the platform" items={FAQ} />
 
-      <CloseBand
+      <CtaBand
         title="Watch one shipment go from ISF to entry in 20 minutes."
-        body="We'll run a sample ISF and entry in a demo account on shipments like yours, then tell you what it would cost."
+        sub="We'll run a sample ISF and entry in a demo account on shipments like yours, then tell you what it would cost."
         src="platform-close"
         micro="Pay per shipment, only when CBP accepts."
+        links={[PRICING_LINK]}
       />
     </>
   );

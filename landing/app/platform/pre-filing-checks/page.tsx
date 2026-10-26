@@ -10,7 +10,8 @@ import { JsonLd } from "@/components/site/json-ld";
 import { webPage } from "@/lib/schema";
 import { ROUTES } from "@/lib/site";
 import { CheckPanel } from "./_components/check-panel";
-import { InlineLink, ModuleCloseBand, SourceNote } from "./_components/module-close-band";
+import { CtaBand, PRICING_LINK } from "@/components/site/cta-band";
+import { InlineLink, SourceNote } from "./_components/module-links";
 
 const PATH = ROUTES.preFilingChecks.href;
 const TITLE = "Customs Filing Error Checks Before You Submit";
@@ -205,11 +206,11 @@ export default function PreFilingChecksPage() {
       </Section>
 
       {/* S7 Final CTA band */}
-      <ModuleCloseBand
+      <CtaBand
         title="Bring your last rejection"
-        body="Book a 20-minute demo. We'll rebuild the filing in a demo account and walk through what the checks flag on it."
+        sub="Book a 20-minute demo. We'll rebuild the filing in a demo account and walk through what the checks flag on it."
         src={SRC}
-        link={{ label: "See pricing", href: ROUTES.pricing.href }}
+        links={[PRICING_LINK]}
       />
     </>
   );

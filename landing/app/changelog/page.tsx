@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { webPage } from "@/lib/schema";
 import { ROUTES } from "@/lib/site";
 import { CHANGELOG_ENTRIES, KIND_LABEL, entryAnchor, formatChangelogDate, type Entry, type EntryKind } from "@/lib/changelog";
-import { CloseBand } from "../about/_components/close-band";
+import { CtaBand } from "@/components/site/cta-band";
 
 const TITLE = "Changelog: what shipped, and when";
 const DESCRIPTION =
@@ -109,7 +109,7 @@ export default function ChangelogPage() {
         )}
       </Section>
 
-      <CloseBand
+      <CtaBand
         title="See the latest version on your own filings."
         sub="Book a 20-minute demo. We'll show you what's new on shipments like yours and set up your team after."
         src="changelog-close"

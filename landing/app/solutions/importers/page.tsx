@@ -11,7 +11,8 @@ import { JsonLd } from "@/components/site/json-ld";
 import { StickyDemoBar } from "@/components/site/sticky-demo-bar";
 import { webPage } from "@/lib/schema";
 import { ROUTES } from "@/lib/site";
-import { ArrowLink, ClosingBand, DashList, pageMetadata } from "../_components/page-bits";
+import { CtaBand, PRICING_LINK } from "@/components/site/cta-band";
+import { ArrowLink, DashList, pageMetadata } from "../_components/page-bits";
 
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/solutions-importers.md
 const PATH = ROUTES.importers.href;
@@ -301,12 +302,12 @@ export default function ImportersPage() {
         <Faq className="mt-8" items={FAQ} />
       </Section>
 
-      <ClosingBand
+      <CtaBand
         title="See your own kind of shipment in the inbox."
         sub="In 20 minutes we'll walk through how you file today, run a draft through the checks, and tell you what it would cost per shipment. Then we set your team up."
         persona="importer"
         src="importer-close"
-        links={[{ label: "See pricing", href: ROUTES.pricing.href }]}
+        links={[PRICING_LINK]}
         micro="Pay per shipment, only when CBP accepts. No monthly fee on the public plans."
       />
       <StickyDemoBar persona="importer" src="importer-sticky" />

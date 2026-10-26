@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Section, SectionHeading, Eyebrow, type Tone } from "@/components/site/section";
+import { Section, SectionHeading, type Tone } from "@/components/site/section";
 import { PageHero } from "@/components/site/page-hero";
 import { DemoButton, SecondaryCta } from "@/components/site/cta";
 import { CertBadge } from "@/components/site/cert-badge";
@@ -248,40 +248,3 @@ export function FaqSection({
   );
 }
 
-/**
- * Page-specific pre-footer band (deck copy). Same look as <CtaBand>, which
- * only takes the registry variants: navy, one gold button, at most one link.
- */
-export function CloseBand({
-  title,
-  body,
-  src,
-  micro,
-  pricingLink = true,
-}: {
-  title: string;
-  body: string;
-  src: string;
-  micro?: string;
-  pricingLink?: boolean;
-}) {
-  return (
-    <Section tone="navy" id="book-a-demo-band" data-cta-band="" aria-labelledby="cta-band-title" className="text-center">
-      <div className="mx-auto max-w-2xl">
-        <Eyebrow>Book a demo</Eyebrow>
-        <h2
-          id="cta-band-title"
-          className="mt-3 text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] text-tone-fg sm:text-[40px]"
-        >
-          {title}
-        </h2>
-        <p className="mx-auto mt-4 max-w-xl text-[16px] leading-relaxed text-tone-muted sm:text-[17px]">{body}</p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-4">
-          <DemoButton src={src} location="close" size="lg" />
-          {pricingLink && <SecondaryCta as="link" location="close" />}
-        </div>
-        {micro && <p className="mt-5 text-[13px] text-tone-muted">{micro}</p>}
-      </div>
-    </Section>
-  );
-}

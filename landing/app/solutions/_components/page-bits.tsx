@@ -3,10 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Section, Eyebrow } from "@/components/site/section";
-import { DemoButton } from "@/components/site/cta";
 import { Button } from "@/components/ui/button";
-import type { Persona } from "@/lib/site";
 
 /**
  * Page-local helpers shared by /solutions, /solutions/* and /compare (T7).
@@ -74,54 +71,6 @@ export function DashList({ items, className }: { items: React.ReactNode[]; class
         </li>
       ))}
     </ul>
-  );
-}
-
-/**
- * Pre-footer band with the page deck's own copy. Same markup and rules as
- * components/site/cta-band.tsx (navy, one gold button, `data-cta-band` so
- * StickyDemoBar hides under it), but CtaBand only takes the global.md
- * variants and each T7 deck writes its own H2 and sub.
- */
-export function ClosingBand({
-  title,
-  sub,
-  persona,
-  src,
-  links = [],
-  micro,
-}: {
-  title: string;
-  sub: string;
-  persona?: Persona;
-  src: string;
-  links?: { label: string; href: string }[];
-  micro?: string;
-}) {
-  return (
-    <Section tone="navy" id="book-a-demo-band" data-cta-band="" aria-labelledby="cta-band-title" className="text-center">
-      <div className="mx-auto max-w-2xl">
-        <Eyebrow>Book a demo</Eyebrow>
-        <h2 id="cta-band-title" className="mt-3 text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] text-tone-fg sm:text-[40px]">
-          {title}
-        </h2>
-        <p className="mx-auto mt-4 max-w-xl text-[16px] leading-relaxed text-tone-muted sm:text-[17px]">{sub}</p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-4">
-          <DemoButton persona={persona} src={src} location="close" size="lg" />
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              data-location="close"
-              className="inline-flex items-center gap-1 text-[15px] font-semibold text-tone-fg underline decoration-current/35 underline-offset-4 transition-colors hover:decoration-current"
-            >
-              {l.label}
-            </Link>
-          ))}
-        </div>
-        {micro && <p className="mt-5 text-[13px] text-tone-muted">{micro}</p>}
-      </div>
-    </Section>
   );
 }
 
