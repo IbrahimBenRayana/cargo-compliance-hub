@@ -64,7 +64,7 @@ export type SiteRoute = {
   scene?: HeroSlug;
   /** P1 pages: listed in nav/footer only once they ship. */
   live: boolean;
-  /** Not in the sitemap (thanks page, etc.). */
+  /** Not in the sitemap or llms.txt (thanks page; content-owned article routes). */
   noindex?: boolean;
 };
 
@@ -227,6 +227,10 @@ export const ROUTES = r({
     group: "resources",
     scene: "resources",
     live: true,
+    // Articles and author pages are indexable only once their content is
+    // published: app/resources/_content owns that status, and sitemap.ts /
+    // llms.txt list them from there. Keep them out of INDEXABLE_ROUTES.
+    noindex: true,
   },
   isfDeadlineCalculator: {
     label: "ISF deadline calculator",
@@ -332,7 +336,7 @@ export function findRoute(path: string): SiteRoute | undefined {
   return all.find((x) => x.href === path);
 }
 
-/** Every indexable, live route (for sitemap.ts in T12). */
+/** Every indexable, live route (sitemap.ts). Articles and authors come from app/resources/_content. */
 export const INDEXABLE_ROUTES: SiteRoute[] = all.filter((x) => x.live && !x.noindex);
 
 // ---------------------------------------------------------------------------
