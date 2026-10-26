@@ -7,7 +7,7 @@ import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
 import { IconTile, type IconTileHover } from "@/components/ui/icon-tile";
 import { PageHero } from "@/components/page-hero";
-import { ContactScene } from "@/components/illustrations/contact-scene";
+import { Hero3D } from "@/components/hero3d/Hero3D";
 
 // Monthly shipment volume — values double as the labels shown in the
 // composed message body, so keep them human-readable.
@@ -164,7 +164,7 @@ export function BookADemoClient() {
         label="BOOK A DEMO"
         title="See MyCargoLens in action."
         description="Book a 20-minute demo — we'll set up your account on the right plan afterward."
-        illustration={<ContactScene className="w-full max-w-xs h-auto text-foreground/90" />}
+        illustration={<Hero3D scene="book-a-demo" />}
       />
       <section className="pb-20 md:pb-28">
         <Container>

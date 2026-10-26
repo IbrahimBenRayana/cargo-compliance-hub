@@ -11,6 +11,7 @@ import { Donut } from "@/components/ui/donut";
 import { SeverityPill, type Severity } from "@/components/ui/severity-pill";
 import { MacWindow } from "@/components/ui/mac-window";
 import { HeroBackground } from "@/components/sections/hero-background";
+import { Hero3D } from "@/components/hero3d/Hero3D";
 import { cn } from "@/lib/utils";
 
 const EASE_OUT_QUART = [0.25, 1, 0.5, 1] as const;
@@ -77,9 +78,9 @@ const QUEUE: QueueRow[] = [
 ];
 
 /**
- * Homepage hero. The claim is "an inbox, not a dashboard" — so the first
- * viewport shows the inbox itself, on every screen size, instead of an
- * abstract illustration.
+ * Homepage hero. The 3D hero (the inbox rising from the sea) fills the
+ * visual slot; the inbox itself sits directly under the hero row so the
+ * "an inbox, not a dashboard" claim is still shown, not just told.
  */
 export function Hero() {
   return (
@@ -178,111 +179,116 @@ export function Hero() {
             </motion.dl>
           </motion.div>
 
-          {/* Product column — the inbox itself, on every screen size */}
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.25, ease: EASE_OUT_EXPO }}
-            className="relative min-w-0 lg:col-span-7 lg:pl-6"
-          >
-            {/* Soft gold halo behind the window */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute -inset-x-8 -top-10 bottom-0"
-              style={{
-                background:
-                  "radial-gradient(ellipse 60% 55% at 55% 30%, hsl(43 96% 56% / 0.14) 0%, transparent 70%)",
-              }}
-            />
-            <MacWindow
-              urlBar="app.mycargolens.com/compliance"
-              className="relative"
-              contentClassName="p-4 sm:p-5"
-            >
-              {/* Today's brief */}
-              <div className="mb-4 flex items-center gap-4">
-                <Donut value={86} tone="gold" size={56} strokeWidth={3.5} showLabel delay={1} />
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    <Sparkles size={12} className="text-gold-dark dark:text-gold" aria-hidden />
-                    Today&apos;s brief
-                  </div>
-                  <p className="truncate text-[13px] font-medium leading-snug text-foreground sm:whitespace-normal">
-                    3 drafts waiting on you. One rejection blocking re-file —
-                    open the coach first.
-                  </p>
-                </div>
-              </div>
+          {/* Visual column — the 3D hero (poster first, live scene on idle) */}
+          <div className="relative min-w-0 lg:col-span-7 lg:-mr-8 xl:-mr-16">
+            <Hero3D scene="home" />
+          </div>
+        </div>
 
-              {/* Queue header */}
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex size-1.5">
-                    <span
-                      aria-hidden
-                      className="absolute inline-flex size-full rounded-full bg-emerald-500/60 motion-safe:animate-ping"
-                    />
-                    <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-                  </span>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Action queue
-                  </span>
+        {/* The inbox itself, directly under the hero */}
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.25, ease: EASE_OUT_EXPO }}
+          className="relative mx-auto mt-12 min-w-0 max-w-3xl md:mt-16"
+        >
+          {/* Soft gold halo behind the window */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -inset-x-8 -top-10 bottom-0"
+            style={{
+              background:
+                "radial-gradient(ellipse 60% 55% at 55% 30%, hsl(43 96% 56% / 0.14) 0%, transparent 70%)",
+            }}
+          />
+          <MacWindow
+            urlBar="app.mycargolens.com/compliance"
+            className="relative"
+            contentClassName="p-4 sm:p-5"
+          >
+            {/* Today's brief */}
+            <div className="mb-4 flex items-center gap-4">
+              <Donut value={86} tone="gold" size={56} strokeWidth={3.5} showLabel delay={1} />
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  <Sparkles size={12} className="text-gold-dark dark:text-gold" aria-hidden />
+                  Today&apos;s brief
                 </div>
-                <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
-                  ranked by urgency
+                <p className="truncate text-[13px] font-medium leading-snug text-foreground sm:whitespace-normal">
+                  3 drafts waiting on you. One rejection blocking re-file —
+                  open the coach first.
+                </p>
+              </div>
+            </div>
+
+            {/* Queue header */}
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="relative flex size-1.5">
+                  <span
+                    aria-hidden
+                    className="absolute inline-flex size-full rounded-full bg-emerald-500/60 motion-safe:animate-ping"
+                  />
+                  <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Action queue
                 </span>
               </div>
+              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
+                ranked by urgency
+              </span>
+            </div>
 
-              {/* Queue rows */}
-              <motion.ul
-                initial="hidden"
-                animate="visible"
-                variants={{
-                  hidden: {},
-                  visible: {
-                    transition: { staggerChildren: 0.07, delayChildren: 0.75 },
-                  },
-                }}
-                className="flex flex-col gap-2"
-              >
-                {QUEUE.map((row) => (
-                  <motion.li
-                    key={row.id}
-                    variants={{
-                      hidden: { opacity: 0, x: -10 },
-                      visible: {
-                        opacity: 1,
-                        x: 0,
-                        transition: { duration: 0.45, ease: EASE_OUT_QUART },
-                      },
-                    }}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 p-2.5 sm:p-3",
-                      row.desktopOnly && "hidden sm:flex",
-                    )}
-                  >
-                    <Donut value={row.score} tone={row.tone} size={30} delay={1.2} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12.5px] font-semibold text-foreground">
-                        {row.title}
-                      </div>
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {row.meta}
-                      </div>
+            {/* Queue rows */}
+            <motion.ul
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: {
+                  transition: { staggerChildren: 0.07, delayChildren: 0.75 },
+                },
+              }}
+              className="flex flex-col gap-2"
+            >
+              {QUEUE.map((row) => (
+                <motion.li
+                  key={row.id}
+                  variants={{
+                    hidden: { opacity: 0, x: -10 },
+                    visible: {
+                      opacity: 1,
+                      x: 0,
+                      transition: { duration: 0.45, ease: EASE_OUT_QUART },
+                    },
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 p-2.5 sm:p-3",
+                    row.desktopOnly && "hidden sm:flex",
+                  )}
+                >
+                  <Donut value={row.score} tone={row.tone} size={30} delay={1.2} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12.5px] font-semibold text-foreground">
+                      {row.title}
                     </div>
-                    <SeverityPill tone={row.pillTone}>{row.pill}</SeverityPill>
-                  </motion.li>
-                ))}
-              </motion.ul>
+                    <div className="truncate text-[11px] text-muted-foreground">
+                      {row.meta}
+                    </div>
+                  </div>
+                  <SeverityPill tone={row.pillTone}>{row.pill}</SeverityPill>
+                </motion.li>
+              ))}
+            </motion.ul>
 
-              {/* Live footer strip */}
-              <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2.5 font-mono text-[10px] tabular-nums text-muted-foreground">
-                <span>Polling CBP every 5 minutes</span>
-                <span className="hidden sm:inline">Last ping: 14s ago</span>
-              </div>
-            </MacWindow>
-          </motion.div>
-        </div>
+            {/* Live footer strip */}
+            <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+              <span>Polling CBP every 5 minutes</span>
+              <span className="hidden sm:inline">Last ping: 14s ago</span>
+            </div>
+          </MacWindow>
+        </motion.div>
       </Container>
     </section>
   );

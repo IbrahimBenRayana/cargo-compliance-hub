@@ -7,7 +7,7 @@ import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
 import { IconTile, type IconTileHover } from "@/components/ui/icon-tile";
 import { PageHero } from "@/components/page-hero";
-import { ContactScene } from "@/components/illustrations/contact-scene";
+import { Hero3D } from "@/components/hero3d/Hero3D";
 
 // Subject values match the server enum (see server/src/routes/contact.ts).
 // The display labels in the <option> elements diverge from these keys —
@@ -145,7 +145,7 @@ export default function ContactPage() {
         label="CONTACT"
         title="Let's talk."
         description="Whether you're evaluating MyCargoLens for your team, have a technical question, or need help with an existing account — we're here."
-        illustration={<ContactScene className="w-full max-w-xs h-auto text-foreground/90" />}
+        illustration={<Hero3D scene="contact" />}
       />
       <section className="pb-20 md:pb-28">
       <Container>

@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Hero3D } from "@/components/hero3d/Hero3D";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -76,6 +77,11 @@ export default function NotFound() {
           <Button variant="outline" size="lg" asChild>
             <Link href="/book-a-demo">Book a demo</Link>
           </Button>
+        </motion.div>
+
+        {/* "Not on the manifest": a lone container the Focus Frame never finds */}
+        <motion.div variants={rise} className="mx-auto mt-10 w-full max-w-sm">
+          <Hero3D scene="not-found" />
         </motion.div>
       </motion.div>
     </div>

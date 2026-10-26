@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Compass,
   Eye,
@@ -13,164 +13,13 @@ import {
   Zap,
 } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
+import { Hero3D } from "@/components/hero3d/Hero3D";
 import { SectionShell } from "@/components/sections/section-shell";
 import { Button } from "@/components/ui/button";
 import { IconTile } from "@/components/ui/icon-tile";
 import { SeverityPill } from "@/components/ui/severity-pill";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-import { GOLD, EMERALD } from "@/lib/colors";
-
-/**
- * About hero — three concentric rings labeled with our principles
- * (Calm · Honest · Ops-first) with a central compass-style hub
- * suggesting direction and care. No bg box, just floating geometry.
- */
-function AboutHeroIllustration() {
-  // SMIL animations (animateTransform / animate) do not respect
-  // prefers-reduced-motion. Gate them on useReducedMotion so users who
-  // ask for reduced motion see a static illustration instead of an
-  // infinite-loop rotation they cannot pause.
-  const reduceMotion = useReducedMotion();
-  return (
-    <motion.svg
-      viewBox="0 0 480 360"
-      className="w-full max-w-md h-auto text-foreground/90"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      initial="hidden"
-      animate="visible"
-      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}
-    >
-      <defs>
-        <radialGradient id="ab-glow" cx="50%" cy="50%" r="55%">
-          <stop offset="0%" stopColor={GOLD} stopOpacity="0.18" />
-          <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <ellipse cx="240" cy="180" rx="200" ry="140" fill="url(#ab-glow)" stroke="none" />
-
-      {/* Three concentric rings */}
-      {[120, 86, 52].map((r, i) => (
-        <motion.circle
-          key={r}
-          cx="240"
-          cy="180"
-          r={r}
-          stroke="currentColor"
-          strokeOpacity={0.18 + i * 0.08}
-          fill="none"
-          variants={{
-            hidden: { pathLength: 0, opacity: 0 },
-            visible: {
-              pathLength: 1,
-              opacity: 1,
-              transition: { duration: 1.2, delay: i * 0.2, ease: EASE },
-            },
-          }}
-        />
-      ))}
-
-      {/* Slow-rotating outer ring with 3 gold dots = our 3 principles.
-          Framer-motion's `rotate` on an SVG <g> orbits the element's
-          bounding-box centre — for our three dots that pivot sits ~30px
-          above (240,180), so the dots drift off the outer ring as the
-          animation runs. SMIL animateTransform with an explicit rotate
-          centre is the SVG-native way to pin the pivot exactly to
-          (240,180) — no transform-origin guesswork. */}
-      <g>
-        {!reduceMotion && (
-          <animateTransform
-            attributeName="transform"
-            type="rotate"
-            from="0 240 180"
-            to="360 240 180"
-            dur="60s"
-            repeatCount="indefinite"
-          />
-        )}
-        {[0, 120, 240].map((deg) => {
-          const rad = (deg - 90) * (Math.PI / 180);
-          const x = 240 + Math.cos(rad) * 120;
-          const y = 180 + Math.sin(rad) * 120;
-          return (
-            <g key={deg}>
-              <circle cx={x} cy={y} r="6" fill={GOLD} stroke="none" />
-              <circle cx={x} cy={y} r="6" stroke={GOLD} strokeOpacity="0.45" fill="none">
-                {!reduceMotion && (
-                  <>
-                    <animate attributeName="r" values="6;14;6" dur="3s" repeatCount="indefinite" />
-                    <animate attributeName="opacity" values="0.5;0;0.5" dur="3s" repeatCount="indefinite" />
-                  </>
-                )}
-              </circle>
-            </g>
-          );
-        })}
-      </g>
-
-      {/* Static labels at outer-ring positions */}
-      {[
-        { label: "CALM", x: 240, y: 50 },
-        { label: "HONEST", x: 372, y: 240 },
-        { label: "OPS-FIRST", x: 108, y: 240 },
-      ].map((l) => (
-        <motion.text
-          key={l.label}
-          x={l.x}
-          y={l.y}
-          textAnchor="middle"
-          fontSize="11"
-          fontFamily="ui-sans-serif, sans-serif"
-          fontWeight="700"
-          letterSpacing="2"
-          fill="currentColor"
-          fillOpacity="0.7"
-          stroke="none"
-          variants={{
-            hidden: { opacity: 0 },
-            visible: { opacity: 1, transition: { duration: 0.6, delay: 0.8 } },
-          }}
-        >
-          {l.label}
-        </motion.text>
-      ))}
-
-      {/* Central compass-like hub */}
-      <motion.g
-        variants={{
-          hidden: { opacity: 0, scale: 0.8 },
-          visible: { opacity: 1, scale: 1, transition: { duration: 0.55, ease: EASE, delay: 0.7 } },
-        }}
-      >
-        <circle cx="240" cy="180" r="38" fill={`${GOLD}26`} stroke={GOLD} strokeWidth="2" />
-        <circle cx="240" cy="180" r="28" fill="none" stroke={GOLD} strokeOpacity="0.5" />
-        {/* North arrow */}
-        <path d="M 240 154 L 234 180 L 240 174 L 246 180 Z" fill={GOLD} stroke="none" />
-        {/* South arrow */}
-        <path d="M 240 206 L 234 180 L 240 186 L 246 180 Z" fill="currentColor" fillOpacity="0.35" stroke="none" />
-        <text x="240" y="148" textAnchor="middle" fontSize="9" fontFamily="ui-monospace, monospace" fontWeight="700" fill="currentColor" stroke="none">N</text>
-      </motion.g>
-
-      {/* "Made by ops, for ops" stamp top-left */}
-      <motion.g
-        variants={{
-          hidden: { opacity: 0 },
-          visible: { opacity: 1, transition: { duration: 0.5, delay: 1.2 } },
-        }}
-      >
-        <circle cx="60" cy="56" r="2.5" fill={EMERALD} stroke="none" />
-        <text x="72" y="60" fontSize="8.5" fontFamily="ui-monospace, monospace" fontWeight="600" fill="currentColor" fillOpacity="0.55" stroke="none">
-          made by ops, for ops
-        </text>
-      </motion.g>
-    </motion.svg>
-  );
-}
 
 const PRINCIPLES = [
   {
@@ -223,7 +72,7 @@ export function AboutClient() {
         title="We're making CBP compliance feel like email — not a phone tree."
         description="MyCargoLens started because customs work had been left behind by the rest of B2B software for two decades. Importers deserved better. We're building it."
         breadcrumbs={[{ label: "About", href: "/about" }]}
-        illustration={<AboutHeroIllustration />}
+        illustration={<Hero3D scene="about" />}
       />
 
       {/* STORY — three beats */}
