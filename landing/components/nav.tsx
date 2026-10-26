@@ -10,12 +10,10 @@ import { cn } from "@/lib/utils";
 import { Wordmark } from "@/components/wordmark";
 import { SiteContainer } from "@/components/site/section";
 import { DemoButton } from "@/components/site/cta";
-import { CertBadge } from "@/components/site/cert-badge";
 import { ACCENTS, accentClass } from "@/lib/accents";
 import {
   APP_LOGIN_URL,
   BROKER_PILOT_LINE,
-  CERT_BADGE,
   HEADER_MENUS,
   HEADER_ORDER,
   PLATFORM_COLUMNS,
@@ -545,10 +543,9 @@ function PlatformPanel({ close }: { close: () => void }) {
           transition={{ duration: 0.28, ease: EASE, delay: 0.1 }}
           className="flex flex-col rounded-2xl bg-secondary/50 p-4"
         >
-          <CertBadge />
-          <p className="mt-3 text-[13px] leading-snug text-muted-foreground">{CERT_BADGE.line}</p>
+          <p className="text-[13px] leading-snug text-muted-foreground">{ROUTES.security.blurb}</p>
           <Link
-            href={CERT_BADGE.href}
+            href={ROUTES.security.href}
             onClick={close}
             className="group mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-foreground"
           >

@@ -87,7 +87,7 @@ export const ON_EVERY_PLAN = [
   "The inbox: open work ranked by urgency",
   "Rule checks on every draft, an AI review on any draft, and HTS suggestions with reasoning",
   "CBP rejections in plain English with numbered fix steps",
-  "CBP responses picked up every minute",
+  "A deadline clock on every ISF, with alerts at 72, 48 and 24 hours",
   "ADD/CVD orders pulled daily; UFLPA and PGA flags",
   "Liquidation and PSC clocks on accepted entries",
   "Four roles, MFA and an audit trail you can export to CSV",
@@ -116,7 +116,7 @@ export const GOOD_TO_KNOW = [
 ] as const;
 
 export const TRUST = [
-  "CBP ABI certified",
+  "ISF-10 · ISF-5 · 7501 · 3461",
   "Every CBP request and response logged",
   "MFA and four roles",
   "Software, not a customs broker",

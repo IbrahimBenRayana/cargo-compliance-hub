@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Section, SectionHeading, Eyebrow } from "@/components/site/section";
 import { PageHero } from "@/components/site/page-hero";
 import { DemoButton } from "@/components/site/cta";
-import { CertBadge } from "@/components/site/cert-badge";
 import { CardGrid, FeatureSplit } from "@/components/site/blocks";
 import { Faq } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
@@ -80,8 +79,8 @@ const FAQ = [
     a: "No. Register a webhook and status changes come to you. You can still read any filing with GET.",
   },
   {
-    q: "Who transmits to CBP?",
-    a: "We do. MyCargoLens is CBP ABI certified, with a direct connection to CBP. Every request and response is logged.",
+    q: "Who sends filings to CBP?",
+    a: "MyCargoLens does. Your system creates and submits them through the API, and each request and response is kept on the filing.",
   },
   {
     q: "What does the API cost?",
@@ -107,7 +106,6 @@ export default function ApiPage() {
       <PageHero
         breadcrumbPath={PATH}
         accent="api"
-        badge={<CertBadge />}
         eyebrow="API and webhooks"
         title="An ISF API your TMS can file through"
         sub="Create and submit ISFs and entries from your own system. REST in, with JSON or XML. Signed webhooks out when CBP answers."

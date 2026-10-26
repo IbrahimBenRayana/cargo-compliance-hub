@@ -4,7 +4,6 @@ import { ArrowRight, Check, Minus } from "lucide-react";
 import { PageHero } from "@/components/site/page-hero";
 import { Section, SectionHeading } from "@/components/site/section";
 import { DemoButton } from "@/components/site/cta";
-import { CertBadge } from "@/components/site/cert-badge";
 import { FeatureSplit, StepFlow } from "@/components/site/blocks";
 import { JsonLd } from "@/components/site/json-ld";
 import { graph, webPage, ORG_ID } from "@/lib/schema";
@@ -14,7 +13,7 @@ import { CtaBand } from "@/components/site/cta-band";
 
 const TITLE = "About us: ISF and customs entry software";
 const DESCRIPTION =
-  "Why we built ISF and entry filing around one inbox, what MyCargoLens files today, and what we are not: a customs broker. CBP ABI certified.";
+  "Why we built ISF and entry filing around one inbox, what MyCargoLens files today, and what we are not: a customs broker.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -66,9 +65,7 @@ export default function AboutPage() {
         sub="MyCargoLens is a small company making one product: software that shows customs filers which ISF or entry needs them now, checks it before CBP does, and puts the price per shipment on the website."
         actions={<DemoButton location="hero" src="about-hero" size="lg" />}
         scene="about"
-      >
-        <CertBadge link />
-      </PageHero>
+      />
 
       {/* 3. Why we built it */}
       <Section tone="cream" id="why">
@@ -96,14 +93,13 @@ export default function AboutPage() {
       {/* 4. What we've built so far */}
       <Section tone="sky" id="built">
         <FeatureSplit
-          title="Filed with CBP, and on the record."
+          title="What we've built so far."
           body={
             <>
               <p>
-                MyCargoLens files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP, and logs every
-                request and response so you can prove what was sent.
+                MyCargoLens files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP, and keeps every
+                request and response on the filing so you can show what was sent.
               </p>
-              <p>CBP ABI certified. Direct connection to CBP.</p>
               <p>
                 <Link href={ROUTES.changelog.href} className={linkCls}>
                   See what shipped, release by release
@@ -190,7 +186,7 @@ export default function AboutPage() {
               body: "The price per shipment is public, and so is the list of things we don't do.",
             },
             {
-              title: "Every transmission on the record.",
+              title: "Keep the history close.",
               body: "Who sent what to CBP, and when, should be one click away for your team and your auditor.",
             },
           ]}

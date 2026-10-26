@@ -5,10 +5,10 @@ import {
   Check,
   FileWarning,
   Inbox,
-  RadioTower,
   Scale,
   ScrollText,
   ShieldCheck,
+  Timer,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
   twitter: { title: `${TITLE} | MyCargoLens`, description: DESCRIPTION },
 };
 
-const PLAN_ICONS: LucideIcon[] = [Inbox, ShieldCheck, FileWarning, RadioTower, Scale, CalendarClock, UsersRound, ScrollText];
+const PLAN_ICONS: LucideIcon[] = [Inbox, ShieldCheck, FileWarning, Timer, Scale, CalendarClock, UsersRound, ScrollText];
 
 /** Navy in light, sky ink in dark (primary flips to gold in dark, so not used here). */
 const NAVY_BORDER = "border-[hsl(222_47%_22%)] dark:border-[hsl(205_90%_78%)]";

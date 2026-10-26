@@ -17,7 +17,7 @@ import { CtaBand, PRICING_LINK } from "@/components/site/cta-band";
 const PATH = ROUTES.inbox.href;
 const TITLE = "Customs Filing Tracking in One Ranked Inbox";
 const DESCRIPTION =
-  "Every open ISF, entry and liquidation in one inbox, ranked by urgency. ISF alerts at 72, 48 and 24 hours. CBP responses picked up every minute.";
+  "Every open ISF, entry and liquidation in one inbox, ranked by urgency. ISF alerts at 72, 48 and 24 hours, and CBP responses on each filing.";
 const SRC = "platform-inbox";
 
 export const metadata: Metadata = pageMetadata({ path: PATH, title: TITLE, description: DESCRIPTION });
@@ -32,8 +32,8 @@ const FAQ = [
     a: "At 72, 48 and 24 hours before the ISF deadline, which is 24 hours before lading.",
   },
   {
-    q: "How often do you check CBP status?",
-    a: "CBP responses are picked up every minute, and any transmission CBP hasn't answered gets flagged.",
+    q: "Where do I see what CBP said?",
+    a: "On the filing and in the inbox: accepted, rejected or still waiting. A rejection comes back with the error in plain English.",
   },
   {
     q: "Does the inbox cover entries after they're accepted?",
@@ -57,7 +57,6 @@ export default function InboxPage() {
         path={PATH}
         scene="inbox"
         module="inbox"
-        certBadge={false}
         eyebrow="The inbox"
         title="Customs filing tracking, ranked by what needs you now"
         sub="An inbox for US customs, not another dashboard. Every open ISF, entry and liquidation in one list, with the most urgent at the top."
@@ -135,14 +134,14 @@ export default function InboxPage() {
               body: "Alerts at 72, 48 and 24 hours before each ISF deadline, one at a time.",
             },
             {
-              kicker: "Every minute",
+              kicker: "Per filing",
               title: "CBP responses",
-              body: "CBP responses are picked up every minute, and any transmission CBP hasn't answered gets flagged.",
+              body: "Each CBP response lands on its filing and in the list: accepted, rejected or still waiting.",
             },
             {
-              kicker: "After 20 minutes",
-              title: "Waiting on CBP",
-              body: "A transmission CBP hasn't answered within 20 minutes gets flagged so someone looks. The check runs every 5 minutes.",
+              kicker: "314 days",
+              title: "Entries to liquidation",
+              body: "Accepted entries stay on the list until they liquidate, with the 300-day PSC deadline marked.",
             },
             {
               kicker: "Daily",

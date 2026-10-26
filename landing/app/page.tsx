@@ -5,7 +5,6 @@ import { Section, SectionHeading } from "@/components/site/section";
 import { CtaBand } from "@/components/site/cta-band";
 import { PageHero } from "@/components/site/page-hero";
 import { DemoButton, SecondaryCta } from "@/components/site/cta";
-import { CertBadge } from "@/components/site/cert-badge";
 import { CheckList } from "@/components/site/blocks";
 import { Screenshot } from "@/components/site/screenshot";
 import { Faq, type FaqItem } from "@/components/site/faq";
@@ -26,7 +25,7 @@ import { articleHref, publishedArticles } from "./resources/_content/articles";
 
 const TITLE = "Customs Filing Software for ISF and Entries | MyCargoLens";
 const DESCRIPTION =
-  "File ISF and customs entries with CBP from one inbox ranked by what needs you now. CBP ABI certified. Per-shipment price, charged when CBP accepts.";
+  "File ISF and customs entries with CBP from one inbox ranked by what needs you now. Per-shipment price, charged when CBP accepts.";
 const OG_TITLE = "Customs, in focus. ISF and entry software · MyCargoLens";
 
 export const metadata: Metadata = {
@@ -58,8 +57,8 @@ const PLANS: OfferInput[] = [
 
 const FAQ: FaqItem[] = [
   {
-    q: "Who transmits my filings to CBP?",
-    a: "We do. MyCargoLens is CBP ABI certified with a direct connection to CBP, and every request and response is logged in your account.",
+    q: "Who sends my filings to CBP?",
+    a: "MyCargoLens files them with CBP for you. You review and submit each one from your account.",
   },
   {
     q: "Are you a customs broker?",
@@ -79,7 +78,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "You're a young company. Why should we trust you with filings?",
-    a: "We're early, and we'd rather say so. We're CBP ABI certified, every CBP request and response is on the record, and you pay per accepted shipment with no monthly fee on the public plans.",
+    a: "We're early, and we'd rather say so. You see and check every filing before it goes, and you pay per accepted shipment with no monthly fee on the public plans.",
   },
   {
     q: "What happens on the demo?",
@@ -141,23 +140,6 @@ function ArrowLink({ href, children, className }: { href: string; children: Reac
         aria-hidden
         className="size-3.5 transition-transform duration-200 ease-[var(--ease-out-quart)] group-hover:translate-x-0.5"
       />
-    </Link>
-  );
-}
-
-/** Hero pill: certification + direct connection (claims A21, A22). */
-function HeroBadge() {
-  return (
-    <Link
-      href={ROUTES.security.href}
-      className="inline-flex w-fit max-w-full flex-wrap items-center gap-x-2 gap-y-0.5 rounded-full border border-border/80 bg-[hsl(var(--card))] py-1 pl-2 pr-3 text-[12.5px] font-semibold text-foreground shadow-[0_1px_2px_hsl(var(--foreground)/0.06)] transition-colors hover:border-foreground/25"
-    >
-      <span aria-hidden className="grid size-3.5 place-items-center rounded-full bg-emerald-500/15">
-        <span className="size-1.5 rounded-full bg-emerald-500" />
-      </span>
-      <span>CBP ABI certified</span>
-      <span aria-hidden className="text-muted-foreground">·</span>
-      <span>Direct connection to CBP</span>
     </Link>
   );
 }
@@ -295,7 +277,6 @@ export default function HomePage() {
       <PageHero
         size="full"
         scene="home"
-        badge={<HeroBadge />}
         eyebrow="ISF and customs entry filing software"
         title="Customs, in focus."
         sub="Customs filing software that shows which ISF or entry needs you now. File ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP from one inbox, check every draft before it goes, and see the price per shipment on this website."
@@ -346,11 +327,10 @@ export default function HomePage() {
               intro="Open work across ISF, entry and liquidation sits in one list, ordered by urgency. Each ISF has a deadline 24 hours before lading, and you get alerts at 72, 48 and 24 hours before it."
             />
             <p className="mt-3 text-[16px] leading-relaxed text-tone-muted sm:text-[17px]">
-              CBP responses are picked up every minute, and any transmission CBP hasn&apos;t answered gets flagged.
+              CBP&apos;s response shows on each filing, so you can see what was accepted, what was rejected and what is still waiting.
             </p>
             <div className="mt-8 grid grid-cols-1 gap-3">
               <ProofChip value="72 · 48 · 24 h" label="ISF alerts before the deadline" />
-              <ProofChip value="Every minute" label="CBP responses picked up" />
               <ProofChip
                 value="314 days"
                 label="Each accepted entry tracked to liquidation, with the 300-day PSC deadline in the inbox"
@@ -399,7 +379,7 @@ export default function HomePage() {
         </div>
       </Section>
 
-      {/* S5 · Trust: certified, direct, on the record */}
+      {/* S5 · Audit trail: what's logged and who can see it */}
       <Section tone="mint" id="on-the-record" accent="compliance" aria-labelledby="s5-title">
         <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
           <div className="relative min-w-0 lg:order-1 order-2">
@@ -407,14 +387,13 @@ export default function HomePage() {
               screen="app-isf-timeline"
               caption="A filing record with sample data: lifecycle, timeline and every CBP response."
             />
-            <CertBadge className="absolute -top-3 right-4 sm:right-6" />
           </div>
           <div className="order-1 min-w-0 lg:order-2">
             <SectionHeading
               id="s5-title"
-              eyebrow="On the record"
-              title="CBP ABI certified. Every transmission on the record."
-              intro="Direct connection to CBP. MyCargoLens files ISF-10, ISF-5, entry summaries and cargo release, and every request to CBP and every response is logged. Your team works under four roles with MFA, and the full audit trail exports to CSV."
+              eyebrow="Audit trail"
+              title="See who changed what, and what CBP sent back."
+              intro="Each filing keeps its own history: who edited it, who submitted it, and every message to and from CBP, with times. Your team works under four roles with MFA, and the full audit trail exports to CSV."
             />
             <ArrowLink href={ROUTES.security.href} className="mt-8">
               How we handle security and access
@@ -553,7 +532,7 @@ export default function HomePage() {
         sub="Book a 20-minute demo. We'll walk through how you file today, show you the parts that matter and tell you what it costs."
         src="home-close"
         micro="Pay per shipment, only when CBP accepts. No monthly fee on the public plans."
-        note="CBP ABI certified · Software, not a customs broker"
+        note="Software, not a customs broker"
       />
     </>
   );

@@ -19,7 +19,7 @@ const inter = Inter({
 
 const DEFAULT_TITLE = "Customs Filing Software for ISF and Entries | MyCargoLens";
 const DEFAULT_DESCRIPTION =
-  "File ISF and customs entries with CBP from one inbox ranked by what needs you now. CBP ABI certified. Per-shipment price, charged when CBP accepts.";
+  "File ISF and customs entries with CBP from one inbox ranked by what needs you now. Per-shipment price, charged when CBP accepts.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://mycargolens.com"),

@@ -244,13 +244,13 @@ function Body() {
           <strong>Rule-based checks on every draft before submit</strong>, plus an optional AI pre-flight review.
         </li>
         <li>
-          <strong>CBP responses picked up every minute</strong>, any transmission CBP hasn&apos;t answered flagged, and
+          <strong>CBP&apos;s response on every filing</strong>, with
           rejections explained in plain English with numbered fix steps (
           <Link href={ROUTES.preFilingChecks.href}>pre-filing checks</Link>).
         </li>
         <li>
           <strong>
-            Filed directly with CBP, with every CBP request and response logged.
+            Every CBP request and response logged on the filing.
           </strong>{" "}
           That log gives you the timeline a petition needs.
         </li>

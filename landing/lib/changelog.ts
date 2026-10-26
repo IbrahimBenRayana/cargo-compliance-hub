@@ -26,13 +26,6 @@ export const KIND_LABEL: Record<EntryKind, string> = {
 
 const ENTRIES: Entry[] = [
   {
-    date: "2026-10-26",
-    kind: "feature",
-    title: "CBP responses every minute",
-    body: "CBP responses are picked up every minute, and any transmission CBP hasn't answered gets flagged. Every request and response is logged on the filing.",
-    href: "/platform/inbox",
-  },
-  {
     date: "2026-08-06",
     kind: "retired",
     title: "Type 86 entries retired",
@@ -163,7 +156,7 @@ const ENTRIES: Entry[] = [
 /** Every entry, newest first. */
 export const CHANGELOG_ENTRIES: Entry[] = [...ENTRIES].sort((a, b) => b.date.localeCompare(a.date));
 
-/** Permalink anchor from the title only (no date): "cbp-responses-every-minute". */
+/** Permalink anchor from the title only (no date): "type-86-entries-retired". */
 export function entryAnchor(e: Pick<Entry, "title">) {
   return e.title
     .toLowerCase()

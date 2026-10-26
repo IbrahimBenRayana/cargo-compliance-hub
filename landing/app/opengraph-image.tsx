@@ -3,9 +3,8 @@
 // gold appears only in the logo mark's centre square. Copy matches the home
 // hero: H1 "Customs, in focus." and the ISF / customs entry sub line.
 import { ImageResponse } from "next/og";
-import { CERT_BADGE } from "@/lib/site";
 
-export const alt = "MyCargoLens. Customs, in focus. ISF and customs entry filing software, CBP ABI certified.";
+export const alt = "MyCargoLens. Customs, in focus. ISF and customs entry filing software.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -43,7 +42,7 @@ export default async function Image() {
           <div style={{ display: "flex", fontSize: "30px", fontWeight: 700, letterSpacing: "-0.02em" }}>MyCargoLens</div>
         </div>
 
-        {/* Headline + sub line + certification pill */}
+        {/* Headline + sub line + filings pill */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
           <div style={{ display: "flex", fontSize: "104px", fontWeight: 700, lineHeight: 1, letterSpacing: "-0.04em" }}>
             Customs, in focus.
@@ -63,7 +62,7 @@ export default async function Image() {
               fontWeight: 600,
             }}
           >
-            {CERT_BADGE.label}
+            ISF-10 · ISF-5 · 7501 · 3461
           </div>
         </div>
 

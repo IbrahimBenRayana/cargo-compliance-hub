@@ -14,7 +14,7 @@ export type PageHeroProps = {
   actions?: React.ReactNode;
   /** Microcopy under the CTAs (one line). */
   micro?: React.ReactNode;
-  /** Badge slot above the H1, e.g. <CertBadge />. */
+  /** Badge slot above the H1. */
   badge?: React.ReactNode;
   /** Hero 3D scene (keys of HERO_SCENES). Omit for no visual. */
   scene?: HeroSlug;

@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { Section, SectionHeading } from "@/components/site/section";
 import { PageHero } from "@/components/site/page-hero";
 import { DemoButton } from "@/components/site/cta";
-import { CertBadge } from "@/components/site/cert-badge";
 import { Faq, type FaqItem } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
 import { webPage } from "@/lib/schema";
@@ -75,7 +74,7 @@ const CARDS: RouterCard[] = [
   },
 ];
 
-const TRUST = ["CBP ABI certified", "Direct ABI connection to CBP", "Every CBP request and response logged"];
+const TRUST = ["Every edit and CBP response kept on the filing", "Four roles, MFA on every account", "Audit trail exports to CSV"];
 
 const FAQ: FaqItem[] = [
   {
@@ -138,12 +137,9 @@ export default function SolutionsPage() {
         </p>
       </Section>
 
-      <Section tone="paper" spacing="compact" aria-label="CBP ABI certified, on the record">
+      <Section tone="paper" spacing="compact" aria-label="What gets logged and who can see it">
         <ul className="flex flex-wrap items-center justify-center gap-3">
-          <li>
-            <CertBadge link />
-          </li>
-          {TRUST.slice(1).map((t) => (
+          {TRUST.map((t) => (
             <li
               key={t}
               className="inline-flex items-center rounded-full border border-border/80 bg-[hsl(var(--card))] px-3 py-1 text-[12.5px] font-semibold text-foreground shadow-[0_1px_2px_hsl(var(--foreground)/0.06)]"

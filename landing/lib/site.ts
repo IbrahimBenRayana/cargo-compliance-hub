@@ -374,13 +374,6 @@ export function platformColumn(column: "file" | "stay-ahead"): SiteRoute[] {
   return all.filter((x) => x.group === "platform" && x.column === column && x.live);
 }
 
-/** Mega-menu rail: the certification badge (global.md §2, claim A21). */
-export const CERT_BADGE = {
-  label: "CBP ABI certified",
-  line: "Direct connection to CBP.",
-  href: "/security",
-} as const;
-
 /** Solutions dropdown footer line (bible P4). */
 export const BROKER_PILOT_LINE = {
   label: "Licensed customs broker? Ask about a pilot.",

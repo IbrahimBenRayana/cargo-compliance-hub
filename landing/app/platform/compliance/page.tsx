@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Section, SectionHeading } from "@/components/site/section";
 import { PageHero } from "@/components/site/page-hero";
 import { DemoButton, SecondaryCta } from "@/components/site/cta";
-import { CertBadge } from "@/components/site/cert-badge";
 import { FeatureSplit } from "@/components/site/blocks";
 import { Faq } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
@@ -72,7 +71,6 @@ export default function CompliancePage() {
       <PageHero
         breadcrumbPath={PATH}
         accent="compliance"
-        badge={<CertBadge />}
         eyebrow="Compliance"
         title="Trade compliance software for what happens after entry"
         sub="CBP accepting the entry is the start of its clock. MyCargoLens tracks every entry until it liquidates, flags possible ADD/CVD and UFLPA exposure on your HTS codes, and suggests codes with the reasoning shown."

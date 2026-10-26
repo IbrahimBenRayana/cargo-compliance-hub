@@ -3,7 +3,6 @@ import { Minus } from "lucide-react";
 import { Section, SectionHeading, Eyebrow } from "@/components/site/section";
 import { CardGrid, CheckList, FeatureSplit, StepFlow } from "@/components/site/blocks";
 import { Screenshot } from "@/components/site/screenshot";
-import { CertBadge } from "@/components/site/cert-badge";
 import { SecondaryCta } from "@/components/site/cta";
 import { accentClass, type ModuleKey } from "@/lib/accents";
 import { ROUTES, type SiteRoute } from "@/lib/site";
@@ -23,7 +22,7 @@ import { CtaBand, PRICING_LINK } from "@/components/site/cta-band";
 const PATH = ROUTES.platform.href;
 const TITLE = "ABI Filing Software for ISF and Entries";
 const DESCRIPTION =
-  "ABI filing software for ISF-10, ISF-5, 7501 and 3461, with one inbox from ISF to liquidation. CBP ABI certified. Charged per accepted shipment.";
+  "ABI filing software for ISF-10, ISF-5, 7501 and 3461, with one inbox from ISF to liquidation. Charged per accepted shipment.";
 
 export const metadata: Metadata = pageMetadata({ path: PATH, title: TITLE, description: DESCRIPTION });
 
@@ -50,7 +49,7 @@ const PARTS: Record<"file" | "stayAhead", Part[]> = {
   stayAhead: [
     {
       route: ROUTES.inbox,
-      body: "Open work ranked by urgency, with CBP responses picked up every minute.",
+      body: "Open work ranked by urgency, with each CBP response on the filing.",
       link: "How the inbox ranks filings",
     },
     {
@@ -152,13 +151,13 @@ export default function PlatformPage() {
             {
               module: "entry",
               title: "Filed with CBP",
-              body: "MyCargoLens files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) directly with CBP, and every request and response is logged.",
+              body: "MyCargoLens files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP, and every request and response is logged.",
               media: <Screenshot screen="app-isf-timeline" aspect="16/10" sizes="(min-width: 1024px) 260px, 100vw" />,
             },
             {
               module: "compliance",
               title: "Tracked until it's closed",
-              body: "CBP responses are picked up every minute, and any transmission CBP hasn't answered gets flagged. Each ISF carries its deadline clock, and each accepted entry carries its 314-day liquidation window. The post-summary correction deadline is marked at day 300 after entry, CBP's regular PSC window. On the Complete plan, containers show vessel ETAs and last free day.",
+              body: "Each ISF carries its deadline clock, and each accepted entry carries its 314-day liquidation window. The post-summary correction deadline is marked at day 300 after entry, CBP's regular PSC window. On the Complete plan, containers show vessel ETAs and last free day.",
               media: <Screenshot screen="app-liquidation-clocks" aspect="16/10" sizes="(min-width: 1024px) 260px, 100vw" />,
             },
           ]}
@@ -199,23 +198,6 @@ export default function PlatformPage() {
           actions={<TextLinks links={[{ label: "Roles, MFA and the audit trail", href: ROUTES.security.href }]} />}
           media={<StackedShots main="app-isf-consolidation" inset="app-isf-timeline" />}
         />
-      </Section>
-
-      {/* S5 · Certified, and on the record */}
-      <Section tone="mint" id="certified" spacing="compact">
-        <div className="grid items-center gap-10 lg:grid-cols-[1fr_1fr] lg:gap-16">
-          <div className="min-w-0">
-            <CertBadge link />
-            <h2 className="mt-5 text-[26px] font-semibold leading-[1.12] tracking-[-0.028em] text-tone-fg sm:text-[32px]">
-              Every transmission on the record
-            </h2>
-            <p className="mt-4 text-[16px] leading-relaxed text-tone-muted sm:text-[17px]">
-              CBP ABI certified, with a direct connection to CBP. Every request to CBP and every response is logged where
-              your team can read it.
-            </p>
-          </div>
-          <Screenshot screen="app-isf-status-history" />
-        </div>
       </Section>
 
       {/* S6 · What MyCargoLens files today */}
