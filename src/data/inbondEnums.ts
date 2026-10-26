@@ -55,14 +55,14 @@ export const INBOND_STATUSES: InbondStatusOption[] = [
     label: 'Arrived',
     dot: 'bg-emerald-500',
     className:
-      'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50',
+      'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50',
   },
   {
     value: 'EXPORTED',
     label: 'Exported',
     dot: 'bg-emerald-500',
     className:
-      'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50',
+      'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50',
   },
   {
     value: 'REJECTED',

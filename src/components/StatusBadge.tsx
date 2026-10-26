@@ -36,7 +36,7 @@ const statusConfig: Record<ShipmentStatus, StatusConfig> = {
   pending_cbp: {
     label: 'Pending CBP',
     dot: 'bg-blue-400',
-    className: 'bg-blue-400/10 text-blue-500 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40',
+    className: 'bg-blue-400/10 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40',
   },
   cancelled: {
     label: 'Cancelled',

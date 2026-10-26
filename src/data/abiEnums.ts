@@ -40,7 +40,7 @@ export const ABI_DOCUMENT_STATUSES: StatusOption[] = [
     color: 'amber',
     dot: 'bg-amber-500',
     className:
-      'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50',
+      'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50',
   },
   {
     value: 'SENT',
@@ -56,7 +56,7 @@ export const ABI_DOCUMENT_STATUSES: StatusOption[] = [
     color: 'emerald',
     dot: 'bg-emerald-500',
     className:
-      'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50',
+      'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50',
   },
   {
     value: 'REJECTED',

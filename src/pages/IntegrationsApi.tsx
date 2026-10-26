@@ -703,7 +703,7 @@ function StatCard({
           <div
             className={cn(
               'h-10 w-10 rounded-xl flex items-center justify-center',
-              status === 'ok' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+              status === 'ok' && 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
               status === 'error' && 'bg-red-500/10 text-red-600 dark:text-red-400',
               status === 'warning' && 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
               status === 'neutral' && 'bg-muted text-muted-foreground',
