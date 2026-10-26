@@ -46,6 +46,8 @@ const FADE_MS = 600;
 type Props = {
   scene: HeroSlug;
   className?: string;
+  /** Soft gold glow under the diorama. Off by default (founder, Oct 26: no gradient glows unless subtle). */
+  glow?: boolean;
 };
 
 /** Why this visitor gets the still poster only (and three.js is never imported). */
@@ -99,7 +101,7 @@ const onIdle = (fn: () => void) => {
  * the scene + engine chunks load, render behind the poster and cross-fade in.
  * Decorative: everything it shows is already in the page copy.
  */
-export function Hero3D({ scene, className }: Props) {
+export function Hero3D({ scene, className, glow = false }: Props) {
   const stageRef = React.useRef<HTMLDivElement>(null);
   const [live, setLive] = React.useState(false);
   const { resolvedTheme, systemTheme } = useTheme();
@@ -210,9 +212,9 @@ export function Hero3D({ scene, className }: Props) {
       )}
     >
       {/* soft gold glow the diorama floats on (kept out of the posters) */}
-      <div
+      {glow && <div
         className="pointer-events-none absolute inset-[8%_6%_4%_4%] blur-[10px] [background:radial-gradient(closest-side,hsl(43_96%_56%/.16),transparent_70%)] dark:[background:radial-gradient(closest-side,hsl(43_96%_56%/.14),hsl(222_60%_30%/.18)_55%,transparent_80%)]"
-      />
+      />}
       <div ref={stageRef} className="absolute inset-0">
         <picture>
           {themeOverride === null && (
