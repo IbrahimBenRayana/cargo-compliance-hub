@@ -6,10 +6,9 @@ import { Section, SectionHeading, Eyebrow } from "@/components/site/section";
 import { CardGrid } from "@/components/site/blocks";
 import { CtaBand } from "@/components/site/cta-band";
 import { JsonLd } from "@/components/site/json-ld";
-import { CTA, ROUTES, authorHref } from "@/lib/site";
+import { CTA, ROUTES } from "@/lib/site";
 import { abs, graph, webPage } from "@/lib/schema";
 import { articleHref, publishedArticles } from "./_content/articles";
-import { AUTHORS } from "./_content/authors";
 import { TOPICS, TOPIC_ORDER } from "./_content/topics";
 import { ArticleCard, FeaturedCard } from "./_components/cards";
 import { CORRECTIONS_EMAIL, REVIEWED_BY_BROKER } from "./_content/editorial";
@@ -33,7 +32,6 @@ export default function ResourcesPage() {
   const topicsWithArticles = TOPIC_ORDER.filter((t) => articles.some((a) => a.topic === t));
   // A chip jumps to its topic list, or to the featured card when that's the topic's only article.
   const chipTarget = (t: (typeof TOPIC_ORDER)[number]) => (rest.some((a) => a.topic === t) ? `#topic-${t}` : "#latest");
-  const author = AUTHORS[0];
 
   // S4: each tool card appears only once its page is live (P1). No "coming soon".
   const tools = [
@@ -162,15 +160,6 @@ export default function ResourcesPage() {
           )}
           <p className="text-[14px]">General information, not legal advice. MyCargoLens is software, not a customs broker.</p>
         </div>
-        {author && (
-          <Link
-            href={authorHref(author.slug)}
-            className="group mt-6 inline-flex items-center gap-1 text-[15px] font-semibold text-tone-fg"
-          >
-            About the author
-            <ArrowRight aria-hidden className="size-4 transition-transform duration-200 ease-[var(--ease-out-quart)] group-hover:translate-x-0.5" />
-          </Link>
-        )}
       </Section>
 
       {/* S6 · Product bridge */}

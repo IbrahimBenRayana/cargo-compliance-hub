@@ -50,7 +50,7 @@ const linkCls =
 export default function AboutPage() {
   return (
     <>
-      {/* The Organization node (with founders) is site-wide, in the root layout. */}
+      {/* The Organization node is site-wide, in the root layout. */}
       <JsonLd
         data={graph({
           ...webPage({ path: ROUTES.about.href, name: TITLE, description: DESCRIPTION, type: "AboutPage" }),

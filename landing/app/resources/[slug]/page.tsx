@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHero } from "@/components/site/page-hero";
 import { Section } from "@/components/site/section";
@@ -7,13 +6,12 @@ import { Faq } from "@/components/site/faq";
 import { CtaBand } from "@/components/site/cta-band";
 import { DemoButton } from "@/components/site/cta";
 import { JsonLd } from "@/components/site/json-ld";
-import { authorHref } from "@/lib/site";
+import { COMPANY } from "@/lib/site";
 import { SOFTWARE_ID, article as articleNode, graph } from "@/lib/schema";
 import { ARTICLES, articleHref, formatDate, getArticle } from "../_content/articles";
-import { getAuthor, personInput } from "../_content/authors";
 import { TOPICS } from "../_content/topics";
 import { Prose } from "../_components/prose";
-import { ArticleCard, AuthorAvatar } from "../_components/cards";
+import { ArticleCard, BYLINE, BylineMark } from "../_components/cards";
 
 /** Article template (site-architecture §6.1, wireframe 10). Content lives in ../_content. */
 export const dynamicParams = false;
@@ -27,7 +25,6 @@ export async function generateMetadata({ params }: PageProps<"/resources/[slug]"
   const a = getArticle(slug);
   if (!a) return {};
   const path = articleHref(a.slug);
-  const author = getAuthor(a.authorSlug);
   return {
     title: a.metaTitle,
     description: a.metaDescription,
@@ -41,7 +38,7 @@ export async function generateMetadata({ params }: PageProps<"/resources/[slug]"
       url: path,
       ...(a.datePublished ? { publishedTime: a.datePublished } : {}),
       modifiedTime: a.dateReviewed,
-      ...(author ? { authors: [author.name] } : {}),
+      authors: [COMPANY.name],
     },
   };
 }
@@ -50,29 +47,25 @@ export default async function ArticlePage({ params }: PageProps<"/resources/[slu
   const { slug } = await params;
   const a = getArticle(slug);
   if (!a) notFound();
-  const author = getAuthor(a.authorSlug);
   const path = articleHref(a.slug);
   const related = a.related
     .map((s) => getArticle(s))
     .filter((r): r is NonNullable<typeof r> => !!r && r.status === "published");
 
-  const posting = author
-    ? articleNode({
-        path,
-        headline: a.title,
-        description: a.metaDescription,
-        datePublished: a.datePublished ?? a.dateReviewed,
-        dateModified: a.dateReviewed,
-        author: personInput(author),
-        citations: a.sources.map((s) => s.href),
-      })
-    : null;
+  const posting = articleNode({
+    path,
+    headline: a.title,
+    description: a.metaDescription,
+    datePublished: a.datePublished ?? a.dateReviewed,
+    dateModified: a.dateReviewed,
+    citations: a.sources.map((s) => s.href),
+  });
   // No invented publish date: drop it from the schema until the article is published.
-  if (posting && !a.datePublished) delete posting.datePublished;
+  if (!a.datePublished) delete posting.datePublished;
 
   return (
     <>
-      {posting && <JsonLd data={graph({ ...posting, about: { "@id": SOFTWARE_ID } })} />}
+      <JsonLd data={graph({ ...posting, about: { "@id": SOFTWARE_ID } })} />
 
       {/* 01 · Article header (banner tier) */}
       <PageHero
@@ -84,32 +77,25 @@ export default async function ArticlePage({ params }: PageProps<"/resources/[slu
         title={a.title}
         scene="resources"
       >
-        {author && (
-          <div className="flex items-center justify-center gap-3 text-left">
-            <AuthorAvatar author={author} size={44} />
-            <div className="text-[14px] leading-snug text-tone-muted">
-              <p>
-                By{" "}
-                <Link href={authorHref(author.slug)} rel="author" className="font-semibold text-tone-fg hover:underline hover:underline-offset-4">
-                  {author.name}
-                </Link>
-                <span aria-hidden> · </span>
-                {author.role}
-              </p>
-              <p className="mt-0.5">
-                {a.datePublished && (
-                  <>
-                    Published <time dateTime={a.datePublished}>{formatDate(a.datePublished)}</time>
-                    <span aria-hidden> · </span>
-                  </>
-                )}
-                Last reviewed against CBP sources <time dateTime={a.dateReviewed}>{formatDate(a.dateReviewed)}</time>
-                <span aria-hidden> · </span>
-                {a.readingMinutes} min read
-              </p>
-            </div>
+        <div className="flex items-center justify-center gap-3 text-left">
+          <BylineMark size={44} />
+          <div className="text-[14px] leading-snug text-tone-muted">
+            <p>
+              By <span className="font-semibold text-tone-fg">{BYLINE}</span>
+            </p>
+            <p className="mt-0.5">
+              {a.datePublished && (
+                <>
+                  Published <time dateTime={a.datePublished}>{formatDate(a.datePublished)}</time>
+                  <span aria-hidden> · </span>
+                </>
+              )}
+              Last reviewed against CBP sources <time dateTime={a.dateReviewed}>{formatDate(a.dateReviewed)}</time>
+              <span aria-hidden> · </span>
+              {a.readingMinutes} min read
+            </p>
           </div>
-        )}
+        </div>
       </PageHero>
 
       {/* 02 · Body with sticky TOC */}

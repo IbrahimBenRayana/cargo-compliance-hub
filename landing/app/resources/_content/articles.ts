@@ -3,7 +3,7 @@ import type { Article } from "./types";
 
 /**
  * Every article with a route. Add new ones here (typed TSX, no MDX).
- * Only `status: "published"` articles are listed (hub, author page, llms.txt)
+ * Only `status: "published"` articles are listed (hub, llms.txt)
  * and indexable; the rest render at their URL with noindex.
  */
 export const ARTICLES: Article[] = [isfLateFilingPenalties];

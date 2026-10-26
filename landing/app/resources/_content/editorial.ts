@@ -1,7 +1,4 @@
-/**
- * Editorial facts shared by the hub and author pages (copy/resources.md S5,
- * copy/resources-author.md S4).
- */
+/** Editorial facts shared by the hub and articles (copy/resources.md S5). */
 
 /**
  * [CONDITIONAL] review line. Stays false until a licensed customs broker or

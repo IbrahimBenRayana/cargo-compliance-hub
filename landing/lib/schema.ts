@@ -30,8 +30,6 @@ export function organization(): JsonLdNode {
     logo: abs("/brand/logo-mark-square.svg"),
     description:
       "MyCargoLens is ISF and customs entry filing software for importers, forwarders, NVOCCs and customs brokers. It is not a licensed customs broker.",
-    founder: COMPANY.founders.map((name) => ({ "@type": "Person", name })),
-    ...(COMPANY.foundingYear ? { foundingDate: COMPANY.foundingYear } : {}),
     ...(COMPANY.postalAddress ? { address: COMPANY.postalAddress } : {}),
     ...(COMPANY.linkedInUrl ? { sameAs: [COMPANY.linkedInUrl] } : {}),
   };
@@ -123,30 +121,13 @@ export function webPage({
   };
 }
 
-export type PersonInput = { slug: string; name: string; jobTitle?: string; description?: string; sameAs?: string[] };
-
-export function person({ slug, name, jobTitle, description, sameAs }: PersonInput): JsonLdNode {
-  const url = abs(`/resources/authors/${slug}`);
-  return {
-    "@type": "Person",
-    "@id": `${url}#person`,
-    name,
-    url,
-    ...(jobTitle ? { jobTitle } : {}),
-    ...(description ? { description } : {}),
-    worksFor: { "@id": ORG_ID },
-    ...(sameAs?.length ? { sameAs } : {}),
-  };
-}
-
-/** Article / BlogPosting for /resources/{slug}. */
+/** Article / BlogPosting for /resources/{slug}. The author is the Organization (no personal bylines). */
 export function article({
   path,
   headline,
   description,
   datePublished,
   dateModified,
-  author,
   citations = [],
   image,
   type = "BlogPosting",
@@ -156,7 +137,6 @@ export function article({
   description?: string;
   datePublished: string;
   dateModified?: string;
-  author: PersonInput;
   citations?: string[];
   image?: string;
   type?: "BlogPosting" | "Article" | "TechArticle";
@@ -169,7 +149,7 @@ export function article({
     ...(description ? { description } : {}),
     datePublished,
     dateModified: dateModified ?? datePublished,
-    author: { "@id": `${abs(`/resources/authors/${author.slug}`)}#person`, name: author.name },
+    author: { "@id": ORG_ID, "@type": "Organization", name: COMPANY.name },
     publisher: { "@id": ORG_ID },
     ...(image ? { image: abs(image) } : {}),
     ...(citations.length ? { citation: citations } : {}),

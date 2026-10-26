@@ -1,54 +1,30 @@
 import * as React from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { accentClass } from "@/lib/accents";
-import { authorHref } from "@/lib/site";
 import { articleHref, formatDate } from "../_content/articles";
-import { getAuthor, initials } from "../_content/authors";
 import { TOPICS } from "../_content/topics";
-import type { Article, Author } from "../_content/types";
+import type { Article } from "../_content/types";
 
-/** Real photo if one exists, otherwise an initials tile (wireframe 10). */
-export function AuthorAvatar({ author, size = 40 }: { author: Author; size?: number }) {
-  if (author.photo) {
-    return (
-      <Image
-        src={author.photo}
-        alt={author.name}
-        width={size}
-        height={size}
-        className="shrink-0 rounded-full object-cover"
-      />
-    );
-  }
+/** Byline. Articles are written by the company, never a named person. */
+export const BYLINE = "The MyCargoLens team";
+
+/** Brand mark tile next to the byline (decorative). */
+export function BylineMark({ size = 40 }: { size?: number }) {
   return (
-    <span
-      aria-hidden
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.36) }}
-      className="grid shrink-0 place-items-center rounded-full bg-[hsl(var(--tone-fg))] font-semibold tracking-[0.02em] text-[hsl(var(--surface))]"
-    >
-      {initials(author.name)}
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/brand/logo-mark-square.svg" alt="" aria-hidden width={size} height={size} className="shrink-0 rounded-[10px]" />
   );
 }
 
-/** "Ibrahim Rayana · Oct 23, 2026 · 8 min read" */
-export function MetaLine({ article, className, linkAuthor = true }: { article: Article; className?: string; linkAuthor?: boolean }) {
-  const author = getAuthor(article.authorSlug);
+/** "The MyCargoLens team · Oct 23, 2026 · 8 min read" */
+export function MetaLine({ article, className }: { article: Article; className?: string }) {
   const date = article.datePublished ?? article.dateReviewed;
   return (
     <p className={cn("text-[14px] text-tone-muted", className)}>
-      {author &&
-        (linkAuthor ? (
-          <Link href={authorHref(author.slug)} className="font-medium text-tone-fg hover:underline hover:underline-offset-4">
-            {author.name}
-          </Link>
-        ) : (
-          <span className="font-medium text-tone-fg">{author.name}</span>
-        ))}
-      {author && <span aria-hidden> · </span>}
+      <span className="font-medium text-tone-fg">{BYLINE}</span>
+      <span aria-hidden> · </span>
       <time dateTime={date}>{formatDate(date)}</time>
       <span aria-hidden> · </span>
       {article.readingMinutes} min read
@@ -94,7 +70,7 @@ export function FeaturedCard({ article }: { article: Article }) {
           </Link>
         </h3>
         <p className="mt-3 text-[16px] leading-relaxed text-tone-muted">{article.dek}</p>
-        <MetaLine article={article} linkAuthor={false} className="mt-5" />
+        <MetaLine article={article} className="mt-5" />
         <span className="mt-auto inline-flex items-center gap-1 pt-6 text-[15px] font-semibold text-tone-fg">
           Read the guide
           <ArrowRight aria-hidden className="size-4 transition-transform duration-200 ease-[var(--ease-out-quart)] group-hover:translate-x-0.5" />
@@ -105,8 +81,8 @@ export function FeaturedCard({ article }: { article: Article }) {
   );
 }
 
-/** List card (hub S3, author page S5): title, dek, topic chip, author/date. */
-export function ArticleCard({ article, showAuthor = true }: { article: Article; showAuthor?: boolean }) {
+/** List card (hub S3): title, dek, topic chip, byline/date. */
+export function ArticleCard({ article }: { article: Article }) {
   return (
     <article className="group relative flex h-full flex-col rounded-[20px] p-6 site-surface transition-transform duration-200 ease-[var(--ease-out-quart)] [@media(hover:hover)]:hover:-translate-y-px">
       <TopicChip article={article} className="self-start" />
@@ -116,15 +92,7 @@ export function ArticleCard({ article, showAuthor = true }: { article: Article; 
         </Link>
       </h3>
       <p className="mt-2 text-[15px] leading-relaxed text-tone-muted">{article.dek}</p>
-      {showAuthor ? (
-        <MetaLine article={article} linkAuthor={false} className="mt-auto pt-5" />
-      ) : (
-        <p className="mt-auto pt-5 text-[14px] text-tone-muted">
-          <time dateTime={article.datePublished ?? article.dateReviewed}>
-            {formatDate(article.datePublished ?? article.dateReviewed)}
-          </time>
-        </p>
-      )}
+      <MetaLine article={article} className="mt-auto pt-5" />
     </article>
   );
 }

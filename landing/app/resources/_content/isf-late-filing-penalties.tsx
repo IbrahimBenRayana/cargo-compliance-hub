@@ -14,7 +14,7 @@ import type { Article } from "./types";
  *
  * STATUS: awaiting review. The article header asks for a licensed customs
  * broker or customs attorney to read it before publishing, so the route is
- * noindex and the article is not listed on /resources, the author page or
+ * noindex and the article is not listed on /resources or
  * llms.txt. Flip `status` to "published" and set `datePublished` once the
  * review is done.
  */
@@ -288,7 +288,6 @@ export const isfLateFilingPenalties: Article = {
   metaDescription:
     "A late, inaccurate or unwithdrawn ISF can draw a $5,000 liquidated-damages claim. What triggers one, who pays, and how NVOCC ISF desks stay on time.",
   dek: "A late, inaccurate or unwithdrawn ISF can draw a $5,000 liquidated-damages claim. What triggers one, who pays, and how NVOCC ISF desks stay on time.",
-  authorSlug: "ibrahim-rayana",
   datePublished: null,
   dateReviewed: "2026-10-23",
   readingMinutes: 8,

@@ -60,6 +60,8 @@ const nextConfig: NextConfig = {
       { source: "/platform/automation", destination: "/platform/inbox", permanent: true },
       { source: "/why-mycargolens", destination: "/compare", permanent: true },
       { source: "/tools", destination: "/resources", permanent: true },
+      // Bylines are the company, not a person: author pages are retired.
+      { source: "/resources/authors/:slug*", destination: "/resources", permanent: true },
     ];
   },
 };

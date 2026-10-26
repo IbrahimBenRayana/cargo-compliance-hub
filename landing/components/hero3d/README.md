@@ -1,6 +1,6 @@
 # Hero 3D
 
-Animated 3D hero visuals in real-time three.js, one per page template. They were approved by Ibrahim on Oct 26 2026. The source prototypes are in the marketing deliverable `2026-10-23-website-rework/hero-3d/`, which has the README, the concept per page and INTEGRATION.md.
+Animated 3D hero visuals in real-time three.js, one per page template. They were approved by the founders. The source prototypes are in the marketing deliverable `2026-10-23-website-rework/hero-3d/`, which has the README, the concept per page and INTEGRATION.md.
 
 ```
 engine.ts          the shared world kit: renderer, light rig, materials, primitives, run loop, dispose()

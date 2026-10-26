@@ -14,29 +14,12 @@ export type Topic = {
   accent: ModuleKey;
 };
 
-export type Author = {
-  /** URL slug: first-last, lowercase. */
-  slug: string;
-  name: string;
-  firstName: string;
-  /** Role line (S1). Only confirmed facts. */
-  role: string;
-  /** schema.org jobTitle. */
-  jobTitle: string;
-  /** Short bio paragraphs: verified facts only (copy/resources-author.md S2 rules). */
-  bio: string[];
-  /** Real headshot path, or null (no stock photos, no illustrated avatars: initials tile instead). */
-  photo: string | null;
-  /** LinkedIn profile URL, or null until supplied. */
-  linkedInUrl: string | null;
-};
-
 export type Source = { label: string; href: string };
 
 export type TocItem = { id: string; label: string };
 
 export type ArticleStatus =
-  /** Live: listed on the hub, author page, llms.txt and indexable. */
+  /** Live: listed on the hub, llms.txt and indexable. */
   | "published"
   /**
    * Route exists but the article is held back: noindex, not listed anywhere.
@@ -58,9 +41,8 @@ export type Article = {
   /** Meta title without the brand (layout template adds "| MyCargoLens"). */
   metaTitle: string;
   metaDescription: string;
-  /** Card dek (hub, author page). */
+  /** Card dek (hub). */
   dek: string;
-  authorSlug: string;
   /** ISO date. Null until the article is actually published. */
   datePublished: string | null;
   /** ISO date of the last check against primary sources. */

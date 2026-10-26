@@ -18,7 +18,7 @@ export const APP_LOGIN_URL = "https://app.mycargolens.com/login";
 export const COMPANY = {
   /** Brand, as printed on the site. */
   name: "MyCargoLens",
-  /** Legal name per the founder (Oct 26 2026). Casing/suffix still to confirm. */
+  /** Legal name. Casing/suffix still to confirm. */
   legalName: "Mycargolens",
   brandLine: "An inbox for US customs, not another dashboard.",
   disclosure:
@@ -27,10 +27,7 @@ export const COMPANY = {
    * Not confirmed yet. Leave null: the footer and schema skip null facts
    * instead of rendering placeholder text.
    */
-  /** Named in the Organization schema (founder). */
-  founders: ["Ibrahim Rayana", "Imran Siddique"],
   postalAddress: null as string | null,
-  foundingYear: null as string | null,
   linkedInUrl: null as string | null,
 } as const;
 
@@ -229,7 +226,7 @@ export const ROUTES = r({
     group: "resources",
     scene: "resources",
     live: true,
-    // Articles and author pages are indexable only once their content is
+    // Articles are indexable only once their content is
     // published: app/resources/_content owns that status, and sitemap.ts /
     // llms.txt list them from there. Keep them out of INDEXABLE_ROUTES.
     noindex: true,
@@ -322,11 +319,6 @@ export function href(key: RouteKey): string {
   return ROUTES[key].href;
 }
 
-/** Author pages: /resources/authors/{first-last}. */
-export function authorHref(slug: string): string {
-  return `/resources/authors/${slug}`;
-}
-
 const all = Object.values(ROUTES) as SiteRoute[];
 
 /** Live routes only, in registry order. */
@@ -338,7 +330,7 @@ export function findRoute(path: string): SiteRoute | undefined {
   return all.find((x) => x.href === path);
 }
 
-/** Every indexable, live route (sitemap.ts). Articles and authors come from app/resources/_content. */
+/** Every indexable, live route (sitemap.ts). Articles come from app/resources/_content. */
 export const INDEXABLE_ROUTES: SiteRoute[] = all.filter((x) => x.live && !x.noindex);
 
 // ---------------------------------------------------------------------------
