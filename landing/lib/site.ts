@@ -27,6 +27,8 @@ export const COMPANY = {
    * Not confirmed yet. Leave null: the footer and schema skip null facts
    * instead of rendering placeholder text.
    */
+  /** Named in the Organization schema (founder). */
+  founders: ["Ibrahim Rayana", "Imran Siddique"],
   postalAddress: null as string | null,
   foundingYear: null as string | null,
   linkedInUrl: null as string | null,

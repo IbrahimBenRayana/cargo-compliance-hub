@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   description:
     "Terms and conditions governing your use of the MyCargoLens CBP compliance platform.",
   alternates: { canonical: "/legal/terms" },
+  openGraph: {
+    url: "/legal/terms",
+    title: "Terms of Service",
+    description: "Terms and conditions governing your use of the MyCargoLens CBP compliance platform.",
+  },
 };
 
 export default function TermsOfServicePage() {

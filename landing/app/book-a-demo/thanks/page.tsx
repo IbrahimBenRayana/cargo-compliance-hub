@@ -9,6 +9,8 @@ import { parseRoute, type Route } from "../_components/demo-copy";
 export const metadata: Metadata = {
   title: "Request received",
   description: "Your MyCargoLens demo request is in. Here's what happens next and how to prepare.",
+  alternates: { canonical: "/book-a-demo/thanks" },
+  openGraph: { url: "/book-a-demo/thanks", title: "Request received" },
   robots: { index: false, follow: false },
 };
 

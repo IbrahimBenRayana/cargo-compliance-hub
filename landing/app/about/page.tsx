@@ -7,7 +7,7 @@ import { DemoButton } from "@/components/site/cta";
 import { CertBadge } from "@/components/site/cert-badge";
 import { FeatureSplit, StepFlow } from "@/components/site/blocks";
 import { JsonLd } from "@/components/site/json-ld";
-import { graph, organization, webPage, ORG_ID } from "@/lib/schema";
+import { graph, webPage, ORG_ID } from "@/lib/schema";
 import { ACCENTS, accentClass } from "@/lib/accents";
 import { COMPANY, ROUTES } from "@/lib/site";
 import { CtaBand } from "@/components/site/cta-band";
@@ -44,24 +44,18 @@ const WE_ARENT = [
   "A full broker suite. In-bond, FTZ, drawback and AES are not available today.",
 ];
 
-/**
- * The founders, named by the CMO brief. The visible team block (copy §7) stays
- * hidden until real roles, backgrounds and photos are supplied; only the
- * names go into the Organization schema.
- */
-const FOUNDERS = ["Ibrahim Rayana", "Imran Siddique"];
-
 const linkCls =
   "font-semibold text-tone-fg underline decoration-current/35 underline-offset-4 transition-colors hover:decoration-current";
 
 export default function AboutPage() {
   return (
     <>
+      {/* The Organization node (with founders) is site-wide, in the root layout. */}
       <JsonLd
-        data={graph(
-          { ...webPage({ path: ROUTES.about.href, name: TITLE, description: DESCRIPTION, type: "AboutPage" }), about: { "@id": ORG_ID } },
-          { ...organization(), founder: FOUNDERS.map((name) => ({ "@type": "Person", name })) },
-        )}
+        data={graph({
+          ...webPage({ path: ROUTES.about.href, name: TITLE, description: DESCRIPTION, type: "AboutPage" }),
+          about: { "@id": ORG_ID },
+        })}
       />
 
       {/* 2. Hero */}

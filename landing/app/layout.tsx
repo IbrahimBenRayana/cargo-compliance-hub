@@ -17,28 +17,31 @@ const inter = Inter({
   display: "swap",
 });
 
+const DEFAULT_TITLE = "Customs Filing Software for ISF and Entries | MyCargoLens";
+const DEFAULT_DESCRIPTION =
+  "File ISF and customs entries with CBP from one inbox ranked by what needs you now. CBP ABI certified. Per-shipment price, charged when CBP accepts.";
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://mycargolens.com"),
+  // Fallbacks only: every page sets its own title, description, canonical
+  // and openGraph (site-architecture §5.5).
   title: {
-    default: "MyCargoLens — CBP Compliance Platform",
+    default: DEFAULT_TITLE,
     template: "%s | MyCargoLens",
   },
-  description:
-    "The complete CBP compliance platform for modern importers. File ISF and Entry in one secure workspace.",
+  description: DEFAULT_DESCRIPTION,
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://mycargolens.com",
     siteName: "MyCargoLens",
-    title: "MyCargoLens — CBP Compliance Platform",
-    description:
-      "The complete CBP compliance platform for modern importers. File ISF and Entry in one secure workspace.",
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: "MyCargoLens — CBP Compliance Platform",
-    description:
-      "The complete CBP compliance platform for modern importers.",
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
   },
   robots: {
     index: true,

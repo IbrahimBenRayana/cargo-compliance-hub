@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   description:
     "How MyCargoLens collects, uses, and protects your personal information.",
   alternates: { canonical: "/legal/privacy" },
+  openGraph: {
+    url: "/legal/privacy",
+    title: "Privacy Policy",
+    description: "How MyCargoLens collects, uses, and protects your personal information.",
+  },
 };
 
 export default function PrivacyPolicyPage() {

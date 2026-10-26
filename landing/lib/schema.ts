@@ -30,6 +30,7 @@ export function organization(): JsonLdNode {
     logo: abs("/brand/logo-mark-square.svg"),
     description:
       "MyCargoLens is ISF and customs entry filing software for importers, forwarders, NVOCCs and customs brokers. It is not a licensed customs broker.",
+    founder: COMPANY.founders.map((name) => ({ "@type": "Person", name })),
     ...(COMPANY.foundingYear ? { foundingDate: COMPANY.foundingYear } : {}),
     ...(COMPANY.postalAddress ? { address: COMPANY.postalAddress } : {}),
     ...(COMPANY.linkedInUrl ? { sameAs: [COMPANY.linkedInUrl] } : {}),
