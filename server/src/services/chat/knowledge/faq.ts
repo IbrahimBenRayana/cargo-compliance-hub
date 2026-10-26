@@ -9,25 +9,24 @@ export const FAQ_KB = `
 
 There is NO monthly subscription fee. You pick ONE tier, which sets a flat
 per-shipment rate and unlocks that tier's features. You keep a card on file and
-are charged the flat rate for each shipment CBP accepts. Rejected filings aren't
-charged — browsing, drafting, and manifest (MBOL) queries are always free.
+are charged the flat rate for each shipment you file. You only pay for what you
+actually file — browsing, drafting, and manifest (MBOL) queries are always free.
 
 Tiers (per shipment filed, no monthly fee):
 - **ISF Filing — $45 / shipment.** File ISF-10 / ISF-5 security filings.
-  Includes templates, manifest query, HTS suggestions, email support.
+  Includes templates, manifest query, email support.
 - **ISF + Entry — $180 / shipment.** Everything in ISF Filing, plus ABI Entry
   Summary (7501) and Cargo Release (3461). Chat support.
 - **Complete — $280 / shipment.** Everything in ISF + Entry, plus container
-  tracking, the duty calculator, and priority support. HTS suggestions are on
-  every plan.
-- **Volume pricing — on request.** NVOCCs, forwarders and brokers filing at
-  volume: per-shipment pricing agreed in writing.
+  tracking, HTS classification, the duty calculator, and priority support.
+- **Enterprise — contact sales.** Volume per-shipment pricing, SSO, uptime SLA,
+  dedicated support, custom integrations.
 
 Billing details:
 - One charge per shipment you file. A linked ISF and ABI Entry on the SAME
   shipment is billed once, not twice. Fixing and resubmitting the same filing
   never double-charges.
-- You're charged when CBP accepts the shipment. Rejected filings aren't charged.
+- The charge happens on the first successful CBP submission for that shipment.
 - You can change tiers anytime from billing settings; the new rate/features
   apply to shipments filed after the change. Existing data is untouched.
 
@@ -40,7 +39,8 @@ Billing details:
 # Security (short form)
 
 - Encryption in transit and at rest, role-based access, per-org isolation.
-- AI uses OpenAI; only filing data + the CBP response is ever sent to the model.
+- AI uses OpenAI's zero-retention API tier; trade data is not used for training,
+  and only filing data + the CBP response is ever sent to the model.
 
 # Customs domain quick reference
 
