@@ -136,6 +136,8 @@ const UTM: [string, keyof Attribution][] = [
 /** Printable text only, clipped to the server's max so one long param can't 400 the lead. */
 function clean(v: string | null | undefined, max: number): string | undefined {
   if (!v) return undefined;
+  // Stripping control characters is the point of this regex.
+  // eslint-disable-next-line no-control-regex
   const s = v.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, max);
   return s || undefined;
 }

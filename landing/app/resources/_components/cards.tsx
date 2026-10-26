@@ -13,7 +13,6 @@ export const BYLINE = "The MyCargoLens team";
 /** Brand mark tile next to the byline (decorative). */
 export function BylineMark({ size = 40 }: { size?: number }) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
     <img src="/brand/logo-mark-square.svg" alt="" aria-hidden width={size} height={size} className="shrink-0 rounded-[10px]" />
   );
 }
