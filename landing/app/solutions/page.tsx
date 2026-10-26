@@ -138,7 +138,7 @@ export default function SolutionsPage() {
         </p>
       </Section>
 
-      <Section tone="paper" spacing="compact" aria-label="Certification and record">
+      <Section tone="paper" spacing="compact" aria-label="CBP ABI certified, on the record">
         <ul className="flex flex-wrap items-center justify-center gap-3">
           <li>
             <CertBadge link />

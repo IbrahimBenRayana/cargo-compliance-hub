@@ -310,7 +310,7 @@ export default function NvoccForwardersPage() {
         <dl className="mt-10 grid gap-4 md:grid-cols-3">
           {[
             ["The price principle", "Written on our website: you're charged only when CBP accepts."],
-            ["The certification", "CBP ABI certified."],
+            ["CBP status", "CBP ABI certified."],
             ["The record", "Every CBP request and response, logged and exportable."],
           ].map(([k, v]) => (
             <div key={k} className="rounded-[20px] p-6 site-surface">
