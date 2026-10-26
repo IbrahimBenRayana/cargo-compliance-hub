@@ -70,3 +70,35 @@ export function computeProtestDeadline(liquidationDate: Date): {
     expired: daysRemaining < 0,
   };
 }
+
+export interface LiquidationSource {
+  id: string;
+  /** Entry number as CBP prints it (XXX-NNNNNNN-N), else the bill. */
+  ref: string;
+  entryType: string;
+  entryDate: Date;
+  linkUrl: string;
+}
+
+/**
+ * Accepted entry summaries to track for PSC and liquidation. Liquidation is
+ * an entry concept, dated from the entry date (falling back to CBP's answer,
+ * then the send); ISF filings never liquidate.
+ */
+export function liquidationSources(docs: Array<{
+  id: string; entryNumber: string | null; mbolNumber: string | null; entryType: string;
+  payload: unknown; respondedAt: Date | null; sentAt: Date | null;
+}>): LiquidationSource[] {
+  const out: LiquidationSource[] = [];
+  for (const d of docs) {
+    const ymd = (d.payload as { dates?: { entryDate?: unknown } } | null)?.dates?.entryDate;
+    const entryDate = typeof ymd === 'string' && /^\d{8}$/.test(ymd)
+      ? new Date(`${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}T00:00:00Z`)
+      : d.respondedAt ?? d.sentAt;
+    if (!entryDate) continue;
+    const n = (d.entryNumber ?? '').replace(/-/g, '');
+    const ref = n.length === 11 ? `${n.slice(0, 3)}-${n.slice(3, 10)}-${n.slice(10)}` : d.entryNumber || d.mbolNumber || d.id.slice(0, 8);
+    out.push({ id: d.id, ref, entryType: d.entryType, entryDate, linkUrl: `/abi-documents/${d.id}` });
+  }
+  return out;
+}

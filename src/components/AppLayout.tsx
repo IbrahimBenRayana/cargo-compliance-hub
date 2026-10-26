@@ -1,4 +1,6 @@
+import { Suspense } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
+import { PageLoading } from '@/components/PageLoading';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { LogOut, Settings } from 'lucide-react';
@@ -117,7 +119,10 @@ export function AppLayout() {
 
           {/* ── Page Content ── */}
           <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto p-6">
-            <Outlet />
+            {/* Keep the sidebar up while a page's code loads. */}
+            <Suspense fallback={<PageLoading />}>
+              <Outlet />
+            </Suspense>
           </main>
 
         </div>

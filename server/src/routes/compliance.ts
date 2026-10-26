@@ -26,7 +26,17 @@ import { authLimiter, classifyLimiter } from '../middleware/rateLimiter.js';
 import * as ai from '../services/ai.js';
 import { lookupPgaFlags, lookupMetadata as pgaMeta } from '../services/compliance/pgaFlags.js';
 import { assessUflpaRisk } from '../services/compliance/uflpa.js';
-import { computeLiquidation } from '../services/compliance/liquidation.js';
+import { computeLiquidation, liquidationSources } from '../services/compliance/liquidation.js';
+
+/** Accepted entry summaries: what PSC windows and liquidation apply to (never ISF filings). */
+function loadAcceptedEntries(orgId: string) {
+  return prisma.abiDocument.findMany({
+    where: { orgId, status: 'ACCEPTED' },
+    select: { id: true, entryNumber: true, mbolNumber: true, entryType: true, payload: true, respondedAt: true, sentAt: true },
+    orderBy: { respondedAt: 'desc' },
+    take: 200,
+  });
+}
 import { lookupAddCvd, getAddCvdMeta, invalidateAddCvdCache } from '../services/compliance/addCvd.js';
 import { syncFromFederalRegister } from '../services/compliance/addCvdSync.js';
 import { lookupFtaForCountry, getFtaMeta } from '../services/compliance/fta.js';
@@ -233,40 +243,15 @@ router.get('/pga-lookup', (req: AuthRequest, res: Response): void => {
 // a calendar / countdown table.
 
 router.get('/liquidation-tracker', async (req: AuthRequest, res: Response): Promise<void> => {
-  const orgId = req.user!.orgId;
-  const filings = await prisma.filing.findMany({
-    where: {
-      orgId,
-      status: { in: ['accepted', 'amended'] },
-      acceptedAt: { not: null },
-    },
-    select: {
-      id: true,
-      masterBol: true,
-      houseBol: true,
-      acceptedAt: true,
-      filingType: true,
-    },
-    orderBy: { acceptedAt: 'desc' },
-    take: 200,
-  });
-
-  const tracked = filings.map((f) => {
-    // computeLiquidation returns { entryDate, estimatedLiquidationAt, ... }
-    // already, so we don't re-set entryDate ourselves — would shadow & confuse.
-    const dates = computeLiquidation(f.acceptedAt!);
-    return {
-      filingId: f.id,
-      bol: f.houseBol || f.masterBol || f.id.slice(0, 8),
-      filingType: f.filingType,
-      ...dates,
-    };
-  });
-
-  res.json({
-    total: tracked.length,
-    tracked,
-  });
+  const sources = liquidationSources(await loadAcceptedEntries(req.user!.orgId));
+  const tracked = sources.map((e) => ({
+    id: e.id,
+    bol: e.ref,
+    filingType: `Entry ${e.entryType}`,
+    linkUrl: e.linkUrl,
+    ...computeLiquidation(e.entryDate),
+  }));
+  res.json({ total: tracked.length, tracked });
 });
 
 // ─── GET /action-queue ───────────────────────────────────────────────
@@ -521,62 +506,31 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
     });
   }
 
-  // 4. PSC deadlines — Post-Summary Correction windows about to close.
-  //    Accepted/amended filings with PSC deadline ≤ 14 days away.
-  for (const f of filings) {
-    if (!['accepted', 'amended'].includes(f.status) || !f.acceptedAt) continue;
-    const liq = computeLiquidation(f.acceptedAt);
-    if (liq.status !== 'psc-window-open') continue;
-    if (liq.daysUntilPscDeadline > 14) continue;
-    const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
-    const en = enrich(f);
+  // 4 + 5. PSC windows closing and liquidation imminent: accepted entries only.
+  for (const e of liquidationSources(await loadAcceptedEntries(orgId))) {
+    const liq = computeLiquidation(e.entryDate);
+    const psc = liq.status === 'psc-window-open' && liq.daysUntilPscDeadline <= 14;
+    const liquidating = liq.status === 'awaiting-liquidation' && liq.daysUntilLiquidation >= 0 && liq.daysUntilLiquidation <= 14;
+    if (!psc && !liquidating) continue;
     items.push({
-      id: `psc:${f.id}`,
-      kind: 'psc',
-      severity: liq.daysUntilPscDeadline <= 7 ? 'high' : 'medium',
-      title: `PSC window closes in ${liq.daysUntilPscDeadline}d — ${bol}`,
-      context: 'File a Post-Summary Correction within the window, or accept the current duty assessment.',
-      filingId: f.id,
-      bol,
-      timestamp: f.acceptedAt.getTime(),
+      id: `${psc ? 'psc' : 'liquidation'}:${e.id}`,
+      kind: psc ? 'psc' : 'liquidation',
+      severity: psc ? (liq.daysUntilPscDeadline <= 7 ? 'high' : 'medium') : 'medium',
+      title: psc ? `PSC window closes in ${liq.daysUntilPscDeadline}d — ${e.ref}` : `Liquidation in ${liq.daysUntilLiquidation}d — ${e.ref}`,
+      context: psc
+        ? 'File a Post-Summary Correction within the window, or accept the current duty assessment.'
+        : 'After liquidation you have 180 days to file a protest if the duty assessment is contested.',
+      bol: e.ref,
+      timestamp: e.entryDate.getTime(),
       isNew: false,
-      score: en.score,
-      status: f.status,
-      originCompany: en.company,
-      originCountry: en.country,
-      actions: [
-        { label: 'Open', kind: 'open', href: `/shipments/${f.id}` },
-      ],
+      score: null,
+      status: 'accepted',
+      originCompany: null,
+      originCountry: null,
+      actions: [{ label: 'Open', kind: 'open', href: e.linkUrl }],
     });
   }
 
-  // 5. Liquidation imminent — entries whose 314-day liquidation is ≤14d.
-  for (const f of filings) {
-    if (!['accepted', 'amended'].includes(f.status) || !f.acceptedAt) continue;
-    const liq = computeLiquidation(f.acceptedAt);
-    if (liq.status !== 'awaiting-liquidation') continue;
-    if (liq.daysUntilLiquidation > 14 || liq.daysUntilLiquidation < 0) continue;
-    const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
-    const en = enrich(f);
-    items.push({
-      id: `liquidation:${f.id}`,
-      kind: 'liquidation',
-      severity: 'medium',
-      title: `Liquidation in ${liq.daysUntilLiquidation}d — ${bol}`,
-      context: 'After liquidation you have 180 days to file a protest if the duty assessment is contested.',
-      filingId: f.id,
-      bol,
-      timestamp: f.acceptedAt.getTime(),
-      isNew: false,
-      score: en.score,
-      status: f.status,
-      originCompany: en.company,
-      originCountry: en.country,
-      actions: [
-        { label: 'Open', kind: 'open', href: `/shipments/${f.id}` },
-      ],
-    });
-  }
 
   // 6. Bulk-fix detector — 3+ recent rejections sharing the same parsed
   //    rejection-summary string indicates the importer is making one
@@ -1231,11 +1185,11 @@ router.get('/health-narrative', async (req: AuthRequest, res: Response): Promise
     if (risk.severity === 'high') uflpaHigh++;
     else if (risk.severity === 'elevated') uflpaElevated++;
 
-    if (f.status === 'accepted' && f.acceptedAt) {
-      const liq = computeLiquidation(new Date(f.acceptedAt));
-      if (liq.daysUntilPscDeadline >= 0 && liq.daysUntilPscDeadline <= 14) pscClosingSoon++;
-      if (liq.daysUntilLiquidation >= 0 && liq.daysUntilLiquidation <= 14) liquidatingSoon++;
-    }
+  }
+  for (const e of liquidationSources(await loadAcceptedEntries(orgId))) {
+    const liq = computeLiquidation(e.entryDate);
+    if (liq.daysUntilPscDeadline >= 0 && liq.daysUntilPscDeadline <= 14) pscClosingSoon++;
+    if (liq.daysUntilLiquidation >= 0 && liq.daysUntilLiquidation <= 14) liquidatingSoon++;
   }
 
   const signals: NarrativeSignals = {

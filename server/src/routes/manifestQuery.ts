@@ -102,7 +102,7 @@ router.post('/', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<
 
     const ccRequestId = ccResult.data?._id;
     if (!ccRequestId) {
-      res.status(502).json({ error: 'CustomsCity did not return a request ID' });
+      res.status(502).json({ error: 'The manifest service did not accept the query. Please try again.' });
       return;
     }
 
@@ -316,7 +316,7 @@ router.post('/:id/poll', ccApiLimiter, async (req: AuthRequest, res: Response): 
   }
 
   if (!query.ccRequestId) {
-    res.status(400).json({ error: 'No CC request ID to poll' });
+    res.status(400).json({ error: 'This query has no pending request to check.' });
     return;
   }
 

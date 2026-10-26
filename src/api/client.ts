@@ -2728,7 +2728,9 @@ export interface FtaPreferenceResponse {
 }
 
 export interface LiquidationTracked {
-  filingId: string;
+  /** Accepted entry (abiDocument) id: liquidation applies to entries, not ISF filings. */
+  id: string;
+  linkUrl: string;
   bol: string;
   filingType: string;
   entryDate: string;

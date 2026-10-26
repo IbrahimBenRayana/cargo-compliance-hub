@@ -214,7 +214,7 @@ export async function sendAbiDocumentToCBP(params: {
   if (hasNativeOnlyData(bodyResult.data)) {
     return {
       httpStatus: 422,
-      body: { error: 'The CustomsCity fallback cannot carry Chapter 99, trade program or AD/CVD claims. Transmit this entry through the native engine.', code: 'NATIVE_ONLY_DATA' },
+      body: { error: 'The legacy filing route cannot carry Chapter 99, trade program or AD/CVD claims. Transmit this entry through the native engine.', code: 'NATIVE_ONLY_DATA' },
     };
   }
 

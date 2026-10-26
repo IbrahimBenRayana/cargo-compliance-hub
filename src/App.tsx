@@ -9,40 +9,45 @@ import { PlatformAdminRoute } from "@/components/PlatformAdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CapabilityGate } from "@/components/CapabilityGate";
 import { CAPABILITIES } from "@/lib/planMeta";
+import { Suspense } from "react";
+import { lazyPage } from "@/lib/lazyPage";
+import { PageLoading } from "@/components/PageLoading";
 import LoginPage from "@/pages/LoginPage";
-import RegisterPage from "@/pages/RegisterPage";
-import { SetPasswordPage } from "@/pages/SetPasswordPage";
-import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
-import { AdminClientsPage } from "@/pages/AdminClientsPage";
-import { AdminChatConsolePage } from "@/pages/AdminChatConsolePage";
-import { AdminCertConsolePage } from "@/pages/AdminCertConsolePage";
-import { AdminCbpTrafficPage } from "@/pages/AdminCbpTrafficPage";
-import VerifyEmailPage from "@/pages/VerifyEmailPage";
-import MfaSetupPage from "@/pages/MfaSetupPage";
-import OnboardingPage from "@/pages/OnboardingPage";
-import UpgradePage from "@/pages/UpgradePage";
-import UpgradeSuccessPage from "@/pages/UpgradeSuccessPage";
-import UpgradeCancelPage from "@/pages/UpgradeCancelPage";
-import Dashboard from "@/pages/Dashboard";
-import ShipmentsList from "@/pages/ShipmentsList";
-import ShipmentDetails from "@/pages/ShipmentDetails";
-import ShipmentWizard from "@/pages/ShipmentWizard";
-import CompliancePage from "@/pages/CompliancePage";
-import ManifestQueryPage from "@/pages/ManifestQueryPage";
-import DutyCalculatorPage from "@/pages/DutyCalculatorPage";
-import ABIDocumentsListPage from "@/pages/ABIDocumentsListPage";
-import ABIDocumentDetailPage from "@/pages/ABIDocumentDetailPage";
-import ABIDocumentWizard from "@/pages/ABIDocumentWizard";
-import InbondListPage from "@/pages/InbondListPage";
-import InbondDetailPage from "@/pages/InbondDetailPage";
-import InbondWizard from "@/pages/InbondWizard";
-import IntegrationsApi from "@/pages/IntegrationsApi";
-import TrackingPage from "@/pages/TrackingPage";
-import TrackingDetailPage from "@/pages/TrackingDetailPage";
-import SubmissionLogs from "@/pages/SubmissionLogs";
-import SettingsPage from "@/pages/SettingsPage";
-import TeamPage from "@/pages/TeamPage";
 import NotFound from "@/pages/NotFound";
+
+// Pages load on first visit (one 2.2 MB bundle otherwise); Login stays eager.
+const RegisterPage = lazyPage(() => import("@/pages/RegisterPage"), "default");
+const SetPasswordPage = lazyPage(() => import("@/pages/SetPasswordPage"), "SetPasswordPage");
+const ForgotPasswordPage = lazyPage(() => import("@/pages/ForgotPasswordPage"), "ForgotPasswordPage");
+const AdminClientsPage = lazyPage(() => import("@/pages/AdminClientsPage"), "AdminClientsPage");
+const AdminChatConsolePage = lazyPage(() => import("@/pages/AdminChatConsolePage"), "AdminChatConsolePage");
+const AdminCertConsolePage = lazyPage(() => import("@/pages/AdminCertConsolePage"), "AdminCertConsolePage");
+const AdminCbpTrafficPage = lazyPage(() => import("@/pages/AdminCbpTrafficPage"), "AdminCbpTrafficPage");
+const VerifyEmailPage = lazyPage(() => import("@/pages/VerifyEmailPage"), "default");
+const MfaSetupPage = lazyPage(() => import("@/pages/MfaSetupPage"), "default");
+const OnboardingPage = lazyPage(() => import("@/pages/OnboardingPage"), "default");
+const UpgradePage = lazyPage(() => import("@/pages/UpgradePage"), "default");
+const UpgradeSuccessPage = lazyPage(() => import("@/pages/UpgradeSuccessPage"), "default");
+const UpgradeCancelPage = lazyPage(() => import("@/pages/UpgradeCancelPage"), "default");
+const Dashboard = lazyPage(() => import("@/pages/Dashboard"), "default");
+const ShipmentsList = lazyPage(() => import("@/pages/ShipmentsList"), "default");
+const ShipmentDetails = lazyPage(() => import("@/pages/ShipmentDetails"), "default");
+const ShipmentWizard = lazyPage(() => import("@/pages/ShipmentWizard"), "default");
+const CompliancePage = lazyPage(() => import("@/pages/CompliancePage"), "default");
+const ManifestQueryPage = lazyPage(() => import("@/pages/ManifestQueryPage"), "default");
+const DutyCalculatorPage = lazyPage(() => import("@/pages/DutyCalculatorPage"), "default");
+const ABIDocumentsListPage = lazyPage(() => import("@/pages/ABIDocumentsListPage"), "default");
+const ABIDocumentDetailPage = lazyPage(() => import("@/pages/ABIDocumentDetailPage"), "default");
+const ABIDocumentWizard = lazyPage(() => import("@/pages/ABIDocumentWizard"), "default");
+const InbondListPage = lazyPage(() => import("@/pages/InbondListPage"), "default");
+const InbondDetailPage = lazyPage(() => import("@/pages/InbondDetailPage"), "default");
+const InbondWizard = lazyPage(() => import("@/pages/InbondWizard"), "default");
+const IntegrationsApi = lazyPage(() => import("@/pages/IntegrationsApi"), "default");
+const TrackingPage = lazyPage(() => import("@/pages/TrackingPage"), "default");
+const TrackingDetailPage = lazyPage(() => import("@/pages/TrackingDetailPage"), "default");
+const SubmissionLogs = lazyPage(() => import("@/pages/SubmissionLogs"), "default");
+const SettingsPage = lazyPage(() => import("@/pages/SettingsPage"), "default");
+const TeamPage = lazyPage(() => import("@/pages/TeamPage"), "default");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -62,6 +67,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <Suspense fallback={<PageLoading />}>
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
@@ -127,6 +133,7 @@ const App = () => (
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

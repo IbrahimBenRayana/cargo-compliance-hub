@@ -586,12 +586,13 @@ export default function ABIDocumentDetailPage() {
                 label="Cargo Release"
                 value={doc.cargoReleaseStatus ?? '—'}
               />
-              <LabeledValue
-                label="CC Document ID"
-                value={doc.ccDocumentId ?? '—'}
-                mono
-              />
-              <LabeledValue label="Poll Attempts" value={String(doc.pollAttempts ?? 0)} />
+              {/* Legacy-route entries only; native entries have neither. */}
+              {doc.ccDocumentId && (
+                <>
+                  <LabeledValue label="Legacy document ID" value={doc.ccDocumentId ?? '—'} mono />
+                  <LabeledValue label="Poll Attempts" value={String(doc.pollAttempts ?? 0)} />
+                </>
+              )}
             </div>
           </CardContent>
         </Card>

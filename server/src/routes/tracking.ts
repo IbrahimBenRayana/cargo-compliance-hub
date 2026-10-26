@@ -27,6 +27,7 @@ import { requireMfaEnrolled } from '../middleware/requireMfaEnrolled.js';
 import { requireCapability } from '../middleware/requireCapability.js';
 import { CAPABILITIES } from '../config/plans.js';
 import * as t49 from '../services/terminal49.js';
+import { trackingErrorResponse } from '../services/trackingErrors.js';
 import logger from '../config/logger.js';
 
 const router = Router();
@@ -176,9 +177,10 @@ router.post('/', requireVerifiedEmail, requireMfaEnrolled, async (req: AuthReque
       refNumbers,
     });
   } catch (err: any) {
-    const status = err?.status === 503 ? 503 : (err?.status === 401 ? 502 : (err?.status >= 400 && err?.status < 500 ? 400 : 502));
-    logger.warn({ err }, '[tracking] createTrackingRequest failed');
-    res.status(status).json({ error: err?.message ?? 'Terminal 49 request failed' });
+    const out = trackingErrorResponse(err);
+    if (out.ourFault) logger.error({ err }, '[tracking] provider refused our credentials: container tracking is down');
+    else logger.warn({ err }, '[tracking] createTrackingRequest failed');
+    res.status(out.status).json(out.body);
     return;
   }
 
@@ -256,7 +258,9 @@ router.post('/:id/refresh', async (req: AuthRequest, res: Response): Promise<voi
       where: { id: row.id },
       data:  { syncError: err?.message ?? 'sync failed', lastSyncedAt: new Date() },
     });
-    res.status(err?.status === 503 ? 503 : 502).json({ error: err?.message ?? 'Refresh failed' });
+    const out = trackingErrorResponse(err);
+    if (out.ourFault) logger.error({ err }, '[tracking] provider refused our credentials: container tracking is down');
+    res.status(out.status).json(out.body);
   }
 });
 
