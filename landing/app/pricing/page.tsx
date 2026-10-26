@@ -279,6 +279,7 @@ export default function PricingPage() {
             id: CTA.volumePricing.id,
           },
         ]}
+        linksBelow
         micro="Pay per shipment, only when CBP accepts. No monthly fee on the public plans."
       />
 

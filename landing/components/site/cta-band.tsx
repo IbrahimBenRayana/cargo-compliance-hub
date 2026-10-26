@@ -30,11 +30,26 @@ export type CtaBandProps = {
   persona?: Persona;
   /** Text links next to the button (keep it to one where the deck allows). */
   links?: CtaBandLink[];
+  /** Stack the links under the microcopy instead of beside the button (pricing close). */
+  linksBelow?: boolean;
   /** Under-button microcopy (one line). */
   micro?: string;
   /** Small trust line under the microcopy (home only). */
   note?: string;
 };
+
+function BandLink({ link }: { link: CtaBandLink }) {
+  return (
+    <Link
+      href={link.href}
+      data-cta-id={link.id}
+      data-location="close"
+      className="inline-flex items-center gap-1 text-[15px] font-semibold text-tone-fg underline decoration-current/35 underline-offset-4 transition-colors hover:decoration-current"
+    >
+      {link.label}
+    </Link>
+  );
+}
 
 /**
  * Pre-footer CTA band: navy, one headline, one sub, one gold button, text
@@ -50,6 +65,7 @@ export function CtaBand({
   cta,
   persona,
   links,
+  linksBelow = false,
   micro,
   note,
 }: CtaBandProps) {
@@ -79,19 +95,16 @@ export function CtaBand({
             location="close"
             size="lg"
           />
-          {bandLinks.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              data-cta-id={l.id}
-              data-location="close"
-              className="inline-flex items-center gap-1 text-[15px] font-semibold text-tone-fg underline decoration-current/35 underline-offset-4 transition-colors hover:decoration-current"
-            >
-              {l.label}
-            </Link>
-          ))}
+          {!linksBelow && bandLinks.map((l) => <BandLink key={l.href} link={l} />)}
         </div>
         {microLine && <p className="mt-5 text-[13px] text-tone-muted">{microLine}</p>}
+        {linksBelow && bandLinks.length > 0 && (
+          <div className="mt-4 flex flex-col items-center gap-2">
+            {bandLinks.map((l) => (
+              <BandLink key={l.href} link={l} />
+            ))}
+          </div>
+        )}
         {note && <p className="mt-2 text-[12.5px] font-medium text-tone-muted">{note}</p>}
       </div>
     </Section>
