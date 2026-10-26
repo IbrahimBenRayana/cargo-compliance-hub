@@ -25,7 +25,7 @@ import logger from '../config/logger.js';
 
 const router = Router();
 
-const SUBJECTS = ['general', 'demo', 'enterprise', 'support', 'bug', 'other'] as const;
+const SUBJECTS = ['general', 'demo', 'enterprise', 'support', 'bug', 'billing', 'partnership', 'press', 'other'] as const;
 // Conversion plan §4.2 field 4 and §4.3 routes.
 const PERSONAS = ['importer', 'nvocc_forwarder', 'broker', 'developer', 'other'] as const;
 const ROUTES = ['book_demo', 'book_volume', 'book_technical', 'broker_review', 'fit_check', 'review'] as const;

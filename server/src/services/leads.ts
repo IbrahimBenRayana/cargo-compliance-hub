@@ -8,8 +8,8 @@
  * and failed or stuck notifications are retried by a background job
  * (retryLeadNotifications). Platform admins list leads via /admin/leads.
  *
- * Sales leads (demo, enterprise) go to env.LEADS_NOTIFY_TO; everything else
- * goes to support@. The prospect confirmation email (conversion plan §4.6,
+ * Founder-facing leads (demo, enterprise, partnership, press) go to
+ * env.LEADS_NOTIFY_TO; everything else (incl. billing) goes to support@. The prospect confirmation email (conversion plan §4.6,
  * email 1) is drafted here but stays off until env.LEAD_CONFIRMATION_EMAIL.
  */
 
@@ -20,7 +20,7 @@ import { sendMail } from './email.js';
 import logger from '../config/logger.js';
 
 const SUPPORT_TO = 'support@mycargolens.com';
-const SALES_SUBJECTS = new Set(['demo', 'enterprise']);
+const SALES_SUBJECTS = new Set(['demo', 'enterprise', 'partnership', 'press']);
 
 /** Retry policy for the team notification. */
 export const LEAD_NOTIFY_MAX_ATTEMPTS = 6;
@@ -34,6 +34,9 @@ export const SUBJECT_LABELS: Record<string, string> = {
   enterprise: 'Enterprise inquiry',
   support: 'Support',
   bug: 'Bug report',
+  billing: 'Billing',
+  partnership: 'Partnership',
+  press: 'Press',
   other: 'Other',
 };
 

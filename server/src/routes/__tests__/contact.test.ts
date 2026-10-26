@@ -64,6 +64,18 @@ describe('POST /contact', () => {
     expect(sendMail.mock.calls[0][0].to).toEqual(['support@mycargolens.com']);
   });
 
+  it.each([
+    ['billing', ['support@mycargolens.com'], 'Billing'],
+    ['partnership', ['ibrahim.rayana@mycargolens.com'], 'Partnership'],
+    ['press', ['ibrahim.rayana@mycargolens.com'], 'Press'],
+  ])('accepts the %s topic and routes it', async (subject, to, label) => {
+    const res = await call(post, { ...demo, subject });
+    expect(res.statusCode).toBe(200);
+    expect(prisma.lead.create.mock.calls[0][0].data.subject).toBe(subject);
+    expect(sendMail.mock.calls[0][0].to).toEqual(to);
+    expect(sendMail.mock.calls[0][0].subject).toContain(label);
+  });
+
   it('still answers success when the email fails, and flags the lead for retry', async () => {
     sendMail.mockResolvedValue(false);
     const res = await call(post, demo);
