@@ -281,7 +281,7 @@ export default function SecurityPage() {
           }
           media={
             <figure className="m-0">
-              <pre className="overflow-x-auto rounded-2xl border border-[hsl(var(--surface-border))] bg-[hsl(222_40%_12%)] p-5 font-mono text-[12.5px] leading-relaxed text-[hsl(216_30%_85%)] sm:text-[13px]">
+              <pre tabIndex={0} className="overflow-x-auto rounded-2xl border border-[hsl(var(--surface-border))] bg-[hsl(222_40%_12%)] p-5 font-mono text-[12.5px] leading-relaxed text-[hsl(216_30%_85%)] sm:text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(205_90%_78%)]">
                 {LOG_SAMPLE}
               </pre>
               <figcaption className="mt-3 text-[13px] text-tone-muted">Audit log entries, with sample data.</figcaption>

@@ -211,8 +211,10 @@ export function CodeBlock({ code, label }: { code: string; label: string }) {
   return (
     <figure className="m-0 min-w-0">
       <pre
+        tabIndex={0}
+        role="region"
         aria-label={label}
-        className="overflow-x-auto rounded-2xl border border-white/10 bg-black/30 p-5 font-mono text-[13px] leading-relaxed text-[hsl(216_30%_85%)]"
+        className="overflow-x-auto rounded-2xl border border-white/10 bg-black/30 p-5 font-mono text-[13px] leading-relaxed text-[hsl(216_30%_85%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(205_90%_78%)]"
       >
         {code}
       </pre>

@@ -221,7 +221,7 @@ export default function NvoccForwardersPage() {
                 "The same checks and audit trail as the app",
               ]}
             />
-            <pre className="mt-8 overflow-x-auto rounded-2xl bg-[hsl(224_50%_7%)] p-5 font-mono text-[12.5px] leading-relaxed text-[hsl(216_30%_85%)] ring-1 ring-white/10">
+            <pre tabIndex={0} className="mt-8 overflow-x-auto rounded-2xl bg-[hsl(224_50%_7%)] p-5 font-mono text-[12.5px] leading-relaxed text-[hsl(216_30%_85%)] ring-1 ring-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(205_90%_78%)]">
               {API_SAMPLE}
             </pre>
           </div>

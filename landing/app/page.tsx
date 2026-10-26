@@ -501,8 +501,10 @@ export default function HomePage() {
           </div>
           <div className="min-w-0">
             <pre
+              tabIndex={0}
+              role="region"
               aria-label="Example: create an ISF draft, submit it, then receive a signed filing.accepted webhook"
-              className="m-0 overflow-x-auto rounded-2xl border border-white/10 bg-black/30 p-5 font-mono text-[12.5px] leading-relaxed text-[hsl(216_30%_85%)] sm:text-[13px]"
+              className="m-0 overflow-x-auto rounded-2xl border border-white/10 bg-black/30 p-5 font-mono text-[12.5px] leading-relaxed text-[hsl(216_30%_85%)] sm:text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(205_90%_78%)]"
             >
               <code>
                 <span className="text-[hsl(216_20%_58%)]"># 1. create an ISF draft from your TMS</span>
