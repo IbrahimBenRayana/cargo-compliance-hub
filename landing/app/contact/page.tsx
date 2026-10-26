@@ -58,7 +58,7 @@ const WAYS: Way[] = [
   {
     icon: ShieldAlert,
     title: "Security reports",
-    body: "Found a vulnerability? See how to report it.",
+    body: "Found a vulnerability?",
     link: { href: `${ROUTES.security.href}#report`, label: "How to report it" },
   },
   { icon: Clock, title: "Reply time", body: "A person reads every message and replies by email." },
@@ -84,7 +84,7 @@ export default function ContactPage() {
         breadcrumbPath={ROUTES.contact.href}
         eyebrow="Contact"
         title="Contact us"
-        sub="For account help, partnerships, press or billing, use the form or write to the right inbox below. A person on our team reads every message."
+        sub="For account help, partnerships, press or billing, use the form below or email support@mycargolens.com. A person on our team reads every message."
       >
         {/* Sales banner (deck §2): the page's only gold button. */}
         <div className="flex flex-col gap-4 rounded-xl border border-[hsl(var(--surface-border))] bg-[hsl(var(--surface))] p-5 sm:flex-row sm:items-center sm:justify-between">

@@ -78,7 +78,7 @@ const ENTRIES: Entry[] = [
     date: "2026-05-20",
     kind: "feature",
     title: "ADD/CVD orders synced from the Federal Register",
-    body: "The full Antidumping & Countervailing Duty docket from the Federal Register now syncs daily at 04:00 UTC into our DB. Look up by HTS, country, or case number.",
+    body: "New antidumping and countervailing duty orders are pulled from the Federal Register every day and reviewed before they're used in flags. Look them up by HTS code, country or case number.",
     href: "/platform/compliance",
   },
   {
@@ -99,21 +99,21 @@ const ENTRIES: Entry[] = [
     date: "2026-05-18",
     kind: "feature",
     title: "Risk & Watch + Records tabs redesigned",
-    body: "UFLPA Risk Inbox with severity rails. 5106 EIN self-check. Liquidation Pipeline with 314-day window and PSC marker. Urgent entries rise to the top.",
+    body: "Possible UFLPA exposure gets its own list, ranked by severity. A CBP Form 5106 importer-number check. The liquidation pipeline shows the 314-day window with the PSC marker. Urgent entries rise to the top.",
     href: "/platform/compliance",
   },
   {
     date: "2026-05-17",
     kind: "feature",
     title: "AI 1-line \"Today's brief\"",
-    body: "A single ≤140-character sentence at the top of the Compliance Center. Auto-generated each login. Rule-based fallback when AI is disabled.",
+    body: "A single ≤140-character sentence at the top of the Compliance Center. Generated daily. Rule-based fallback when AI is disabled.",
     href: "/platform/inbox",
   },
   {
     date: "2026-05-15",
     kind: "feature",
     title: "Classification tab + Risk/Records polish",
-    body: "HTS Classifier, ADD/CVD Lookup, and FTA Preference Calculator all live under one tab. Risk + Records tabs polished for visual consistency.",
+    body: "HTS suggestions, ADD/CVD lookup and the FTA lookup now sit under one tab. Risk + Records tabs polished for visual consistency.",
     href: "/platform/compliance",
   },
   {
@@ -134,7 +134,7 @@ const ENTRIES: Entry[] = [
     date: "2026-05-10",
     kind: "feature",
     title: "AI pre-flight for drafts",
-    body: "Run an AI review on any draft / submitted / on-hold filing before re-submitting. Surfaces UFLPA risks, PGA flags, rule-based issues, and suggestions.",
+    body: "Run an AI review on any draft / submitted / on-hold filing before re-submitting. Points out possible UFLPA exposure, PGA flags, rule-based issues, and suggestions.",
     href: "/platform/pre-filing-checks",
   },
   {
@@ -157,13 +157,6 @@ const ENTRIES: Entry[] = [
     title: "6-digit email verification for new team members",
     body: "A 6-digit code sent to your email verifies your account. Single-use, time-limited.",
     href: "/security",
-  },
-  {
-    date: "2026-04-28",
-    kind: "improvement",
-    title: "Plan-limit + celebration modals redesigned",
-    body: "Calmer, more Stripe-flavored modal styling for plan-limit hits and successful first-filing celebrations.",
-    href: "/pricing",
   },
 ];
 

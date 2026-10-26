@@ -229,7 +229,7 @@ function Body() {
 
       <h2 id="software">Where software fits</h2>
       <Answer>
-        Most ISF claims start with a deadline someone lost track of across email, spreadsheets and a filing screen.{" "}
+        A deadline is easy to lose across email, spreadsheets and a filing screen.{" "}
         <Link href={ROUTES.isfFiling.href}>MyCargoLens</Link> is ISF and customs entry software built for that problem:
       </Answer>
       <ul>
@@ -284,7 +284,7 @@ export const isfLateFilingPenalties: Article = {
   kind: "Guide",
   title: "ISF late filing penalties: what triggers liquidated damages and how NVOCC ISF desks stay on time",
   shortTitle: "ISF late filing penalties",
-  metaTitle: "ISF Late Filing Penalties: What Triggers $5,000 Claims",
+  metaTitle: "ISF Late Filing Penalties: What Triggers a $5,000 Claim",
   metaDescription:
     "A late, inaccurate or unwithdrawn ISF can draw a $5,000 liquidated-damages claim. What triggers one, who pays, and how NVOCC ISF desks stay on time.",
   dek: "A late, inaccurate or unwithdrawn ISF can draw a $5,000 liquidated-damages claim. What triggers one, who pays, and how NVOCC ISF desks stay on time.",

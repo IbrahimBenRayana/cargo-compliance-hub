@@ -27,7 +27,7 @@ export const metadata = pageMetadata({
 const ext = "underline decoration-current/35 underline-offset-2 hover:text-tone-fg";
 const AJOT_URL = "https://www.ajot.com/news/us-importers-turn-to-brokers-to-navigate-trump-era-tariffs-at-a-cost";
 
-const OPTIONS = ["Your customs broker", "Spreadsheets, email and a terminal", "Legacy ABI software", "DIY filing services", "MyCargoLens"];
+const OPTIONS = ["Your customs broker", "Spreadsheets, email and a terminal", "Established ABI software", "DIY online filing services", "MyCargoLens"];
 
 /** Rows of the side-by-side table: [label, broker, spreadsheets, legacy, DIY, MyCargoLens]. Words only, no icons. */
 const ROWS: [string, string, string, string, string, string][] = [
@@ -51,7 +51,7 @@ const ROWS: [string, string, string, string, string, string][] = [
     "When you see the price",
     "Your broker's fee schedule, on the invoice",
     "Your team's time",
-    "Usually a quote, licence or contract; most don't publish software prices on their websites (checked Oct 23 2026)",
+    "Usually a quote, licence or contract; most don't publish software prices on their websites (checked October 23, 2026)",
     "Published on their websites",
     "On our website, per shipment, charged when CBP accepts. Volume filers: written quote",
   ],

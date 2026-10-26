@@ -274,7 +274,7 @@ export const ROUTES = r({
     label: "About",
     href: "/about",
     group: "company",
-    blurb: "Who builds MyCargoLens, and what it isn't.",
+    blurb: "What we build, and what we aren't.",
     scene: "about",
     nav: true,
     footer: true,

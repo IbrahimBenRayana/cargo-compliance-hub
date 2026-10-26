@@ -309,7 +309,7 @@ export default function NvoccForwardersPage() {
         <SectionHeading title="What you can check before you sign" />
         <dl className="mt-10 grid gap-4 md:grid-cols-3">
           {[
-            ["The price principle", "It's on our website: charged only when CBP accepts."],
+            ["The price principle", "Written on our website: you're charged only when CBP accepts."],
             ["The certification", "CBP ABI certified."],
             ["The record", "Every CBP request and response, logged and exportable."],
           ].map(([k, v]) => (

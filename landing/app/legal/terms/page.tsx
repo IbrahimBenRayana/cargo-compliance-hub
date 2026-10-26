@@ -7,12 +7,12 @@ export const metadata: Metadata = {
   // Plain title: the root layout's title.template appends " | MyCargoLens".
   title: "Terms of Service",
   description:
-    "Terms and conditions governing your use of the MyCargoLens CBP compliance platform.",
+    "Terms and conditions governing your use of MyCargoLens, ISF and customs entry filing software.",
   alternates: { canonical: "/legal/terms" },
   openGraph: {
     url: "/legal/terms",
     title: "Terms of Service",
-    description: "Terms and conditions governing your use of the MyCargoLens CBP compliance platform.",
+    description: "Terms and conditions governing your use of MyCargoLens, ISF and customs entry filing software.",
   },
 };
 
@@ -24,7 +24,7 @@ export default function TermsOfServicePage() {
         breadcrumbPath={ROUTES.terms.href}
         eyebrow="Legal"
         title="Terms of Service"
-        sub="Last updated: May 2026"
+        sub="Last updated: October 2026"
       />
       <Section tone="paper" width="narrow">
       <div className="text-base leading-relaxed text-tone-fg [&_h2]:text-tone-fg [&_a:hover]:text-tone-fg">
@@ -45,7 +45,7 @@ export default function TermsOfServicePage() {
 
         <h2 className="text-xl font-semibold mt-10 mb-4">3. Account Registration</h2>
         <p className="mb-4">
-          You must provide accurate, complete, and current information when registering an account.
+          You must provide accurate, complete, and current information when your account is set up.
           You are responsible for maintaining the confidentiality of your account credentials and
           for all activity that occurs under your account. Notify us immediately of any unauthorized
           access at{" "}

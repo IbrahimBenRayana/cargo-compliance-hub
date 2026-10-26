@@ -14,7 +14,7 @@ import { CtaBand } from "@/components/site/cta-band";
 
 const TITLE = "About us: ISF and customs entry software";
 const DESCRIPTION =
-  "Who builds MyCargoLens, why we built ISF and entry filing around one inbox, and what we are not: a customs broker. CBP ABI certified.";
+  "Why we built ISF and entry filing around one inbox, what MyCargoLens files today, and what we are not: a customs broker. CBP ABI certified.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -76,8 +76,9 @@ export default function AboutPage() {
           <SectionHeading title="Customs filing turned into rework." />
           <div className="space-y-5 text-[16px] leading-relaxed text-tone-muted sm:text-[17px]">
             <p>
-              Rules change every few months. The ISF deadline doesn&apos;t move: 24 hours before the cargo is laden. Most
-              filing tools still show forty rows and leave you to work out which one matters, and most are priced by quote.
+              Rules change every few months. The ISF deadline doesn&apos;t move: 24 hours before the cargo is laden. Many
+              filing tools still show forty rows and leave you to work out which one matters, and the big ones are priced by
+              quote.
             </p>
             <p>
               We started MyCargoLens to make the first screen answer one question: what needs me now? Open work across ISF,
@@ -85,7 +86,7 @@ export default function AboutPage() {
               it&apos;s sent, and when CBP rejects something you get the reason in plain English with numbered steps to fix it.
             </p>
             <p>
-              We put the price on the website because the invoice is the part filers say they can&apos;t predict. You&apos;re
+              We put the price on the website because the invoice is the hardest part of filing to predict. You&apos;re
               charged per shipment, only when CBP accepts.
             </p>
           </div>

@@ -10,7 +10,7 @@ import { ROUTES } from "@/lib/site";
 import { CHANGELOG_ENTRIES, KIND_LABEL, entryAnchor, type Entry, type EntryKind } from "@/lib/changelog";
 import { CtaBand } from "@/components/site/cta-band";
 
-const TITLE = "Changelog: what shipped in MyCargoLens";
+const TITLE = "Changelog: what shipped";
 const DESCRIPTION =
   "Release notes for MyCargoLens, newest first: ISF and entry filing, the compliance inbox, the public API and security updates.";
 

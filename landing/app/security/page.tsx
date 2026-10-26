@@ -186,7 +186,7 @@ export default function SecurityPage() {
             <DemoButton location="hero" src="security-hero" size="lg" />
             <Button asChild variant="outline" size="lg" className="bg-[hsl(var(--surface))]">
               <a href={QUESTIONNAIRE_MAILTO} data-location="hero">
-                Ask for our security answers
+                Send us your security questionnaire
               </a>
             </Button>
           </>
@@ -406,7 +406,7 @@ export default function SecurityPage() {
         title="Have a security review to run? Start with a demo."
         sub="We'll show you roles, MFA and the CBP submission log in the product, and answer your questionnaire after."
         src="security-close"
-        links={[{ label: "Email our security answers request", href: QUESTIONNAIRE_MAILTO }]}
+        links={[{ label: "Email us your security questionnaire", href: QUESTIONNAIRE_MAILTO }]}
       />
     </>
   );

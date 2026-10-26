@@ -111,7 +111,7 @@ export default function InboxPage() {
         <FeatureSplit
           reverse
           eyebrow="Daily brief"
-          title="A one-line brief each morning"
+          title="A one-line brief, generated daily"
           body={
             <p>
               Open the inbox and the top line tells you what changed and what&apos;s due today. Not your problem yet?
