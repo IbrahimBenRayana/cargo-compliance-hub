@@ -57,6 +57,8 @@ function fmtKeyRelative(ts: string | null) {
 }
 
 export default function IntegrationsApi() {
+  // The connection test is a platform-admin check; for anyone else it always failed (BUG-003).
+  const isPlatformAdmin = useAuthStore((st) => !!st.user?.isPlatformAdmin);
   const testConnection = useTestCCConnection();
 
   const [connectionResult, setConnectionResult] = useState<{
@@ -142,6 +144,7 @@ export default function IntegrationsApi() {
             Manage your filing gateway connectivity, email delivery, and data services
           </p>
         </div>
+        {isPlatformAdmin && (
         <Button onClick={handleTestConnection} disabled={testConnection.isPending} className="cursor-pointer shrink-0">
           {testConnection.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -150,6 +153,7 @@ export default function IntegrationsApi() {
           )}
           Test All Connections
         </Button>
+        )}
       </div>
 
       {/* ─── Top Stat Cards ─────────────────────────────── */}
