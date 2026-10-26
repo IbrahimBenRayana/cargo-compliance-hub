@@ -67,8 +67,10 @@ export function PageHero({
       {eyebrow && <Eyebrow className="mb-4">{eyebrow}</Eyebrow>}
       <h1
         className={cn(
-          "font-semibold leading-[1.04] tracking-[-0.035em] text-tone-fg",
+          "font-semibold tracking-[-0.035em] text-tone-fg",
           size === "full" ? "text-[40px] sm:text-[52px] lg:text-[60px]" : "text-[36px] sm:text-[46px] lg:text-[52px]",
+          // after the size classes: tailwind-merge drops a leading-* that precedes a text-size
+          "leading-[1.04]",
         )}
       >
         {title}

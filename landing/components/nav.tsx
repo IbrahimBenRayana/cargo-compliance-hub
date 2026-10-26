@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { createPortal } from "react-dom";
 import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ import {
 } from "@/lib/site";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
+const noopSubscribe = () => () => {};
 const MENU_ORDER = HEADER_MENUS.map((m) => m.key);
 const PANEL_WIDTH: Record<MenuKey, number> = {
   platform: 900,
@@ -163,7 +165,7 @@ export function Nav() {
           "sticky top-0 z-50 w-full transition-[backdrop-filter,background-color,box-shadow] duration-300 ease-[var(--ease-out-quart)]",
           raised
             ? "bg-[hsl(var(--background)/0.92)] shadow-[0_4px_16px_-8px_hsl(var(--foreground)/0.08),0_12px_32px_-16px_hsl(var(--foreground)/0.1)] backdrop-blur-xl backdrop-saturate-150"
-            : "bg-transparent",
+            : "bg-[hsl(var(--paper))]",
         )}
       >
         <SiteContainer>
@@ -234,14 +236,9 @@ export function Nav() {
 
             {/* Mobile: compact demo button + menu */}
             <div className="flex items-center gap-2 lg:hidden">
-              {showCta && (
-                <DemoButton
-                  location="nav"
-                  src="nav"
-                  size="sm"
-                  className="h-9 px-3.5 text-[13px]"
-                  onClick={() => setMobileOpen(false)}
-                />
+              {/* hidden while the sheet is open: its pinned button is the one gold button */}
+              {showCta && !mobileOpen && (
+                <DemoButton location="nav" src="nav" size="sm" className="h-9 px-3.5 text-[13px]" />
               )}
               <button
                 type="button"
@@ -545,7 +542,11 @@ function MobileSheet({ open, close, showCta }: { open: boolean; close: () => voi
   const groupItems = (k: MenuKey): SiteRoute[] =>
     k === "platform" ? [ROUTES.platform, ...menuItems("platform").filter((x) => x.href !== ROUTES.platform.href)] : menuItems(k);
 
-  return (
+  // Portalled to <body>: the header's backdrop-filter would otherwise become
+  // the containing block of this fixed sheet and collapse it to the bar.
+  const mounted = React.useSyncExternalStore(noopSubscribe, () => true, () => false);
+  if (!mounted) return null;
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -640,6 +641,7 @@ function MobileSheet({ open, close, showCta }: { open: boolean; close: () => voi
           )}
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

@@ -1,5 +1,5 @@
 import type { HeroSlug } from "@/components/hero3d/Hero3D";
-import type { ModuleKey } from "@/lib/accents";
+import { MODULE_ORDER, type ModuleKey } from "@/lib/accents";
 
 /**
  * The route registry for mycargolens.com (rebuild, Oct 2026).
@@ -402,7 +402,13 @@ export function footerColumns(): { heading: string; links: FooterLink[] }[] {
     module: x.module,
   });
   return [
-    { heading: "Platform", links: routesIn("platform", "footer").map(toLink) },
+    {
+      heading: "Platform",
+      // footer order (site-architecture §4.4): overview, then modules in product order
+      links: routesIn("platform", "footer")
+        .sort((a, b) => (a.module ? MODULE_ORDER.indexOf(a.module) : -1) - (b.module ? MODULE_ORDER.indexOf(b.module) : -1))
+        .map(toLink),
+    },
     {
       heading: "Solutions",
       links: [...routesIn("solutions", "footer"), ROUTES.pricing].map(toLink),
