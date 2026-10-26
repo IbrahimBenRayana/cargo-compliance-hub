@@ -79,6 +79,19 @@ export const contactFormLimiter = rateLimit({
   },
 });
 
+// Step 2 of the /book-a-demo form updates the lead saved by step 1. Kept off
+// contactFormLimiter so a two-step submission costs one contact slot, not two.
+export const leadUpdateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many contact-form submissions. Please email us directly.',
+    code: 'RATE_LIMIT_CONTACT',
+  },
+});
+
 // AI chat — per-IP cap on message/stream traffic. The assistant is also bounded
 // by the per-key daily AI cap inside services/ai.ts (userId for signed-in users,
 // anon:<visitorId> for marketing visitors); this protects the endpoint itself

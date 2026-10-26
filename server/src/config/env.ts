@@ -105,6 +105,14 @@ const envSchema = z.object({
   CHAT_ANON_DAILY_CAP:   z.coerce.number().int().positive().default(30),
   // Where marketing-surface escalations are emailed (reuses the ACS sender).
   CHAT_SUPPORT_EMAIL:    z.string().default('support@mycargolens.com'),
+  // Marketing leads (routes/contact.ts, services/leads.ts). Every contact-form
+  // and /book-a-demo submission is stored in `leads` first, then the team is
+  // emailed. LEADS_NOTIFY_TO: comma-separated recipients for sales leads
+  // (demo + enterprise); other subjects still go to support@.
+  LEADS_NOTIFY_TO: z.string().default('ibrahim.rayana@mycargolens.com'),
+  // Prospect confirmation email (conversion plan §4.6 email 1). OFF until the
+  // founder approves its copy. Parsed literally: only "true" turns it on.
+  LEAD_CONFIRMATION_EMAIL: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   // Multi-factor auth — AES-256-GCM key that encrypts TOTP secrets at rest
   // (services/mfaCrypto.ts). 32 bytes as 64 hex chars. Optional in dev (a
   // JWT-derived key is used as a fallback), REQUIRED in production (enforced

@@ -1307,3 +1307,53 @@ model HtsClassification {
   @@index([orgId, createdAt])
   @@map("hts_classifications")
 }
+
+/// Inbound marketing lead: one row per contact-form or /book-a-demo
+/// submission, stored before any notification email is attempted so a lead is
+/// never lost to an SMTP failure (conversion plan §4.3). Platform admins only.
+model Lead {
+  id                   String    @id @default(uuid()) @db.Uuid
+  // contact | book_a_demo
+  formSource           String    @default("contact") @map("form_source") @db.VarChar(30)
+  // Contact-form subject: general | demo | enterprise | support | bug | other
+  subject              String    @db.VarChar(20)
+  name                 String    @db.VarChar(120)
+  email                String    @db.VarChar(255)
+  company              String?   @db.VarChar(200)
+  message              String?   @db.Text
+  // Qualification (two-step demo form, step 2)
+  persona              String?   @db.VarChar(30)
+  volumeBand           String?   @map("volume_band") @db.VarChar(30)
+  filesToday           String?   @map("files_today") @db.VarChar(40)
+  filerBond            String?   @map("filer_bond") @db.VarChar(20)
+  country              String?   @db.VarChar(2)
+  opsOwner             String?   @map("ops_owner") @db.VarChar(200)
+  route                String?   @db.VarChar(30)
+  stepReached          Int       @default(1) @map("step_reached")
+  // requested | booked
+  bookingStatus        String    @default("requested") @map("booking_status") @db.VarChar(20)
+  // Attribution (first touch)
+  src                  String?   @db.VarChar(100)
+  utmSource            String?   @map("utm_source") @db.VarChar(100)
+  utmMedium            String?   @map("utm_medium") @db.VarChar(100)
+  utmCampaign          String?   @map("utm_campaign") @db.VarChar(100)
+  utmTerm              String?   @map("utm_term") @db.VarChar(100)
+  utmContent           String?   @map("utm_content") @db.VarChar(100)
+  landingPage          String?   @map("landing_page") @db.VarChar(500)
+  referrerDomain       String?   @map("referrer_domain") @db.VarChar(255)
+  ip                   String?   @db.VarChar(64)
+  userAgent            String?   @map("user_agent") @db.VarChar(255)
+  // Team notification: pending | sent | failed (failed rows are retried by a job)
+  notificationStatus   String    @default("pending") @map("notification_status") @db.VarChar(20)
+  notificationAttempts Int       @default(0) @map("notification_attempts")
+  notificationError    String?   @map("notification_error") @db.VarChar(500)
+  notifiedAt           DateTime? @map("notified_at") @db.Timestamptz()
+  confirmationSentAt   DateTime? @map("confirmation_sent_at") @db.Timestamptz()
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([createdAt])
+  @@index([notificationStatus, createdAt])
+  @@index([email])
+  @@map("leads")
+}
