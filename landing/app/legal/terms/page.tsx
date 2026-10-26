@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
-import { Container } from "@/components/ui/container";
+import { PageHero } from "@/components/site/page-hero";
+import { Section } from "@/components/site/section";
+import { ROUTES } from "@/lib/site";
 
 export const metadata: Metadata = {
-  // Plain title — the root layout's title.template appends " — MyCargoLens".
+  // Plain title: the root layout's title.template appends " | MyCargoLens".
   title: "Terms of Service",
   description:
     "Terms and conditions governing your use of the MyCargoLens CBP compliance platform.",
@@ -11,24 +13,22 @@ export const metadata: Metadata = {
 
 export default function TermsOfServicePage() {
   return (
-    <Container className="max-w-3xl py-20 md:py-28">
-      {/* Page header */}
-      <div className="mb-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-          Legal
-        </p>
-        <h1 className="text-4xl font-bold tracking-tight mb-4">Terms of Service</h1>
-        <p className="text-sm text-muted-foreground">Last updated: May 2026</p>
-      </div>
-
-      {/* Prose content */}
-      <div className="text-base leading-relaxed text-foreground/85">
+    <>
+      <PageHero
+        size="compact"
+        breadcrumbPath={ROUTES.terms.href}
+        eyebrow="Legal"
+        title="Terms of Service"
+        sub="Last updated: May 2026"
+      />
+      <Section tone="paper" width="narrow">
+      <div className="text-base leading-relaxed text-tone-fg [&_h2]:text-tone-fg [&_a:hover]:text-tone-fg">
 
         <h2 className="text-xl font-semibold mt-10 mb-4">1. Acceptance of Terms</h2>
         <p className="mb-4">
           By accessing or using MyCargoLens, you agree to be bound by these Terms of Service and
           our Privacy Policy. If you do not agree to these terms, you may not use the platform.
-          These terms constitute a legally binding agreement between you and MyCargoLens.
+          These terms constitute a legally binding agreement between you and Mycargolens.
         </p>
 
         <h2 className="text-xl font-semibold mt-10 mb-4">2. Description of Service</h2>
@@ -46,7 +46,7 @@ export default function TermsOfServicePage() {
           access at{" "}
           <a
             href="mailto:support@mycargolens.com"
-            className="underline underline-offset-2 hover:text-foreground transition-colors"
+            className="underline underline-offset-2 hover:text-tone-fg transition-colors"
           >
             support@mycargolens.com
           </a>
@@ -64,7 +64,7 @@ export default function TermsOfServicePage() {
           available at{" "}
           <a
             href="/pricing"
-            className="underline underline-offset-2 hover:text-foreground transition-colors"
+            className="underline underline-offset-2 hover:text-tone-fg transition-colors"
           >
             mycargolens.com/pricing
           </a>
@@ -103,7 +103,7 @@ export default function TermsOfServicePage() {
         <h2 className="text-xl font-semibold mt-10 mb-4">7. Intellectual Property</h2>
         <p className="mb-4">
           All platform software, design, trademarks, and content are the intellectual property of
-          MyCargoLens and are protected by applicable intellectual property laws. No license to our
+          Mycargolens and are protected by applicable intellectual property laws. No license to our
           intellectual property is granted except as necessary to use the platform as described in
           these terms.
         </p>
@@ -119,7 +119,7 @@ export default function TermsOfServicePage() {
           for a particular purpose, or non-infringement.
         </p>
         <p className="mb-4">
-          To the maximum extent permitted by law, MyCargoLens shall not be liable for any indirect,
+          To the maximum extent permitted by law, Mycargolens shall not be liable for any indirect,
           incidental, special, consequential, or punitive damages. Our total liability to you for
           any claim arising from use of the platform shall not exceed the fees paid by you to us in
           the twelve (12) months preceding the claim.
@@ -127,7 +127,7 @@ export default function TermsOfServicePage() {
 
         <h2 className="text-xl font-semibold mt-10 mb-4">9. Indemnification</h2>
         <p className="mb-4">
-          You agree to indemnify, defend, and hold harmless MyCargoLens and its officers, directors,
+          You agree to indemnify, defend, and hold harmless Mycargolens and its officers, directors,
           employees, and agents from and against any claims, liabilities, damages, losses, and
           expenses (including reasonable attorneys&apos; fees) arising out of or related to your use
           of the platform, your filings, or your violation of these terms.
@@ -165,18 +165,19 @@ export default function TermsOfServicePage() {
           For questions about these Terms of Service, please contact:
         </p>
         <p className="mb-4">
-          MyCargoLens
+          Mycargolens
           <br />
           Email:{" "}
           <a
             href="mailto:support@mycargolens.com"
-            className="underline underline-offset-2 hover:text-foreground transition-colors"
+            className="underline underline-offset-2 hover:text-tone-fg transition-colors"
           >
             support@mycargolens.com
           </a>
         </p>
 
       </div>
-    </Container>
+      </Section>
+    </>
   );
 }

@@ -1,353 +1,152 @@
-"use client";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Clock, Handshake, LifeBuoy, Newspaper, ShieldAlert, TrendingUp, type LucideIcon } from "lucide-react";
+import { Section } from "@/components/site/section";
+import { PageHero } from "@/components/site/page-hero";
+import { DemoButton } from "@/components/site/cta";
+import { JsonLd } from "@/components/site/json-ld";
+import { COMPANY, ROUTES, ctaHref } from "@/lib/site";
+import { ORG_ID, graph, webPage } from "@/lib/schema";
+import { ContactForm, SUPPORT_EMAIL, TopicButton, type Topic } from "./_components/contact-form";
 
-import * as React from "react";
-import { motion } from "framer-motion";
-import { Mail, Clock, Building2, CheckCircle2 } from "lucide-react";
-import { Container } from "@/components/ui/container";
-import { Button } from "@/components/ui/button";
-import { IconTile, type IconTileHover } from "@/components/ui/icon-tile";
-import { PageHero } from "@/components/page-hero";
-import { Hero3D } from "@/components/hero3d/Hero3D";
+const TITLE = "Contact us: support, partners and press";
+const DESCRIPTION =
+  "Reach the MyCargoLens team for account support, partnerships, press or billing. Want to see the product on your own filings? Book a demo.";
 
-// Subject values match the server enum (see server/src/routes/contact.ts).
-// The display labels in the <option> elements diverge from these keys —
-// keys are stable, labels can be reworded without a server change.
-type SubjectOption =
-  | ""
-  | "demo"
-  | "general"
-  | "support"
-  | "enterprise"
-  | "bug"
-  | "other";
-
-interface FormState {
-  name: string;
-  email: string;
-  subject: SubjectOption;
-  message: string;
-  // Honeypot — kept hidden in the DOM. Real users never fill it; bots do.
-  // Submitted as-is so the server can drop spam silently.
-  website: string;
-}
-
-const initialForm: FormState = {
-  name: "",
-  email: "",
-  subject: "",
-  message: "",
-  website: "",
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: ROUTES.contact.href },
+  openGraph: { title: `${TITLE} | MyCargoLens`, description: DESCRIPTION, url: ROUTES.contact.href, type: "website" },
+  twitter: { title: `${TITLE} | MyCargoLens`, description: DESCRIPTION },
 };
 
-// Marketing site → API base URL. Configured per-deploy via
-// NEXT_PUBLIC_API_URL (e.g. https://app.mycargolens.com). Falls back to the
-// dev server in development.
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:3001";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-const infoCards: Array<{
-  icon: typeof Mail;
-  hover: IconTileHover;
+type Way = {
+  icon: LucideIcon;
   title: string;
   body: string;
-  href: string | null;
-}> = [
+  link?: { href: string; label: string; mail?: boolean };
+  /** No public inbox yet: the card points at the form with this topic preselected. */
+  topic?: Topic;
+};
+
+/**
+ * Deck §3. [PARTNERS INBOX] and [PRESS INBOX] aren't confirmed, so those
+ * cards send people to the form (topic preselected) instead of showing a
+ * placeholder. The reply-time card uses the deck's fallback line.
+ */
+const WAYS: Way[] = [
   {
-    icon: Mail,
-    hover: "lift",
-    title: "Email us",
-    body: "support@mycargolens.com",
-    href: "mailto:support@mycargolens.com",
+    icon: LifeBuoy,
+    title: "Customers",
+    body: "Help with filings, your account or the API.",
+    link: { href: `mailto:${SUPPORT_EMAIL}`, label: SUPPORT_EMAIL, mail: true },
   },
   {
-    icon: Clock,
-    hover: "spin",
-    title: "Response time",
-    body: "We reply within one business day",
-    href: null,
+    icon: TrendingUp,
+    title: "Sales and volume pricing",
+    body: "NVOCCs, forwarders and brokers filing at volume.",
+    link: { href: ctaHref({ persona: "nvocc", src: "contact" }), label: "Book a demo" },
   },
   {
-    icon: Building2,
-    hover: "lift",
-    title: "Enterprise",
-    body: "For enterprise inquiries, use the form or email sales@mycargolens.com",
-    href: "mailto:sales@mycargolens.com",
+    icon: Handshake,
+    title: "Partnerships",
+    body: "Brokers, surety agents, associations and software partners.",
+    topic: "partnership",
   },
+  { icon: Newspaper, title: "Press", body: "Interviews and media questions.", topic: "press" },
+  {
+    icon: ShieldAlert,
+    title: "Security reports",
+    body: "Found a vulnerability? See how to report it.",
+    link: { href: `${ROUTES.security.href}#report`, label: "How to report it" },
+  },
+  { icon: Clock, title: "Reply time", body: "A person reads every message and replies by email." },
 ];
 
 export default function ContactPage() {
-  const [form, setForm] = React.useState<FormState>(initialForm);
-  const [submitted, setSubmitted] = React.useState(false);
-  const [loading, setLoading] = React.useState(false);
-
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  }
-
-  const [error, setError] = React.useState<string | null>(null);
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-
-    // Browser-side guard — the select keeps an empty-string default.
-    if (!form.subject) {
-      setError("Please pick a topic.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/v1/contact`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // No cookies needed — endpoint is public. credentials:'omit' keeps
-        // the preflight simple.
-        credentials: "omit",
-        body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim(),
-          subject: form.subject,
-          message: form.message.trim(),
-          // Honeypot — kept blank by real users, populated by bots.
-          website: form.website,
-        }),
-      });
-
-      if (!res.ok) {
-        // 429 = rate-limited (caller hit our 5/hr cap). Surface a specific
-        // message; everything else gets a generic one.
-        if (res.status === 429) {
-          setError("Too many submissions from this network. Email us directly: support@mycargolens.com");
-        } else {
-          setError("Something went wrong sending your message. Please email us at support@mycargolens.com");
-        }
-        setLoading(false);
-        return;
-      }
-
-      setLoading(false);
-      setSubmitted(true);
-    } catch {
-      setError("Couldn't reach the server. Please email us at support@mycargolens.com");
-      setLoading(false);
-    }
-  }
-
   return (
     <>
-      <PageHero
-        label="CONTACT"
-        title="Let's talk."
-        description="Whether you're evaluating MyCargoLens for your team, have a technical question, or need help with an existing account — we're here."
-        illustration={<Hero3D scene="contact" />}
+      <JsonLd
+        data={graph(
+          webPage({ path: ROUTES.contact.href, name: `${TITLE} | MyCargoLens`, description: DESCRIPTION, type: "ContactPage" }),
+          {
+            "@type": "Organization",
+            "@id": ORG_ID,
+            contactPoint: [{ "@type": "ContactPoint", contactType: "customer support", email: SUPPORT_EMAIL }],
+          },
+        )}
       />
-      <section className="pb-20 md:pb-28">
-      <Container>
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-start">
-          {/* Left — Info */}
-          <div>
 
-            {/* Info cards */}
-            <div className="flex flex-col gap-4">
-              {infoCards.map(({ icon: Icon, hover, title, body, href }, idx) => (
-                <div
-                  key={title}
-                  className="flex items-start gap-4 rounded-xl border border-border/60 bg-card/50 p-5"
-                >
-                  <IconTile
-                    icon={Icon}
-                    hover={hover}
-                    tone="primary"
-                    reveal
-                    revealDelay={idx * 0.06}
-                    className="mt-0.5 size-9 rounded-lg"
-                  />
-                  <div>
-                    <p className="text-sm font-semibold mb-0.5">{title}</p>
-                    {href ? (
-                      <a
-                        href={href}
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
-                      >
-                        {body}
-                      </a>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">{body}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
+      <PageHero
+        size="compact"
+        scene="contact"
+        breadcrumbPath={ROUTES.contact.href}
+        eyebrow="Contact"
+        title="Contact us"
+        sub="For account help, partnerships, press or billing, use the form or write to the right inbox below. A person on our team reads every message."
+      >
+        {/* Sales banner (deck §2): the page's only gold button. */}
+        <div className="flex flex-col gap-4 rounded-xl border border-[hsl(var(--surface-border))] bg-[hsl(var(--surface))] p-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[15px] leading-relaxed text-tone-muted">
+            <strong className="font-semibold text-tone-fg">Looking for a demo or pricing?</strong> Book a demo and
+            we&apos;ll set up a call on shipments like yours.
+          </p>
+          <DemoButton location="inline" src="contact" className="shrink-0" />
+        </div>
+      </PageHero>
+
+      <Section tone="paper" spacing="compact" aria-label="Ways to reach us">
+        <div className="grid gap-10 lg:grid-cols-12 lg:gap-14">
+          {/* Mobile: form first, then the cards (deck §6). */}
+          <div className="min-w-0 lg:order-2 lg:col-span-7">
+            <div className="site-surface rounded-2xl p-5 sm:p-8">
+              <ContactForm />
             </div>
           </div>
 
-          {/* Right — Form */}
-          <div className="glass rounded-2xl border border-border/60 p-6 sm:p-8 shadow-card">
-            {submitted ? (
-              /* Success is a rare, earned moment — the one place a little
-                 spring is allowed. Check settles in first, copy follows. */
-              <motion.div
-                initial={{ opacity: 0, scale: 0.97 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.35, ease: EASE }}
-                className="flex flex-col items-center justify-center text-center py-10 gap-4"
-              >
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: "spring", duration: 0.5, bounce: 0.25, delay: 0.05 }}
-                  className="inline-flex"
-                  aria-hidden="true"
-                >
-                  <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-                </motion.span>
-                <motion.h2
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.12, ease: EASE }}
-                  className="text-xl font-semibold tracking-tight"
-                >
-                  Message sent!
-                </motion.h2>
-                <motion.p
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.18, ease: EASE }}
-                  className="text-muted-foreground text-sm max-w-xs"
-                >
-                  We&apos;ll get back to you within one business day.
-                </motion.p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => {
-                    setForm(initialForm);
-                    setSubmitted(false);
-                    setError(null);
-                  }}
-                >
-                  Send another message
-                </Button>
-              </motion.div>
-            ) : (
-              <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="name" className="text-sm font-medium">
-                    Name
-                  </label>
-                  <input
-                    id="name"
-                    name="name"
-                    type="text"
-                    autoComplete="name"
-                    value={form.name}
-                    onChange={handleChange}
-                    placeholder="Jane Smith"
-                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-[box-shadow,border-color] duration-200 hover:border-foreground/25"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="email" className="text-sm font-medium">
-                    Email <span className="text-muted-foreground">(required)</span>
-                  </label>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={form.email}
-                    onChange={handleChange}
-                    placeholder="jane@company.com"
-                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-[box-shadow,border-color] duration-200 hover:border-foreground/25"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="subject" className="text-sm font-medium">
-                    Subject
-                  </label>
-                  <select
-                    id="subject"
-                    name="subject"
-                    value={form.subject}
-                    onChange={handleChange}
-                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-[box-shadow,border-color] duration-200 hover:border-foreground/25"
+          <div className="min-w-0 lg:order-1 lg:col-span-5">
+            <h2 className="sr-only">Ways to reach us</h2>
+            <ul className="divide-y divide-[hsl(var(--surface-border))] border-y border-[hsl(var(--surface-border))]">
+              {WAYS.map(({ icon: Icon, title, body, link, topic }) => (
+                <li key={title} className="flex items-start gap-4 py-4">
+                  <span
+                    aria-hidden
+                    className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-[hsl(var(--surface-border))] bg-[hsl(var(--surface))] text-tone-eyebrow"
                   >
-                    <option value="">Select a topic…</option>
-                    <option value="general">General inquiry</option>
-                    <option value="support">Technical support</option>
-                    <option value="enterprise">Enterprise inquiry</option>
-                    <option value="bug">Bug report</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="message" className="text-sm font-medium">
-                    Message <span className="text-muted-foreground">(required)</span>
-                  </label>
-                  <textarea
-                    id="message"
-                    name="message"
-                    rows={5}
-                    required
-                    value={form.message}
-                    onChange={handleChange}
-                    placeholder="Tell us how we can help…"
-                    className="w-full resize-none rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-[box-shadow,border-color] duration-200 hover:border-foreground/25"
-                  />
-                </div>
-
-                {/* Honeypot — visually hidden, off the tab order, with a name
-                    most bots can't resist filling. Real users never see it. */}
-                <div aria-hidden="true" className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden">
-                  <label htmlFor="website">Website</label>
-                  <input
-                    id="website"
-                    name="website"
-                    type="text"
-                    tabIndex={-1}
-                    autoComplete="off"
-                    value={form.website}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                {error && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2, ease: EASE }}
-                    className="text-sm text-red-600 dark:text-red-400"
-                    role="alert"
-                  >
-                    {error}
-                  </motion.p>
-                )}
-
-                <Button
-                  type="submit"
-                  variant="gold"
-                  size="lg"
-                  className="w-full mt-1"
-                  disabled={loading}
-                >
-                  {loading ? "Sending…" : "Send message"}
-                </Button>
-              </form>
-            )}
+                    <Icon className="size-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-[15.5px] font-semibold text-tone-fg">{title}</h3>
+                    <p className="mt-0.5 text-[14.5px] leading-relaxed text-tone-muted">{body}</p>
+                    {link &&
+                      (link.mail ? (
+                        <a
+                          href={link.href}
+                          className="inline-flex min-h-11 items-center break-all text-[14.5px] font-medium text-tone-fg underline decoration-current/35 underline-offset-4 hover:decoration-current"
+                        >
+                          {link.label}
+                        </a>
+                      ) : (
+                        <Link
+                          href={link.href}
+                          className="inline-flex min-h-11 items-center text-[14.5px] font-medium text-tone-fg underline decoration-current/35 underline-offset-4 hover:decoration-current"
+                        >
+                          {link.label}
+                        </Link>
+                      ))}
+                    {topic && <TopicButton topic={topic}>Send a message</TopicButton>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-5 text-[13px] text-tone-muted">
+              {COMPANY.legalName}
+              {COMPANY.postalAddress ? ` · ${COMPANY.postalAddress}` : null}
+            </p>
           </div>
         </div>
-      </Container>
-      </section>
+      </Section>
     </>
   );
 }

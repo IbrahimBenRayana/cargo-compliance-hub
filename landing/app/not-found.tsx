@@ -1,89 +1,55 @@
-"use client";
+import type { Metadata } from "next";
+import { PageHero } from "@/components/site/page-hero";
+import { CardGrid } from "@/components/site/blocks";
+import { DemoButton } from "@/components/site/cta";
+import { APP_LOGIN_URL, ROUTES } from "@/lib/site";
 
-import { motion } from "framer-motion";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Hero3D } from "@/components/hero3d/Hero3D";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-const rise = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
+// Next adds <meta name="robots" content="noindex"> to 404 responses itself.
+export const metadata: Metadata = {
+  title: "Page not found",
+  description:
+    "This page doesn't exist or has moved. Find ISF and entry filing software, pricing and guides from MyCargoLens.",
+  robots: { index: false, follow: true },
 };
 
-/**
- * The brand's Focus Frame, drawn around the numeral: four gold corner
- * brackets that settle inward from just outside their resting spot.
- * Rare-page tier, so a small moment of delight is allowed — but it's
- * still transform/opacity only, on the site's easing tokens.
- */
-const CORNERS = [
-  { pos: "left-0 top-0", edges: "border-l-2 border-t-2", dx: -5, dy: -5 },
-  { pos: "right-0 top-0", edges: "border-r-2 border-t-2", dx: 5, dy: -5 },
-  { pos: "right-0 bottom-0", edges: "border-r-2 border-b-2", dx: 5, dy: 5 },
-  { pos: "left-0 bottom-0", edges: "border-l-2 border-b-2", dx: -5, dy: 5 },
-] as const;
+const CARDS = [
+  { title: "The product", body: "ISF and entry filing, the inbox and pre-filing checks.", href: ROUTES.platform.href, linkLabel: "See the platform" },
+  {
+    title: "Pricing",
+    body: "$45, $180 or $280 per shipment, charged when CBP accepts. Volume pricing on request.",
+    href: ROUTES.pricing.href,
+    linkLabel: "See pricing",
+  },
+  { title: "Guides", body: "ISF deadlines, penalties and entry how-tos.", href: ROUTES.resources.href, linkLabel: "Read the guides" },
+  { title: "Log in", body: "Already a customer? Go to the app.", href: APP_LOGIN_URL, linkLabel: "Log in" },
+];
 
+/** 404 (copy/not-found.md, wireframe 16): banner hero, no breadcrumbs, no pre-footer band. */
 export default function NotFound() {
   return (
-    <div className="bg-mesh flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
-        className="max-w-md text-center"
-      >
-        {/* Numeral inside the Focus Frame — the middle 0 is the "lens". */}
-        <motion.div
-          variants={rise}
-          aria-hidden="true"
-          className="relative mx-auto mb-8 inline-block select-none px-7 py-4"
-        >
-          {CORNERS.map(({ pos, edges, dx, dy }, i) => (
-            <motion.span
-              key={pos}
-              initial={{ opacity: 0, x: dx, y: dy }}
-              animate={{ opacity: 1, x: 0, y: 0 }}
-              transition={{ duration: 0.45, delay: 0.2 + i * 0.06, ease: EASE }}
-              className={`absolute size-5 border-gold/60 ${pos} ${edges}`}
-            />
-          ))}
-          <p className="text-8xl font-bold leading-none tracking-tight text-foreground">
-            4<span className="text-gold-word">0</span>4
+    <PageHero
+      size="banner"
+      eyebrow={<span className="font-mono text-[15px] tracking-[0.3em] text-tone-muted">404</span>}
+      title="We couldn't find that page."
+      sub="It may have moved when we rebuilt the site. These are the pages most people are looking for."
+      scene="not-found"
+    >
+      <div className="mx-auto max-w-[720px] text-left">
+        <CardGrid columns={2} items={CARDS} />
+        <div className="mt-8 flex flex-col items-center gap-4 text-center">
+          <DemoButton location="section" src="404" size="lg" />
+          <p className="text-[14px] text-tone-muted">
+            Followed a broken link from our site? Tell us at{" "}
+            <a
+              href="mailto:support@mycargolens.com"
+              className="font-semibold text-tone-fg underline decoration-current/35 underline-offset-4 hover:decoration-current"
+            >
+              support@mycargolens.com
+            </a>{" "}
+            and we&apos;ll fix it.
           </p>
-        </motion.div>
-
-        <motion.h1
-          variants={rise}
-          className="mb-3 text-2xl font-semibold tracking-tight"
-        >
-          This page didn&apos;t clear customs.
-        </motion.h1>
-        <motion.p
-          variants={rise}
-          className="mb-8 text-base leading-relaxed text-muted-foreground"
-        >
-          The page you&apos;re looking for doesn&apos;t exist or has been moved.
-          The rest of the site is right where you left it.
-        </motion.p>
-        <motion.div
-          variants={rise}
-          className="flex flex-col items-center justify-center gap-3 sm:flex-row"
-        >
-          <Button variant="gold" size="lg" asChild>
-            <Link href="/">Back to home</Link>
-          </Button>
-          <Button variant="outline" size="lg" asChild>
-            <Link href="/book-a-demo">Book a demo</Link>
-          </Button>
-        </motion.div>
-
-        {/* "Not on the manifest": a lone container the Focus Frame never finds */}
-        <motion.div variants={rise} className="mx-auto mt-10 w-full max-w-sm">
-          <Hero3D scene="not-found" />
-        </motion.div>
-      </motion.div>
-    </div>
+        </div>
+      </div>
+    </PageHero>
   );
 }

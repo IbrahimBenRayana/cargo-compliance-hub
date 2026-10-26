@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { Container } from "@/components/ui/container";
+import { PageHero } from "@/components/site/page-hero";
+import { Section } from "@/components/site/section";
+import { ROUTES } from "@/lib/site";
 
 export const metadata: Metadata = {
-  // Plain title — the root layout's title.template appends " — MyCargoLens".
-  // Pre-fix this read as "Privacy Policy — MyCargoLens — MyCargoLens".
+  // Plain title: the root layout's title.template appends " | MyCargoLens".
   title: "Privacy Policy",
   description:
     "How MyCargoLens collects, uses, and protects your personal information.",
@@ -12,22 +13,20 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <Container className="max-w-3xl py-20 md:py-28">
-      {/* Page header */}
-      <div className="mb-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-          Legal
-        </p>
-        <h1 className="text-4xl font-bold tracking-tight mb-4">Privacy Policy</h1>
-        <p className="text-sm text-muted-foreground">Last updated: May 2026</p>
-      </div>
-
-      {/* Prose content */}
-      <div className="text-base leading-relaxed text-foreground/85">
+    <>
+      <PageHero
+        size="compact"
+        breadcrumbPath={ROUTES.privacy.href}
+        eyebrow="Legal"
+        title="Privacy Policy"
+        sub="Last updated: May 2026"
+      />
+      <Section tone="paper" width="narrow">
+      <div className="text-base leading-relaxed text-tone-fg [&_h2]:text-tone-fg [&_a:hover]:text-tone-fg">
 
         <h2 className="text-xl font-semibold mt-10 mb-4">1. Introduction</h2>
         <p className="mb-4">
-          MyCargoLens (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the MyCargoLens
+          Mycargolens (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the MyCargoLens
           platform at mycargolens.com. This policy describes how we collect, use, and protect your
           personal information.
         </p>
@@ -82,7 +81,7 @@ export default function PrivacyPolicyPage() {
               href="https://stripe.com/privacy"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-foreground transition-colors"
+              className="underline underline-offset-2 hover:text-tone-fg transition-colors"
             >
               Stripe&apos;s Privacy Policy
             </a>
@@ -118,7 +117,7 @@ export default function PrivacyPolicyPage() {
           You may request access to, correction of, or deletion of your personal data by emailing{" "}
           <a
             href="mailto:support@mycargolens.com"
-            className="underline underline-offset-2 hover:text-foreground transition-colors"
+            className="underline underline-offset-2 hover:text-tone-fg transition-colors"
           >
             support@mycargolens.com
           </a>
@@ -136,7 +135,7 @@ export default function PrivacyPolicyPage() {
           To exercise your CCPA rights, contact us at{" "}
           <a
             href="mailto:support@mycargolens.com"
-            className="underline underline-offset-2 hover:text-foreground transition-colors"
+            className="underline underline-offset-2 hover:text-tone-fg transition-colors"
           >
             support@mycargolens.com
           </a>
@@ -162,18 +161,19 @@ export default function PrivacyPolicyPage() {
           If you have questions about this Privacy Policy, please contact:
         </p>
         <p className="mb-4">
-          MyCargoLens
+          Mycargolens
           <br />
           Email:{" "}
           <a
             href="mailto:support@mycargolens.com"
-            className="underline underline-offset-2 hover:text-foreground transition-colors"
+            className="underline underline-offset-2 hover:text-tone-fg transition-colors"
           >
             support@mycargolens.com
           </a>
         </p>
 
       </div>
-    </Container>
+      </Section>
+    </>
   );
 }
