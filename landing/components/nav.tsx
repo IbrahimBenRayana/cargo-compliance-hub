@@ -89,6 +89,7 @@ function FullNav() {
   const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const navRef = React.useRef<HTMLElement | null>(null);
   const triggerRefs = React.useRef<Partial<Record<MenuKey, HTMLButtonElement>>>({});
+  const mobileBtnRef = React.useRef<HTMLButtonElement | null>(null);
   const reducedMotion = useReducedMotion();
 
   React.useEffect(() => {
@@ -178,10 +179,61 @@ function FullNav() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (activeRef.current) closeNow(true);
+      // the sheet only exists while open: send focus back to its toggle
+      if (document.getElementById("mobile-menu")?.contains(document.activeElement)) mobileBtnRef.current?.focus();
       setMobileOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, [closeNow]);
+
+  // Keyboard bridge: the dropdown panel sits after the header actions in the
+  // DOM and the mobile sheet is portalled to <body>, so plain Tab order would
+  // skip past them. Tab from an open trigger enters its panel; leaving either
+  // end hands focus back to the trigger. The mobile sheet keeps focus inside
+  // itself and its toggle while open.
+  React.useEffect(() => {
+    const focusables = (root: Element | null) =>
+      root
+        ? Array.from(root.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex='-1'])"))
+        : [];
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || e.altKey || e.ctrlKey || e.metaKey) return;
+      const el = document.activeElement;
+      const key = activeRef.current;
+      if (key) {
+        const trigger = triggerRefs.current[key];
+        const items = focusables(document.getElementById(`menu-${key}`));
+        if (!trigger || !items.length) return;
+        if (el === trigger && !e.shiftKey) {
+          e.preventDefault();
+          items[0].focus();
+        } else if (el === items[0] && e.shiftKey) {
+          e.preventDefault();
+          trigger.focus();
+        } else if (el === items[items.length - 1] && !e.shiftKey) {
+          // close, then let the browser's Tab continue from the trigger
+          closeNow();
+          trigger.focus();
+        }
+        return;
+      }
+      const btn = mobileBtnRef.current;
+      const items = focusables(document.getElementById("mobile-menu"));
+      if (!btn || !items.length) return;
+      if (el === btn && !e.shiftKey) {
+        e.preventDefault();
+        items[0].focus();
+      } else if (el === btn && e.shiftKey) {
+        e.preventDefault();
+        items[items.length - 1].focus();
+      } else if ((el === items[items.length - 1] && !e.shiftKey) || (el === items[0] && e.shiftKey)) {
+        e.preventDefault();
+        btn.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [closeNow]);
 
   const raised = scrolled || active !== null || mobileOpen;
@@ -269,6 +321,7 @@ function FullNav() {
                 <DemoButton location="nav" src="nav" size="sm" className="h-9 px-3.5 text-[13px]" />
               )}
               <button
+                ref={mobileBtnRef}
                 type="button"
                 className="grid size-10 place-items-center rounded-xl border border-border/70 bg-[hsl(var(--card)/0.7)] text-foreground transition-colors hover:bg-secondary"
                 onClick={() => setMobileOpen((v) => !v)}
