@@ -303,7 +303,7 @@ function SeverityChips({
             {c.count !== undefined && (
               <span className={cn(
                 'tabular-nums text-[11px] font-semibold',
-                isActive ? 'opacity-90' : 'opacity-60',
+                isActive ? 'opacity-90' : '',
               )}>
                 {c.count}
               </span>

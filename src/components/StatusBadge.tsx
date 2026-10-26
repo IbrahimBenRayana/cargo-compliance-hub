@@ -41,7 +41,7 @@ const statusConfig: Record<ShipmentStatus, StatusConfig> = {
   cancelled: {
     label: 'Cancelled',
     dot: 'bg-slate-300',
-    className: 'bg-slate-400/8 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700/30 opacity-70',
+    className: 'bg-slate-400/8 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700/30',
   },
   amended: {
     label: 'Amended',

@@ -27,7 +27,7 @@ export const INBOND_STATUSES: InbondStatusOption[] = [
     label: 'Draft',
     dot: 'bg-slate-400',
     className:
-      'bg-slate-400/10 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700/40',
+      'bg-slate-400/10 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700/40',
   },
   {
     value: 'READY',

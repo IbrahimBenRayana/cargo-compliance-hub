@@ -159,25 +159,27 @@ function ParamsCard() {
     <Card>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer select-none">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Settings2 className="h-4 w-4 text-muted-foreground" />
-                <CardTitle className="text-lg">CERT parameters</CardTitle>
-                {filerIsPlaceholder && (
-                  <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    filer code ZZZ — placeholder, awaiting CBP filer code
-                  </Badge>
-                )}
+          <button type="button" className="block w-full text-left rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <CardHeader className="cursor-pointer select-none">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-lg font-semibold leading-none tracking-tight">CERT parameters</span>
+                  {filerIsPlaceholder && (
+                    <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      filer code ZZZ — placeholder, awaiting CBP filer code
+                    </Badge>
+                  )}
+                </div>
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
               </div>
-              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
-            </div>
-            <CardDescription>
-              Shared inputs every scenario is generated with — filer code, importer, sender credentials.
-              {data?.params?.updatedAt && ` Last saved ${formatDateTime(data.params.updatedAt)}.`}
-            </CardDescription>
-          </CardHeader>
+              <CardDescription>
+                Shared inputs every scenario is generated with — filer code, importer, sender credentials.
+                {data?.params?.updatedAt && ` Last saved ${formatDateTime(data.params.updatedAt)}.`}
+              </CardDescription>
+            </CardHeader>
+          </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="space-y-4">
