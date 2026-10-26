@@ -1448,7 +1448,7 @@ export default function ShipmentWizard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <TextField label="Importer Name" required value={form.importerName}
               onChange={v => set('importerName', v)} maxLength={35} error={errors.importerName}
-              placeholder="e.g., Acme Imports Inc" hint="Max 35 chars. No periods — CC rejects them." />
+              placeholder="e.g., Acme Imports Inc" hint="Max 35 characters. Leave out periods." />
             <TextField label="IOR Number (EIN)" required value={form.importerNumber}
               onChange={v => set('importerNumber', v)} placeholder="XX-XXXXXXXXX"
               hint="Employer Identification Number. Format: 2 digits, dash, 9 digits." error={errors.importerNumber} maxLength={12} />

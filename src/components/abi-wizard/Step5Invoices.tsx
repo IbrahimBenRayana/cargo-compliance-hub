@@ -326,7 +326,7 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                     })
                   }
                   type="number"
-                  hint="Invoice-currency to USD exchange rate (CC max: 8)."
+                  hint="Invoice-currency to USD exchange rate (maximum 8)."
                   error={errors[`invoices.${invIdx}.exchangeRate`]}
                 />
               </div>
@@ -486,7 +486,7 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                               })
                             }
                             type="number"
-                            hint="CC max: 8."
+                            hint="Maximum 8."
                             error={errors[`${itemPath}.values.exchangeRate`]}
                           />
                           <TextField
@@ -872,7 +872,7 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                                     { value: '8', label: '8' },
                                     { value: '9', label: '9' },
                                   ]}
-                                  hint="CC accepts 1–9 or none. 0 is rejected."
+                                  hint="1 to 9, or none. 0 is not accepted."
                                 />
                               </div>
                             </AccordionContent>
