@@ -3,6 +3,7 @@ import { Section, SectionHeading } from "@/components/site/section";
 import { FeatureSplit } from "@/components/site/blocks";
 import { Screenshot } from "@/components/site/screenshot";
 import { ROUTES } from "@/lib/site";
+import { isArticleLive } from "@/app/resources/_content/articles";
 import {
   CodeBlock,
   FaqSection,
@@ -32,6 +33,9 @@ export const metadata: Metadata = pageMetadata({
   ogTitle: "ISF filing software with a clock on every filing",
 });
 
+/** The penalties guide is linked only once it is published (it is held for broker review). */
+const PENALTIES_LIVE = isArticleLive("isf-late-filing-penalties");
+
 const FAQ = [
   {
     q: "When is the ISF-10 due?",
@@ -39,7 +43,7 @@ const FAQ = [
   },
   {
     q: "What's the penalty for a late or missing ISF?",
-    a: "CBP can assess liquidated damages of $5,000 per violation, and each house bill counts as its own ISF. Read our guide to ISF late filing penalties.",
+    a: "CBP can assess liquidated damages of $5,000 per violation, and each house bill counts as its own ISF.",
   },
   {
     q: "Who files the ISF-10 and who files the ISF-5?",
@@ -134,7 +138,9 @@ export default function IsfFilingPage() {
             <TextLinks
               links={[
                 { label: "See how the ISF deadline clock feeds the inbox", href: ROUTES.inbox.href },
-                { label: "What a late ISF actually costs", href: ROUTES.isfLateFilingPenalties.href },
+                ...(PENALTIES_LIVE
+                  ? [{ label: "What a late ISF actually costs", href: ROUTES.isfLateFilingPenalties.href }]
+                  : []),
               ]}
             />
           }
@@ -279,7 +285,7 @@ Authorization: Bearer mcl_live_…
         items={FAQ}
         accent="isf"
         related={[
-          { label: "ISF late filing penalties", href: ROUTES.isfLateFilingPenalties.href },
+          ...(PENALTIES_LIVE ? [{ label: "ISF late filing penalties", href: ROUTES.isfLateFilingPenalties.href }] : []),
           { label: "Volume pricing", href: "/pricing#volume" },
         ]}
       />

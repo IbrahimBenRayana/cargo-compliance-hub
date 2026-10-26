@@ -6,7 +6,7 @@ import { Section, SectionHeading, Eyebrow } from "@/components/site/section";
 import { CardGrid } from "@/components/site/blocks";
 import { CtaBand } from "@/components/site/cta-band";
 import { JsonLd } from "@/components/site/json-ld";
-import { CTA, ROUTES } from "@/lib/site";
+import { CTA, RESOURCES_PUBLISHED, ROUTES } from "@/lib/site";
 import { abs, graph, webPage } from "@/lib/schema";
 import { articleHref, publishedArticles } from "./_content/articles";
 import { TOPICS, TOPIC_ORDER } from "./_content/topics";
@@ -23,6 +23,8 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: PATH },
+  // Hidden until the first article passes broker review (lib/site.ts RESOURCES_PUBLISHED).
+  ...(!RESOURCES_PUBLISHED ? { robots: { index: false, follow: true } } : {}),
   openGraph: { title: `${TITLE} | MyCargoLens`, description: DESCRIPTION, url: PATH, type: "website" },
 };
 

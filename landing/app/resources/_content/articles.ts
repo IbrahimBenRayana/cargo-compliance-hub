@@ -1,3 +1,4 @@
+import { RESOURCES_PUBLISHED } from "@/lib/site";
 import { isfLateFilingPenalties } from "./isf-late-filing-penalties";
 import type { Article } from "./types";
 
@@ -14,9 +15,15 @@ export function getArticle(slug: string): Article | undefined {
 
 const sortKey = (a: Article) => a.datePublished ?? a.dateReviewed;
 
-/** Published articles, newest first. */
+/** Published articles, newest first. Empty while the Resources hub is hidden (RESOURCES_PUBLISHED). */
 export function publishedArticles(): Article[] {
+  if (!RESOURCES_PUBLISHED) return [];
   return ARTICLES.filter((a) => a.status === "published").sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+}
+
+/** True when an article may be linked and indexed. Gate every in-page link on this, not on route `live`. */
+export function isArticleLive(slug: string): boolean {
+  return publishedArticles().some((a) => a.slug === slug);
 }
 
 export function articleHref(slug: string): string {

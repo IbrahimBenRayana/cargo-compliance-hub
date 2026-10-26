@@ -8,7 +8,7 @@ import { DemoButton } from "@/components/site/cta";
 import { JsonLd } from "@/components/site/json-ld";
 import { COMPANY } from "@/lib/site";
 import { SOFTWARE_ID, article as articleNode, graph } from "@/lib/schema";
-import { ARTICLES, articleHref, formatDate, getArticle } from "../_content/articles";
+import { ARTICLES, articleHref, formatDate, getArticle, isArticleLive } from "../_content/articles";
 import { TOPICS } from "../_content/topics";
 import { Prose } from "../_components/prose";
 import { ArticleCard, BYLINE, BylineMark } from "../_components/cards";
@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: PageProps<"/resources/[slug]"
     description: a.metaDescription,
     alternates: { canonical: path },
     // Held back until the broker/attorney review is done: not indexed, not listed.
-    ...(a.status !== "published" ? { robots: { index: false, follow: true } } : {}),
+    ...(!isArticleLive(a.slug) ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       type: "article",
       title: `${a.metaTitle} | MyCargoLens`,
@@ -50,7 +50,7 @@ export default async function ArticlePage({ params }: PageProps<"/resources/[slu
   const path = articleHref(a.slug);
   const related = a.related
     .map((s) => getArticle(s))
-    .filter((r): r is NonNullable<typeof r> => !!r && r.status === "published");
+    .filter((r): r is NonNullable<typeof r> => !!r && isArticleLive(r.slug));
 
   const posting = articleNode({
     path,

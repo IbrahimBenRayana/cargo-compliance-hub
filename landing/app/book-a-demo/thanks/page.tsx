@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Section, Eyebrow } from "@/components/site/section";
 import { PageHero } from "@/components/site/page-hero";
 import { ROUTES } from "@/lib/site";
+import { isArticleLive } from "@/app/resources/_content/articles";
 import { parseRoute, type Route } from "../_components/demo-copy";
 
 export const metadata: Metadata = {
@@ -132,7 +133,7 @@ export default async function ThanksPage({
                 {
                   href: ROUTES.isfLateFilingPenalties.href,
                   label: "ISF late filing penalties: what CBP can claim, and when",
-                  live: ROUTES.isfLateFilingPenalties.live,
+                  live: isArticleLive("isf-late-filing-penalties"),
                 },
                 { href: ROUTES.security.href, label: "How we handle your data", live: true },
               ]

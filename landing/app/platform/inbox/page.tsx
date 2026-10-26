@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Section, SectionHeading } from "@/components/site/section";
 import { CardGrid, FeatureSplit } from "@/components/site/blocks";
 import { ROUTES } from "@/lib/site";
+import { isArticleLive } from "@/app/resources/_content/articles";
 import {
   FaqSection,
   ModuleHero,
@@ -150,15 +151,17 @@ export default function InboxPage() {
             },
           ]}
         />
-        <TextLinks
-          className="mt-8"
-          links={[
-            {
-              label: "Why the 24-hour line matters: ISF late filing penalties",
-              href: ROUTES.isfLateFilingPenalties.href,
-            },
-          ]}
-        />
+        {isArticleLive("isf-late-filing-penalties") && (
+          <TextLinks
+            className="mt-8"
+            links={[
+              {
+                label: "Why the 24-hour line matters: ISF late filing penalties",
+                href: ROUTES.isfLateFilingPenalties.href,
+              },
+            ]}
+          />
+        )}
       </Section>
 
       {/* S5 · Open any item */}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PageHero } from "@/components/site/page-hero";
 import { CardGrid } from "@/components/site/blocks";
 import { DemoButton } from "@/components/site/cta";
-import { APP_LOGIN_URL, ROUTES } from "@/lib/site";
+import { APP_LOGIN_URL, RESOURCES_PUBLISHED, ROUTES } from "@/lib/site";
 
 // Next adds <meta name="robots" content="noindex"> to 404 responses itself.
 export const metadata: Metadata = {
@@ -20,7 +20,9 @@ const CARDS = [
     href: ROUTES.pricing.href,
     linkLabel: "See pricing",
   },
-  { title: "Guides", body: "ISF deadlines, penalties and entry how-tos.", href: ROUTES.resources.href, linkLabel: "Read the guides" },
+  RESOURCES_PUBLISHED
+    ? { title: "Guides", body: "ISF deadlines, penalties and entry how-tos.", href: ROUTES.resources.href, linkLabel: "Read the guides" }
+    : { title: "Security", body: "Roles, MFA, the audit trail and every CBP request on the record.", href: ROUTES.security.href, linkLabel: "See security" },
   { title: "Log in", body: "Already a customer? Go to the app.", href: APP_LOGIN_URL, linkLabel: "Log in" },
 ];
 

@@ -58,10 +58,14 @@ function body(): string {
     "## Trust",
     item(ROUTES.security),
     "",
-    "## Resources",
-    item(ROUTES.resources),
-    ...articles.map((a) => `- [${a.shortTitle}](${url(articleHref(a.slug))}): ${a.dek}`),
-    "",
+    ...(ROUTES.resources.noindex
+      ? []
+      : [
+          "## Resources",
+          item(ROUTES.resources),
+          ...articles.map((a) => `- [${a.shortTitle}](${url(articleHref(a.slug))}): ${a.dek}`),
+          "",
+        ]),
     "## Optional",
     item(ROUTES.about),
     item(ROUTES.changelog),

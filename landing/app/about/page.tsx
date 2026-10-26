@@ -9,7 +9,7 @@ import { FeatureSplit, StepFlow } from "@/components/site/blocks";
 import { JsonLd } from "@/components/site/json-ld";
 import { graph, webPage, ORG_ID } from "@/lib/schema";
 import { ACCENTS, accentClass } from "@/lib/accents";
-import { COMPANY, ROUTES } from "@/lib/site";
+import { COMPANY, RESOURCES_PUBLISHED, ROUTES } from "@/lib/site";
 import { CtaBand } from "@/components/site/cta-band";
 
 const TITLE = "About us: ISF and customs entry software";
@@ -222,14 +222,16 @@ export default function AboutPage() {
               </Link>
             </dd>
           </div>
-          <div>
-            <dt className="text-[12px] font-semibold uppercase tracking-[0.14em] text-tone-muted">Guides</dt>
-            <dd className="mt-1.5">
-              <Link href={ROUTES.resources.href} className={linkCls}>
-                {ROUTES.resources.label}
-              </Link>
-            </dd>
-          </div>
+          {RESOURCES_PUBLISHED && (
+            <div>
+              <dt className="text-[12px] font-semibold uppercase tracking-[0.14em] text-tone-muted">Guides</dt>
+              <dd className="mt-1.5">
+                <Link href={ROUTES.resources.href} className={linkCls}>
+                  {ROUTES.resources.label}
+                </Link>
+              </dd>
+            </div>
+          )}
         </dl>
       </Section>
 

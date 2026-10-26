@@ -10,6 +10,7 @@ import { JsonLd } from "@/components/site/json-ld";
 import { StickyDemoBar } from "@/components/site/sticky-demo-bar";
 import { webPage } from "@/lib/schema";
 import { ROUTES } from "@/lib/site";
+import { isArticleLive } from "@/app/resources/_content/articles";
 import { CtaBand } from "@/components/site/cta-band";
 import { ArrowLink, DashList, OutlineLink, TrustPill, pageMetadata } from "../_components/page-bits";
 import { HouseBillsIllustration } from "../_components/house-bills";
@@ -139,9 +140,11 @@ export default function NvoccForwardersPage() {
               ))}
               . Figures are CBP&apos;s guideline amounts, not a prediction of any claim.
             </p>
-            <ArrowLink href={ROUTES.isfLateFilingPenalties.href} className="mt-5">
-              {ROUTES.isfLateFilingPenalties.label}
-            </ArrowLink>
+            {isArticleLive("isf-late-filing-penalties") && (
+              <ArrowLink href={ROUTES.isfLateFilingPenalties.href} className="mt-5">
+                {ROUTES.isfLateFilingPenalties.label}
+              </ArrowLink>
+            )}
           </div>
           <div className="min-w-0">
             <HouseBillsIllustration />

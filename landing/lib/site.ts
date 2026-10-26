@@ -13,6 +13,14 @@ import { MODULE_ORDER, type ModuleKey } from "@/lib/accents";
  */
 
 export const SITE_URL = "https://mycargolens.com";
+
+/**
+ * Resources hub switch. Off until the first article passes broker review:
+ * /resources and its articles still render (noindex) but drop out of the
+ * header, mega-menu, footer, sitemap, llms.txt and every in-page link, and the
+ * Changelog moves under Company. Flip to true to publish the hub again.
+ */
+export const RESOURCES_PUBLISHED = false;
 export const APP_LOGIN_URL = "https://app.mycargolens.com/login";
 
 export const COMPANY = {
@@ -216,9 +224,10 @@ export const ROUTES = r({
     group: "resources",
     blurb: "ISF deadlines, penalties, entries and tariffs, with sources.",
     scene: "resources",
-    nav: true,
-    footer: true,
+    nav: RESOURCES_PUBLISHED,
+    footer: RESOURCES_PUBLISHED,
     live: true,
+    noindex: !RESOURCES_PUBLISHED,
   },
   isfLateFilingPenalties: {
     label: "ISF late filing penalties",
@@ -252,7 +261,8 @@ export const ROUTES = r({
   changelog: {
     label: "Changelog",
     href: "/changelog",
-    group: "resources",
+    // Sits under Company while the Resources hub is hidden.
+    group: RESOURCES_PUBLISHED ? "resources" : "company",
     blurb: "What shipped, newest first.",
     nav: true,
     footer: true,
@@ -339,21 +349,21 @@ export const INDEXABLE_ROUTES: SiteRoute[] = all.filter((x) => x.live && !x.noin
 
 export type MenuKey = "platform" | "solutions" | "resources" | "company";
 
-export const HEADER_MENUS: { key: MenuKey; label: string }[] = [
-  { key: "platform", label: "Platform" },
-  { key: "solutions", label: "Solutions" },
-  { key: "resources", label: "Resources" },
-  { key: "company", label: "Company" },
-];
+const showMenu = (k: MenuKey | "pricing") => k !== "resources" || RESOURCES_PUBLISHED;
+
+export const HEADER_MENUS: { key: MenuKey; label: string }[] = (
+  [
+    { key: "platform", label: "Platform" },
+    { key: "solutions", label: "Solutions" },
+    { key: "resources", label: "Resources" },
+    { key: "company", label: "Company" },
+  ] as { key: MenuKey; label: string }[]
+).filter((m) => showMenu(m.key));
 
 /** Header order: Platform, Solutions, Pricing (plain link), Resources, Company. */
-export const HEADER_ORDER: (MenuKey | "pricing")[] = [
-  "platform",
-  "solutions",
-  "pricing",
-  "resources",
-  "company",
-];
+export const HEADER_ORDER: (MenuKey | "pricing")[] = (
+  ["platform", "solutions", "pricing", "resources", "company"] as (MenuKey | "pricing")[]
+).filter(showMenu);
 
 export const PLATFORM_COLUMNS = [
   { key: "file" as const, heading: "File" },
@@ -399,7 +409,7 @@ export function footerColumns(): { heading: string; links: FooterLink[] }[] {
     href: x.href,
     module: x.module,
   });
-  return [
+  const columns = [
     {
       heading: "Platform",
       // footer order (site-architecture §4.4): overview, then modules in product order
@@ -421,6 +431,7 @@ export function footerColumns(): { heading: string; links: FooterLink[] }[] {
       ],
     },
   ];
+  return columns.filter((c) => c.links.length > 0);
 }
 
 // ---------------------------------------------------------------------------
