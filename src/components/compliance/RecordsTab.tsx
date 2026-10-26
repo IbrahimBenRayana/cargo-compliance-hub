@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 /**
- * Records & Liquidation tab — every accepted filing's 314-day liquidation
+ * Records & Liquidation tab — every accepted entry's 314-day liquidation
  * countdown plus 270-day PSC window. Three layout sections:
  *
  *   1. KPI strip (tracked / PSC open / awaiting / liquidated)
@@ -292,7 +292,7 @@ function PipelineCard({
             <Input
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search BOL or filing type…"
+              placeholder="Search entry number or type…"
               className="pl-9 text-[13px]"
             />
           </div>
@@ -308,7 +308,7 @@ function PipelineCard({
           </div>
         ) : (
           <ul className="space-y-2">
-            {filtered.map((t) => <PipelineRow key={t.filingId} t={t} />)}
+            {filtered.map((t) => <PipelineRow key={t.id} t={t} />)}
           </ul>
         )}
       </div>
@@ -396,7 +396,7 @@ function PipelineRow({ t }: { t: LiquidationTracked }) {
       transition={{ duration: 0.18 }}
     >
       <Link
-        to={`/shipments/${t.filingId}`}
+        to={t.linkUrl}
         className={cn(
           'group relative block rounded-xl border bg-white dark:bg-slate-900/40 transition-colors',
           tone.ring,
