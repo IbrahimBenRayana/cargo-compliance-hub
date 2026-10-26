@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { generalLimiter } from '../middleware/rateLimiter.js';
 import { getJobStatus } from '../services/backgroundJobs.js';
 
 const router = Router();
@@ -27,7 +26,9 @@ const CBP_HEALTHY_WINDOW_MS = 6 * 60 * 1000;
 // was within 26 hours (one cycle plus a 2-hour buffer for slow days).
 const ADD_CVD_HEALTHY_WINDOW_MS = 26 * 60 * 60 * 1000;
 
-router.get('/', generalLimiter, (_req, res) => {
+// Bounded by the app-wide generalLimiter (index.ts); mounting it again here
+// counted each status call twice.
+router.get('/', (_req, res) => {
   const jobs = getJobStatus();
   const now = Date.now();
 
