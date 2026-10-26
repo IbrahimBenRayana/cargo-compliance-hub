@@ -7,6 +7,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { BfcacheFix } from "@/components/bfcache-fix";
 import { MotionRoot } from "@/components/motion-root";
 import { ChatWidget } from "@/components/chat/ChatWidget";
+import { JsonLd } from "@/components/site/json-ld";
+import { graph, organization, website } from "@/lib/schema";
+import { UI_STRINGS } from "@/lib/site";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -18,7 +21,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://mycargolens.com"),
   title: {
     default: "MyCargoLens — CBP Compliance Platform",
-    template: "%s — MyCargoLens",
+    template: "%s | MyCargoLens",
   },
   description:
     "The complete CBP compliance platform for modern importers. File ISF and Entry in one secure workspace.",
@@ -54,12 +57,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.className} antialiased`} suppressHydrationWarning>
-      <body className="bg-mesh min-h-screen flex flex-col">
+      <body className="bg-background min-h-screen flex flex-col">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-card focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg"
+        >
+          {UI_STRINGS.skipLink}
+        </a>
+        <JsonLd data={graph(organization(), website())} />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <MotionRoot>
             <BfcacheFix />
             <Nav />
-            <main className="flex-1">{children}</main>
+            <main id="main" tabIndex={-1} className="flex-1 outline-none">{children}</main>
             <Footer />
             <ChatWidget />
           </MotionRoot>
