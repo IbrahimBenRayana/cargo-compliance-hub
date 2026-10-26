@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * Records & Liquidation tab — every accepted entry's 314-day liquidation
- * countdown plus 270-day PSC window. Three layout sections:
+ * countdown plus 300-day PSC window. Three layout sections:
  *
  *   1. KPI strip (tracked / PSC open / awaiting / liquidated)
  *   2. Filter bar (search + status chips)
@@ -124,14 +124,14 @@ function RecordsKpiStrip({
       <KpiTile
         label="PSC open"
         value={counts.psc}
-        sub="≤ 270 days post-entry"
+        sub="≤ 300 days post-entry"
         tone="amber"
         Icon={Calendar}
       />
       <KpiTile
         label="Awaiting liquidation"
         value={counts.awaiting}
-        sub="270 – 314 days"
+        sub="300 – 314 days"
         tone="blue"
         Icon={Clock}
       />
@@ -253,7 +253,7 @@ function PipelineCard({
           No accepted entries yet
         </p>
         <p className="text-[12px] text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-          Once CBP accepts an entry, its 314-day liquidation countdown and 270-day PSC window will appear here.
+          Once CBP accepts an entry, its 314-day liquidation countdown and 300-day PSC window will appear here.
         </p>
       </article>
     );
@@ -280,7 +280,7 @@ function PipelineCard({
               Liquidation pipeline
             </h3>
             <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Sorted by urgency. PSC = Post-Summary Correction (270d); liquidation = entry finalization (314d).
+              Sorted by urgency. PSC = Post-Summary Correction (300d); liquidation = entry finalization (314d).
             </p>
           </div>
         </div>
@@ -369,7 +369,7 @@ function PipelineRow({ t }: { t: LiquidationTracked }) {
   const TOTAL = 314;
   const elapsed = TOTAL - Math.max(0, t.daysUntilLiquidation);
   const pct = Math.max(0, Math.min(100, (elapsed / TOTAL) * 100));
-  const pscMarker = (270 / TOTAL) * 100; // PSC deadline at 270d
+  const pscMarker = (300 / TOTAL) * 100; // PSC deadline at 300d
   // Bar fill colour by remaining-days urgency, not status.
   const barFill =
     t.daysUntilLiquidation < 0 ? 'bg-slate-300 dark:bg-slate-700'
@@ -459,12 +459,12 @@ function PipelineRow({ t }: { t: LiquidationTracked }) {
               aria-hidden
               className="absolute top-[-2px] h-[10px] w-px bg-slate-400 dark:bg-slate-500"
               style={{ left: `${pscMarker}%` }}
-              title="PSC deadline (270d)"
+              title="PSC deadline (300d)"
             />
             <div className="flex justify-between text-[10px] tabular-nums text-slate-500 dark:text-slate-400 mt-1">
               <span>entry</span>
-              <span style={{ marginLeft: `${pscMarker - 50}%` }}>PSC 270d</span>
-              <span>liquidation 314d</span>
+              {/* PSC (300d) sits too close to liquidation (314d) for its own floating label. */}
+              <span>PSC 300d · liquidation 314d</span>
             </div>
           </div>
         </div>

@@ -4,12 +4,19 @@
  * CBP "liquidates" an entry — i.e. finalizes the duty/fee/tax amount — by
  * default 314 days after the entry summary is filed (19 CFR § 159.11).
  * Within the 314-day window, the importer can file a Post-Summary Correction
- * (PSC) up to 270 days after entry. After liquidation, the importer has 180
- * days to file a Protest (19 USC § 1514) to challenge the final amount.
+ * (PSC) up to 300 days after entry (CBP Federal Register notice of Jul 6
+ * 2026, FR Doc. 2026-13574: "the regular 300-day timeframe for filing a
+ * PSC"). After liquidation, the importer has 180 days to file a Protest
+ * (19 USC § 1514) to challenge the final amount.
+ *
+ * Not modelled: the same notice also caps a PSC at 15 days before the
+ * scheduled liquidation date ("whichever date is earlier"), and allows PSCs
+ * past day 300 for entries whose liquidation is suspended (AD/CVD, EAPA,
+ * court injunction).
  *
  * Reference dates we compute:
  *   • estimatedLiquidationAt = entryDate + 314 days
- *   • pscDeadline            = entryDate + 270 days
+ *   • pscDeadline            = entryDate + 300 days
  *   • protestDeadline        = liquidationAt + 180 days  (if liquidated)
  *
  * All math is done in UTC to avoid timezone drift.
@@ -18,7 +25,7 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const LIQUIDATION_WINDOW_DAYS = 314;
-export const PSC_WINDOW_DAYS = 270;
+export const PSC_WINDOW_DAYS = 300;
 export const PROTEST_WINDOW_DAYS = 180;
 
 export interface LiquidationDates {
