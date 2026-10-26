@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PageHero } from "@/components/site/page-hero";
 import { Section } from "@/components/site/section";
 import { ROUTES } from "@/lib/site";
@@ -24,7 +25,7 @@ export default function PrivacyPolicyPage() {
         breadcrumbPath={ROUTES.privacy.href}
         eyebrow="Legal"
         title="Privacy Policy"
-        sub="Last updated: May 2026"
+        sub="Last updated: October 2026"
       />
       <Section tone="paper" width="narrow">
       <div className="text-base leading-relaxed text-tone-fg [&_h2]:text-tone-fg [&_a:hover]:text-tone-fg">
@@ -93,12 +94,35 @@ export default function PrivacyPolicyPage() {
             .
           </li>
           <li>
-            <strong>(c)</strong> Third parties as required by law, legal process, or government
+            <strong>(c)</strong> Contabo, which hosts our servers and database.
+          </li>
+          <li>
+            <strong>(d)</strong> OpenAI, for AI features (pre-flight review, rejection explanations,
+            HTS suggestions and the in-app assistant). It receives the filing or question being
+            reviewed, and the CBP response where relevant.
+          </li>
+          <li>
+            <strong>(e)</strong> Microsoft Azure (Communication Services), to send transactional
+            email such as invites, sign-in codes and alerts.
+          </li>
+          <li>
+            <strong>(f)</strong> Terminal49, for container tracking. It receives the bill of lading,
+            booking or container numbers you choose to track.
+          </li>
+          <li>
+            <strong>(g)</strong> Third parties as required by law, legal process, or government
             request.
           </li>
         </ul>
         <p className="mb-4">
-          We do not sell or rent your personal information to third parties.
+          The same service providers are listed on our{" "}
+          <Link
+            href={`${ROUTES.security.href}#processors`}
+            className="underline underline-offset-2 hover:text-tone-fg transition-colors"
+          >
+            security page
+          </Link>
+          . We do not sell or rent your personal information to third parties.
         </p>
 
         <h2 className="text-xl font-semibold mt-10 mb-4">5. Data Retention</h2>

@@ -139,9 +139,9 @@ export default function InboxPage() {
               body: "CBP responses are picked up every minute, and any transmission CBP hasn't answered gets flagged.",
             },
             {
-              kicker: "After 72 hours",
+              kicker: "After 20 minutes",
               title: "Waiting on CBP",
-              body: "Filings still waiting on a CBP answer after 72 hours get flagged so someone looks.",
+              body: "A transmission CBP hasn't answered within 20 minutes gets flagged so someone looks. The check runs every 5 minutes.",
             },
             {
               kicker: "Daily",

@@ -104,16 +104,16 @@ const PROCESSORS = [
   {
     company: "OpenAI",
     what: "Pre-flight review, rejection explanations, HTS suggestions, in-app assistant",
-    receives: "The filing or question being reviewed, and the CBP response where relevant.",
+    receives: "The filing or question being reviewed, and the CBP response where relevant",
   },
-  { company: "Stripe", what: "Billing", receives: "Billing contact email and payment events." },
+  { company: "Stripe", what: "Billing", receives: "Billing contact email and payment events" },
   {
     company: "Microsoft Azure (Communication Services)",
     what: "Transactional email (invites, codes, alerts)",
     receives: "Recipient address and message content",
   },
   {
-    company: "Terminal 49",
+    company: "Terminal49",
     what: "Container tracking (Complete plan)",
     receives: "Bill of lading, booking or container numbers you choose to track",
   },
