@@ -5,7 +5,6 @@
 import { ImageResponse } from "next/og";
 import { CERT_BADGE } from "@/lib/site";
 
-export const runtime = "edge";
 export const alt = "MyCargoLens. Customs, in focus. ISF and customs entry filing software, CBP ABI certified.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
