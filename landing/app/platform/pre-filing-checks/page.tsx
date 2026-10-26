@@ -48,7 +48,7 @@ const FAQ = [
   },
   {
     q: "Does the AI see our data?",
-    a: "It sees the filing it's reviewing, sent with the setting that asks the provider not to store it.",
+    a: "It sees only the filing it's reviewing.",
   },
   {
     q: "If CBP rejects a filing, do we pay again to resubmit?",
@@ -133,7 +133,7 @@ export default function PreFilingChecksPage() {
                 ask, and your team makes the call.
               </p>
               <p className="text-[13.5px]">
-                We send only the filing being reviewed, with the setting that asks the AI provider not to store it.
+                We send only the filing being reviewed.
               </p>
             </>
           }

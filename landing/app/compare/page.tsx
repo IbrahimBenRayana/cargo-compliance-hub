@@ -136,7 +136,7 @@ const BLOCKS: OptionBlock[] = [
         sources: [{ label: "magaya.com/acelynk", href: "https://www.magaya.com/acelynk/" }],
       },
       {
-        text: "CargoWise moved most customers to per-transaction “Value Pack” pricing on December 1, 2025.",
+        text: "WiseTech introduced per-transaction “Value Pack” pricing for CargoWise in December 2025; December invoices were the first under it.",
         sources: [
           { label: "ecommercenews.com.au", href: "https://ecommercenews.com.au/story/wisetech-shifts-cargowise-pricing-to-per-transaction" },
           { label: "The Loadstar, Jan 2026", href: "https://theloadstar.com/cargowise-customers-confused-by-first-invoices-under-new-pricing-model/" },

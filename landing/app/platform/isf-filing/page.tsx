@@ -229,8 +229,8 @@ export default function IsfFilingPage() {
                 Any transmission CBP hasn&apos;t answered gets flagged.
               </p>
               <p>
-                Query by master bill to see CBP&apos;s dispositions on each house bill, such as 1W (arrived) and 1C
-                (cargo released). Manifest queries are free, like drafts.
+                Query by master bill to see CBP&apos;s disposition on each house bill. Manifest queries are free, like
+                drafts.
               </p>
             </>
           }

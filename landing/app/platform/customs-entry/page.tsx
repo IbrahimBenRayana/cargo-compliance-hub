@@ -12,6 +12,7 @@ import {
   pageMetadata,
 } from "../_components/module-page";
 import { CtaBand, PRICING_LINK } from "@/components/site/cta-band";
+import { SourceNote } from "../pre-filing-checks/_components/module-links";
 
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/platform-customs-entry.md
 const PATH = ROUTES.customsEntry.href;
@@ -168,7 +169,12 @@ export default function CustomsEntryPage() {
               liquidation, the 180-day protest window gets its own date.
             </p>
           }
-          actions={<TextLinks links={[{ label: "Liquidation and PSC tracking", href: ROUTES.compliance.href }]} />}
+          actions={
+            <div className="space-y-4">
+              <TextLinks links={[{ label: "Liquidation and PSC tracking", href: ROUTES.compliance.href }]} />
+              <SourceNote label="19 U.S.C. 1514 (protests)" href="https://www.law.cornell.edu/uscode/text/19/1514" />
+            </div>
+          }
           screenshot={{ screen: "app-liquidation-clocks" }}
         />
       </Section>

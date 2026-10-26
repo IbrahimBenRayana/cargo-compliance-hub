@@ -40,7 +40,7 @@ export const SCREENS = {
   },
   "app-m-compliance": { width: 780, height: 1688, route: "/compliance", alt: "The inbox on a phone.", phone: true },
   "app-m-dashboard": { width: 780, height: 1688, route: "/", alt: "The dashboard on a phone.", phone: true },
-  "app-manifest-dispositions": { width: 1600, height: 1216, route: "/manifest-query", alt: "Manifest query results with 1W and 1C dispositions per house bill." },
+  "app-manifest-dispositions": { width: 1600, height: 1216, route: "/manifest-query", alt: "Manifest query results with CBP's disposition for each house bill." },
   "app-risk-watch": { width: 1600, height: 1000, route: "/compliance", alt: "Risk and watch tab: UFLPA inbox, PGA lookup and CBP 5106 check." },
   "app-shipments-list": { width: 1600, height: 1000, route: "/shipments", alt: "Shipments list with drafts, statuses and deadlines." },
   "app-team-roles": { width: 1600, height: 704, route: "/team", alt: "Team page with owner, admin, operator and viewer roles." },

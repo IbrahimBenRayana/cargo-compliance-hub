@@ -106,6 +106,7 @@ export default function CompliancePage() {
                 label="CBP, Federal Register doc 2026-13574"
                 href="https://public-inspection.federalregister.gov/2026-13574.pdf"
               />
+              <SourceNote label="19 U.S.C. 1514 (protests)" href="https://www.law.cornell.edu/uscode/text/19/1514" />
             </div>
           }
           media={<ClockStrip />}

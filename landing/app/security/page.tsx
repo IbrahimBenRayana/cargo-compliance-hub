@@ -65,20 +65,24 @@ const SIGN_IN: Fact[] = [
   {
     icon: Fingerprint,
     title: "Multi-factor authentication",
-    body: "Available on every account: an authenticator app, email one-time codes as a backup, and single-use recovery codes.",
+    body: "On every account: an authenticator app, email one-time codes as a backup, and single-use recovery codes.",
   },
   { icon: KeyRound, title: "Passwords", body: "Hashed with bcrypt (cost 12). We never store them in plain text." },
   {
     icon: RefreshCcw,
     title: "Sessions",
-    body: "Short-lived access tokens, and a refresh token that changes every time it's used. Resetting a password signs out every other session.",
+    body: "Short-lived access tokens, and a refresh token that changes every time it's used.",
   },
   { icon: Timer, title: "Login limits", body: "Repeated sign-in attempts are rate-limited." },
   { icon: Lock, title: "MFA secrets", body: "Stored encrypted with AES-256-GCM." },
 ];
 
 const IN_TRANSIT: Fact[] = [
-  { icon: Lock, title: "TLS everywhere", body: "Every connection to the app, the API and webhooks uses TLS." },
+  {
+    icon: Lock,
+    title: "Encrypted connections, signed webhooks",
+    body: "The app and the API are served over TLS. Webhooks are signed, so your system can check they came from us.",
+  },
   {
     icon: KeyRound,
     title: "API keys shown once",
