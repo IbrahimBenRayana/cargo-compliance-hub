@@ -30,7 +30,7 @@ const PRINCIPLES = [
   {
     icon: Zap,
     title: "Honest pricing",
-    body: "No per-feature gotchas. No \"talk to sales\" walls. No hidden filings markup. No monthly fee — sign up free and pay a flat rate per shipment you file.",
+    body: "No per-feature gotchas. No hidden filings markup. No monthly fee — book a demo, get set up, and pay a flat rate per shipment you file.",
   },
   {
     icon: Lock,
@@ -53,7 +53,7 @@ const STORY_BEATS = [
   {
     when: "Today",
     title: "Same product, three angles.",
-    body: "Ops managers, customs brokerages, and freight forwarders use MyCargoLens differently. Same data, same plumbing — different surfaces. Email-verified team accounts with proper RBAC. Built on the rails CBP actually uses (CustomsCity ABI, Federal Register, FDA/USDA-APHIS/EPA/FCC).",
+    body: "Ops managers, customs brokerages, and freight forwarders use MyCargoLens differently. Same data, same plumbing — different surfaces. Email-verified team accounts with proper RBAC. Built on the rails CBP actually uses (CBP's ABI, Federal Register, FDA/USDA-APHIS/EPA/FCC).",
   },
 ];
 

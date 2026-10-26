@@ -30,9 +30,8 @@ export const CHANGELOG_ENTRIES: Entry[] = [
   {
     date: "2026-08-06",
     kind: "feature",
-    title: "Type 86 (Section 321 de-minimis) entries",
-    body: "Low-value shipments under the $800 de-minimis threshold can now be filed as Type 86 entries — same inbox, same pre-flight checks, same ranked queue as your ISF and entry work.",
-    link: { label: "Filings", href: "/platform/filings" },
+    title: "Type 86 (Section 321) entries — no longer offered",
+    body: "CBP discontinued Type 86 de-minimis entries effective June 24, 2026, so we no longer offer them. Low-value shipments file as formal or informal entries in the same inbox, with the same pre-flight checks as your ISF and entry work.",
   },
   {
     date: "2026-07-22",
@@ -59,7 +58,7 @@ export const CHANGELOG_ENTRIES: Entry[] = [
     date: "2026-05-22",
     kind: "fix",
     title: "HTS codes preserved in full",
-    body: "The DB now keeps the full 10-digit HTS you enter. We only truncate to 6 digits at the CustomsCity ABI boundary — so duty-calc previews, history search, and PDF exports all show the real code.",
+    body: "The DB now keeps the full 10-digit HTS you enter. We only truncate to 6 digits at the ABI boundary — so duty-calc previews, history search, and PDF exports all show the real code.",
     link: { label: "Filings", href: "/platform/filings" },
   },
   {

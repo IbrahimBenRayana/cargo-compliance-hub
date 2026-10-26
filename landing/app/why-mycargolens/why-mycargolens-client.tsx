@@ -413,14 +413,14 @@ const DIFFERENTIATORS = [
     icon: Tag,
     title: "Transparent, per-shipment pricing",
     body:
-      "No monthly fee. No enterprise contract. No \"talk to sales\" wall. $45 for an ISF, $180 for ISF + Entry, $280 for the full suite — and you only pay when you file. A rejected or late ISF, or a single misclassification, costs far more than the filing fee. The AI pre-flight is what stands between you and that cost.",
+      "No monthly fee. No enterprise contract. $45 for an ISF, $180 for ISF + Entry, $280 for the full suite — and you only pay when you file. A rejected or late ISF, or a single misclassification, costs far more than the filing fee. The AI pre-flight is what stands between you and that cost.",
     hover: "lift" as const,
   },
   {
     icon: Rocket,
-    title: "Fast to start — first filing in under an hour",
+    title: "Fast to start — no IT project",
     body:
-      "Sign up, watch a short demo, get provisioned, and file. No six-month implementation, no professional-services engagement, no IT project. The product is ready the day you are.",
+      "Book a demo, get provisioned by our team, and file. No six-month implementation, no professional-services engagement. The product is ready the day you are.",
     hover: "lift" as const,
   },
   {
@@ -465,7 +465,7 @@ const cardReveal = (i: number) => ({
 
 const ONBOARDING = [
   { step: "01", title: "Book a walkthrough", body: "20 minutes with the team. We show you the inbox and learn your filing volume." },
-  { step: "02", title: "Get provisioned", body: "Your account and ABI gateway connection are set up on our side." },
+  { step: "02", title: "Get provisioned", body: "Your account and CBP connection are set up on our side." },
   { step: "03", title: "Add a card", body: "Saved via Stripe, never charged until you file. You control every filing." },
   { step: "04", title: "File", body: "Run a real ISF or Entry — AI pre-flight checks it first. Billed on CBP acceptance." },
 ];
@@ -558,8 +558,8 @@ export function WhyMyCargoLensClient() {
       <SectionShell
         tone="muted"
         eyebrow="Fast to start"
-        title="Your first filing in well under an hour."
-        intro="No implementation project. No professional-services contract. No six-month rollout. The product works the day you sign up."
+        title="Up and running without an IT project."
+        intro="No implementation project. No professional-services contract. No six-month rollout. The product works the day your account is provisioned."
       >
         <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {ONBOARDING.map((s, idx) => (

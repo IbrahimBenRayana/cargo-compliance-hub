@@ -168,7 +168,7 @@ const FAQ = [
   },
   {
     q: "What about high volume?",
-    a: "For high-volume importers and brokerages, our Enterprise option offers custom per-shipment pricing plus SSO and SLAs. Talk to us about terms that fit your numbers.",
+    a: "For high-volume importers and brokerages, our Enterprise option offers custom per-shipment pricing plus SLAs. Talk to us about terms that fit your numbers.",
   },
 ];
 
@@ -375,7 +375,7 @@ export function PricingPageClient() {
             { icon: Wallet, text: "No monthly subscription" },
             { icon: Zap, text: "Pay only for what you file" },
             { icon: Layers, text: "ISF + Entry billed once" },
-            { icon: Sparkles, text: "Free to sign up & draft" },
+            { icon: Sparkles, text: "No fee to draft" },
           ].map(({ icon: Icon, text }) => (
             <span
               key={text}
@@ -559,7 +559,7 @@ export function PricingPageClient() {
               High-volume?
             </h3>
             <p className="relative mt-2 text-sm leading-relaxed text-white/70">
-              Custom per-shipment pricing for high-volume importers and brokerages, with SSO and SLAs. Talk to us about volume terms.
+              Custom per-shipment pricing for high-volume importers and brokerages, with SLAs. Talk to us about volume terms.
             </p>
             <Button
               variant="outline"
