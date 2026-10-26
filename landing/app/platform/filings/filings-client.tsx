@@ -111,7 +111,7 @@ const FAQ = [
   },
   {
     q: "Are filings actually submitted to CBP or to a sandbox?",
-    a: "Real CBP, through our certified ABI gateway partner. Sandbox mode is available for onboarding. A native CBP ABI engine is currently in CBP certification.",
+    a: "Real CBP, over our CBP ABI certified, direct connection to CBP. Sandbox mode is available for onboarding.",
   },
   {
     q: "Can we file from our own system instead of the UI?",

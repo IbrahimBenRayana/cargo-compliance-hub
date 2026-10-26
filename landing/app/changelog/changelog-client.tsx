@@ -46,26 +46,25 @@ export function ChangelogClient() {
           <div className="lg:col-span-3">
             <div className="sticky top-24">
               <span className="font-mono text-[12.5px] font-semibold text-muted-foreground">
-                Up next
+                Latest
               </span>
               <div className="mt-2">
-                <SeverityPill tone="neutral">In progress</SeverityPill>
+                <SeverityPill tone="emerald">Live</SeverityPill>
               </div>
             </div>
           </div>
           <div className="lg:col-span-9">
             <article className="rounded-2xl border border-dashed border-gold/50 bg-gold/[0.04] p-6">
               <p className="mb-2 font-mono text-[10.5px] font-semibold tracking-[0.14em] text-gold-dark dark:text-gold">
-                IN CBP CERTIFICATION
+                CBP ABI CERTIFIED
               </p>
               <h2 className="text-lg md:text-xl font-semibold tracking-tight text-foreground mb-3">
-                Native CBP ABI engine
+                Direct connection to CBP
               </h2>
               <p className="text-[14.5px] text-muted-foreground leading-relaxed">
-                We&apos;re building our own CATAIR engine for CBP&apos;s Automated Broker
-                Interface. Our CBP filer code is assigned and the engine is in CBP&apos;s
-                certification process now. Until it&apos;s certified, filings continue to
-                transmit through our existing ABI gateway — nothing changes for you.
+                Our own CATAIR engine for CBP&apos;s Automated Broker Interface is certified
+                by CBP and connects directly to CBP under our own filer code. Every
+                transmission and every CBP response is on the record in your filing timeline.
               </p>
             </article>
           </div>

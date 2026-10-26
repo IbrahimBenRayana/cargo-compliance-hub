@@ -58,7 +58,7 @@ export const CHANGELOG_ENTRIES: Entry[] = [
     date: "2026-05-22",
     kind: "fix",
     title: "HTS codes preserved in full",
-    body: "The DB now keeps the full 10-digit HTS you enter. We only truncate to 6 digits at the ABI gateway boundary — so duty-calc previews, history search, and PDF exports all show the real code.",
+    body: "The DB now keeps the full 10-digit HTS you enter. We only truncate to 6 digits at the ABI boundary — so duty-calc previews, history search, and PDF exports all show the real code.",
     link: { label: "Filings", href: "/platform/filings" },
   },
   {

@@ -465,7 +465,7 @@ const cardReveal = (i: number) => ({
 
 const ONBOARDING = [
   { step: "01", title: "Book a walkthrough", body: "20 minutes with the team. We show you the inbox and learn your filing volume." },
-  { step: "02", title: "Get provisioned", body: "Your account and ABI gateway connection are set up on our side." },
+  { step: "02", title: "Get provisioned", body: "Your account and CBP connection are set up on our side." },
   { step: "03", title: "Add a card", body: "Saved via Stripe, never charged until you file. You control every filing." },
   { step: "04", title: "File", body: "Run a real ISF or Entry — AI pre-flight checks it first. Billed on CBP acceptance." },
 ];

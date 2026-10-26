@@ -69,7 +69,7 @@ const PERSONAS: Persona[] = [
     title: "You move the box. Customs is downstream — but it's on your invoice.",
     pullquote:
       "Half my customer calls are 'is my shipment cleared yet?' I need that answer in two clicks, with the manifest open.",
-    pain: "ABI status checks via the gateway. Manifest queries by phone. Liquidation tracking nowhere. Customers asking for PDFs you don't have.",
+    pain: "ABI status checks by hand. Manifest queries by phone. Liquidation tracking nowhere. Customers asking for PDFs you don't have.",
     body: "MBOL-driven manifest queries, ISF → ABI → manifest chain in one view, and a PDF export at every stage of the lifecycle. Liquidation pipeline tracks the 314-day window for every accepted entry so you can close out your client's case.",
     whatYouUse: [
       { icon: Ship, label: "Manifest queries", href: "/platform/filings" },
