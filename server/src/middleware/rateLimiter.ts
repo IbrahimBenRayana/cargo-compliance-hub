@@ -40,10 +40,12 @@ export const generalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  // The public API has its own per-IP limiter (publicApiIpLimiter, mounted
-  // on its router so 429s honor XML); counting it here too made each call
-  // count twice (~50/min).
-  skip: (req) => req.originalUrl.startsWith('/api/public/'),
+  // API routes only: page loads, JS chunks and other static files are served
+  // by the same app (express.static + SPA fallback) and must not spend the
+  // API budget. The public API has its own limiter (publicApiIpLimiter, on
+  // its router so 429s honor XML); counting it here too made each call count
+  // twice (~50/min).
+  skip: (req) => !req.originalUrl.startsWith('/api/') || req.originalUrl.startsWith('/api/public/'),
   message: {
     error: 'Too many requests. Please try again shortly.',
     code: 'RATE_LIMIT_GENERAL',
