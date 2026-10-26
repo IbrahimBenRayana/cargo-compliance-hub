@@ -4,7 +4,6 @@ import { FileStack, MessagesSquare, Ship } from "lucide-react";
 import { Section, SectionHeading } from "@/components/site/section";
 import { PageHero } from "@/components/site/page-hero";
 import { DemoButton, SecondaryCta } from "@/components/site/cta";
-import { CertBadge } from "@/components/site/cert-badge";
 import { CardGrid, CheckList, FeatureSplit } from "@/components/site/blocks";
 import { Faq, type FaqItem } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
@@ -64,7 +63,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Who sends our filings to CBP?",
-    a: "We do. MyCargoLens is CBP ABI certified, with a direct connection to CBP, and every request and response is logged.",
+    a: "MyCargoLens does. Your team prepares and submits each filing, and we send it to CBP.",
   },
   {
     q: "Does the AI pick the right HTS code?",
@@ -95,7 +94,6 @@ export default function ImportersPage() {
       <PageHero
         breadcrumbPath={PATH}
         accent="checks"
-        badge={<CertBadge />}
         eyebrow="For importers who file their own"
         title={
           <>
@@ -203,7 +201,7 @@ export default function ImportersPage() {
           }
           bullets={[
             "ISF deadline clock set 24 hours before lading, with alerts at 72, 48 and 24 hours before it",
-            "CBP responses picked up every minute, and any transmission CBP hasn't answered gets flagged",
+            "CBP's response on each filing: accepted, rejected or still waiting",
             "Each accepted entry tracked through its 314-day liquidation window, with the post-summary correction deadline (300 days from entry, CBP's regular PSC window) in the inbox",
             "Container tracking with vessel ETAs and last free day, on the Complete plan",
           ]}
@@ -253,16 +251,16 @@ export default function ImportersPage() {
         </p>
       </Section>
 
-      {/* S6 · Trust bar (short band) */}
+      {/* S6 · Who sees what (short band) */}
       <Section tone="lilac" id="on-the-record" spacing="compact">
         <div className="grid items-center gap-6 md:grid-cols-[1fr_auto] md:gap-10">
           <div className="min-w-0">
             <h2 className="text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-tone-fg sm:text-[28px]">
-              CBP ABI certified. Every transmission on the record.
+              Your team sees the whole history.
             </h2>
             <p className="mt-3 max-w-3xl text-[16px] leading-relaxed text-tone-muted">
-              Direct connection to CBP. Every CBP request and
-              response is logged, and your team works with four roles, MFA and an audit trail you can export to CSV.
+              Every edit, every submission and every CBP response stays on the filing with a name and a time. Four
+              roles decide who can file and who can only look, MFA protects every sign-in, and the audit trail exports to CSV.
             </p>
           </div>
           <ArrowLink href={ROUTES.security.href}>Security</ArrowLink>

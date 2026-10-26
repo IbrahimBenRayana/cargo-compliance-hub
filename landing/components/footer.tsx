@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Wordmark } from "@/components/wordmark";
 import { Section } from "@/components/site/section";
 import { DemoButton } from "@/components/site/cta";
-import { CertBadge } from "@/components/site/cert-badge";
 import { ThemeSwitch } from "@/components/site/theme-switch";
 import { accentClass } from "@/lib/accents";
 import { COMPANY, ROUTES, UI_STRINGS, footerColumns } from "@/lib/site";
@@ -27,7 +26,6 @@ export function Footer() {
             <Wordmark />
           </Link>
           <p className="mt-4 text-[14px] leading-relaxed text-tone-muted">{COMPANY.brandLine}</p>
-          <CertBadge link className="mt-5" />
           <div className="mt-5">
             {/* Outline here: the pre-footer band above keeps the only gold button. */}
             <DemoButton location="footer" src="footer" variant="outline" size="sm" className="h-9 px-4" />

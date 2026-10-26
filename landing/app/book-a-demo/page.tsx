@@ -3,7 +3,6 @@ import Link from "next/link";
 import { ArrowRight, CalendarClock, MessageSquareText, ReceiptText, type LucideIcon } from "lucide-react";
 import { Section } from "@/components/site/section";
 import { PageHero } from "@/components/site/page-hero";
-import { CertBadge } from "@/components/site/cert-badge";
 import { Faq } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
 import { APP_LOGIN_URL, ROUTES } from "@/lib/site";
@@ -116,9 +115,8 @@ export default async function BookADemoPage({
             )}
 
             <div className="mt-8 border-t border-[hsl(var(--surface-border))] pt-6">
-              <CertBadge />
-              <p className="mt-4 text-[15px] leading-relaxed text-tone-fg">
-                Direct connection to CBP. Every request and response logged.
+              <p className="text-[15px] leading-relaxed text-tone-fg">
+                Files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP.
               </p>
               <p className="mt-2 text-[14px] leading-relaxed text-tone-muted">
                 Software for importers, forwarders, NVOCCs and customs brokers. We are not a customs broker.

@@ -37,7 +37,7 @@ const ROWS: [string, string, string, string, string, string][] = [
     "Your team, through whatever system you have",
     "Your team, through the vendor's software",
     "The service, for you",
-    "Your team, through MyCargoLens. CBP ABI certified, with a direct connection to CBP",
+    "Your team, through MyCargoLens",
   ],
   [
     "Who's responsible",
@@ -120,7 +120,7 @@ const BLOCKS: OptionBlock[] = [
     title: "Spreadsheets, email and a terminal",
     rightWhen: "volume is small, the team knows the routine, and nothing has gone wrong yet.",
     elsewhereWhen: "an ISF slips, the team grows, or an audit asks who sent what and when.",
-    fits: "the same work, ranked by what needs you first, a deadline clock on every ISF, and every CBP request and response on the record.",
+    fits: "the same work, ranked by what needs you first, a deadline clock on every ISF, and every CBP request and response kept on the filing.",
   },
   {
     title: "Established ABI software",
@@ -180,8 +180,8 @@ const FAQ: FaqItem[] = [
     a: "No. MyCargoLens is software for importers, forwarders, NVOCCs and customs brokers. You, or your broker, stay in charge of advice and classification decisions.",
   },
   {
-    q: "Who transmits filings to CBP when we use MyCargoLens?",
-    a: "We do. MyCargoLens is CBP ABI certified, with a direct connection to CBP. Every request and response is logged.",
+    q: "Who sends filings to CBP when we use MyCargoLens?",
+    a: "MyCargoLens does, after your team reviews and submits each one. Every request and response is logged.",
   },
   {
     q: "You're a young company. What if it doesn't work out?",

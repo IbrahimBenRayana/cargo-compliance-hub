@@ -21,7 +21,7 @@ import { DeadlineChips } from "./_components/deadline-chips";
 const PATH = ROUTES.isfFiling.href;
 const TITLE = "ISF Filing Software for ISF-10 and ISF-5";
 const DESCRIPTION =
-  "File ISF-10 and ISF-5 with CBP. Every filing gets a deadline clock with alerts at 72, 48 and 24 hours. CBP ABI certified. Book a demo.";
+  "File ISF-10 and ISF-5 with CBP. Every filing gets a deadline clock with alerts at 72, 48 and 24 hours. Book a demo.";
 const SRC = "platform-isf";
 const CBP_ISF_FAQ =
   "https://www.cbp.gov/sites/default/files/assets/documents/2023-May/ISF%20FAQ%202.0%20(508).pdf";
@@ -55,8 +55,8 @@ const FAQ = [
   },
   { q: "Do you sell ISF bonds?", a: "No. You file under your own bond or your customer's." },
   {
-    q: "Who transmits the ISF to CBP?",
-    a: "We do. MyCargoLens is CBP ABI certified, with a direct connection to CBP. Every request and response is logged on the filing.",
+    q: "Who files the ISF with CBP?",
+    a: "MyCargoLens files it with CBP for you, and every request and response is logged on the filing.",
   },
   {
     q: "What does an ISF cost?",
@@ -88,7 +88,7 @@ export default function IsfFilingPage() {
       <Section tone="cream" id="what-you-file" accent="isf">
         <SectionHeading
           eyebrow="What you file"
-          title="ISF-10 and ISF-5, filed directly with CBP"
+          title="ISF-10 and ISF-5, both in one place"
           intro={`MyCargoLens files the importer security filing (ISF-10, the "10+2") and the carrier filing (ISF-5) with CBP.`}
         />
         <ScopeCards
@@ -221,12 +221,11 @@ export default function IsfFilingPage() {
         <FeatureSplit
           reverse
           eyebrow="After submit"
-          title="Know what CBP said without refreshing a screen"
+          title="See what CBP said on each filing"
           body={
             <>
               <p>
-                CBP responses are picked up every minute and move into the inbox: accepted, rejected or still waiting.
-                Any transmission CBP hasn&apos;t answered gets flagged.
+                CBP&apos;s response moves into the inbox and onto the filing: accepted, rejected or still waiting.
               </p>
               <p>
                 Query by master bill to see CBP&apos;s disposition on each house bill. Manifest queries are free, like

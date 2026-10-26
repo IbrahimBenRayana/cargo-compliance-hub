@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { Section, SectionHeading, type Tone } from "@/components/site/section";
 import { PageHero } from "@/components/site/page-hero";
 import { DemoButton, SecondaryCta } from "@/components/site/cta";
-import { CertBadge } from "@/components/site/cert-badge";
 import { Faq, type FaqItem } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
 import { Screenshot } from "@/components/site/screenshot";
@@ -83,18 +82,15 @@ export type ModuleHeroProps = {
   /** `?src=` for Book a demo, e.g. "platform-isf". */
   src: string;
   micro?: string;
-  /** Show the "CBP ABI certified" badge (default true). */
-  certBadge?: boolean;
   children?: React.ReactNode;
 };
 
 /** PageHero (full tier) with Book a demo + See pricing. */
-export function ModuleHero({ path, scene, module, eyebrow, title, sub, src, micro, certBadge = true, children }: ModuleHeroProps) {
+export function ModuleHero({ path, scene, module, eyebrow, title, sub, src, micro, children }: ModuleHeroProps) {
   return (
     <PageHero
       breadcrumbPath={path}
       accent={module}
-      badge={certBadge ? <CertBadge /> : undefined}
       eyebrow={eyebrow}
       title={title}
       sub={sub}

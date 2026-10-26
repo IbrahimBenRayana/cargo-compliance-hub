@@ -49,8 +49,8 @@ const FAQ = [
     a: "The importer of record, whoever transmits it. That's why you want to see and check every entry first.",
   },
   {
-    q: "Who transmits the entry to CBP?",
-    a: "We do. MyCargoLens is CBP ABI certified, with a direct connection to CBP. Every request and response is logged.",
+    q: "Who sends the entry to CBP?",
+    a: "MyCargoLens does, once you submit it. CBP's response shows on the entry.",
   },
 ];
 

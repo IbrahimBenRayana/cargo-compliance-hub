@@ -15,7 +15,6 @@ import {
 import { PageHero } from "@/components/site/page-hero";
 import { Section, SectionHeading } from "@/components/site/section";
 import { DemoButton } from "@/components/site/cta";
-import { CertBadge } from "@/components/site/cert-badge";
 import { CheckList, FeatureSplit } from "@/components/site/blocks";
 import { Faq } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
@@ -102,7 +101,7 @@ const IN_TRANSIT: Fact[] = [
 
 const ROLES = ["Owner", "Admin", "Operator", "Viewer"];
 
-/** Subprocessors (copy §7). No transmission row: filings go directly to CBP. Unverified regions are not printed. */
+/** Subprocessors (copy §7). Unverified regions are not printed. */
 const PROCESSORS = [
   { company: "Contabo", what: "Servers and database hosting", receives: "All application data" },
   {
@@ -177,7 +176,6 @@ export default function SecurityPage() {
       <PageHero
         size="compact"
         breadcrumbPath={ROUTES.security.href}
-        badge={<CertBadge />}
         eyebrow="Security"
         title="Security at MyCargoLens"
         sub="Customs filings carry your IOR number, your parties and your bond. This page lists who can see that data, how sign-in works, which companies process it, and what gets logged. If something here doesn't answer your question, ask us."
@@ -217,10 +215,9 @@ export default function SecurityPage() {
             <CheckList
               className="mt-2"
               items={[
-                "CBP ABI certified, with a direct connection to CBP.",
                 "MyCargoLens files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP.",
                 "Every request we send to CBP and every response we get back is logged against the filing, with its status and timing, and visible to your team.",
-                "CBP responses are picked up every minute, and any transmission CBP hasn't answered gets flagged.",
+                "Each filing shows its CBP status: accepted, rejected or still waiting.",
               ]}
             />
           }

@@ -1,6 +1,5 @@
 import {
   BROKER_PILOT_LINE,
-  CERT_BADGE,
   COMPANY,
   CTA,
   ROUTES,
@@ -36,7 +35,7 @@ function body(): string {
     "",
     `> ${ONE_LINER}`,
     "",
-    `${COMPANY.brandLine} ${CERT_BADGE.label}. ${CERT_BADGE.line}`,
+    COMPANY.brandLine,
     "",
     "Who it's for: importers of record who file their own ISF and entries, and NVOCCs and freight forwarders filing ISFs at volume.",
     `${BROKER_PILOT_LINE.label}`,

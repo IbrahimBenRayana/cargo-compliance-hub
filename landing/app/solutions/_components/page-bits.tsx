@@ -81,23 +81,6 @@ export function PriceLine({ children, className }: { children: React.ReactNode; 
   );
 }
 
-/** Badge with the certification dot, for lines the CertBadge label doesn't cover. */
-export function TrustPill({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex w-fit items-center gap-2 rounded-full border border-border/80 bg-[hsl(var(--card))] py-1 pl-2 pr-3 text-[12.5px] font-semibold text-foreground shadow-[0_1px_2px_hsl(var(--foreground)/0.06)]",
-        className,
-      )}
-    >
-      <span aria-hidden className="relative grid size-3.5 shrink-0 place-items-center rounded-full bg-emerald-500/15">
-        <span className="size-1.5 rounded-full bg-emerald-500" />
-      </span>
-      {children}
-    </span>
-  );
-}
-
 /** Outline secondary button for deck labels the CTA registry doesn't carry ("See the API"). */
 export function OutlineLink({
   href,

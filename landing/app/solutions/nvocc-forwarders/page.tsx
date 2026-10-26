@@ -12,13 +12,13 @@ import { webPage } from "@/lib/schema";
 import { ROUTES } from "@/lib/site";
 import { isArticleLive } from "@/app/resources/_content/articles";
 import { CtaBand } from "@/components/site/cta-band";
-import { ArrowLink, DashList, OutlineLink, TrustPill, pageMetadata } from "../_components/page-bits";
+import { ArrowLink, DashList, OutlineLink, pageMetadata } from "../_components/page-bits";
 import { HouseBillsIllustration } from "../_components/house-bills";
 
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/solutions-nvocc-forwarders.md
 const PATH = ROUTES.nvoccForwarders.href;
 const DESCRIPTION =
-  "File ISF-10 and ISF-5 for every house bill from your TMS or in bulk, each with a deadline clock. CBP ABI certified. Volume pricing on request.";
+  "File ISF-10 and ISF-5 for every house bill from your TMS or in bulk, each with a deadline clock. Volume pricing on request.";
 const DESIGN_PARTNERS =
   "We're taking a small number of NVOCC and forwarder design partners: API onboarding with the founder, and volume pricing agreed in writing.";
 const VOLUME = "/pricing#volume";
@@ -48,8 +48,8 @@ webhook  filing.accepted · filing.rejected`;
 
 const FAQ: FaqItem[] = [
   {
-    q: "Who actually transmits our ISFs to CBP?",
-    a: "We do. MyCargoLens is CBP ABI certified, with a direct connection to CBP. Every request and response is logged.",
+    q: "Who actually sends our ISFs to CBP?",
+    a: "MyCargoLens does, whether your team submits in the app or your TMS submits through the API.",
   },
   {
     q: "We already use another ISF or ABI system. Do we have to switch everything?",
@@ -91,7 +91,6 @@ export default function NvoccForwardersPage() {
       <PageHero
         breadcrumbPath={PATH}
         accent="isf"
-        badge={<TrustPill>CBP ABI certified · Direct ABI connection to CBP</TrustPill>}
         eyebrow="For NVOCCs and freight forwarders"
         title={
           <>
@@ -169,7 +168,7 @@ export default function NvoccForwardersPage() {
           }
           bullets={[
             "Deadline clock on every ISF, with alerts at 72, 48 and 24 hours before it",
-            "CBP responses picked up every minute, and any transmission CBP hasn't answered gets flagged",
+            "CBP's response on every ISF: accepted, rejected or still waiting",
             "Manifest (MBOL) query by master bill shows CBP's disposition per house bill, so you can see whether the bill is on file. Queries are free",
             "Every filing's full history in one timeline, with a PDF export",
           ]}
@@ -237,17 +236,16 @@ export default function NvoccForwardersPage() {
         </div>
       </Section>
 
-      {/* S5 · Who transmits to CBP */}
+      {/* S5 · Audit trail */}
       <Section tone="mint" id="on-the-record">
         <FeatureSplit
           reverse
-          eyebrow="On the record"
-          title="CBP ABI certified. Every transmission on the record."
+          eyebrow="Audit trail"
+          title="Show a customer exactly what was filed."
           body={
             <p>
-              Direct connection to CBP. Every CBP
-              request and response is logged, so you can show what was sent, when and by whom. Four roles (Owner, Admin, Operator,
-              Viewer), MFA, and an audit trail you can export to CSV.
+              Every edit, submission and CBP response stays on the filing, so you can show what was sent, when and by whom.
+              Your team works under four roles (Owner, Admin, Operator, Viewer) with MFA, and the audit trail exports to CSV.
             </p>
           }
           actions={<ArrowLink href={ROUTES.security.href}>Security and audit trail</ArrowLink>}
@@ -310,7 +308,7 @@ export default function NvoccForwardersPage() {
         <dl className="mt-10 grid gap-4 md:grid-cols-3">
           {[
             ["The price principle", "Written on our website: you're charged only when CBP accepts."],
-            ["CBP status", "CBP ABI certified."],
+            ["What we file", "ISF-10, ISF-5, 7501 and 3461, plus manifest queries."],
             ["The record", "Every CBP request and response, logged and exportable."],
           ].map(([k, v]) => (
             <div key={k} className="rounded-[20px] p-6 site-surface">

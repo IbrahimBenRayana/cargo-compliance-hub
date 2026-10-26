@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Section, SectionHeading } from "@/components/site/section";
 import { PageHero } from "@/components/site/page-hero";
 import { DemoButton, SecondaryCta } from "@/components/site/cta";
-import { CertBadge } from "@/components/site/cert-badge";
 import { FeatureSplit } from "@/components/site/blocks";
 import { Faq } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
@@ -73,7 +72,6 @@ export default function PreFilingChecksPage() {
       <PageHero
         breadcrumbPath={PATH}
         accent="checks"
-        badge={<CertBadge />}
         eyebrow="Pre-filing checks"
         title="Catch filing errors before CBP does"
         sub="Every ISF and entry draft is checked against the rules before you can submit it. Ask for an AI review when a draft looks off. And if CBP still rejects it, the error comes back in plain English with the steps to fix it."
