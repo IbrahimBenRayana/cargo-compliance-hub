@@ -47,6 +47,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        // StickyDemoBar hides while any gold button is on screen.
+        data-gold-cta={variant === "gold" ? "" : undefined}
         {...props}
       />
     );

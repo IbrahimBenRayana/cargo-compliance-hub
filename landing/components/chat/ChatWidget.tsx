@@ -29,7 +29,7 @@ const WELCOME: UiMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "Hi! I'm the MyCargoLens assistant. Ask me anything about the platform — features, pricing, security — or tap “Talk to a human” to reach our team.",
+    "Hi! I'm the MyCargoLens assistant. Ask me about filing, pricing or security, or tap “Talk to a human” to reach our team.",
 };
 
 function mapMessage(m: ChatMessage): UiMessage {

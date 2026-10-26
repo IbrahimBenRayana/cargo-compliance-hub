@@ -7,6 +7,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { BfcacheFix } from "@/components/bfcache-fix";
 import { MotionRoot } from "@/components/motion-root";
 import { ChatWidget } from "@/components/chat/ChatWidget";
+import { JsonLd } from "@/components/site/json-ld";
+import { graph, organization, website } from "@/lib/schema";
+import { UI_STRINGS } from "@/lib/site";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -14,28 +17,31 @@ const inter = Inter({
   display: "swap",
 });
 
+const DEFAULT_TITLE = "Customs Filing Software for ISF and Entries | MyCargoLens";
+const DEFAULT_DESCRIPTION =
+  "File ISF and customs entries with CBP from one inbox ranked by what needs you now. CBP ABI certified. Per-shipment price, charged when CBP accepts.";
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://mycargolens.com"),
+  // Fallbacks only: every page sets its own title, description, canonical
+  // and openGraph (site-architecture §5.5).
   title: {
-    default: "MyCargoLens — CBP Compliance Platform",
-    template: "%s — MyCargoLens",
+    default: DEFAULT_TITLE,
+    template: "%s | MyCargoLens",
   },
-  description:
-    "The complete CBP compliance platform for modern importers. File ISF and Entry in one secure workspace.",
+  description: DEFAULT_DESCRIPTION,
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://mycargolens.com",
     siteName: "MyCargoLens",
-    title: "MyCargoLens — CBP Compliance Platform",
-    description:
-      "The complete CBP compliance platform for modern importers. File ISF and Entry in one secure workspace.",
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: "MyCargoLens — CBP Compliance Platform",
-    description:
-      "The complete CBP compliance platform for modern importers.",
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
   },
   robots: {
     index: true,
@@ -54,12 +60,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.className} antialiased`} suppressHydrationWarning>
-      <body className="bg-mesh min-h-screen flex flex-col">
+      <body className="bg-background min-h-screen flex flex-col">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-card focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg"
+        >
+          {UI_STRINGS.skipLink}
+        </a>
+        <JsonLd data={graph(organization(), website())} />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <MotionRoot>
             <BfcacheFix />
             <Nav />
-            <main className="flex-1">{children}</main>
+            <main id="main" tabIndex={-1} className="flex-1 outline-none">{children}</main>
             <Footer />
             <ChatWidget />
           </MotionRoot>
