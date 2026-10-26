@@ -374,7 +374,7 @@ export default function ComparePage() {
                 ))}
               </dl>
               {b.facts && (
-                <aside className="mt-5 rounded-2xl border border-[hsl(var(--surface-border))] bg-[hsl(var(--foreground)/0.03)] p-4">
+                <div className="mt-5 rounded-2xl border border-[hsl(var(--surface-border))] bg-[hsl(var(--foreground)/0.03)] p-4">
                   <p className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-tone-eyebrow">
                     <CalendarDays aria-hidden className="size-3.5" />
                     As of October 23, 2026
@@ -399,7 +399,7 @@ export default function ComparePage() {
                       </li>
                     ))}
                   </ul>
-                </aside>
+                </div>
               )}
               {b.link && <ArrowLink href={b.link.href} className="mt-5 self-start">{b.link.label}</ArrowLink>}
             </article>
