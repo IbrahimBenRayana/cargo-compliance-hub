@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
-import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Wordmark } from "@/components/wordmark";
@@ -20,6 +20,7 @@ import {
   HEADER_ORDER,
   PLATFORM_COLUMNS,
   ROUTES,
+  UI_STRINGS,
   menuItems,
   platformColumn,
   type MenuKey,
@@ -39,8 +40,8 @@ const PANEL_WIDTH: Record<MenuKey, number> = {
 const OPEN_DELAY = 110;
 const CLOSE_DELAY = 140;
 
-/** Pages that use a minimal header and never show the header demo button. */
-const NO_HEADER_CTA = ["/book-a-demo"];
+/** Pages that use the minimal header: logo + "Back to site" (book-a-demo.md §2, global.md §1). */
+const MINIMAL_HEADER = [ROUTES.bookADemo.href];
 
 /* ---------------------------------------------------------------- */
 /* Nav                                                                */
@@ -48,7 +49,34 @@ const NO_HEADER_CTA = ["/book-a-demo"];
 
 export function Nav() {
   const pathname = usePathname() ?? "/";
-  const showCta = !NO_HEADER_CTA.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const minimal = MINIMAL_HEADER.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  return minimal ? <MinimalHeader /> : <FullNav />;
+}
+
+/** Conversion pages: no menus, no header demo button. */
+function MinimalHeader() {
+  return (
+    <header className="sticky top-0 z-50 w-full bg-[hsl(var(--paper))]">
+      <SiteContainer>
+        <nav aria-label="Main" className="flex h-14 items-center justify-between gap-4 lg:h-16">
+          <Link href="/" className="flex-shrink-0 rounded-md" aria-label="MyCargoLens home">
+            <Wordmark />
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[14px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft size={15} aria-hidden />
+            {UI_STRINGS.backToSite}
+          </Link>
+        </nav>
+      </SiteContainer>
+    </header>
+  );
+}
+
+function FullNav() {
+  const pathname = usePathname() ?? "/";
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
@@ -231,13 +259,13 @@ export function Nav() {
               >
                 Log in
               </a>
-              {showCta && <DemoButton location="nav" src="nav" size="sm" className="h-9 px-4 text-[13.5px]" />}
+              <DemoButton location="nav" src="nav" size="sm" className="h-9 px-4 text-[13.5px]" />
             </div>
 
             {/* Mobile: compact demo button + menu */}
             <div className="flex items-center gap-2 lg:hidden">
               {/* hidden while the sheet is open: its pinned button is the one gold button */}
-              {showCta && !mobileOpen && (
+              {!mobileOpen && (
                 <DemoButton location="nav" src="nav" size="sm" className="h-9 px-3.5 text-[13px]" />
               )}
               <button
@@ -271,7 +299,7 @@ export function Nav() {
           </nav>
         </SiteContainer>
 
-        <MobileSheet open={mobileOpen} close={() => setMobileOpen(false)} showCta={showCta} />
+        <MobileSheet open={mobileOpen} close={() => setMobileOpen(false)} />
       </header>
     </MotionConfig>
   );
@@ -535,7 +563,7 @@ function ListPanel({ menu, close }: { menu: Exclude<MenuKey, "platform">; close:
 /* Mobile sheet                                                       */
 /* ---------------------------------------------------------------- */
 
-function MobileSheet({ open, close, showCta }: { open: boolean; close: () => void; showCta: boolean }) {
+function MobileSheet({ open, close }: { open: boolean; close: () => void }) {
   const [group, setGroup] = React.useState<MenuKey | null>("platform");
   const toggle = (k: MenuKey) => setGroup((g) => (g === k ? null : k));
 
@@ -634,11 +662,9 @@ function MobileSheet({ open, close, showCta }: { open: boolean; close: () => voi
               Log in
             </a>
           </nav>
-          {showCta && (
-            <div className="border-t border-border/60 bg-[hsl(var(--card))] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <DemoButton location="nav" src="nav" size="lg" className="w-full" onClick={close} />
-            </div>
-          )}
+          <div className="border-t border-border/60 bg-[hsl(var(--card))] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <DemoButton location="nav" src="nav" size="lg" className="w-full" onClick={close} />
+          </div>
         </motion.div>
       )}
     </AnimatePresence>,
