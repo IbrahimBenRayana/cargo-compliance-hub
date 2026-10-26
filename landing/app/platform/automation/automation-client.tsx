@@ -319,7 +319,7 @@ const SCHEDULES: Array<{
     hover: "spin",
     cadence: "Every 5 minutes",
     title: "CBP status polling",
-    body: "We poll our ABI gateway for every in-flight filing. New acceptances, rejections, and on-hold notices land in your action queue within minutes.",
+    body: "We track every in-flight filing with CBP over our direct connection. New acceptances, rejections, and on-hold notices land in your action queue within minutes.",
     trigger: "Triggers: acceptance card · rejection card with AI Coach link · on-hold notification",
   },
   {

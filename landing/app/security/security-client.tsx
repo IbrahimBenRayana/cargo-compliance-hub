@@ -210,7 +210,6 @@ const DATA_ITEMS = [
 ];
 
 const VENDORS = [
-  { name: "ABI gateway partner", role: "CBP filing transmission", data: "Filing data, party data, MBOL", region: "US" },
   { name: "OpenAI", role: "AI Coach + pre-flight + HTS classifier", data: "Filing data + CBP response only", region: "US" },
   { name: "Stripe", role: "Billing", data: "Email, plan, invoice events", region: "US" },
   { name: "Contabo", role: "VPS hosting + PostgreSQL", data: "All app data", region: "US" },
