@@ -46,7 +46,7 @@ const BOOKED: Partial<Record<Route, { call: string; prepare: string; after: stri
 const EMAIL_SUB: Partial<Record<Route, string>> = {
   broker_review: "We'll read what you file today and tell you plainly what fits before we book a time.",
   fit_check: "We'll look at your shipments and suggest the best next step, even if that isn't us.",
-  review: "We read every request ourselves.",
+  review: "A person on our team reads every request.",
 };
 
 const EMAIL_STEPS: Step[] = [

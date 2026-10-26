@@ -37,7 +37,7 @@ const ROWS: [string, string, string, string, string, string][] = [
     "Your team, through whatever system you have",
     "Your team, through the vendor's software",
     "The service, for you",
-    "Your team, through MyCargoLens. CBP ABI certified, and we transmit to CBP directly",
+    "Your team, through MyCargoLens. CBP ABI certified, with a direct connection to CBP",
   ],
   [
     "Who's responsible",
@@ -181,7 +181,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Who transmits filings to CBP when we use MyCargoLens?",
-    a: "We do, directly, through our own ABI connection to CBP with no middleman. Our native ABI engine is certified by CBP, and every request and response is logged.",
+    a: "We do. MyCargoLens is CBP ABI certified, with a direct connection to CBP. Every request and response is logged.",
   },
   {
     q: "You're a young company. What if it doesn't work out?",

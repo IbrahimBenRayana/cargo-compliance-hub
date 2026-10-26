@@ -81,7 +81,7 @@ const FAQ = [
   },
   {
     q: "Who transmits to CBP?",
-    a: "We do. MyCargoLens is CBP ABI certified and we transmit to CBP ourselves, with no middleman. Every request and response is logged.",
+    a: "We do. MyCargoLens is CBP ABI certified, with a direct connection to CBP. Every request and response is logged.",
   },
   {
     q: "What does the API cost?",

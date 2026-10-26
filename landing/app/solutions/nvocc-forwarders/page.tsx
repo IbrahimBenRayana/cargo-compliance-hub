@@ -48,7 +48,7 @@ webhook  filing.accepted · filing.rejected`;
 const FAQ: FaqItem[] = [
   {
     q: "Who actually transmits our ISFs to CBP?",
-    a: "We do, directly. MyCargoLens holds its own ABI connection to CBP with no middleman, our engine is CBP certified, and every request and response is logged.",
+    a: "We do. MyCargoLens is CBP ABI certified, with a direct connection to CBP. Every request and response is logged.",
   },
   {
     q: "We already use another ISF or ABI system. Do we have to switch everything?",
@@ -239,10 +239,10 @@ export default function NvoccForwardersPage() {
         <FeatureSplit
           reverse
           eyebrow="On the record"
-          title="We transmit to CBP ourselves. Every transmission on the record."
+          title="CBP ABI certified. Every transmission on the record."
           body={
             <p>
-              Our native ABI engine is certified by CBP, and we hold the connection to CBP directly, with no middleman. Every CBP
+              Direct connection to CBP. Every CBP
               request and response is logged, so you can show what was sent, when and by whom. Four roles (Owner, Admin, Operator,
               Viewer), MFA, and an audit trail you can export to CSV.
             </p>

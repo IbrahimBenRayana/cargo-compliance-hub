@@ -250,7 +250,7 @@ function Body() {
         </li>
         <li>
           <strong>
-            Filed directly with CBP from our CBP-certified ABI engine, with every CBP request and response logged.
+            Filed directly with CBP, with every CBP request and response logged.
           </strong>{" "}
           That log gives you the timeline a petition needs.
         </li>

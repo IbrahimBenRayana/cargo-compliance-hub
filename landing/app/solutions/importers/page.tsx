@@ -64,7 +64,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Who sends our filings to CBP?",
-    a: "We do, directly. MyCargoLens holds its own ABI connection to CBP with no middleman, and every request and response is logged.",
+    a: "We do. MyCargoLens is CBP ABI certified, with a direct connection to CBP, and every request and response is logged.",
   },
   {
     q: "Does the AI pick the right HTS code?",
@@ -261,7 +261,7 @@ export default function ImportersPage() {
               CBP ABI certified. Every transmission on the record.
             </h2>
             <p className="mt-3 max-w-3xl text-[16px] leading-relaxed text-tone-muted">
-              Our native ABI engine is certified by CBP, and we transmit to CBP ourselves, with no middleman. Every CBP request and
+              Direct connection to CBP. Every CBP request and
               response is logged, and your team works with four roles, MFA and an audit trail you can export to CSV.
             </p>
           </div>

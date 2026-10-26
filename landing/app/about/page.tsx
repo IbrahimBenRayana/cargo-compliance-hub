@@ -95,15 +95,14 @@ export default function AboutPage() {
       {/* 4. What we've built so far */}
       <Section tone="sky" id="built">
         <FeatureSplit
-          title="Our own ABI engine, certified by CBP."
+          title="Filed with CBP, and on the record."
           body={
             <>
               <p>
-                We wrote our own engine for CBP&apos;s Automated Broker Interface. CBP has certified it.
-                MyCargoLens files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461), and logs every request and
-                response so you can prove what was sent.
+                MyCargoLens files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP, and logs every
+                request and response so you can prove what was sent.
               </p>
-              <p>We transmit to CBP ourselves, with no middleman.</p>
+              <p>CBP ABI certified. Direct connection to CBP.</p>
               <p>
                 <Link href={ROUTES.changelog.href} className={linkCls}>
                   See what shipped, release by release

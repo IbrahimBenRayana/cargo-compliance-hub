@@ -118,7 +118,7 @@ export default async function BookADemoPage({
             <div className="mt-8 border-t border-[hsl(var(--surface-border))] pt-6">
               <CertBadge />
               <p className="mt-4 text-[15px] leading-relaxed text-tone-fg">
-                We transmit to CBP ourselves, with no middleman.
+                Direct connection to CBP. Every request and response logged.
               </p>
               <p className="mt-2 text-[14px] leading-relaxed text-tone-muted">
                 Software for importers, forwarders, NVOCCs and customs brokers. We are not a customs broker.

@@ -156,7 +156,7 @@ export default function PlatformPage() {
             {
               module: "entry",
               title: "Filed with CBP",
-              body: "MyCargoLens files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP. Our native ABI engine is certified by CBP, and every request and response is logged. We transmit to CBP ourselves over our own ABI connection.",
+              body: "MyCargoLens files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) directly with CBP, and every request and response is logged.",
               media: <Screenshot screen="app-isf-timeline" aspect="16/10" sizes="(min-width: 1024px) 260px, 100vw" />,
             },
             {
@@ -211,12 +211,11 @@ export default function PlatformPage() {
           <div className="min-w-0">
             <CertBadge link />
             <h2 className="mt-5 text-[26px] font-semibold leading-[1.12] tracking-[-0.028em] text-tone-fg sm:text-[32px]">
-              CBP ABI certified, with a direct connection to CBP
+              Every transmission on the record
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-tone-muted sm:text-[17px]">
-              Our native ABI engine is certified by CBP and built on CBP&apos;s ABI standards. We transmit to CBP
-              ourselves, with no middleman. Every request to CBP and every response is logged where your team can read
-              it.
+              CBP ABI certified, with a direct connection to CBP. Every request to CBP and every response is logged where
+              your team can read it.
             </p>
           </div>
           <Screenshot screen="app-isf-status-history" />

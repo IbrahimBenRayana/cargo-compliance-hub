@@ -98,7 +98,7 @@ const IN_TRANSIT: Fact[] = [
 
 const ROLES = ["Owner", "Admin", "Operator", "Viewer"];
 
-/** Subprocessors (copy §7). No transmission row: we transmit to CBP ourselves. Unverified regions are not printed. */
+/** Subprocessors (copy §7). No transmission row: filings go directly to CBP. Unverified regions are not printed. */
 const PROCESSORS = [
   { company: "Contabo", what: "Servers and database hosting", receives: "All application data" },
   {
@@ -208,15 +208,14 @@ export default function SecurityPage() {
       {/* 3. CBP filing */}
       <Section tone="cream" id="cbp-filing">
         <FeatureSplit
-          title="We transmit to CBP ourselves."
+          title="What happens when you file with CBP."
           body={
             <CheckList
               className="mt-2"
               items={[
-                "Our native ABI engine is certified by CBP.",
+                "CBP ABI certified, with a direct connection to CBP.",
                 "MyCargoLens files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP.",
                 "Every request we send to CBP and every response we get back is logged against the filing, with its status and timing, and visible to your team.",
-                "We transmit to CBP ourselves, with no middleman.",
                 "CBP responses are picked up every minute, and any transmission CBP hasn't answered gets flagged.",
               ]}
             />

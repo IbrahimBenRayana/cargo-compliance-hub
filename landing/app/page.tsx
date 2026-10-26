@@ -59,7 +59,7 @@ const PLANS: OfferInput[] = [
 const FAQ: FaqItem[] = [
   {
     q: "Who transmits my filings to CBP?",
-    a: "We do. We transmit to CBP ourselves over our own ABI connection, with no middleman, and every request and response is logged in your account.",
+    a: "We do. MyCargoLens is CBP ABI certified with a direct connection to CBP, and every request and response is logged in your account.",
   },
   {
     q: "Are you a customs broker?",
@@ -79,7 +79,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "You're a young company. Why should we trust you with filings?",
-    a: "We're early, and we'd rather say so. Our ABI engine is certified by CBP, every CBP request and response is on the record, and you pay per accepted shipment with no monthly fee on the public plans.",
+    a: "We're early, and we'd rather say so. We're CBP ABI certified, every CBP request and response is on the record, and you pay per accepted shipment with no monthly fee on the public plans.",
   },
   {
     q: "What happens on the demo?",
@@ -413,8 +413,8 @@ export default function HomePage() {
             <SectionHeading
               id="s5-title"
               eyebrow="On the record"
-              title="We transmit to CBP ourselves. Every transmission on the record."
-              intro="Our native ABI engine is certified by CBP. We transmit to CBP ourselves over our own ABI connection, with no middleman. It files ISF-10, ISF-5, entry summaries and cargo release, and every request to CBP and every response is logged. Your team works under four roles with MFA, and the full audit trail exports to CSV."
+              title="CBP ABI certified. Every transmission on the record."
+              intro="Direct connection to CBP. MyCargoLens files ISF-10, ISF-5, entry summaries and cargo release, and every request to CBP and every response is logged. Your team works under four roles with MFA, and the full audit trail exports to CSV."
             />
             <ArrowLink href={ROUTES.security.href} className="mt-8">
               How we handle security and access

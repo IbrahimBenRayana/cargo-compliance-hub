@@ -52,7 +52,7 @@ const FAQ = [
   { q: "Do you sell ISF bonds?", a: "No. You file under your own bond or your customer's." },
   {
     q: "Who transmits the ISF to CBP?",
-    a: "We do. MyCargoLens is CBP ABI certified and we transmit to CBP ourselves, with no middleman. Every request and response is logged on the filing.",
+    a: "We do. MyCargoLens is CBP ABI certified, with a direct connection to CBP. Every request and response is logged on the filing.",
   },
   {
     q: "What does an ISF cost?",
@@ -84,7 +84,7 @@ export default function IsfFilingPage() {
       <Section tone="cream" id="what-you-file" accent="isf">
         <SectionHeading
           eyebrow="What you file"
-          title="ISF-10 and ISF-5, built on CBP's ABI standards"
+          title="ISF-10 and ISF-5, filed directly with CBP"
           intro={`MyCargoLens files the importer security filing (ISF-10, the "10+2") and the carrier filing (ISF-5) with CBP.`}
         />
         <ScopeCards

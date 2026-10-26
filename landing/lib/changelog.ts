@@ -28,16 +28,9 @@ const ENTRIES: Entry[] = [
   {
     date: "2026-10-26",
     kind: "feature",
-    title: "Direct ABI connection to CBP",
-    body: "We transmit to CBP ourselves from our certified ABI engine, with no middleman. CBP responses are picked up every minute, and any transmission CBP hasn't answered gets flagged.",
+    title: "CBP responses every minute",
+    body: "CBP responses are picked up every minute, and any transmission CBP hasn't answered gets flagged. Every request and response is logged on the filing.",
     href: "/platform/inbox",
-  },
-  {
-    date: "2026-10-13",
-    kind: "feature",
-    title: "Our ABI engine is certified by CBP",
-    body: "We built our own engine for CBP's Automated Broker Interface, and it passed CBP certification. It handles ISF-10, ISF-5, entry summaries (7501) and cargo release (3461), and every request and response is logged on the filing.",
-    href: "/security",
   },
   {
     date: "2026-08-06",
@@ -177,7 +170,7 @@ const ENTRIES: Entry[] = [
 /** Every entry, newest first. */
 export const CHANGELOG_ENTRIES: Entry[] = [...ENTRIES].sort((a, b) => b.date.localeCompare(a.date));
 
-/** Permalink anchor from the title only (no date): "our-abi-engine-is-certified-by-cbp". */
+/** Permalink anchor from the title only (no date): "cbp-responses-every-minute". */
 export function entryAnchor(e: Pick<Entry, "title">) {
   return e.title
     .toLowerCase()
