@@ -323,7 +323,7 @@ interface ColumnDef {
 const COLUMNS: ColumnDef[] = [
   { stage: 'isf',      index: '01', title: 'ISF Filed',         subtitle: 'Drafting or with CBP',          emptyTitle: 'No ISF filings in flight',  emptyHint: 'New ISF filings will appear here.' },
   { stage: 'manifest', index: '02', title: 'Manifest Verified', subtitle: 'ISF accepted — file the Entry', emptyTitle: 'Nothing waiting on entry',  emptyHint: 'Once an ISF clears, it lands here.' },
-  { stage: 'entry',    index: '03', title: 'Entry Filed',       subtitle: '7501 + 3461 with CBP',          emptyTitle: 'No entries in flight',      emptyHint: 'Transmitted entries appear here.' },
+  { stage: 'entry',    index: '03', title: 'Entry Filed',       subtitle: 'Drafting or with CBP',          emptyTitle: 'No entries in flight',      emptyHint: 'Entries you draft or send appear here.' },
   { stage: 'cleared',  index: '04', title: 'Cleared',           subtitle: 'Accepted by CBP',               emptyTitle: 'No cleared shipments yet',  emptyHint: 'Once CBP accepts an entry, it lands here.' },
 ];
 
