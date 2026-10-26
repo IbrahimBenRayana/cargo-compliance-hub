@@ -5,7 +5,11 @@
 export type EntryKind = "feature" | "improvement" | "fix" | "retired";
 
 export type Entry = {
-  date: string; // ISO
+  /**
+   * ISO. Used only to sort entries newest-first. Never rendered and never
+   * output as schema (founder rule, Oct 26: no company dates on the site).
+   */
+  date: string;
   kind: EntryKind;
   title: string;
   body: string;
@@ -20,7 +24,7 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   retired: "Retired",
 };
 
-export const CHANGELOG_ENTRIES: Entry[] = [
+const ENTRIES: Entry[] = [
   {
     date: "2026-10-26",
     kind: "feature",
@@ -170,17 +174,13 @@ export const CHANGELOG_ENTRIES: Entry[] = [
   },
 ];
 
-/** "Oct 13, 2026" */
-export function formatChangelogDate(iso: string) {
-  const d = new Date(iso + "T00:00:00Z");
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-}
+/** Every entry, newest first. */
+export const CHANGELOG_ENTRIES: Entry[] = [...ENTRIES].sort((a, b) => b.date.localeCompare(a.date));
 
-/** Permalink anchor: "2026-10-13-our-abi-engine-is-certified-by-cbp". */
-export function entryAnchor(e: Pick<Entry, "date" | "title">) {
-  const slug = e.title
+/** Permalink anchor from the title only (no date): "our-abi-engine-is-certified-by-cbp". */
+export function entryAnchor(e: Pick<Entry, "title">) {
+  return e.title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  return `${e.date}-${slug}`;
 }

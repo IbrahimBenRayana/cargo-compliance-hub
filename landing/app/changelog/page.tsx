@@ -7,10 +7,10 @@ import { JsonLd } from "@/components/site/json-ld";
 import { cn } from "@/lib/utils";
 import { webPage } from "@/lib/schema";
 import { ROUTES } from "@/lib/site";
-import { CHANGELOG_ENTRIES, KIND_LABEL, entryAnchor, formatChangelogDate, type Entry, type EntryKind } from "@/lib/changelog";
+import { CHANGELOG_ENTRIES, KIND_LABEL, entryAnchor, type Entry, type EntryKind } from "@/lib/changelog";
 import { CtaBand } from "@/components/site/cta-band";
 
-const TITLE = "Changelog: what shipped, and when";
+const TITLE = "Changelog: what shipped in MyCargoLens";
 const DESCRIPTION =
   "Release notes for MyCargoLens, newest first: ISF and entry filing, the compliance inbox, the public API and security updates.";
 
@@ -35,13 +35,8 @@ const PILL: Record<EntryKind, string> = {
 function EntryRow({ entry }: { entry: Entry }) {
   const id = entryAnchor(entry);
   return (
-    <li id={id} className="grid scroll-mt-24 grid-cols-1 gap-3 md:grid-cols-12 md:gap-8">
-      <div className="md:col-span-3 md:pt-6">
-        <time dateTime={entry.date} className="font-mono text-[13px] tabular-nums text-tone-muted">
-          {formatChangelogDate(entry.date)}
-        </time>
-      </div>
-      <article className="rounded-[20px] p-6 site-surface md:col-span-9">
+    <li id={id} className="scroll-mt-24">
+      <article className="rounded-[20px] p-6 site-surface">
         <span
           className={cn(
             "inline-flex h-6 items-center rounded-full px-2.5 text-[12px] font-semibold ring-1",
@@ -82,13 +77,13 @@ export default function ChangelogPage() {
         size="compact"
         breadcrumbPath={ROUTES.changelog.href}
         eyebrow="Changelog"
-        title="What shipped, and when."
+        title="What shipped."
         sub="Release notes for MyCargoLens, newest first. We write up the changes you'd notice in your work: new filing types, new checks, the inbox, the API and security. Smaller fixes don't get an entry."
         scene="resources"
       />
 
       <Section tone="paper" id="releases">
-        <ol className="space-y-6 md:space-y-8">
+        <ol className="mx-auto max-w-[820px] space-y-6 md:space-y-8">
           {recent.map((e) => (
             <EntryRow key={entryAnchor(e)} entry={e} />
           ))}
@@ -100,7 +95,7 @@ export default function ChangelogPage() {
               <span className="hidden group-open:inline">Show fewer</span>
               <ChevronDown aria-hidden className="size-4 transition-transform duration-200 group-open:rotate-180" />
             </summary>
-            <ol className="mt-8 space-y-6 md:space-y-8">
+            <ol className="mx-auto mt-8 max-w-[820px] space-y-6 md:space-y-8">
               {older.map((e) => (
                 <EntryRow key={entryAnchor(e)} entry={e} />
               ))}

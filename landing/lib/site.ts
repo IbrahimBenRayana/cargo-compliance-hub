@@ -253,7 +253,7 @@ export const ROUTES = r({
     label: "Changelog",
     href: "/changelog",
     group: "resources",
-    blurb: "What shipped, and when.",
+    blurb: "What shipped, newest first.",
     nav: true,
     footer: true,
     live: true,

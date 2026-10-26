@@ -99,7 +99,7 @@ export default function AboutPage() {
           body={
             <>
               <p>
-                We wrote our own engine for CBP&apos;s Automated Broker Interface. It was certified by CBP in October 2026.
+                We wrote our own engine for CBP&apos;s Automated Broker Interface. CBP has certified it.
                 MyCargoLens files ISF-10, ISF-5, entry summaries (7501) and cargo release (3461), and logs every request and
                 response so you can prove what was sent.
               </p>
