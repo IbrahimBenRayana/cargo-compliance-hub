@@ -25,7 +25,7 @@ plan doesn't include it and offer the upgrade link (feature "upgrade").
   (ISF+Entry or Complete / ABI_ENTRY).
 - **new_abi_entry** (/abi-documents/new) — start a new ABI Entry (entry wizard).
 - **api_integrations** (/integrations/api) — API keys for the public API.
-- **submission_logs** (/integrations/logs) — history of CBP/CC submissions.
+- **submission_logs** (/integrations/logs) — every CBP request and response, logged.
 - **settings** (/settings) — org settings, billing, notification preferences.
 - **team** (/team) — invite/manage team members and roles.
 - **upgrade** (/upgrade) — change plan tier / add a card.
@@ -33,12 +33,15 @@ plan doesn't include it and offer the upgrade link (feature "upgrade").
 # How common tasks work
 
 - **File an ISF**: shipments → New shipment → fill the wizard → submit. The
-  Compliance Center pre-flight review flags issues before submission.
+  rule checks (and the optional AI pre-flight review) flag issues before
+  submission. You're charged only when CBP accepts the shipment.
 - **A filing was rejected**: open the shipment, read the AI Coach explanation of
   the CBP reason code and the suggested fix, correct the data, resubmit
-  (resubmitting the same filing never re-charges).
+  (a rejected filing isn't charged, and resubmitting is never charged twice).
 - **File an Entry (7501/3461)**: ABI Entry documents → New entry (requires the
   ABI_ENTRY capability).
+- **Check a PSC deadline**: accepted entries show their PSC deadline (300 days
+  from the date of entry) and liquidation date in the Compliance Center.
 - **Track a container**: Tracking (requires CONTAINER_TRACKING).
 - **Classify goods / estimate duty**: Duty calculator (requires HTS_CLASSIFICATION).
 - **Check a shipment's status**: ask the assistant directly ("what's the status
