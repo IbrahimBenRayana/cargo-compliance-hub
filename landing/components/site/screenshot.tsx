@@ -2,6 +2,7 @@ import * as React from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { SCREENS, type ScreenKey } from "@/lib/screens";
+import { DevicePhone } from "@/components/site/device-phone";
 
 type CommonProps = {
   /** Caption under the frame (muted, small). */
@@ -33,7 +34,7 @@ const BEZEL =
 
 /**
  * A real product screen in a browser window with a double bezel (wireframes
- * "Round 3"). Phone captures render in a phone frame. Uses next/image with
+ * "Round 3"). Phone captures render in <DevicePhone>. Uses next/image with
  * the file's intrinsic width/height, so layout never shifts. Files are
  * pre-sized webp, so they're served as-is (`unoptimized`).
  */
@@ -43,7 +44,18 @@ export function Screenshot(props: ScreenshotProps) {
   const isPhone = meta && "phone" in meta && meta.phone;
 
   let body: React.ReactNode;
-  if (props.screen && meta) {
+  if (props.screen && meta && isPhone) {
+    body = (
+      <DevicePhone
+        src2x={`/screens/${props.screen}-2x.webp`}
+        src3x={`/screens/${props.screen}.webp`}
+        alt={props.alt ?? meta.alt}
+        sizes={props.sizes ?? "(min-width: 1024px) 300px, 70vw"}
+        eager={props.eager}
+        className="max-w-[300px]"
+      />
+    );
+  } else if (props.screen && meta) {
     const img = (
       <Image
         src={`/screens/${props.screen}.webp`}
@@ -51,17 +63,13 @@ export function Screenshot(props: ScreenshotProps) {
         width={meta.width}
         height={meta.height}
         unoptimized
-        sizes={props.sizes ?? (isPhone ? "(min-width: 1024px) 280px, 60vw" : "(min-width: 1024px) 560px, 100vw")}
+        sizes={props.sizes ?? "(min-width: 1024px) 560px, 100vw"}
         loading={props.eager ? "eager" : "lazy"}
         fetchPriority={props.eager ? "high" : undefined}
         className={cn("block h-auto w-full", props.aspect && "h-full object-cover object-left-top")}
       />
     );
-    body = isPhone ? (
-      <div className="mx-auto w-full max-w-[300px] rounded-[36px] bg-[hsl(222_40%_14%)] p-[7px] shadow-[0_30px_60px_-20px_hsl(222_47%_10%/0.55)]">
-        <div className="overflow-hidden rounded-[30px] bg-white">{img}</div>
-      </div>
-    ) : (
+    body = (
       <div className={BEZEL}>
         <div className="overflow-hidden rounded-[17px] bg-white ring-1 ring-[hsl(222_47%_22%/0.08)]">
           <WindowBar url={props.url ?? `app.mycargolens.com${meta.route === "/" ? "" : meta.route}`} />

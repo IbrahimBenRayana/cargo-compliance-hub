@@ -310,14 +310,17 @@ export default function HomePage() {
       {/* S3 · Pillar 1: the inbox */}
       <Section tone="sky" id="inbox" accent="inbox" aria-labelledby="s3-title">
         <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
-          <div className="relative min-w-0 lg:pb-10 lg:pr-10">
-            <Screenshot screen="app-compliance-inbox" />
-            <p className="mt-3 text-[13px] leading-snug text-tone-muted lg:pr-40">
+          <div className="relative min-w-0 lg:pb-14 lg:pr-12">
+            {/* Desktop: the browser capture with the phone over its corner. Mobile: the phone alone. */}
+            <Screenshot screen="app-compliance-inbox" className="hidden lg:block" />
+            <Screenshot
+              screen="app-m-compliance"
+              sizes="(min-width: 1024px) 184px, 264px"
+              className="mx-auto w-[264px] max-w-[72vw] lg:absolute lg:bottom-0 lg:right-0 lg:mx-0 lg:w-[184px]"
+            />
+            <p className="mt-6 text-center text-[13px] leading-snug text-tone-muted lg:mt-3 lg:pr-48 lg:text-left">
               The inbox with sample data. Each ISF deadline is 24 hours before lading (19 CFR 149.2(b)).
             </p>
-            <div className="absolute bottom-0 right-0 hidden w-[150px] lg:block" aria-hidden>
-              <Screenshot screen="app-m-compliance" alt="" />
-            </div>
           </div>
           <div className="min-w-0">
             <SectionHeading
