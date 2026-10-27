@@ -6,6 +6,7 @@ import type { SceneDef } from "../engine";
 export const scene: SceneDef = {
   loop: 12, poster: 5.4, radius: 6.2, exposure: 1.05,
   camera: { pos: [6, 6.5, 14], target: [0, 2.2, 0], fov: 26 },
+  fit: { d: [1.085, -0.023, 0.177], m: [0.994, 0.01, 0.163] }, // measured by the poster harness fit pass
   build(W) {
     const { THREE, C, M, E, win, env, lerp, TAU } = W;
     // glowing floor grid that fades out
