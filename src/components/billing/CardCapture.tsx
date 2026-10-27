@@ -46,7 +46,7 @@ function CardForm({ onSaved, submitLabel }: { onSaved?: () => void; submitLabel:
         return;
       }
       await saveCard.mutateAsync({ setupIntentId: setupIntent.id });
-      toast.success('Card saved.');
+      // The caller announces success (each page words it differently).
       onSaved?.();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not save the card.';

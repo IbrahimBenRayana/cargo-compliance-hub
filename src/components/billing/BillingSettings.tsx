@@ -95,7 +95,7 @@ export function BillingSettings() {
             <div>
               <CardCapture
                 submitLabel={card ? 'Update card' : 'Save card'}
-                onSaved={() => { setEditingCard(false); toast.success('Card updated.'); }}
+                onSaved={() => { setEditingCard(false); toast.success(card ? 'Card updated.' : 'Card saved.'); }}
               />
               <button type="button" onClick={() => setEditingCard(false)} className="mt-3 w-full text-center text-xs text-muted-foreground hover:text-foreground">
                 Cancel
