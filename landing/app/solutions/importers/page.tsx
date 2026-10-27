@@ -44,6 +44,13 @@ const TIERS = [
     body: "Entry summary (7501) and cargo release (3461), linked to the ISF. Container tracking and the duty calculator on request",
     module: "entry" as const,
   },
+  {
+    name: "Filing for others at volume",
+    price: "On request",
+    unit: "",
+    body: "NVOCCs, forwarders and brokers get volume pricing agreed in writing",
+    module: "api" as const,
+  },
 ];
 
 const FAQ: FaqItem[] = [
@@ -219,7 +226,7 @@ export default function ImportersPage() {
       {/* S5 · Pillar 3: the price */}
       <Section tone="mint" id="pricing">
         <SectionHeading eyebrow="Pricing" title="The ISF price is on the website" />
-        <ul className="mt-10 grid max-w-4xl gap-4 md:grid-cols-2">
+        <ul className="mt-10 grid gap-4 md:grid-cols-3">
           {TIERS.map((t) => (
             <li key={t.name} className={`acc-${t.module} flex flex-col rounded-[20px] p-6 site-surface`}>
               <span aria-hidden className="mb-4 block h-1 w-10 rounded-full bg-a" />

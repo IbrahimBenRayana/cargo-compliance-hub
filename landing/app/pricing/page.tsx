@@ -160,7 +160,7 @@ export default function PricingPage() {
       {/* S2 · The importer card: ISF ($45) + customs entry (talk to us) */}
       <Section tone="cream" id="importers" aria-labelledby="importer-card">
         <SectionHeading id="importer-card" title="For importers filing their own ISF and entries" />
-        <div className="mt-12 grid max-w-5xl items-stretch gap-5 md:grid-cols-2 lg:gap-6">
+        <div className="mt-12 grid items-stretch gap-5 md:grid-cols-2 lg:gap-6">
           <PlanCard plan={ISF_PLAN} />
           <PlanCard plan={ENTRY_PLAN} />
         </div>

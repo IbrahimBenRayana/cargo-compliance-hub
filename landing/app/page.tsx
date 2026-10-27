@@ -55,6 +55,7 @@ const PLANS: OfferInput[] = [{ name: "ISF Filing", price: 45, unitText: "per acc
 const PRICE_STRIP = [
   { name: "ISF Filing", value: "$45", unit: "per accepted ISF" },
   { name: "Customs entry", value: "Talk to us", unit: "Priced on a call" },
+  { name: "Filing at volume", value: "On request", unit: "NVOCCs, forwarders and brokers" },
 ];
 
 const FAQ: FaqItem[] = [
@@ -415,7 +416,7 @@ export default function HomePage() {
           title="The ISF price is on the website."
           intro="ISF is $45 per accepted ISF, with no monthly fee. Customs entry is priced on a call, so talk to us."
         />
-        <ul className="mt-10 grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5">
+        <ul className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3 md:gap-5">
           {PRICE_STRIP.map((p) => (
             <li key={p.name} className="rounded-[20px] p-6 site-surface">
               <p className="text-[15px] font-semibold text-tone-fg">{p.name}</p>
