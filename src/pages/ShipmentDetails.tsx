@@ -877,13 +877,13 @@ export default function ShipmentDetails() {
       </Dialog>
 
       {/* Header */}
-      <div className="flex items-center gap-3 opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
-        <Button variant="ghost" size="icon" className="rounded-xl" asChild>
+      <div className="flex flex-wrap items-start gap-3 opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
+        <Button variant="ghost" size="icon" className="rounded-xl shrink-0" asChild>
           <Link to="/shipments" aria-label="Back to shipments"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black tracking-tight">{filing.houseBol || filing.masterBol || filing.id.slice(0, 8)}</h1>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="text-2xl font-black tracking-tight break-all">{filing.houseBol || filing.masterBol || filing.id.slice(0, 8)}</h1>
             <StatusBadge status={filing.status as ShipmentStatus} />
             {filing.ccFilingId && (
               <Badge variant="outline" className="text-[10px] font-mono">Ref: {filing.ccFilingId.slice(0, 12)}</Badge>
@@ -896,7 +896,8 @@ export default function ShipmentDetails() {
             )}
           </p>
         </div>
-        <div className="flex gap-2">
+        {/* Own row on phones; wraps instead of pushing the page sideways. */}
+        <div className="flex flex-wrap gap-2 basis-full sm:basis-auto">
           {/* AI pre-flight review — surfaces UFLPA/PGA risks + rule-based issues
               + AI suggestions before submit. Available for any in-flight filing. */}
           {aiStatusQuery.data?.enabled
@@ -1421,7 +1422,7 @@ export default function ShipmentDetails() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1 transition-opacity can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:focus-within:opacity-100">
                       <Button
                         variant="ghost" size="icon" className="h-8 w-8"
                         title="Download"

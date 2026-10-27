@@ -419,7 +419,7 @@ function PipelineRow({ t }: { t: LiquidationTracked }) {
             <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
               entered {fmtDate(t.entryDate)}
             </span>
-            <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-primary transition-opacity can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:group-focus-visible:opacity-100">
               Open <ArrowRight className="h-3 w-3" />
             </span>
           </div>

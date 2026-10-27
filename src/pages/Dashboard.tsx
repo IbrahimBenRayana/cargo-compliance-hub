@@ -918,7 +918,7 @@ export default function Dashboard() {
 
         {/* ─── KPIs ────────────────────────────────────────────────────── */}
         <section
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
           style={{ animationDelay: '40ms', animationFillMode: 'forwards' }}
         >
           <KpiCard

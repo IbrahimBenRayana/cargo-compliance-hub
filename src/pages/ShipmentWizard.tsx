@@ -1345,7 +1345,7 @@ export default function ShipmentWizard() {
               type="button"
               variant="outline"
               size="sm"
-              className="gap-1.5"
+              className="gap-1.5 h-auto min-h-9 max-w-full whitespace-normal text-left"
               onClick={() =>
                 setForm((prev) => ({
                   ...prev,

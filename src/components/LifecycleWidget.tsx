@@ -484,7 +484,7 @@ export function LifecycleWidget({ filing, abiDocs = [], manifestQueries = [] }: 
                   <ExpandableDetail
                     text={node.detail}
                     className={cn(
-                      'text-[12.5px] font-medium leading-snug px-1',
+                      'text-[12.5px] font-medium leading-snug px-1 hyphens-auto',
                       node.state === 'pending' ? 'text-muted-foreground' : 'text-foreground',
                     )}
                   />
@@ -501,10 +501,10 @@ export function LifecycleWidget({ filing, abiDocs = [], manifestQueries = [] }: 
                     <Button
                       size="sm"
                       variant={node.cta.variant === 'outline' ? 'outline' : 'default'}
-                      className="h-7 px-2.5 text-[11px] gap-1 rounded-lg font-medium"
+                      className="h-auto min-h-7 max-w-full whitespace-normal py-1 px-2.5 text-[11px] leading-tight gap-1 rounded-lg font-medium"
                     >
                       {node.cta.label}
-                      <ArrowRight className="h-3 w-3" />
+                      <ArrowRight className="hidden sm:block h-3 w-3 shrink-0" />
                     </Button>
                   </Link>
                 )}

@@ -512,12 +512,12 @@ export default function InbondWizard() {
       </Card>
 
       {/* Nav bar */}
-      <div className="flex items-center justify-between pb-6">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-6">
         <Button variant="outline" onClick={goBack} disabled={step === 0} size="lg">
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Button variant="outline" size="lg" onClick={handleSaveDraft} disabled={isSaving}>
             Save draft
           </Button>

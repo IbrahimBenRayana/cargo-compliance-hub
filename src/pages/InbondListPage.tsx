@@ -155,7 +155,7 @@ export default function InbondListPage() {
             </p>
             <span className="h-px flex-1 bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
           </div>
-          <div className="flex items-end justify-between gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
               <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground inline-flex items-center gap-3">
                 <ArrowLeftRight className="h-7 w-7 text-teal-500 shrink-0" strokeWidth={2} />
