@@ -27,7 +27,7 @@ const BOOKED: Partial<Record<Route, { call: string; prepare: string; after: stri
     call: "your 20-minute demo",
     prepare:
       "Have a recent shipment in mind: origin, a rough HTS chapter, how many lines. No documents needed. If you've had a recent rejection, bring the error code and we'll walk through it.",
-    after: "If it fits, we set up your team. Public plans are charged per shipment, only when CBP accepts.",
+    after: "If it fits, we set up your team. ISF is $45, charged only when CBP accepts. Customs entry is priced on the call.",
   },
   book_volume: {
     call: "your volume and API call",

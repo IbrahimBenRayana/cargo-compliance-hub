@@ -46,10 +46,10 @@ function valueItems(persona: DemoPersona): Item[] {
     },
     {
       icon: ReceiptText,
-      title: "Set up after, priced per shipment.",
+      title: "Set up after, with the price up front.",
       body: volume
         ? "If it fits, we set up your team with volume pricing agreed in writing. Same rule: charged only when CBP accepts."
-        : "If it fits, we set up your team. Public plans are charged per shipment, only when CBP accepts.",
+        : "If it fits, we set up your team. ISF is $45, charged only when CBP accepts. Customs entry is priced on the call.",
     },
   ];
 }

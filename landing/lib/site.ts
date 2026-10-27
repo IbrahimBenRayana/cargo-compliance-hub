@@ -495,7 +495,7 @@ export type CtaBandCopy = {
   micro?: string;
 };
 
-const MICRO_PRICE = "Pay per shipment, only when CBP accepts. No monthly fee on the public plans.";
+const MICRO_PRICE = "ISF is $45, charged only when CBP accepts. No monthly fee.";
 
 export const CTA_BANDS: Record<CtaBandVariant, CtaBandCopy> = {
   default: {

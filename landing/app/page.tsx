@@ -25,7 +25,7 @@ import { articleHref, publishedArticles } from "./resources/_content/articles";
 
 const TITLE = "Customs Filing Software for ISF and Entries | MyCargoLens";
 const DESCRIPTION =
-  "File ISF and customs entries with CBP from one inbox ranked by what needs you now. Per-shipment price, charged when CBP accepts.";
+  "File ISF and customs entries with CBP from one inbox ranked by what needs you now. ISF is $45, charged when CBP accepts.";
 const OG_TITLE = "Customs, in focus. ISF and entry software · MyCargoLens";
 
 export const metadata: Metadata = {
@@ -48,11 +48,13 @@ export const metadata: Metadata = {
   },
 };
 
-/** Public plans (copy/home.md S6, mirrored from /pricing) for the SoftwareApplication offers. */
-const PLANS: OfferInput[] = [
-  { name: "ISF Filing", price: 45 },
-  { name: "ISF + Entry", price: 180 },
-  { name: "Complete", price: 280 },
+/** The one public price (mirrored from /pricing) for the SoftwareApplication offers. */
+const PLANS: OfferInput[] = [{ name: "ISF Filing", price: 45, unitText: "per accepted ISF" }];
+
+/** S6 price strip: ISF has a price; customs entry is "talk to us". */
+const PRICE_STRIP = [
+  { name: "ISF Filing", value: "$45", unit: "per accepted ISF" },
+  { name: "Customs entry", value: "Talk to us", unit: "Priced on a call" },
 ];
 
 const FAQ: FaqItem[] = [
@@ -74,11 +76,11 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "What does it cost?",
-    a: "Importers pay per shipment: $45 for ISF, $180 for ISF + Entry, $280 for Complete, with no monthly fee. You're charged only when CBP accepts. NVOCCs, forwarders and brokers filing at volume get volume pricing on request.",
+    a: "ISF is $45 per accepted ISF, with no monthly fee. You're charged only when CBP accepts. For customs entry, talk to us on a demo. NVOCCs, forwarders and brokers filing at volume get volume pricing on request.",
   },
   {
     q: "You're a young company. Why should we trust you with filings?",
-    a: "We're early, and we'd rather say so. You see and check every filing before it goes, and you pay per accepted shipment with no monthly fee on the public plans.",
+    a: "We're early, and we'd rather say so. You see and check every filing before it goes, and ISF is charged only when CBP accepts it, with no monthly fee.",
   },
   {
     q: "What happens on the demo?",
@@ -268,7 +270,7 @@ export default function HomePage() {
           ...softwareApplication({
             offers: PLANS,
             description:
-              "ISF and customs entry filing software: file ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP from one inbox ranked by urgency, priced per shipment.",
+              "ISF and customs entry filing software: file ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP from one inbox ranked by urgency.",
           }),
         }}
       />
@@ -279,7 +281,7 @@ export default function HomePage() {
         scene="home"
         eyebrow="ISF and customs entry filing software"
         title="Customs, in focus."
-        sub="Customs filing software that shows which ISF or entry needs you now. File ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP from one inbox, check every draft before it goes, and see the price per shipment on this website."
+        sub="Customs filing software that shows which ISF or entry needs you now. File ISF-10, ISF-5, entry summaries (7501) and cargo release (3461) with CBP from one inbox, check every draft before it goes, and see the ISF price on this website."
         actions={
           <>
             <DemoButton location="hero" src="home-hero" size="lg" />
@@ -410,26 +412,26 @@ export default function HomePage() {
         <SectionHeading
           id="s6-title"
           eyebrow="Pricing"
-          title="The price is on the website."
-          intro="Pick a plan and pay per shipment. There's no monthly fee on the public plans."
+          title="The ISF price is on the website."
+          intro="ISF is $45 per accepted ISF, with no monthly fee. Customs entry is priced on a call, so talk to us."
         />
-        <ul className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3 md:gap-5">
-          {PLANS.map((p) => (
+        <ul className="mt-10 grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5">
+          {PRICE_STRIP.map((p) => (
             <li key={p.name} className="rounded-[20px] p-6 site-surface">
               <p className="text-[15px] font-semibold text-tone-fg">{p.name}</p>
               <p className="mt-3 text-[40px] font-semibold leading-none tracking-[-0.03em] text-tone-fg tabular-nums">
-                ${p.price}
+                {p.value}
               </p>
-              <p className="mt-2 text-[13.5px] text-tone-muted">per shipment</p>
+              <p className="mt-2 text-[13.5px] text-tone-muted">{p.unit}</p>
             </li>
           ))}
         </ul>
         <div className="mt-8 grid items-end gap-8 lg:grid-cols-[1fr_auto]">
           <ul className="space-y-2.5">
             {[
-              "You're charged when CBP accepts the shipment.",
-              "Rejected filings aren't charged, and resubmits or amendments are never charged twice.",
-              "A linked ISF and entry is billed once. Drafts and manifest queries are free.",
+              "You're charged when CBP accepts the ISF.",
+              "Rejected filings and amendments aren't charged.",
+              "Drafts and manifest queries are free.",
             ].map((rule) => (
               <li key={rule} className="flex gap-3 text-[15.5px] leading-snug text-tone-fg">
                 <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-tone-eyebrow" strokeWidth={2.6} />
@@ -534,7 +536,7 @@ export default function HomePage() {
         title="See how your shipments would run through the inbox."
         sub="Book a 20-minute demo. We'll walk through how you file today, show you the parts that matter and tell you what it costs."
         src="home-close"
-        micro="Pay per shipment, only when CBP accepts. No monthly fee on the public plans."
+        micro="ISF is $45, charged only when CBP accepts. No monthly fee."
         note="Software, not a customs broker"
       />
     </>

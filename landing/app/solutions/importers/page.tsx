@@ -16,7 +16,7 @@ import { ArrowLink, DashList, pageMetadata } from "../_components/page-bits";
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/solutions-importers.md
 const PATH = ROUTES.importers.href;
 const DESCRIPTION =
-  "See and check every ISF and entry you file under your IOR number before CBP does. $45 ISF, $180 ISF + Entry, charged only when CBP accepts.";
+  "See and check every ISF and entry you file under your IOR number before CBP does. ISF is $45, charged only when CBP accepts. Customs entry: talk to us.";
 
 export const metadata = pageMetadata({
   path: PATH,
@@ -30,14 +30,20 @@ const TR_301_URL =
   "https://www.thomsonreuters.com/en-us/help/onesource-global-trade/regulatory-insights/2026/july-24th/us-imposes-section-301-forced-labor-tariffs-60";
 
 const TIERS = [
-  { name: "ISF Filing", price: "$45", body: "ISF-10 and ISF-5, templates, manifest query, deadline tracking", module: "isf" as const },
   {
-    name: "ISF + Entry",
-    price: "$180",
-    body: "+ Entry summary (7501) and cargo release (3461); a linked ISF and entry billed once",
+    name: "ISF Filing",
+    price: "$45",
+    unit: "per accepted ISF",
+    body: "ISF-10 and ISF-5, templates, manifest query, deadline tracking",
+    module: "isf" as const,
+  },
+  {
+    name: "Customs entry",
+    price: "Talk to us",
+    unit: "",
+    body: "Entry summary (7501) and cargo release (3461), linked to the ISF. Container tracking and the duty calculator on request",
     module: "entry" as const,
   },
-  { name: "Complete", price: "$280", body: "+ Container tracking and the duty calculator", module: "compliance" as const },
 ];
 
 const FAQ: FaqItem[] = [
@@ -50,8 +56,8 @@ const FAQ: FaqItem[] = [
     a: "You might keep them. You can file your own ISFs and leave entries with the broker, or file both and keep the broker for advice. Either way, everything you file through MyCargoLens is checked before it goes and tracked through liquidation in one inbox.",
   },
   {
-    q: "Is $180 cheaper than a broker?",
-    a: "Often it's about the same as a typical broker fee per shipment. The difference is that the price is written on our website, a linked ISF and entry is billed once, and rejected filings aren't charged.",
+    q: "What does customs entry cost?",
+    a: "Talk to us. Tell us on the demo how many entries you file and how you file them today, and we'll go through the price with you. The ISF price is on the website: $45, charged only when CBP accepts.",
   },
   {
     q: "Do we need our own filer code and bond to file?",
@@ -75,7 +81,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Is there a monthly fee?",
-    a: "There's no monthly fee on the public plans. You pay per shipment when CBP accepts it.",
+    a: "Not for ISF filing. You pay $45 for each ISF that CBP accepts.",
   },
 ];
 
@@ -103,7 +109,7 @@ export default function ImportersPage() {
             </span>
           </>
         }
-        sub="File ISF-10, entry summaries (7501) and cargo release (3461) under your IOR number. Every draft is checked before it goes, and the price per shipment is on our website, charged only when CBP accepts."
+        sub="File ISF-10, entry summaries (7501) and cargo release (3461) under your IOR number. Every draft is checked before it goes, and the ISF price is on our website, charged only when CBP accepts."
         actions={
           <>
             <DemoButton persona="importer" location="hero" src="importer-hero" size="lg" />
@@ -203,7 +209,7 @@ export default function ImportersPage() {
             "ISF deadline clock set 24 hours before lading, with alerts at 72, 48 and 24 hours before it",
             "CBP's response on each filing: accepted, rejected or still waiting",
             "Each accepted entry tracked through its 314-day liquidation window, with the post-summary correction deadline (300 days from entry, CBP's regular PSC window) in the inbox",
-            "Container tracking with vessel ETAs and last free day, on the Complete plan",
+            "Container tracking with vessel ETAs and last free day, on request",
           ]}
           actions={<ArrowLink href={ROUTES.compliance.href}>See the compliance view</ArrowLink>}
           screenshot={{ screen: "app-liquidation-clocks", caption: "Liquidation pipeline, a clock per entry. Sample data." }}
@@ -212,15 +218,15 @@ export default function ImportersPage() {
 
       {/* S5 · Pillar 3: the price */}
       <Section tone="mint" id="pricing">
-        <SectionHeading eyebrow="Pricing" title="The price is on the website" />
-        <ul className="mt-10 grid gap-4 md:grid-cols-3">
+        <SectionHeading eyebrow="Pricing" title="The ISF price is on the website" />
+        <ul className="mt-10 grid max-w-4xl gap-4 md:grid-cols-2">
           {TIERS.map((t) => (
             <li key={t.name} className={`acc-${t.module} flex flex-col rounded-[20px] p-6 site-surface`}>
               <span aria-hidden className="mb-4 block h-1 w-10 rounded-full bg-a" />
               <h3 className="text-[15px] font-semibold text-tone-fg">{t.name}</h3>
               <p className="mt-2 text-tone-fg">
-                <span className="text-[38px] font-semibold leading-none tracking-[-0.03em] tabular-nums">{t.price}</span>{" "}
-                <span className="text-[14px] text-tone-muted">per shipment</span>
+                <span className="text-[38px] font-semibold leading-none tracking-[-0.03em] tabular-nums">{t.price}</span>
+                {t.unit && <span className="text-[14px] text-tone-muted"> {t.unit}</span>}
               </p>
               <p className="mt-4 text-[14.5px] leading-relaxed text-tone-muted">{t.body}</p>
             </li>
@@ -229,14 +235,14 @@ export default function ImportersPage() {
         <CheckList
           className="mt-8"
           items={[
-            "You're charged when CBP accepts the shipment. Rejected filings aren't charged",
-            "Resubmits and amendments are never charged twice",
+            "You're charged when CBP accepts the ISF. Rejected filings aren't charged",
+            "Amendments aren't charged",
             "No monthly fee. Drafts and manifest queries are free",
           ]}
         />
         <p className="mt-6 max-w-3xl text-[15.5px] leading-relaxed text-tone-muted">
-          At $180, ISF + Entry costs about what many brokers charge per shipment. For that you get one written price per shipment
-          and the filing in your own hands.
+          Customs entry is priced on a call. Tell us how many entries you file and we&apos;ll go through it with you in the
+          demo, with the filing in your own hands either way.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
           <DemoButton persona="importer" location="section" src="importer-pricing" />
@@ -306,7 +312,7 @@ export default function ImportersPage() {
         persona="importer"
         src="importer-close"
         links={[PRICING_LINK]}
-        micro="Pay per shipment, only when CBP accepts. No monthly fee on the public plans."
+        micro="ISF is $45, charged only when CBP accepts. No monthly fee."
       />
       <StickyDemoBar persona="importer" src="importer-sticky" />
     </>

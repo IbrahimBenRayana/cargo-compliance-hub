@@ -188,9 +188,9 @@ export default function InboxPage() {
       {/* S6 · Containers and last free day */}
       <Section tone="lilac" id="containers" accent="inbox" spacing="compact">
         <SectionHeading
-          eyebrow="Tracking (Complete plan)"
+          eyebrow="Tracking, on request"
           title="Vessel ETAs and last free day next to the filing"
-          intro="On the Complete plan, tracked containers show vessel ETAs, port arrival and the last free day, so the filing and the box sit in the same place."
+          intro="Tracked containers show vessel ETAs, port arrival and the last free day, so the filing and the box sit in the same place. It's available with customs entry; ask us in the demo."
         />
       </Section>
 
