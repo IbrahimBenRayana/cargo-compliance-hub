@@ -131,8 +131,8 @@ export default function IntegrationsApi() {
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
       {/* ─── Header ─────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4 opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
+        <div className="min-w-0">
           <div className="flex items-center gap-3 mb-1">
             <h1 className="text-[28px] font-bold tracking-tight text-foreground">API & Integrations</h1>
             <Badge variant="secondary" className="gap-1 text-[10px] font-bold uppercase tracking-wider px-2">
