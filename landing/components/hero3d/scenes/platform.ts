@@ -7,6 +7,7 @@ import type { SceneDef } from "../engine";
 export const scene: SceneDef = {
   loop: 12, poster: 6.3, radius: 5.5, width: 6.5,
   camera: { pos: [1.0, 4.6, 15], target: [0, 2.2, 0], fov: 26 },
+  fit: { d: [0.999, -0.005, 0.114], m: [1.003, 0.003, 0.1] }, // measured by the poster harness fit pass
   build(W) {
     const { THREE, C, M, E, win, env, lerp, TAU } = W;
     W.add(W.slab(12.4, .4, 3.6, M.porcelain, .2));

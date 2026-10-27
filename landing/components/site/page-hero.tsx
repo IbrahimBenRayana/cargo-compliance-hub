@@ -5,6 +5,9 @@ import { Section, Eyebrow } from "@/components/site/section";
 import { Breadcrumbs } from "@/components/site/breadcrumbs";
 import type { ModuleKey } from "@/lib/accents";
 
+/** Phones: the visual spans the full screen width (cancels the container's px-5). */
+const BLEED_PHONE = "-mx-5 w-[calc(100%+2.5rem)] sm:mx-auto sm:w-full";
+
 export type PageHeroProps = {
   eyebrow?: React.ReactNode;
   /** The page's only H1. Renders static (no word-by-word reveal). */
@@ -100,7 +103,7 @@ export function PageHero({
         <>
           {copy}
           {scene && (
-            <div className="mx-auto mt-10 max-w-[560px]">
+            <div className={cn(BLEED_PHONE, "mt-10 sm:max-w-[680px]")}>
               <Hero3D scene={scene} glow={glow} />
             </div>
           )}
@@ -108,12 +111,15 @@ export function PageHero({
       ) : (
         <div
           className={cn(
-            "grid items-center gap-10 lg:gap-12",
-            size === "full" ? "lg:grid-cols-[1.05fr_1fr]" : "lg:grid-cols-[1.3fr_1fr]",
+            "grid items-center gap-10 lg:gap-8",
+            size === "full" ? "lg:grid-cols-[1fr_1fr]" : "lg:grid-cols-[1.15fr_1fr]",
           )}
         >
           {copy}
-          <div className={cn("mx-auto w-full", size === "full" ? "max-w-[640px]" : "max-w-[460px]")}>
+          {/* The canvas is transparent and the sets are wide, so the slot bleeds
+              into the page gutter (phones: edge to edge; desktop: right gutter)
+              instead of floating small inside the column. */}
+          <div className={cn(BLEED_PHONE, "sm:max-w-[640px] lg:ml-0 lg:-mr-8 lg:w-[calc(100%+2rem)] lg:max-w-none xl:-mr-12 xl:w-[calc(100%+3rem)]")}>
             <Hero3D scene={scene} glow={glow} />
           </div>
         </div>
