@@ -96,7 +96,15 @@ test.describe('Screen sweep', () => {
           failedRequests.length = 0;
           await gotoAuthed(page, route);
           await page.waitForTimeout(900);
-          const overflowPx = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+          // Page width AND the main scroll area: the main content can scroll sideways
+          // on its own while the page doesn't (missed until X-02, Oct 27).
+          const overflowPx = await page.evaluate(() => {
+            const main = document.getElementById('main-content');
+            return Math.max(
+              document.documentElement.scrollWidth - document.documentElement.clientWidth,
+              main ? main.scrollWidth - main.clientWidth : 0,
+            );
+          });
           const file = path.join(OUT, `${slug(route)}--${w.name}--${scheme}.png`);
           await page.screenshot({ path: file, fullPage: true });
           const result: ScreenResult = {
