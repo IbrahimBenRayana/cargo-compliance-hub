@@ -10,7 +10,12 @@ export type ScreenMeta = {
   height: number;
   alt: string;
   route: string;
-  /** Phone-width capture (render in a phone frame, not a browser window). */
+  /**
+   * Phone capture, rendered in <DevicePhone>. Must be 440 × 956 CSS px (the
+   * Pro Max viewport) at DPR 3, saved as <key>.webp (1320w) plus
+   * <key>-2x.webp (880w), with the app's top bar pushed 62 px down so the
+   * status bar and Dynamic Island sit over empty header space.
+   */
   phone?: boolean;
   /** Something on it must change before launch. */
   note?: string;
@@ -38,8 +43,13 @@ export const SCREENS = {
     alt: "Liquidation pipeline with a clock per entry.",
     note: "PSC labels blurred (app still says 270 days). Re-capture once PSC_WINDOW_DAYS ships as 300.",
   },
-  "app-m-compliance": { width: 780, height: 1688, route: "/compliance", alt: "The inbox on a phone.", phone: true },
-  "app-m-dashboard": { width: 780, height: 1688, route: "/", alt: "The dashboard on a phone.", phone: true },
+  "app-m-compliance": {
+    width: 1320,
+    height: 2868,
+    route: "/compliance",
+    alt: "The MyCargoLens inbox on an iPhone, with sample data: today's brief, a compliance score of 100, and filings needing attention ranked by urgency, led by an ISF due in 20 hours.",
+    phone: true,
+  },
   "app-manifest-dispositions": { width: 1600, height: 1216, route: "/manifest-query", alt: "Manifest query results with CBP's disposition for each house bill." },
   "app-risk-watch": { width: 1600, height: 1000, route: "/compliance", alt: "Risk and watch tab: UFLPA inbox, PGA lookup and CBP 5106 check." },
   "app-shipments-list": { width: 1600, height: 1000, route: "/shipments", alt: "Shipments list with drafts, statuses and deadlines." },

@@ -6,6 +6,7 @@ import type { CardFaceOpts, SceneDef } from "../engine";
 export const scene: SceneDef = {
   loop: 12, poster: 10.2, radius: 5.0, width: 5.4,
   camera: { pos: [0, 6.5, 14.5], target: [0, 1.5, 0], fov: 27 },
+  fit: { d: [1.064, -0.041, 0.11], m: [0.917, -0.0, 0.089] }, // measured by the poster harness fit pass
   build(W) {
     const { THREE, C, M, E, win, env, lerp, TAU } = W;
     const xs = [-4.2, -1.4, 1.4, 4.2], zs = [.4, -.3, -.3, .4];

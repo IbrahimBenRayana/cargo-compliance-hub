@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Wordmark } from "@/components/wordmark";
 import { Section } from "@/components/site/section";
 import { DemoButton } from "@/components/site/cta";
-import { ThemeSwitch } from "@/components/site/theme-switch";
 import { accentClass } from "@/lib/accents";
 import { COMPANY, ROUTES, UI_STRINGS, footerColumns } from "@/lib/site";
 
@@ -92,7 +91,6 @@ export function Footer() {
               )}
             </span>
           </div>
-          <ThemeSwitch />
         </div>
       </div>
     </Section>

@@ -3,37 +3,18 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createPortal } from "react-dom";
-import { ArrowLeft, ArrowRight, ChevronDown, Menu, X } from "lucide-react";
-import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "framer-motion";
+import { ArrowLeft, ChevronDown, Menu, X } from "lucide-react";
+import { AnimatePresence, MotionConfig, motion, useMotionValueEvent, useScroll } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Wordmark } from "@/components/wordmark";
 import { SiteContainer } from "@/components/site/section";
 import { DemoButton } from "@/components/site/cta";
-import { ACCENTS, accentClass } from "@/lib/accents";
-import {
-  APP_LOGIN_URL,
-  BROKER_PILOT_LINE,
-  HEADER_MENUS,
-  HEADER_ORDER,
-  PLATFORM_COLUMNS,
-  ROUTES,
-  UI_STRINGS,
-  menuItems,
-  platformColumn,
-  type MenuKey,
-  type SiteRoute,
-} from "@/lib/site";
+import { ThemeSwitch } from "@/components/site/theme-switch";
+import { NAV_EASE, NavPanel, PANEL_WIDTH } from "@/components/site/nav-panels";
+import { MobileSheet } from "@/components/site/nav-mobile";
+import { APP_LOGIN_URL, HEADER_MENUS, HEADER_ORDER, ROUTES, UI_STRINGS, menuItems, type MenuKey } from "@/lib/site";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
-const noopSubscribe = () => () => {};
 const MENU_ORDER = HEADER_MENUS.map((m) => m.key);
-const PANEL_WIDTH: Record<MenuKey, number> = {
-  platform: 900,
-  solutions: 400,
-  resources: 380,
-  company: 360,
-};
 /** Hover intent before the first menu opens (wireframe 01: ~120ms). */
 const OPEN_DELAY = 110;
 const CLOSE_DELAY = 140;
@@ -41,9 +22,58 @@ const CLOSE_DELAY = 140;
 /** Pages that use the minimal header: logo + "Back to site" (book-a-demo.md §2, global.md §1). */
 const MINIMAL_HEADER = [ROUTES.bookADemo.href];
 
-/* ---------------------------------------------------------------- */
-/* Nav                                                                */
-/* ---------------------------------------------------------------- */
+/*
+ * Header: a calm inset bar. At the top of the page it sits flat on the paper
+ * background; once the page scrolls (or a menu opens) it becomes a floating
+ * card surface with a hairline border and a soft shadow. One dropdown panel
+ * glides between menus. Gold stays on Book a demo only.
+ */
+
+/** Shared bar shell so the full and minimal headers line up exactly. */
+function Bar({
+  raised,
+  scrolled,
+  children,
+  barRef,
+}: {
+  raised: boolean;
+  /** The outer band stays paper until the page moves, so no body colour shows behind the bar. */
+  scrolled: boolean;
+  children: React.ReactNode;
+  barRef?: React.Ref<HTMLElement>;
+}) {
+  return (
+    <header
+      className={cn(
+        "sticky top-0 z-50 w-full py-2 transition-[background-color] duration-200",
+        scrolled ? "bg-transparent" : "bg-[hsl(var(--paper))]",
+      )}
+    >
+      <SiteContainer>
+        <nav
+          ref={barRef}
+          aria-label="Main"
+          className={cn(
+            "relative -mx-3 flex h-12 items-center justify-between gap-3 rounded-2xl border pl-3 pr-1.5",
+            "transition-[background-color,border-color,box-shadow] duration-200 ease-[var(--ease-out-quart)]",
+            raised
+              ? "border-[hsl(var(--surface-border))] bg-[hsl(var(--card)/0.88)] shadow-[0_1px_2px_hsl(var(--foreground)/0.04),0_8px_24px_-12px_hsl(var(--foreground)/0.16)] backdrop-blur-xl backdrop-saturate-150 [@media(prefers-reduced-transparency:reduce)]:bg-[hsl(var(--card))]"
+              : "border-transparent",
+          )}
+        >
+          {children}
+        </nav>
+      </SiteContainer>
+    </header>
+  );
+}
+
+function useScrolled() {
+  const { scrollY } = useScroll();
+  const [scrolled, setScrolled] = React.useState(false);
+  useMotionValueEvent(scrollY, "change", (y) => setScrolled(y >= 8));
+  return scrolled;
+}
 
 export function Nav() {
   const pathname = usePathname() ?? "/";
@@ -51,33 +81,39 @@ export function Nav() {
   return minimal ? <MinimalHeader /> : <FullNav />;
 }
 
-/** Conversion pages: no menus, no header demo button. */
-function MinimalHeader() {
+function HomeLink() {
   return (
-    <header className="sticky top-0 z-50 w-full bg-[hsl(var(--paper))]">
-      <SiteContainer>
-        <nav aria-label="Main" className="flex h-14 items-center justify-between gap-4 lg:h-16">
-          <Link href="/" className="flex-shrink-0 rounded-md" aria-label="MyCargoLens home">
-            <Wordmark />
-          </Link>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[14px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft size={15} aria-hidden />
-            {UI_STRINGS.backToSite}
-          </Link>
-        </nav>
-      </SiteContainer>
-    </header>
+    <Link href="/" className="flex-shrink-0 rounded-lg" aria-label="MyCargoLens home">
+      <Wordmark />
+    </Link>
+  );
+}
+
+/** Conversion pages: logo, Back to site and the theme switch. No menus, no demo button. */
+function MinimalHeader() {
+  const scrolled = useScrolled();
+  return (
+    <Bar raised={scrolled} scrolled={scrolled}>
+      <HomeLink />
+      <div className="flex items-center gap-1.5">
+        <Link
+          href="/"
+          className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft size={15} aria-hidden />
+          {UI_STRINGS.backToSite}
+        </Link>
+        <ThemeSwitch compact />
+      </div>
+    </Bar>
   );
 }
 
 function FullNav() {
   const pathname = usePathname() ?? "/";
+  const scrolled = useScrolled();
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const [scrolled, setScrolled] = React.useState(false);
   const [active, setActive] = React.useState<MenuKey | null>(null);
   const [direction, setDirection] = React.useState(0);
   const [box, setBox] = React.useState<{ left: number; width: number } | null>(null);
@@ -88,18 +124,6 @@ function FullNav() {
   const navRef = React.useRef<HTMLElement | null>(null);
   const triggerRefs = React.useRef<Partial<Record<MenuKey, HTMLButtonElement>>>({});
   const mobileBtnRef = React.useRef<HTMLButtonElement | null>(null);
-  const reducedMotion = useReducedMotion();
-
-  React.useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY >= 8);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    // first read happens in a frame so the effect never sets state synchronously
-    const id = requestAnimationFrame(onScroll);
-    return () => {
-      cancelAnimationFrame(id);
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, []);
 
   // Close everything on route change (adjusting state while rendering, per
   // React docs, instead of an effect).
@@ -193,7 +217,9 @@ function FullNav() {
   React.useEffect(() => {
     const focusables = (root: Element | null) =>
       root
-        ? Array.from(root.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex='-1'])"))
+        ? Array.from(
+            root.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input, select, textarea, [tabindex]"),
+          ).filter((el) => el.tabIndex >= 0)
         : [];
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || e.altKey || e.ctrlKey || e.metaKey) return;
@@ -234,138 +260,119 @@ function FullNav() {
     return () => document.removeEventListener("keydown", onKey);
   }, [closeNow]);
 
-  const raised = scrolled || active !== null || mobileOpen;
+  // The sheet supplies its own surface, so the bar stays flat on top of it.
+  const raised = (scrolled || active !== null) && !mobileOpen;
+  const inSection = (k: MenuKey) => menuItems(k).some((i) => pathname === i.href || pathname.startsWith(`${i.href}/`));
 
   return (
     <MotionConfig reducedMotion="user">
-      <header
-        className={cn(
-          "sticky top-0 z-50 w-full transition-[backdrop-filter,background-color,box-shadow] duration-300 ease-[var(--ease-out-quart)]",
-          raised
-            ? "bg-[hsl(var(--background)/0.92)] shadow-[0_4px_16px_-8px_hsl(var(--foreground)/0.08),0_12px_32px_-16px_hsl(var(--foreground)/0.1)] backdrop-blur-xl backdrop-saturate-150"
-            : "bg-[hsl(var(--paper))]",
-        )}
-      >
-        <SiteContainer>
-          <nav
-            ref={navRef}
-            aria-label="Main"
-            className="relative flex h-14 items-center justify-between gap-4 lg:h-16"
+      <Bar raised={raised} scrolled={scrolled} barRef={navRef}>
+        <HomeLink />
+
+        {/* Desktop menus: one hover pill glides between items, one panel glides between menus. */}
+        <ul
+          className="hidden items-center gap-0.5 lg:flex xl:absolute xl:left-1/2 xl:-translate-x-1/2"
+          onMouseLeave={() => setHovered(null)}
+        >
+          {HEADER_ORDER.map((item) =>
+            item === "pricing" ? (
+              <li key="pricing" className="relative">
+                <Link
+                  href={ROUTES.pricing.href}
+                  aria-current={pathname === ROUTES.pricing.href ? "page" : undefined}
+                  className="relative flex h-9 items-center rounded-full px-3.5 text-[14px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground aria-[current=page]:text-foreground"
+                  onMouseEnter={() => {
+                    setHovered("pricing");
+                    scheduleClose();
+                  }}
+                >
+                  {hovered === "pricing" && <HoverPill />}
+                  <span className="relative">{ROUTES.pricing.label}</span>
+                </Link>
+              </li>
+            ) : (
+              <NavTrigger
+                key={item}
+                menuKey={item}
+                label={HEADER_MENUS.find((m) => m.key === item)!.label}
+                open={active === item}
+                current={inSection(item)}
+                hovered={hovered === item}
+                onHover={() => {
+                  setHovered(item);
+                  hoverOpen(item);
+                }}
+                onLeave={scheduleClose}
+                onToggle={() => (active === item ? closeNow() : openMenu(item))}
+                registerRef={(el) => {
+                  if (el) triggerRefs.current[item] = el;
+                }}
+              />
+            ),
+          )}
+        </ul>
+
+        <div className="hidden items-center gap-1 lg:flex">
+          <ThemeSwitch compact className="mr-1.5" />
+          <a
+            href={APP_LOGIN_URL}
+            data-location="nav"
+            className="flex h-9 items-center rounded-full px-3 text-[14px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
           >
-            <Link href="/" className="flex-shrink-0 rounded-md" aria-label="MyCargoLens home">
+            Log in
+          </a>
+          <DemoButton location="nav" src="nav" size="sm" className="h-9 rounded-xl px-4 text-[13.5px]" />
+        </div>
+
+        {/* Mobile: compact demo button + menu toggle */}
+        <div className="flex items-center gap-1.5 lg:hidden">
+          {/* hidden while the sheet is open: its pinned button is the one gold button */}
+          {!mobileOpen && <DemoButton location="nav" src="nav" size="sm" className="h-9 rounded-xl px-3.5 text-[13px]" />}
+          <button
+            ref={mobileBtnRef}
+            type="button"
+            className="relative grid size-10 place-items-center rounded-xl text-foreground transition-colors duration-150 hover:bg-secondary/70 active:bg-secondary"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-menu"
+          >
+            <AnimatePresence mode="popLayout" initial={false}>
               <motion.span
-                whileHover={reducedMotion ? undefined : { scale: 1.03 }}
-                transition={{ duration: 0.3, ease: EASE }}
+                key={mobileOpen ? "x" : "m"}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.15, ease: NAV_EASE }}
                 className="inline-flex"
               >
-                <Wordmark />
+                {mobileOpen ? <X size={20} aria-hidden /> : <Menu size={20} aria-hidden />}
               </motion.span>
-            </Link>
+            </AnimatePresence>
+          </button>
+        </div>
 
-            {/* Desktop menus: one hover pill glides between items, one panel morphs between menus. */}
-            <ul className="hidden items-center gap-0.5 lg:flex" onMouseLeave={() => setHovered(null)}>
-              {HEADER_ORDER.map((item) =>
-                item === "pricing" ? (
-                  <li key="pricing" className="relative">
-                    <Link
-                      href={ROUTES.pricing.href}
-                      aria-current={pathname === ROUTES.pricing.href ? "page" : undefined}
-                      className="relative block rounded-full px-3 py-2 text-[14px] font-medium text-muted-foreground transition-colors hover:text-foreground aria-[current=page]:text-foreground"
-                      onMouseEnter={() => {
-                        setHovered("pricing");
-                        scheduleClose();
-                      }}
-                    >
-                      {hovered === "pricing" && <HoverPill />}
-                      <span className="relative z-10">{ROUTES.pricing.label}</span>
-                    </Link>
-                  </li>
-                ) : (
-                  <NavTrigger
-                    key={item}
-                    menuKey={item}
-                    label={HEADER_MENUS.find((m) => m.key === item)!.label}
-                    open={active === item}
-                    hovered={hovered === item}
-                    onHover={() => {
-                      setHovered(item);
-                      hoverOpen(item);
-                    }}
-                    onLeave={scheduleClose}
-                    onToggle={() => (active === item ? closeNow() : openMenu(item))}
-                    registerRef={(el) => {
-                      if (el) triggerRefs.current[item] = el;
-                    }}
-                  />
-                ),
-              )}
-            </ul>
+        <NavPanel
+          active={active}
+          box={box}
+          direction={direction}
+          cancelClose={cancelClose}
+          scheduleClose={scheduleClose}
+          close={() => closeNow()}
+        />
+      </Bar>
 
-            <div className="hidden items-center gap-1.5 lg:flex">
-              <a
-                href={APP_LOGIN_URL}
-                data-location="nav"
-                className="rounded-full px-3 py-2 text-[14px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Log in
-              </a>
-              <DemoButton location="nav" src="nav" size="sm" className="h-9 px-4 text-[13.5px]" />
-            </div>
-
-            {/* Mobile: compact demo button + menu */}
-            <div className="flex items-center gap-2 lg:hidden">
-              {/* hidden while the sheet is open: its pinned button is the one gold button */}
-              {!mobileOpen && (
-                <DemoButton location="nav" src="nav" size="sm" className="h-9 px-3.5 text-[13px]" />
-              )}
-              <button
-                ref={mobileBtnRef}
-                type="button"
-                className="grid size-10 place-items-center rounded-xl border border-border/70 bg-[hsl(var(--card)/0.7)] text-foreground transition-colors hover:bg-secondary"
-                onClick={() => setMobileOpen((v) => !v)}
-                aria-label={mobileOpen ? "Close menu" : "Open menu"}
-                aria-expanded={mobileOpen}
-                aria-controls="mobile-menu"
-              >
-                <motion.span
-                  key={mobileOpen ? "x" : "m"}
-                  initial={{ opacity: 0, rotate: -90 }}
-                  animate={{ opacity: 1, rotate: 0 }}
-                  transition={{ duration: 0.2, ease: EASE }}
-                  className="inline-flex"
-                >
-                  {mobileOpen ? <X size={19} /> : <Menu size={19} />}
-                </motion.span>
-              </button>
-            </div>
-
-            <MorphPanel
-              active={active}
-              box={box}
-              direction={direction}
-              cancelClose={cancelClose}
-              scheduleClose={scheduleClose}
-              close={() => closeNow()}
-            />
-          </nav>
-        </SiteContainer>
-
-        <MobileSheet open={mobileOpen} close={() => setMobileOpen(false)} />
-      </header>
+      <MobileSheet open={mobileOpen} close={() => setMobileOpen(false)} />
     </MotionConfig>
   );
 }
-
-/* ---------------------------------------------------------------- */
-/* Triggers                                                           */
-/* ---------------------------------------------------------------- */
 
 function HoverPill() {
   return (
     <motion.span
       layoutId="nav-hover-pill"
-      transition={{ duration: 0.25, ease: EASE }}
-      className="absolute inset-0 z-0 rounded-full bg-secondary/80"
+      transition={{ duration: 0.18, ease: NAV_EASE }}
+      className="absolute inset-0 rounded-full bg-secondary/70"
       aria-hidden
     />
   );
@@ -375,6 +382,7 @@ function NavTrigger({
   menuKey,
   label,
   open,
+  current,
   hovered,
   onHover,
   onLeave,
@@ -384,6 +392,7 @@ function NavTrigger({
   menuKey: MenuKey;
   label: string;
   open: boolean;
+  current: boolean;
   hovered: boolean;
   onHover: () => void;
   onLeave: () => void;
@@ -396,8 +405,8 @@ function NavTrigger({
         ref={registerRef}
         type="button"
         className={cn(
-          "relative flex items-center gap-1 rounded-full px-3 py-2 text-[14px] font-medium transition-colors",
-          open ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+          "relative flex h-9 items-center gap-1 rounded-full pl-3.5 pr-2.5 text-[14px] font-medium transition-colors duration-150",
+          open || current ? "text-foreground" : "text-muted-foreground hover:text-foreground",
         )}
         onMouseEnter={onHover}
         onMouseLeave={onLeave}
@@ -405,319 +414,18 @@ function NavTrigger({
         aria-expanded={open}
         aria-controls={`menu-${menuKey}`}
       >
-        {hovered && <HoverPill />}
-        <span className="relative z-10">{label}</span>
-        <motion.span
-          animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.2, ease: EASE }}
-          className="relative z-10 flex items-center"
-        >
-          <ChevronDown size={14} strokeWidth={2.2} aria-hidden />
-        </motion.span>
+        {(hovered || open) && <HoverPill />}
+        <span className="relative">{label}</span>
+        <ChevronDown
+          size={14}
+          strokeWidth={2.2}
+          aria-hidden
+          className={cn(
+            "relative opacity-60 transition-transform duration-200 ease-[var(--ease-out-quart)]",
+            open && "rotate-180",
+          )}
+        />
       </button>
     </li>
-  );
-}
-
-/* ---------------------------------------------------------------- */
-/* Morphing dropdown panel (FLIP layout, PR #126)                     */
-/* ---------------------------------------------------------------- */
-
-function MorphPanel({
-  active,
-  box,
-  direction,
-  cancelClose,
-  scheduleClose,
-  close,
-}: {
-  active: MenuKey | null;
-  box: { left: number; width: number } | null;
-  direction: number;
-  cancelClose: () => void;
-  scheduleClose: () => void;
-  close: () => void;
-}) {
-  return (
-    <AnimatePresence>
-      {active && box && (
-        <motion.div
-          key="morph-panel"
-          initial={{ opacity: 0, y: 8, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.98, transition: { duration: 0.16, ease: EASE } }}
-          transition={{ duration: 0.24, ease: EASE }}
-          style={{ transformOrigin: `${box.left + box.width / 2}px top` }}
-          className="absolute left-0 right-0 top-full z-50 hidden pt-2 lg:block"
-          onMouseEnter={cancelClose}
-          onMouseLeave={scheduleClose}
-        >
-          {/* width + marginLeft change between menus and height follows the content: framer interpolates all of it. */}
-          <motion.div
-            layout
-            initial={false}
-            transition={{ duration: 0.3, ease: EASE }}
-            style={{ width: box.width, marginLeft: box.left, borderRadius: 18 }}
-            className="relative overflow-hidden border border-border/60 bg-[hsl(var(--card)/0.98)] shadow-[0_24px_80px_-20px_hsl(var(--foreground)/0.28)] backdrop-blur-2xl backdrop-saturate-150"
-          >
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.div
-                key={active}
-                id={`menu-${active}`}
-                initial={{ opacity: 0, x: direction * 28 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: direction * -28 }}
-                transition={{ duration: 0.26, ease: EASE }}
-                style={{ width: box.width }}
-              >
-                {active === "platform" ? (
-                  <PlatformPanel close={close} />
-                ) : (
-                  <ListPanel menu={active} close={close} />
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-const listVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.03, delayChildren: 0.04 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 6 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.26, ease: EASE } },
-};
-
-const columnHeading = "mb-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground";
-
-function ModuleLink({ item, close }: { item: SiteRoute; close: () => void }) {
-  const Icon = item.module ? ACCENTS[item.module].icon : ArrowRight;
-  return (
-    <motion.li variants={itemVariants}>
-      <Link
-        href={item.href}
-        onClick={close}
-        className={cn("group -mx-2.5 flex items-start gap-3 rounded-xl px-2.5 py-2.5 transition-colors hover:bg-secondary/60", accentClass(item.module))}
-      >
-        <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[10px] bg-a-soft text-a-ink shadow-[inset_0_0_0_1px_hsl(var(--a)/0.22)]">
-          <Icon size={16} strokeWidth={2} aria-hidden />
-        </span>
-        <span className="min-w-0">
-          <span className="flex items-center gap-1 text-[15px] font-semibold leading-tight text-foreground">
-            {item.label}
-            <ArrowRight
-              size={12}
-              aria-hidden
-              className="-translate-x-1 opacity-0 transition-[transform,opacity] duration-200 ease-[var(--ease-out-quart)] group-hover:translate-x-0 group-hover:opacity-60"
-            />
-          </span>
-          <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">{item.blurb}</span>
-        </span>
-      </Link>
-    </motion.li>
-  );
-}
-
-function PlatformPanel({ close }: { close: () => void }) {
-  return (
-    <div>
-      <div className="grid grid-cols-[1fr_1fr_220px] gap-6 p-6 pb-5">
-        {PLATFORM_COLUMNS.map((col) => (
-          <motion.div key={col.key} initial="hidden" animate="visible" variants={listVariants}>
-            <p className={columnHeading}>{col.heading}</p>
-            <ul className="space-y-0.5">
-              {platformColumn(col.key).map((item) => (
-                <ModuleLink key={item.href} item={item} close={close} />
-              ))}
-            </ul>
-          </motion.div>
-        ))}
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, ease: EASE, delay: 0.1 }}
-          className="flex flex-col rounded-2xl bg-secondary/50 p-4"
-        >
-          <p className="text-[13px] leading-snug text-muted-foreground">{ROUTES.security.blurb}</p>
-          <Link
-            href={ROUTES.security.href}
-            onClick={close}
-            className="group mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-foreground"
-          >
-            {ROUTES.security.label}
-            <ArrowRight size={12} aria-hidden className="transition-transform duration-200 group-hover:translate-x-0.5" />
-          </Link>
-        </motion.div>
-      </div>
-      <Link
-        href={ROUTES.platform.href}
-        onClick={close}
-        className="group flex items-center justify-between border-t border-border/60 px-6 py-3.5 text-[13.5px] transition-colors hover:bg-secondary/40"
-      >
-        <span>
-          <span className="font-semibold text-foreground">{ROUTES.platform.label}</span>
-          <span className="text-muted-foreground"> · {ROUTES.platform.blurb}</span>
-        </span>
-        <ArrowRight size={14} aria-hidden className="text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5" />
-      </Link>
-    </div>
-  );
-}
-
-function ListPanel({ menu, close }: { menu: Exclude<MenuKey, "platform">; close: () => void }) {
-  return (
-    <div>
-      <motion.ul className="space-y-0.5 p-5" initial="hidden" animate="visible" variants={listVariants}>
-        {menuItems(menu).map((item) => (
-          <motion.li key={item.href} variants={itemVariants}>
-            <Link
-              href={item.href}
-              onClick={close}
-              className="group -mx-1 block rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60"
-            >
-              <span className="flex items-center gap-1 text-[15px] font-semibold leading-tight text-foreground">
-                {item.label}
-                <ArrowRight
-                  size={12}
-                  aria-hidden
-                  className="-translate-x-1 opacity-0 transition-[transform,opacity] duration-200 ease-[var(--ease-out-quart)] group-hover:translate-x-0 group-hover:opacity-60"
-                />
-              </span>
-              {item.blurb && <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">{item.blurb}</span>}
-            </Link>
-          </motion.li>
-        ))}
-      </motion.ul>
-      {menu === "solutions" && (
-        <Link
-          href={BROKER_PILOT_LINE.href}
-          onClick={close}
-          data-cta-id="book_demo"
-          data-location="nav"
-          className="group flex items-center justify-between border-t border-border/60 px-6 py-3.5 text-[13.5px] text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
-        >
-          {BROKER_PILOT_LINE.label}
-          <ArrowRight size={14} aria-hidden className="transition-transform duration-200 group-hover:translate-x-0.5" />
-        </Link>
-      )}
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------------- */
-/* Mobile sheet                                                       */
-/* ---------------------------------------------------------------- */
-
-function MobileSheet({ open, close }: { open: boolean; close: () => void }) {
-  const [group, setGroup] = React.useState<MenuKey | null>("platform");
-  const toggle = (k: MenuKey) => setGroup((g) => (g === k ? null : k));
-
-  const groupItems = (k: MenuKey): SiteRoute[] =>
-    k === "platform" ? [ROUTES.platform, ...menuItems("platform").filter((x) => x.href !== ROUTES.platform.href)] : menuItems(k);
-
-  // Portalled to <body>: the header's backdrop-filter would otherwise become
-  // the containing block of this fixed sheet and collapse it to the bar.
-  const mounted = React.useSyncExternalStore(noopSubscribe, () => true, () => false);
-  if (!mounted) return null;
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          key="mobile-sheet"
-          id="mobile-menu"
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8, transition: { duration: 0.16, ease: EASE } }}
-          transition={{ duration: 0.24, ease: EASE }}
-          className="fixed inset-x-0 bottom-0 top-14 z-40 flex flex-col border-t border-border/60 bg-background lg:hidden"
-        >
-          <nav aria-label="Mobile" className="flex-1 overflow-y-auto overscroll-contain px-5 pb-6 pt-2">
-            {HEADER_ORDER.map((k) =>
-              k === "pricing" ? (
-                <Link
-                  key="pricing"
-                  href={ROUTES.pricing.href}
-                  onClick={close}
-                  className="flex min-h-12 items-center border-b border-border/60 text-[16px] font-semibold text-foreground"
-                >
-                  {ROUTES.pricing.label}
-                </Link>
-              ) : (
-                <div key={k} className="border-b border-border/60">
-                  <button
-                    type="button"
-                    onClick={() => toggle(k)}
-                    aria-expanded={group === k}
-                    className="flex min-h-12 w-full items-center justify-between text-left text-[16px] font-semibold text-foreground"
-                  >
-                    {HEADER_MENUS.find((m) => m.key === k)!.label}
-                    <motion.span animate={{ rotate: group === k ? 180 : 0 }} transition={{ duration: 0.2, ease: EASE }}>
-                      <ChevronDown size={16} className="text-muted-foreground" aria-hidden />
-                    </motion.span>
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {group === k && (
-                      <motion.ul
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.22, ease: EASE }}
-                        className="overflow-hidden"
-                      >
-                        <div className="pb-3">
-                          {groupItems(k).map((item) => (
-                            <li key={item.href}>
-                              <Link
-                                href={item.href}
-                                onClick={close}
-                                className={cn(
-                                  "flex min-h-11 items-center gap-3 rounded-lg px-2 text-[15px] text-foreground/85 transition-colors hover:bg-secondary/60",
-                                  accentClass(item.module),
-                                )}
-                              >
-                                {item.module ? (
-                                  <span aria-hidden className="size-2 rounded-[3px] bg-a" />
-                                ) : (
-                                  <span aria-hidden className="size-2" />
-                                )}
-                                {item.label}
-                              </Link>
-                            </li>
-                          ))}
-                          {k === "solutions" && (
-                            <li>
-                              <Link
-                                href={BROKER_PILOT_LINE.href}
-                                onClick={close}
-                                className="flex min-h-11 items-center gap-3 px-2 text-[14px] text-muted-foreground"
-                              >
-                                <span aria-hidden className="size-2" />
-                                {BROKER_PILOT_LINE.label}
-                              </Link>
-                            </li>
-                          )}
-                        </div>
-                      </motion.ul>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ),
-            )}
-            <a href={APP_LOGIN_URL} className="flex min-h-12 items-center text-[16px] text-muted-foreground">
-              Log in
-            </a>
-          </nav>
-          <div className="border-t border-border/60 bg-[hsl(var(--card))] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <DemoButton location="nav" src="nav" size="lg" className="w-full" onClick={close} />
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
   );
 }

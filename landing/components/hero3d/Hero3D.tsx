@@ -35,10 +35,15 @@ export const HERO_SCENES = {
 
 export type HeroSlug = keyof typeof HERO_SCENES;
 
-// Poster files in /public/hero: 1512x1240 desktop and 780x720 mobile (both 2x),
-// transparent, light + dark, rendered from this engine at the scene's poster time.
+// Poster files in /public/hero, transparent, light + dark, rendered from this
+// engine at the scene's poster time and fit: desktop <slug>.webp 1512x1240 (2x of
+// the 756x620 slot), phone <slug>-m.webp 780x718 (2x) and <slug>-m3x.webp
+// 1170x1077 (3x of the 390x359 edge-to-edge phone slot).
 const DESKTOP = { width: 1512, height: 1240 };
-const MOBILE = { width: 780, height: 720 };
+const MOBILE = { width: 780, height: 718 };
+const MOBILE_3X_W = 1170;
+// below sm the slot is the full viewport width; sm..md it's capped at 640px
+const MOBILE_SIZES = "(max-width: 639px) 100vw, 640px";
 const MOBILE_MQ = "(max-width: 767px)";
 const DARK_MQ = "(prefers-color-scheme: dark)";
 const FADE_MS = 600;
@@ -65,7 +70,7 @@ function stillReason(): string | null {
   return null;
 }
 
-/** Phones, coarse pointers and low-core machines: no shadows, lower DPR, lighter sea. */
+/** Phones, coarse pointers and low-core machines: no shadows, lighter sea, no parallax (DPR is budgeted in the engine). */
 function isLite() {
   return (
     Math.min(innerWidth, innerHeight) < 600 ||
@@ -185,13 +190,12 @@ export function Hero3D({ scene, className, glow = false }: Props) {
 
   const light = scene;
   const darkName = `${scene}-dark`;
-  const src = (name: string, mobile: boolean) =>
-    getImageProps({
-      src: `/hero/${name}${mobile ? "-m" : ""}.webp`,
-      alt: "",
-      unoptimized: true,
-      ...(mobile ? MOBILE : DESKTOP),
-    }).props.src;
+  const desktopSrc = (name: string) =>
+    getImageProps({ src: `/hero/${name}.webp`, alt: "", unoptimized: true, ...DESKTOP }).props.src;
+  // w descriptors so a 3x phone gets the 1170px poster and a 2x phone the 780px one
+  const mobileSet = (name: string) =>
+    `${getImageProps({ src: `/hero/${name}-m.webp`, alt: "", unoptimized: true, ...MOBILE }).props.src} ${MOBILE.width}w, ` +
+    `${getImageProps({ src: `/hero/${name}-m3x.webp`, alt: "", unoptimized: true, ...MOBILE }).props.src} ${MOBILE_3X_W}w`;
 
   const base = themeOverride === "dark" ? darkName : light;
   const { props: img } = getImageProps({
@@ -219,11 +223,11 @@ export function Hero3D({ scene, className, glow = false }: Props) {
         <picture>
           {themeOverride === null && (
             <>
-              <source media={`${DARK_MQ} and ${MOBILE_MQ}`} srcSet={src(darkName, true)} {...MOBILE} />
-              <source media={DARK_MQ} srcSet={src(darkName, false)} {...DESKTOP} />
+              <source media={`${DARK_MQ} and ${MOBILE_MQ}`} srcSet={mobileSet(darkName)} sizes={MOBILE_SIZES} {...MOBILE} />
+              <source media={DARK_MQ} srcSet={desktopSrc(darkName)} {...DESKTOP} />
             </>
           )}
-          <source media={MOBILE_MQ} srcSet={src(base, true)} {...MOBILE} />
+          <source media={MOBILE_MQ} srcSet={mobileSet(base)} sizes={MOBILE_SIZES} {...MOBILE} />
           <img
             {...img}
             alt=""
