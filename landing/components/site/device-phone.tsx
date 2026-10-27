@@ -87,7 +87,7 @@ export function DevicePhone({ src2x, src3x, alt, sizes, eager, className }: Devi
             className="relative isolate h-full w-full overflow-hidden bg-white"
             style={{ borderRadius: radius(SCREEN_R, SCREEN_W, SCREEN_H) }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized 2x/3x webp via srcset; next/image can't take a custom srcset */}
+            {/* Plain <img>: pre-sized 2x/3x webp via srcset; next/image can't take a custom srcset. */}
             <img
               src={src3x}
               srcSet={`${src2x} 880w, ${src3x} 1320w`}
