@@ -81,7 +81,7 @@ export const VOLUME = {
   title: "Filing at volume?",
   body: "If you file ISFs or entries for other companies, the $45 above isn't your price. Volume pricing is on request and agreed in writing, under the same rule: you're charged only when CBP accepts.",
   partners:
-    "We're taking a small number of NVOCC and forwarder design partners: API onboarding with the founder, and volume pricing agreed in writing.",
+    "We're taking a small number of paid NVOCC and forwarder pilots: API onboarding with our team, and volume pricing agreed in writing.",
   includes: [
     "Written per-shipment volume pricing",
     "Public REST API (JSON or XML) with HMAC-signed status webhooks",
