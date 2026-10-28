@@ -21,7 +21,7 @@ export const dynamic = "force-static";
 
 /** Bible v3 one-liner (product-marketing.md §5): the only one. */
 const ONE_LINER =
-  "MyCargoLens is ISF and customs entry software that shows which filing needs you now, checks it before CBP does, and puts the price per shipment on the website.";
+  "MyCargoLens is ISF and customs entry software that shows which filing needs you now, checks it before CBP does, and puts the ISF price on the website.";
 
 const url = (path: string) => `${SITE_URL}${path === "/" ? "" : path}`;
 const item = (r: Pick<SiteRoute, "label" | "href" | "blurb">) =>
@@ -50,8 +50,8 @@ function body(): string {
     ...menuItems("solutions").map(item),
     "",
     "## Pricing",
-    `- [Pricing](${url(ROUTES.pricing.href)}): $45 ISF, $180 ISF + Entry, $280 Complete, per shipment, charged only when CBP accepts. No monthly fee. Volume pricing on request.`,
-    `- [Pricing in Markdown](${url("/pricing.md")}): the same plans and billing rules as plain text.`,
+    `- [Pricing](${url(ROUTES.pricing.href)}): ISF is $45 per accepted ISF, charged only when CBP accepts. No monthly fee. Customs entry: talk to us. Volume pricing on request.`,
+    `- [Pricing in Markdown](${url("/pricing.md")}): the same prices and billing rules as plain text.`,
     "",
     "## Trust",
     item(ROUTES.security),

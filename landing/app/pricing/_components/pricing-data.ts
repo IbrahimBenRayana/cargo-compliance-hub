@@ -1,87 +1,69 @@
 import type { ModuleKey } from "@/lib/accents";
 
 /**
- * Pricing data for /pricing and /pricing.md (copy/pricing.md, W5).
- * Prices mirror server/src/config/plans.ts (perFilingCents 4500 / 18000 / 28000,
- * charged on CBP acceptance). Keep both in sync. No volume price exists:
- * volume pricing is on request (bible v3, A40).
+ * Pricing data for /pricing and /pricing.md.
+ * Public card (v2): ISF is $45 per accepted ISF, charged on CBP acceptance
+ * (server/src/config/plans.ts perFilingCents 4500). Customs entry has no public
+ * price ("talk to us"). Volume pricing is on request. Never publish another number.
  */
 
-export type TierId = "isf" | "entry" | "full";
-
-export type Tier = {
-  /** plans.ts tier id, passed to the demo form as `?tier=`. */
-  id: TierId;
+export type Plan = {
+  id: "isf" | "entry";
   name: string;
-  /** USD per shipment. */
-  price: number;
-  /** Fact badge on the highlighted tier (never "Most popular"). */
-  badge?: string;
-  featured?: boolean;
-  /** Accent for the tier bar (module hues). */
+  /** USD per accepted ISF. Absent = no public price ("Talk to us"). */
+  price?: number;
+  /** Line under the price (or under "Talk to us"). */
+  unit: string;
+  note: string;
+  /** Module hue for the card bar. */
   accent: ModuleKey;
   who: string;
   includes: string[];
-  /** One-line summary used by /pricing.md (deck §pricing.md, word for word). */
-  md: string;
 };
 
-export const PRICE_NOTE = "No monthly fee";
-export const PER = "per shipment";
+export const ISF_PRICE = 45;
+export const PER_ISF = "per accepted ISF";
 
-export const TIERS: Tier[] = [
-  {
-    id: "isf",
-    name: "ISF Filing",
-    price: 45,
-    accent: "isf",
-    who: "You file the ISF; your broker or another tool handles the entry.",
-    includes: [
-      "ISF-10 (10+2) and ISF-5",
-      "Deadline clock with alerts at 72, 48 and 24 hours",
-      "Templates and bulk submit",
-      "Manifest (MBOL) query",
-      "Email support",
-    ],
-    md: "ISF-10, ISF-5, deadline clock, templates, manifest query.",
-  },
-  {
-    id: "entry",
-    name: "ISF + Entry",
-    price: 180,
-    badge: "ISF and entry, billed once",
-    featured: true,
-    accent: "entry",
-    who: "You file both the ISF and the entry for the same shipment.",
-    includes: [
-      "Everything in ISF Filing",
-      "Entry summary (7501)",
-      "Cargo release (3461), prefilled from the accepted ISF",
-      "Linked ISF and entry billed once",
-      "Chat support",
-    ],
-    md: "Adds entry summary (7501) and cargo release (3461). A linked ISF and entry is billed once.",
-  },
-  {
-    id: "full",
-    name: "Complete",
-    price: 280,
-    accent: "compliance",
-    who: "You also want container tracking and duty estimates in the same place.",
-    includes: [
-      "Everything in ISF + Entry",
-      "Container tracking with vessel ETAs and last free day",
-      "Duty calculator",
-      "Priority support",
-    ],
-    md: "Adds container tracking and the duty calculator.",
-  },
-];
+export const ISF_PLAN: Plan = {
+  id: "isf",
+  name: "ISF Filing",
+  price: ISF_PRICE,
+  unit: PER_ISF,
+  note: "No monthly fee",
+  accent: "isf",
+  who: "You file the ISF. Your card is charged only when CBP accepts it.",
+  includes: [
+    "ISF-10 (10+2) and ISF-5",
+    "Deadline clock with alerts at 72, 48 and 24 hours",
+    "Templates and bulk submit",
+    "Manifest (MBOL) query",
+    "Rejections and amendments aren't charged",
+  ],
+};
+
+export const ENTRY_PLAN: Plan = {
+  id: "entry",
+  name: "Customs entry",
+  unit: "Priced on a call",
+  note: "Tell us how many entries you file",
+  accent: "entry",
+  who: "You also file the entry for your shipments, linked to the ISF.",
+  includes: [
+    "Entry summary (7501)",
+    "Cargo release (3461), prefilled from the accepted ISF",
+    "ISF and entry linked on one shipment",
+    "Container tracking and the duty calculator: ask us in the demo",
+  ],
+};
+
+export const PLANS: Plan[] = [ISF_PLAN, ENTRY_PLAN];
 
 export const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
 
 export const UNDER_CARDS =
-  "You're charged when CBP accepts the shipment, using the card on file. Drafts and rejected filings cost nothing, and resubmits are never charged twice.";
+  "You're charged when CBP accepts the ISF, using the card on file. Drafts, rejected filings and amendments cost nothing.";
+
+export const ENTERPRISE = "Larger team, or a setup that doesn't fit either card?";
 
 export const ON_EVERY_PLAN = [
   "The inbox: open work ranked by urgency",
@@ -97,9 +79,9 @@ export const ON_EVERY_PLAN = [
 export const VOLUME = {
   eyebrow: "NVOCCs, forwarders and customs brokers",
   title: "Filing at volume?",
-  body: "If you file ISFs or entries for other companies, the importer card above isn't your price. Volume pricing is on request and agreed in writing, under the same rule: you're charged only when CBP accepts.",
+  body: "If you file ISFs or entries for other companies, the $45 above isn't your price. Volume pricing is on request and agreed in writing, under the same rule: you're charged only when CBP accepts.",
   partners:
-    "We're taking a small number of NVOCC and forwarder design partners: API onboarding with the founder, and volume pricing agreed in writing.",
+    "We're taking a small number of paid NVOCC and forwarder pilots: API onboarding with our team, and volume pricing agreed in writing.",
   includes: [
     "Written per-shipment volume pricing",
     "Public REST API (JSON or XML) with HMAC-signed status webhooks",
@@ -122,43 +104,35 @@ export const TRUST = [
   "Software, not a customs broker",
 ] as const;
 
-/** FAQ in the deck's page order (Q1, Q2, Q3, Q11, Q6, Q7, Q5, Q4, Q9, Q8, Q10, Q12). */
+/** Pricing FAQ. */
 export const FAQ = [
   {
-    q: "How does per-shipment pricing work?",
-    a: "You pick a plan, which sets your rate per shipment and the features you get. We keep a card on file and charge that rate once for each shipment CBP accepts. There's no monthly fee on the public plans.",
-  },
-  {
-    q: "What counts as one shipment?",
-    a: "One ISF, one entry, or an ISF and its linked entry. A linked ISF and entry on the same shipment is billed once.",
+    q: "How does the ISF price work?",
+    a: "We keep a card on file and charge $45 once for each ISF that CBP accepts. There's no monthly fee, and nothing is charged until CBP accepts the filing.",
   },
   {
     q: "What am I never charged for?",
-    a: "Drafts, manifest (MBOL) queries and filings CBP rejects. Fixing and resubmitting a filing, or amending it later, never charges the shipment a second time.",
+    a: "Drafts, manifest (MBOL) queries and filings CBP rejects. Fixing and resubmitting a filing, or amending it later, isn't charged again.",
+  },
+  {
+    q: "What does customs entry cost?",
+    a: "Talk to us. Book a demo, tell us how many entries you file and how you file them today, and we'll go through the price with you on the call.",
   },
   {
     q: "We're an NVOCC filing hundreds of ISFs a month. Is $45 our price?",
-    a: "No. The public plans are built for importers. NVOCCs, forwarders and brokers get volume pricing on request, agreed in writing, with the same rule: charged only when CBP accepts.",
+    a: "No. The $45 price is built for importers. NVOCCs, forwarders and brokers get volume pricing on request, agreed in writing, with the same rule: charged only when CBP accepts.",
   },
   {
     q: "How do I get started?",
-    a: "Book a 20-minute demo. If it fits, our team sets up your account, you add a card and pick a plan, and you're charged per shipment from your first accepted filing.",
-  },
-  {
-    q: "Is $180 cheaper than my broker?",
-    a: "Often it's about the same as a typical broker fee. What changes is that you see and check every ISF and entry you file, a linked ISF and entry is billed once, and rejected filings are never charged.",
+    a: "Book a 20-minute demo. If it fits, our team sets up your account, you add a card, and you're charged from your first accepted ISF.",
   },
   {
     q: "Is there a monthly fee?",
-    a: "There's no monthly fee on the ISF Filing, ISF + Entry or Complete plans.",
+    a: "Not for ISF filing. You pay $45 for each accepted ISF and nothing else.",
   },
   {
     q: "What happens if CBP rejects my filing?",
     a: "You aren't charged. The rejection shows up in your inbox in plain English with numbered steps to fix it, and the corrected resubmit is billed once when CBP accepts.",
-  },
-  {
-    q: "Can I change plans later?",
-    a: "Yes. An Owner or Admin on your account can switch plans in billing settings. The new rate applies to shipments billed after the change.",
   },
   {
     q: "Do I need my own filer code and bond?",
@@ -166,26 +140,26 @@ export const FAQ = [
   },
   {
     q: "What if my card payment fails?",
-    a: "The shipment is already filed with CBP. We retry the charge, and new filings pause until the card is updated.",
+    a: "The filing is already with CBP. We retry the charge, and new filings pause until the card is updated.",
   },
   {
-    q: "Why pay per shipment when an ISF penalty can be $5,000?",
-    a: "CBP can claim $5,000 in liquidated damages per ISF violation. The per-shipment price covers the deadline clock, the checks before you submit and the record of what was sent. You stay the importer of record and decide what to file.",
+    q: "Why pay per ISF when an ISF penalty can be $5,000?",
+    a: "CBP can claim $5,000 in liquidated damages per ISF violation. The price covers the deadline clock, the checks before you submit and the record of what was sent. You stay the importer of record and decide what to file.",
   },
 ];
 
-/** /pricing.md body (site-architecture §5.5; copy/pricing.md "/pricing.md" block). */
+/** /pricing.md body (site-architecture §5.5), generated from the same data as /pricing. */
 export function pricingMarkdown(): string {
   return [
     "# MyCargoLens pricing",
     "",
-    "Per shipment, charged when CBP accepts the shipment. Card on file. No monthly fee on public plans.",
-    "",
-    ...TIERS.map((t) => `- ${t.name}: ${usd(t.price)} ${PER}. ${t.md}`),
+    `- ISF Filing (ISF-10 or ISF-5): ${usd(ISF_PRICE)} ${PER_ISF}. Card on file, charged only when CBP accepts. No monthly fee. Rejections and amendments aren't charged.`,
+    "- Customs entry (entry summary 7501, cargo release 3461, ISF and entry linked): talk to us (book a demo).",
+    "- Volume pricing for NVOCCs, forwarders and customs brokers: on request (book a demo).",
+    "- Larger teams: contact us.",
     "",
     "On every plan: HTS suggestions with reasoning, rule checks and an AI review on any draft, and CBP rejections in plain English.",
-    "Not charged: drafts, manifest queries and rejected filings. Resubmits and amendments never charge a shipment twice.",
-    "Volume and API pricing for NVOCCs, forwarders and customs brokers: on request (book a demo).",
+    "Not charged: drafts, manifest queries and rejected filings.",
     "MyCargoLens is software, not a licensed customs broker.",
     "",
   ].join("\n");

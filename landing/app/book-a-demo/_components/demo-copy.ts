@@ -115,7 +115,7 @@ export function faqItems(persona: DemoPersona) {
       q: "What does it cost?",
       a: volume
         ? "NVOCCs, forwarders and brokers filing at volume get volume pricing on request. Same rule: charged only when CBP accepts."
-        : "Public plans are $45 for ISF, $180 for ISF + Entry and $280 for Complete, per shipment, charged only when CBP accepts. NVOCCs, forwarders and brokers filing at volume get volume pricing on request.",
+        : "ISF is $45 per accepted ISF, charged only when CBP accepts. Customs entry is priced on the call. NVOCCs, forwarders and brokers filing at volume get volume pricing on request.",
     },
   ];
 }

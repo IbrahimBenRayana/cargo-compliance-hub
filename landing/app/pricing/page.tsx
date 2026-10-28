@@ -28,22 +28,22 @@ import { cn } from "@/lib/utils";
 import { LaneSwitch } from "./_components/lane-switch";
 import { Estimator } from "./_components/estimator";
 import {
+  ENTERPRISE,
   FAQ,
   GOOD_TO_KNOW,
+  ISF_PLAN,
+  ENTRY_PLAN,
   ON_EVERY_PLAN,
-  PER,
-  PRICE_NOTE,
-  TIERS,
   TRUST,
   UNDER_CARDS,
   VOLUME,
   usd,
-  type Tier,
+  type Plan,
 } from "./_components/pricing-data";
 
-const TITLE = "Customs Filing Software Pricing, Per Shipment";
+const TITLE = "Customs Filing Software Pricing: ISF $45";
 const DESCRIPTION =
-  "ISF $45, ISF + Entry $180, Complete $280 per shipment. No monthly fee. Charged only when CBP accepts. Volume and API pricing for NVOCCs on request.";
+  "ISF filing is $45 per accepted ISF, charged only when CBP accepts. No monthly fee. Customs entry: talk to us. Volume and API pricing for NVOCCs on request.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -67,40 +67,36 @@ const PLAN_ICONS: LucideIcon[] = [Inbox, ShieldCheck, FileWarning, Timer, Scale,
 const NAVY_BORDER = "border-[hsl(222_47%_22%)] dark:border-[hsl(205_90%_78%)]";
 const NAVY_PILL = "bg-[hsl(222_47%_22%)] text-white dark:bg-[hsl(205_90%_78%)] dark:text-[hsl(222_47%_11%)]";
 
-function tierHref(id: Tier["id"]) {
-  return `${ctaHref({ persona: "importer" })}&tier=${id}&src=pricing`;
+function planHref(id: Plan["id"]) {
+  return ctaHref({ persona: "importer", src: id === "isf" ? "pricing-isf" : "pricing-entry" });
 }
 
-function TierCard({ tier }: { tier: Tier }) {
-  const featured = !!tier.featured;
+/** ISF carries the page's one gold CTA; customs entry has no public price and an outline CTA. */
+function PlanCard({ plan }: { plan: Plan }) {
+  const priced = plan.price !== undefined;
   return (
     <article
-      aria-labelledby={`tier-${tier.id}`}
+      aria-labelledby={`plan-${plan.id}`}
       className={cn(
-        "relative flex min-w-0 flex-col rounded-[24px] p-6 site-surface sm:p-7",
-        accentClass(tier.accent),
-        featured ? cn("order-first border-2 md:order-none lg:-my-4 lg:py-10", NAVY_BORDER) : "",
+        "relative flex min-w-0 flex-col rounded-[24px] p-6 site-surface sm:p-8",
+        accentClass(plan.accent),
+        priced && cn("border-2", NAVY_BORDER),
       )}
     >
       <span aria-hidden className="mb-5 block h-1.5 w-12 rounded-full bg-a" />
-      {tier.badge && (
-        <p className={cn("absolute right-5 top-5 rounded-full px-3 py-1 text-[12px] font-semibold", NAVY_PILL)}>
-          {tier.badge}
-        </p>
-      )}
-      <h3 id={`tier-${tier.id}`} className="text-[20px] font-semibold tracking-[-0.015em] text-tone-fg">
-        {tier.name}
+      <h3 id={`plan-${plan.id}`} className="text-[20px] font-semibold tracking-[-0.015em] text-tone-fg">
+        {plan.name}
       </h3>
-      <p className="mt-4 flex items-baseline gap-2">
+      <p className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-[44px] font-bold leading-none tracking-[-0.03em] tabular-nums text-tone-fg">
-          {usd(tier.price)}
+          {priced ? usd(plan.price!) : "Talk to us"}
         </span>
-        <span className="text-[14px] font-medium text-tone-muted">{PER}</span>
+        {priced && <span className="text-[14px] font-medium text-tone-muted">{plan.unit}</span>}
       </p>
-      <p className="mt-2 text-[13.5px] font-medium text-tone-muted">{PRICE_NOTE}</p>
-      <p className="mt-5 text-[15px] leading-relaxed text-tone-fg">{tier.who}</p>
+      <p className="mt-2 text-[13.5px] font-medium text-tone-muted">{priced ? plan.note : `${plan.unit}. ${plan.note}.`}</p>
+      <p className="mt-5 text-[15px] leading-relaxed text-tone-fg">{plan.who}</p>
       <ul className="mt-5 flex-1 space-y-2.5 border-t border-[hsl(var(--surface-border))] pt-5">
-        {tier.includes.map((item) => (
+        {plan.includes.map((item) => (
           <li key={item} className="flex gap-2.5 text-[14.5px] leading-snug text-tone-fg">
             <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-a-ink" strokeWidth={2.5} />
             <span className="min-w-0">{item}</span>
@@ -109,12 +105,12 @@ function TierCard({ tier }: { tier: Tier }) {
       </ul>
       <Button
         asChild
-        variant={featured ? "gold" : "outline"}
+        variant={priced ? "gold" : "outline"}
         size="lg"
-        className={cn("mt-7 w-full", !featured && "bg-[hsl(var(--surface))]")}
+        className={cn("mt-7 w-full", !priced && "bg-[hsl(var(--surface))]")}
       >
-        <Link href={tierHref(tier.id)} data-cta-id={CTA.bookDemo.id} data-location="section" data-tier={tier.id}>
-          {CTA.bookDemo.label}
+        <Link href={planHref(plan.id)} data-cta-id={CTA.bookDemo.id} data-location="section" data-plan={plan.id}>
+          {priced ? CTA.bookDemo.label : "Talk to us"}
         </Link>
       </Button>
     </article>
@@ -131,16 +127,18 @@ export default function PricingPage() {
         data={graph(
           webPage({ path: "/pricing", name: TITLE, description: DESCRIPTION, aboutSoftware: true }),
           {
-            // Product + SoftwareApplication: the three public Offers (UnitPriceSpecification,
-            // per shipment, USD). No price node for volume pricing.
+            // Product + SoftwareApplication: the one public Offer (ISF, per accepted ISF, USD).
+            // Customs entry and volume have no public price, so no Offer node.
             ...softwareApplication({
-              description:
-                "ISF and customs entry filing software, priced per shipment and charged when CBP accepts.",
-              offers: TIERS.map((t) => ({
-                name: t.name,
-                price: t.price,
-                description: `${usd(t.price)} ${PER}, charged when CBP accepts. ${PRICE_NOTE}.`,
-              })),
+              description: "ISF and customs entry filing software. ISF is charged per accepted ISF, when CBP accepts.",
+              offers: [
+                {
+                  name: ISF_PLAN.name,
+                  price: ISF_PLAN.price!,
+                  unitText: ISF_PLAN.unit,
+                  description: `${usd(ISF_PLAN.price!)} ${ISF_PLAN.unit}, charged when CBP accepts. ${ISF_PLAN.note}.`,
+                },
+              ],
             }),
             "@type": ["SoftwareApplication", "Product"],
           },
@@ -152,20 +150,19 @@ export default function PricingPage() {
         size="compact"
         breadcrumbPath="/pricing"
         eyebrow="Pricing"
-        title="A price per shipment, charged when CBP accepts."
-        sub="Importers see the full price below, with no monthly fee on the public plans. Rejected filings aren't charged, and resubmits are never charged twice."
+        title="$45 per ISF, charged when CBP accepts."
+        sub="No monthly fee, and rejected filings and amendments aren't charged. For customs entry, or if you file at volume, talk to us."
         scene="pricing"
       >
         <LaneSwitch />
       </PageHero>
 
-      {/* S2 · The importer card */}
+      {/* S2 · The importer card: ISF ($45) + customs entry (talk to us) */}
       <Section tone="cream" id="importers" aria-labelledby="importer-card">
         <SectionHeading id="importer-card" title="For importers filing their own ISF and entries" />
-        <div className="mt-12 grid items-stretch gap-5 md:grid-cols-3 lg:gap-6">
-          {TIERS.map((t) => (
-            <TierCard key={t.id} tier={t} />
-          ))}
+        <div className="mt-12 grid items-stretch gap-5 md:grid-cols-2 lg:gap-6">
+          <PlanCard plan={ISF_PLAN} />
+          <PlanCard plan={ENTRY_PLAN} />
         </div>
         <p className="mt-10 max-w-3xl text-[15px] leading-relaxed text-tone-muted">{UNDER_CARDS}</p>
       </Section>
@@ -213,6 +210,12 @@ export default function PricingPage() {
                 How the API works →
               </Link>
             </div>
+            <p className="mt-8 max-w-2xl text-[14.5px] leading-relaxed text-tone-muted">
+              {ENTERPRISE}{" "}
+              <Link href={ROUTES.contact.href} className="font-semibold text-tone-fg underline decoration-current/35 underline-offset-4 hover:decoration-current">
+                Contact us →
+              </Link>
+            </p>
           </div>
           <div className="min-w-0 self-start rounded-[24px] p-6 site-surface sm:p-8">
             <Eyebrow>Includes</Eyebrow>
@@ -223,7 +226,7 @@ export default function PricingPage() {
 
       {/* S5 · Estimator */}
       <Section tone="paper" spacing="compact" aria-labelledby="estimator-title">
-        <SectionHeading id="estimator-title" as="h3" title="What would a month cost?" />
+        <SectionHeading id="estimator-title" as="h3" title="What would a month of ISFs cost?" />
         <div className="mt-8">
           <Estimator />
         </div>
@@ -269,8 +272,8 @@ export default function PricingPage() {
 
       {/* S9 · Final CTA band */}
       <CtaBand
-        title="Find out which plan fits in 20 minutes."
-        sub="Tell us what you ship and how you file today. We'll show you the inbox on shipments like yours and set your team up on the right plan."
+        title="Find out what you'd pay in 20 minutes."
+        sub="Tell us what you ship and how you file today. We'll show you the inbox on shipments like yours, go through the price for your ISFs and entries, and set your team up."
         src="pricing-close"
         links={[
           {
@@ -280,7 +283,7 @@ export default function PricingPage() {
           },
         ]}
         linksBelow
-        micro="Pay per shipment, only when CBP accepts. No monthly fee on the public plans."
+        micro="ISF is $45, charged only when CBP accepts. No monthly fee."
       />
 
       <StickyDemoBar persona="importer" src="pricing-sticky" />

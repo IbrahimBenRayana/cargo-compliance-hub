@@ -20,7 +20,7 @@ const PATH = ROUTES.nvoccForwarders.href;
 const DESCRIPTION =
   "File ISF-10 and ISF-5 for every house bill from your TMS or in bulk, each with a deadline clock. Volume pricing on request.";
 const DESIGN_PARTNERS =
-  "We're taking a small number of NVOCC and forwarder design partners: API onboarding with the founder, and volume pricing agreed in writing.";
+  "We're taking a small number of paid NVOCC and forwarder pilots: API onboarding with our team, and volume pricing agreed in writing.";
 const VOLUME = "/pricing#volume";
 
 export const metadata = pageMetadata({
