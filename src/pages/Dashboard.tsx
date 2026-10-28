@@ -681,10 +681,12 @@ export default function Dashboard() {
   const { data: filingsData, isLoading: filingsLoading } = useFilings({
     sortBy: 'updatedAt', sortOrder: 'desc', limit: 200,
   });
-  const { data: abiData, isLoading: abiLoading } = useAbiDocumentsList({ take: 100 });
+
   const { data: mqData, isLoading: mqLoading } = useManifestQueries({ limit: 30 });
   const { data: profile } = useCurrentUser();
   const { can } = useCapabilities();
+  // Entry plans only: on an ISF plan the list is a 403 on every load.
+  const { data: abiData, isLoading: abiLoading } = useAbiDocumentsList({ take: 100 }, { enabled: can(CAPABILITIES.ABI_ENTRY) });
 
   const [searchParams, setSearchParams] = useSearchParams();
   const welcomePlanId = searchParams.get('welcome');

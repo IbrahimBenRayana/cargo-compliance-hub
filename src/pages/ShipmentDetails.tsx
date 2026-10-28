@@ -661,7 +661,7 @@ export default function ShipmentDetails() {
   const { data: docsData, isLoading: docsLoading } = useFilingDocuments(id);
   // Lifecycle widget data — fetched lazily; failure of either is fine
   // (the widget falls back to ISF-only state if abis/mqs don't load).
-  const { data: abiListData } = useAbiDocumentsList({ take: 100 });
+  const { data: abiListData } = useAbiDocumentsList({ take: 100 }, { enabled: can(CAPABILITIES.ABI_ENTRY) });
   const { data: mqListData } = useManifestQueries({ limit: 50 });
   const uploadDocs = useUploadDocuments();
   const downloadDoc = useDownloadDocument();

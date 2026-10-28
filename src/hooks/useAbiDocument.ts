@@ -7,10 +7,11 @@ import {
   AbiDocumentListParams,
 } from '../api/client';
 
-export function useAbiDocumentsList(params?: AbiDocumentListParams) {
+export function useAbiDocumentsList(params?: AbiDocumentListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['abi-documents', 'list', params],
     queryFn: () => abiDocumentsApi.list(params),
+    enabled: options?.enabled ?? true,
   });
 }
 
