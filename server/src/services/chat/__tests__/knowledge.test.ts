@@ -87,11 +87,14 @@ describe('buildSystemPrompt — product claims', () => {
         expectOnlyNegated(p, /\b270\b/);
       });
 
-      it('states the public per-shipment pricing and volume pricing on request', () => {
-        expect(p).toMatch(/\$45 \/ shipment/);
-        expect(p).toMatch(/\$180 \/ shipment/);
-        expect(p).toMatch(/\$280 \/ shipment/);
+      it('states the v2 public card: ISF $45, entries talk to us, volume on request', () => {
+        expect(p).toMatch(/\$45 per accepted ISF/);
+        expect(p).toMatch(/entries[^.]*talk to us/i);
         expect(p).toMatch(/Volume pricing on request/);
+      });
+
+      it('never quotes the retired $180 / $280 tiers', () => {
+        expect(p).not.toMatch(/\$180|\$280|Complete —/);
       });
 
       it('allows the approved certification claims', () => {
