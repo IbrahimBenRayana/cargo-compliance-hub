@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Section, SectionHeading } from "@/components/site/section";
 import { FeatureSplit } from "@/components/site/blocks";
-import { SecondaryCta } from "@/components/site/cta";
-import { ROUTES } from "@/lib/site";
+import { Button } from "@/components/ui/button";
+import { CTA, ROUTES, ctaHref } from "@/lib/site";
 import {
   FaqSection,
   ModuleHero,
@@ -18,7 +19,7 @@ import { SourceNote } from "../pre-filing-checks/_components/module-links";
 const PATH = ROUTES.customsEntry.href;
 const TITLE = "Customs Entry Software for 7501 and 3461";
 const DESCRIPTION =
-  "File entry summaries (7501) and cargo release (3461) with CBP, prefilled from the accepted ISF. Linked ISF and entry billed once. Book a demo.";
+  "File entry summaries (7501) and cargo release (3461) with CBP, prefilled from the accepted ISF and linked to it on one shipment. Book a demo.";
 const SRC = "platform-entry";
 
 export const metadata: Metadata = pageMetadata({ path: PATH, title: TITLE, description: DESCRIPTION });
@@ -150,7 +151,7 @@ export default function CustomsEntryPage() {
               <p className="text-[14px] font-medium text-tone-fg">
                 Suggestions, not rulings. We don&apos;t publish an accuracy figure.
               </p>
-              <p className="text-[13.5px]">HTS suggestions are on every plan. The duty calculator is on the Complete plan.</p>
+              <p className="text-[13.5px]">HTS suggestions are on every plan. The duty calculator is available with customs entry; ask us in the demo.</p>
             </>
           }
         />
@@ -184,31 +185,41 @@ export default function CustomsEntryPage() {
       <Section tone="peach" id="price" accent="entry">
         <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
           <div className="min-w-0">
-            <SectionHeading eyebrow="Price" title="One price for the shipment, ISF and entry together" />
+            <SectionHeading eyebrow="Price" title="Customs entry is priced on a call" />
             <div className="mt-4 space-y-3 text-[16px] leading-relaxed text-tone-muted sm:text-[17px]">
               <p>
-                ISF + Entry is $180 per shipment, with no monthly fee. A linked ISF and entry is billed once, and only
-                when CBP accepts. Rejected filings aren&apos;t charged, and resubmits and amendments are never charged
-                twice.
+                Tell us how many entries you file and how you file them today, and we&apos;ll go through the price with
+                you in the demo. The ISF on the same shipment is $45, charged only when CBP accepts.
               </p>
               <p>Filing entries for clients at volume? Volume pricing is on request.</p>
             </div>
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
-              <SecondaryCta location="section" />
-              <TextLinks links={[{ label: "Volume pricing", href: "/pricing#volume" }]} />
+            <div className="mt-8">
+              <TextLinks
+                links={[
+                  { label: "See pricing", href: ROUTES.pricing.href },
+                  { label: "Volume pricing", href: "/pricing#volume" },
+                ]}
+              />
             </div>
           </div>
           <div className="min-w-0 rounded-[20px] p-7 site-surface">
-            <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-a-ink">ISF + Entry</p>
-            <p className="mt-3 text-[44px] font-semibold leading-none tracking-[-0.03em] text-tone-fg tabular-nums">
-              $180
-            </p>
-            <p className="mt-2 text-[15px] text-tone-muted">per shipment, no monthly fee</p>
+            <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-a-ink">Customs entry</p>
+            <p className="mt-3 text-[44px] font-semibold leading-none tracking-[-0.03em] text-tone-fg">Talk to us</p>
+            <p className="mt-2 text-[15px] text-tone-muted">Priced on a call</p>
             <ul className="mt-6 space-y-2 border-t border-[hsl(var(--surface-border))] pt-5 text-[14.5px] text-tone-fg">
-              <li>Linked ISF and entry billed once</li>
-              <li>Charged only when CBP accepts</li>
-              <li>Rejected filings aren&apos;t charged</li>
+              <li>Entry summary (7501) and cargo release (3461)</li>
+              <li>Linked to the accepted ISF on one shipment</li>
+              <li>Container tracking and the duty calculator: ask us</li>
             </ul>
+            <Button asChild variant="outline" size="lg" className="mt-7 w-full bg-[hsl(var(--surface))]">
+              <Link
+                href={ctaHref({ persona: "importer", src: "platform-entry-price" })}
+                data-cta-id={CTA.bookDemo.id}
+                data-location="section"
+              >
+                Talk to us
+              </Link>
+            </Button>
           </div>
         </div>
       </Section>

@@ -42,9 +42,9 @@ export const scene: SceneDef = {
     const tagTex = W.canvasTex(520, 400, (g) => {
       W.rr(g, 0, 0, 520, 400, 40); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 3; g.strokeStyle = 'rgba(216,146,15,.45)'; g.stroke();
       g.beginPath(); g.arc(70, 70, 18, 0, TAU); g.strokeStyle = '#D8920F'; g.lineWidth = 6; g.stroke();
-      g.font = `600 24px ${W.FONT}`; g.fillStyle = '#6B7794'; g.fillText('I S F  +  E N T R Y', 110, 80);
-      g.font = `750 110px ${W.FONT}`; g.fillStyle = '#0F1A30'; g.fillText('$180', 50, 220);
-      g.font = `600 30px ${W.FONT}`; g.fillStyle = '#1E2D4D'; g.fillText('per shipment', 54, 270);
+      g.font = `600 24px ${W.FONT}`; g.fillStyle = '#6B7794'; g.fillText('I S F', 110, 80);
+      g.font = `750 110px ${W.FONT}`; g.fillStyle = '#0F1A30'; g.fillText('$45', 50, 220);
+      g.font = `600 30px ${W.FONT}`; g.fillStyle = '#1E2D4D'; g.fillText('per accepted ISF', 54, 270);
       g.font = `500 24px ${W.FONT}`; g.fillStyle = '#0E8A62'; g.fillText('Charged when CBP accepts', 54, 340);
     });
     const tag = W.card(tagTex, { w: 2.1, aspect: 400 / 520, d: .06 }); tag.position.set(0, 1.75, -.3); tag.rotation.set(-.05, -.1, .04); g3.add(tag);

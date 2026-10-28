@@ -15,7 +15,7 @@ import { PriceLine, pageMetadata } from "./_components/page-bits";
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/solutions.md
 const PATH = ROUTES.solutions.href;
 const DESCRIPTION =
-  "ISF and customs entry software for NVOCCs, forwarders and importers who file their own. Pick your lane: volume and API, or a price per shipment.";
+  "ISF and customs entry software for NVOCCs, forwarders and importers who file their own. Pick your lane: volume and API, or $45 per ISF.";
 
 export const metadata = pageMetadata({
   path: PATH,
@@ -41,7 +41,7 @@ const CARDS: RouterCard[] = [
     icon: Building2,
     title: "Importers who file their own",
     line: "Check every ISF and entry you file before CBP does, from ISF to liquidation.",
-    fine: "$45 ISF · $180 ISF + Entry · $280 Complete, per shipment, charged when CBP accepts.",
+    fine: "ISF $45, charged when CBP accepts. Customs entry: talk to us.",
     href: ROUTES.importers.href,
     linkLabel: "See how importers file",
     size: "large",
@@ -87,7 +87,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Why is pricing different for forwarders and importers?",
-    a: "The per-shipment card ($45 / $180 / $280) is built for importers filing their own shipments. NVOCCs, forwarders and brokers filing at volume get volume pricing on request, agreed in writing. Both are charged only when CBP accepts the shipment.",
+    a: "The $45 ISF price is built for importers filing their own shipments, and customs entry is priced on a call. NVOCCs, forwarders and brokers filing at volume get volume pricing on request, agreed in writing. Both are charged only when CBP accepts.",
   },
 ];
 
@@ -163,7 +163,7 @@ export default function SolutionsPage() {
         sub="Tell us how you file today. We'll show you the parts that matter and what it would cost."
         src="solutions-close"
         links={[PRICING_LINK]}
-        micro="Pay per shipment, only when CBP accepts. No monthly fee on the public plans."
+        micro="ISF is $45, charged only when CBP accepts. No monthly fee."
       />
     </>
   );

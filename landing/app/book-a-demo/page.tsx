@@ -46,10 +46,10 @@ function valueItems(persona: DemoPersona): Item[] {
     },
     {
       icon: ReceiptText,
-      title: "Set up after, priced per shipment.",
+      title: "Set up after, with the price up front.",
       body: volume
         ? "If it fits, we set up your team with volume pricing agreed in writing. Same rule: charged only when CBP accepts."
-        : "If it fits, we set up your team. Public plans are charged per shipment, only when CBP accepts.",
+        : "If it fits, we set up your team. ISF is $45, charged only when CBP accepts. Customs entry is priced on the call.",
     },
   ];
 }
@@ -109,8 +109,8 @@ export default async function BookADemoPage({
 
             {persona === "nvocc" && (
               <p className="mt-6 border-l-2 border-[hsl(222_47%_22%)] pl-4 text-[15px] leading-relaxed text-tone-fg dark:border-[hsl(205_90%_78%)]">
-                We&apos;re taking a small number of NVOCC and forwarder design partners: API onboarding with the
-                founder, and volume pricing agreed in writing.
+                We&apos;re taking a small number of paid NVOCC and forwarder pilots: API onboarding with our
+                team, and volume pricing agreed in writing.
               </p>
             )}
 

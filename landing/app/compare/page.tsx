@@ -15,7 +15,7 @@ import { ArrowLink, DashList, PriceLine, pageMetadata } from "../solutions/_comp
 // Copy: marketing/deliverables/2026-10-23-website-rework/copy/compare.md
 const PATH = ROUTES.compare.href;
 const DESCRIPTION =
-  "Customs broker vs self-filing software vs legacy ABI vendors: when each fits, when teams switch, and what MyCargoLens costs per shipment.";
+  "Customs broker vs self-filing software vs legacy ABI vendors: when each fits, when teams switch, and what MyCargoLens costs.";
 
 export const metadata = pageMetadata({
   path: PATH,
@@ -53,7 +53,7 @@ const ROWS: [string, string, string, string, string, string][] = [
     "Your team's time",
     "Usually a quote, licence or contract; most don't publish software prices on their websites (checked October 23, 2026)",
     "Published on their websites",
-    "On our website, per shipment, charged when CBP accepts. Volume filers: written quote",
+    "ISF price on our website, charged when CBP accepts. Customs entry and volume: talk to us",
   ],
   [
     "Seeing deadlines coming",
@@ -169,11 +169,11 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Is MyCargoLens cheaper than a customs broker?",
-    a: "Not necessarily. Our ISF + Entry price is $180 per shipment, about what many brokers charge. You get one written price, a linked ISF and entry billed once, and no charge for rejected filings.",
+    a: "Not necessarily, and we don't claim to be. ISF is $45, charged only when CBP accepts, and rejected filings aren't charged. Customs entry is priced on a call, so you can compare it with your broker's invoice before you decide.",
   },
   {
     q: "How does MyCargoLens compare with Descartes, CargoWise or Magaya?",
-    a: "They're broader. Some file in-bond, FTZ, drawback and AES, and some include a forwarding ERP. MyCargoLens focuses on ISF and entry, with a ranked inbox, checks on every draft and a price on the website. You can start with one lane next to your current system.",
+    a: "They're broader. Some file in-bond, FTZ, drawback and AES, and some include a forwarding ERP. MyCargoLens focuses on ISF and entry, with a ranked inbox, checks on every draft and the ISF price on the website. You can start with one lane next to your current system.",
   },
   {
     q: "Is MyCargoLens a customs broker?",
@@ -185,7 +185,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "You're a young company. What if it doesn't work out?",
-    a: "There's no monthly fee on the public plans, and you pay per shipment when CBP accepts it. Your audit trail exports to CSV and each filing exports as a PDF.",
+    a: "There's no monthly fee on ISF filing, and you pay only when CBP accepts. Your audit trail exports to CSV and each filing exports as a PDF.",
   },
   {
     q: "What doesn't MyCargoLens file?",
@@ -231,7 +231,7 @@ export default function ComparePage() {
           </li>
           <li>
             <strong className="font-semibold text-tone-fg">Pick MyCargoLens</strong> if you file ISF and entries yourself, every week,
-            and want each filing checked before CBP sees it at a price on the website.
+            and want each filing checked before CBP sees it, with the price agreed before you file.
           </li>
         </ul>
       </Section>
@@ -424,11 +424,11 @@ export default function ComparePage() {
 
       {/* S7 · How MyCargoLens charges */}
       <Section tone="peach" id="pricing">
-        <SectionHeading title="The price is on the website" />
+        <SectionHeading title="How MyCargoLens charges" />
         <div className="mt-10 grid gap-5 md:grid-cols-2">
           <div className="flex flex-col rounded-[20px] p-6 site-surface sm:p-8">
             <h3 className="text-[17px] font-semibold text-tone-fg">Importers filing their own</h3>
-            <PriceLine className="mt-3 text-[14px]">$45 ISF · $180 ISF + Entry · $280 Complete, per shipment, no monthly fee</PriceLine>
+            <PriceLine className="mt-3 text-[14px]">ISF $45 per accepted ISF, no monthly fee · Customs entry: talk to us</PriceLine>
             <ArrowLink href={ROUTES.pricing.href} className="mt-auto self-start pt-5">
               See pricing
             </ArrowLink>
@@ -444,12 +444,12 @@ export default function ComparePage() {
         <CheckList
           className="mt-8"
           items={[
-            "You're charged when CBP accepts the shipment. Rejected filings aren't charged, and resubmits are never charged twice.",
+            "You're charged when CBP accepts. Rejected filings aren't charged, and resubmits are never charged twice.",
           ]}
         />
         <p className="mt-5 max-w-3xl text-[15.5px] leading-relaxed text-tone-muted">
-          For an importer, $180 for ISF and entry is about what many brokers charge per shipment. We compete on a known price and on
-          what you can see, and we don&apos;t claim to be cheaper.
+          We don&apos;t claim to be cheaper than your broker. We compete on what you can see before a filing goes, and on
+          telling you the price before you file.
         </p>
       </Section>
 

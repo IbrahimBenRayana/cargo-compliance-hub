@@ -62,7 +62,7 @@ export default function AboutPage() {
         breadcrumbPath={ROUTES.about.href}
         eyebrow="About"
         title="We build ISF and entry filing software. That's all we build."
-        sub="MyCargoLens is a small company making one product: software that shows customs filers which ISF or entry needs them now, checks it before CBP does, and puts the price per shipment on the website."
+        sub="MyCargoLens is a small company making one product: software that shows customs filers which ISF or entry needs them now, checks it before CBP does, and puts the ISF price on the website."
         actions={<DemoButton location="hero" src="about-hero" size="lg" />}
         scene="about"
       />
@@ -83,8 +83,8 @@ export default function AboutPage() {
               it&apos;s sent, and when CBP rejects something you get the reason in plain English with numbered steps to fix it.
             </p>
             <p>
-              We put the price on the website because the invoice is the hardest part of filing to predict. You&apos;re
-              charged per shipment, only when CBP accepts.
+              We put the ISF price on the website because the invoice is the hardest part of filing to predict. You&apos;re
+              charged only when CBP accepts.
             </p>
           </div>
         </div>
@@ -183,7 +183,7 @@ export default function AboutPage() {
             },
             {
               title: "Say the price, say the limits.",
-              body: "The price per shipment is public, and so is the list of things we don't do.",
+              body: "The ISF price is public, and so is the list of things we don't do.",
             },
             {
               title: "Keep the history close.",
@@ -237,7 +237,7 @@ export default function AboutPage() {
         title="Meet us on a 20-minute demo."
         sub="We'll look at how you file today, show you the inbox on shipments like yours, and tell you what it would cost. If it fits, we set up your team."
         src="about-close"
-        micro="Pay per shipment, only when CBP accepts. No monthly fee on the public plans."
+        micro="ISF is $45, charged only when CBP accepts. No monthly fee."
       />
     </>
   );

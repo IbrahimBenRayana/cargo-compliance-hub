@@ -1,6 +1,6 @@
-// PRICING · "A price per shipment, charged when CBP accepts."
-// Shipments ride a belt through an acceptance gate. Each carries its price. Accepted: the price is
-// charged and turns gold. Rejected: not charged. The gate is the only place money changes hands.
+// PRICING · "$45 per ISF, charged when CBP accepts."
+// Shipments ride a belt through an acceptance gate, each with a tag. An accepted ISF is charged $45
+// and turns gold; a rejected one isn't charged. Customs entry carries no price ("Talk to us").
 import type * as THREE from "three";
 import type { SceneDef, World } from "../engine";
 
@@ -23,18 +23,20 @@ export const scene: SceneDef = {
     const flash = W.glow(C.emerald, 4, 0); flash.position.y = 1.6; gate.add(flash);
     const gtag = W.pill('CBP response', { h: .4, dot: C.slate }); gtag.position.set(0, 3.45, 0); gate.add(gtag); W.billboard(gtag);
     // shipments
+    // Only the ISF has a public price. Entry is "Talk to us"; its accepted tag names no amount.
     const plans = [
-      { price: '$45', name: 'ISF', ok: true, color: C.steel },
-      { price: '$180', name: 'ISF + Entry', ok: false, color: C.denim },
-      { price: '$280', name: 'Complete', ok: true, color: C.navy },
+      { label: '$45 · ISF', done: 'Charged $45 · accepted', ok: true, color: C.steel },
+      { label: '$45 · ISF', done: 'Rejected · not charged', ok: false, color: C.denim },
+      { label: 'Entry · Talk to us', done: 'Entry · accepted', ok: true, color: C.navy },
     ];
     const ships = plans.map((p) => {
       const g = W.add(W.clip(W.container(p.color, 2.2, .95, .95), -L / 2 + .05, L / 2 - .05));
-      const before = W.pillTex(`${p.price} · ${p.name}`, {});
-      const acc = W.pillTex(`Charged ${p.price} · accepted`, { dot: C.emerald, bg: '#FFF7E0', border: 'rgba(216,146,15,.5)' });
-      const rej = W.pillTex('Rejected · not charged', { dot: C.rose, color: '#66728C' });
-      const tag = W.pill(`${p.price} · ${p.name}`, { h: .44 }); W.add(tag);
-      return { ...p, g, tag, texs: { before, after: p.ok ? acc : rej } };
+      const before = W.pillTex(p.label, {});
+      const after = p.ok
+        ? W.pillTex(p.done, { dot: C.emerald, bg: '#FFF7E0', border: 'rgba(216,146,15,.5)' })
+        : W.pillTex(p.done, { dot: C.rose, color: '#66728C' });
+      const tag = W.pill(p.label, { h: .44 }); W.add(tag);
+      return { ...p, g, tag, texs: { before, after } };
     });
     const setTag = (tag: ReturnType<World["pill"]>, tex: THREE.Texture) => { if (tag.material.map !== tex) { tag.material.map = tex; tag.material.needsUpdate = true; tag.scale.x = tex.userData.aspect / tag.geometry.parameters.width * tag.geometry.parameters.height; } };
     const gx = .6;
