@@ -1,0 +1,5 @@
+ALA  MCLPASSWD           AD                                                     
+B  2704ZZZAD                                               SCENARIO 064         
+Q2 A                                                       081826               
+Y  2704ZZZAD                                                                    
+ZLA  MCL                                                                        

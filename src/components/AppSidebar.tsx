@@ -1,4 +1,4 @@
-import { LayoutDashboard, Ship, Shield, ShieldCheck, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator, Container, MessagesSquare } from 'lucide-react';
+import { LayoutDashboard, Ship, Shield, ShieldCheck, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator, Container, MessagesSquare, ArrowLeftRight } from 'lucide-react';
 import { LogoMark } from '@/components/LogoMark';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -63,6 +63,7 @@ const navSections: NavSection[] = [
     items: [
       { title: 'Shipments',       url: '/shipments',     icon: Ship },
       { title: 'Entry Documents', url: '/abi-documents', icon: FileCheck, requiredCapability: CAPABILITIES.ABI_ENTRY },
+      { title: 'In-Bond',         url: '/inbond',        icon: ArrowLeftRight, requiredCapability: CAPABILITIES.IN_BOND },
     ],
   },
   {
@@ -183,7 +184,7 @@ export function AppSidebar() {
         {visibleSections.map((section) => (
           <SidebarGroup key={section.label}>
             {!collapsed && (
-              <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1 px-3">
+              <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/85 mb-1 px-3">
                 {section.label}
               </SidebarGroupLabel>
             )}

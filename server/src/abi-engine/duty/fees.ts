@@ -27,6 +27,8 @@ export const MPF_RATE_PER_MILLION = 3464;
 
 /** Min/max thresholds in cents, newest first (ESF-173). */
 const MPF_LIMITS: FeeEra<{ minCents: number; maxCents: number }>[] = [
+  // FY2027: CBP Dec. 26-14, FR 2026-15530 (Jul 31 2026).
+  { from: '20261001', value: { minCents: 3458, maxCents: 67086 } },
   { from: '20251001', value: { minCents: 3358, maxCents: 65150 } },
   { from: '20241001', value: { minCents: 3271, maxCents: 63462 } },
   { from: '20231001', value: { minCents: 3167, maxCents: 61435 } },
@@ -63,6 +65,29 @@ export const HMF_RATE_PER_MILLION = 1250;
 /** HMF de minimis threshold: ≤ $3.00 for the entire summary (note o). */
 export const HMF_DE_MINIMIS_CENTS = 300;
 
+/**
+ * SPI programs whose goods are exempt from MPF per CBP's "Merchandise
+ * Processing Fee and Preferential Trade Programs" table (19 CFR 24.23(c)):
+ * Australia, Bahrain, CAFTA-DR, Chile, Colombia, Korea, USMCA, Oman,
+ * Panama, Peru, Singapore. Notably NOT exempt: Israel (IL), Jordan (JO),
+ * Morocco (MA), plain GSP (A). CERT enforces this as F632.
+ */
+export const MPF_EXEMPT_SPI = new Set([
+  'AU', 'BH', 'P', 'P+', 'CL', 'CO', 'KS', 'S', 'S+', 'OM', 'PA', 'PE', 'SG',
+  // KR = Korea FTA — live F632, scenario 054, 9/8.
+  'KR',
+  // Y = insular possessions (general note 3(a)(iv)) — live F632 FORMAL MPF
+  // NOT ALLOWED - ARTICLE EXEMPT, scenario 040, 9/4.
+  'Y',
+  // W = CBERA meat provision — live F632, scenario 044, 9/4.
+  'W',
+  // B#, C#, K#, L#: the program '+ FTA MPF Exemption' (AE Table 8).
+  'B#', 'C#', 'K#', 'L#',
+  // NOT 'D': AGOA does NOT exempt MPF — live F633 FORMAL MPF REQUIRED -
+  // ARTICLE NOT EXEMPT, scenario 051, 9/8. The unilateral-programs
+  // analogy (Y/W) does not extend to it.
+]);
+
 const HMF_MOTS = new Set(['10', '11', '12']);
 const HMF_EXEMPT_ENTRY_TYPES = new Set(['11', '12', '06', '22', '31', '32', '34', '38']);
 
@@ -83,6 +108,7 @@ export function computeLineHmfCents(lineValueDollarsSum: number): number {
 
 /** Informal Entry Fee, class 311 (ESF-164). */
 const INFORMAL_FEE: FeeEra<number>[] = [
+  { from: '20261001', value: 277 },
   { from: '20251001', value: 269 },
   { from: '20241001', value: 262 },
   { from: '20231001', value: 253 },
@@ -97,6 +123,7 @@ const INFORMAL_FEE: FeeEra<number>[] = [
 
 /** Dutiable Mail Fee, class 496 (ESF-163). */
 const MAIL_FEE: FeeEra<number>[] = [
+  { from: '20261001', value: 761 },
   { from: '20251001', value: 739 },
   { from: '20241001', value: 720 },
   { from: '20231001', value: 697 },
@@ -111,6 +138,7 @@ const MAIL_FEE: FeeEra<number>[] = [
 
 /** Manual Entry Surcharge, class 500 (ESF-165). */
 const SURCHARGE: FeeEra<number>[] = [
+  { from: '20261001', value: 415 },
   { from: '20251001', value: 403 },
   { from: '20241001', value: 393 },
   { from: '20231001', value: 380 },

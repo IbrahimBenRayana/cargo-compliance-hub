@@ -57,6 +57,8 @@ function fmtKeyRelative(ts: string | null) {
 }
 
 export default function IntegrationsApi() {
+  // The connection test is a platform-admin check; for anyone else it always failed (BUG-003).
+  const isPlatformAdmin = useAuthStore((st) => !!st.user?.isPlatformAdmin);
   const testConnection = useTestCCConnection();
 
   const [connectionResult, setConnectionResult] = useState<{
@@ -109,9 +111,9 @@ export default function IntegrationsApi() {
   };
 
   const capabilities = [
-    { icon: FileText, label: 'ISF-10 Filing', desc: 'Importer Security Filing (10+2) — full E2E with CBP', status: 'active' as const },
+    { icon: FileText, label: 'ISF-10 Filing', desc: 'Importer Security Filing (10+2)', status: 'active' as const },
     { icon: FileText, label: 'ISF-5 Filing', desc: 'Carrier Security Filing (5+2)', status: 'active' as const },
-    { icon: Radio, label: 'Status Polling', desc: 'Automated CBP response checking every 5 minutes', status: 'active' as const },
+    { icon: Radio, label: 'Status Updates', desc: 'CBP responses are checked automatically', status: 'active' as const },
     { icon: Search, label: 'HTS Classification', desc: 'AI-powered tariff code suggestions', status: 'active' as const },
     { icon: Zap, label: 'Amendment & Cancel', desc: 'File amendments and cancellations via filing gateway', status: 'active' as const },
     { icon: Globe, label: 'MID Lookup', desc: 'Manufacturer Identification (MID) database', status: 'beta' as const },
@@ -129,8 +131,8 @@ export default function IntegrationsApi() {
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
       {/* ─── Header ─────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4 opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
+        <div className="min-w-0">
           <div className="flex items-center gap-3 mb-1">
             <h1 className="text-[28px] font-bold tracking-tight text-foreground">API & Integrations</h1>
             <Badge variant="secondary" className="gap-1 text-[10px] font-bold uppercase tracking-wider px-2">
@@ -142,6 +144,7 @@ export default function IntegrationsApi() {
             Manage your filing gateway connectivity, email delivery, and data services
           </p>
         </div>
+        {isPlatformAdmin && (
         <Button onClick={handleTestConnection} disabled={testConnection.isPending} className="cursor-pointer shrink-0">
           {testConnection.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -150,6 +153,7 @@ export default function IntegrationsApi() {
           )}
           Test All Connections
         </Button>
+        )}
       </div>
 
       {/* ─── Top Stat Cards ─────────────────────────────── */}
@@ -198,7 +202,7 @@ export default function IntegrationsApi() {
                   <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">v2</span>
                 </CardTitle>
                 <CardDescription className="mt-0.5">
-                  Direct integration with US Customs &amp; Border Protection for ISF filings
+                  Transmits your ISF and entry filings to US Customs &amp; Border Protection
                 </CardDescription>
               </div>
             </div>
@@ -260,7 +264,7 @@ export default function IntegrationsApi() {
                         variant={cap.status === 'active' ? 'default' : 'secondary'}
                         className={cn(
                           'text-[9px] px-1.5 py-0 h-4 uppercase font-bold tracking-wider',
-                          cap.status === 'active' && 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20',
+                          cap.status === 'active' && 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20',
                         )}
                       >
                         {cap.status === 'active' ? 'Active' : 'Beta'}
@@ -703,7 +707,7 @@ function StatCard({
           <div
             className={cn(
               'h-10 w-10 rounded-xl flex items-center justify-center',
-              status === 'ok' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+              status === 'ok' && 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
               status === 'error' && 'bg-red-500/10 text-red-600 dark:text-red-400',
               status === 'warning' && 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
               status === 'neutral' && 'bg-muted text-muted-foreground',

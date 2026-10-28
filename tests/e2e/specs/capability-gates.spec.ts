@@ -11,6 +11,8 @@ const GATED = [
 ];
 
 test.describe('Capability gates (ISF-only demo tier)', () => {
+  // E2E_TIER says which plan the run's account is on (local demo: isf).
+  test.skip((process.env.E2E_TIER || 'isf') !== 'isf', 'Runs only as an ISF-plan account (E2E_TIER=isf)');
 
   for (const g of GATED) {
     test(`${g.name} shows an upgrade gate`, async ({ page }) => {

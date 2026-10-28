@@ -81,7 +81,7 @@ function CreateTrackingCard() {
           <div className="space-y-1.5">
             <Label className="text-xs">Type</Label>
             <Select value={requestType} onValueChange={(v) => setRequestType(v as TrackedShipment['requestType'])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Tracking type"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="bill_of_lading">Bill of Lading</SelectItem>
                 <SelectItem value="booking_number">Booking Number</SelectItem>
@@ -152,18 +152,18 @@ function ListCard() {
               <CardDescription>Live container status from Terminal 49.</CardDescription>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search BOL, vessel, line…"
-                className="pl-8 w-[220px]"
+                className="pl-8 w-full sm:w-[220px]"
               />
             </div>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[160px]" aria-label="Filter by status"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map((o) => (
                   <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>

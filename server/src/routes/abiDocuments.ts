@@ -1,4 +1,8 @@
 import { Router, type Response } from 'express';
+import { isOverdue } from '../services/cbp/unanswered.js';
+import { buildNativeEntry } from '../services/cbp/nativeEntry.js';
+import { ch99Semantics } from '../abi-engine/duty/rateExpression.js';
+import { ch99SearchWhere, rankCh99Results } from '../abi-engine/payload/ch99.js';
 import { prisma } from '../config/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
@@ -23,11 +27,28 @@ import {
   extractDenormFromPayload,
 } from '../services/abiDocumentMapper.js';
 import { sanitizeErrorMessage } from '../services/errorTranslator.js';
-import { createAbiDocumentForOrg, sendAbiDocumentToCBP } from '../services/abiWrite.js';
+import { createAbiDocumentForOrg, sendAbiDocumentToCBP, isEntryEditable } from '../services/abiWrite.js';
+import { transmitEntryNative } from '../services/cbp/nativeEntry.js';
 import { notify } from '../services/notifications.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import logger from '../config/logger.js';
 import { runSinglePoll, pollABIDocumentStatus } from '../services/abiPolling.js';
+import { estimateDutyForBody } from '../services/dutyEstimate.js';
+import { convertInvoiceValuesToUsd } from '../services/cbp/currency.js';
+import type { AbiDocumentBody } from '../services/abi/types.js';
+import { DbHtsRateSource } from '../abi-engine/refdata/dbRateSource.js';
+import {
+  drawEntryNumber,
+  validateEntryNumber,
+  EntryNumberDrawError,
+} from '../services/entryNumberBlocks.js';
+import { renderEntry7501Pdf } from '../services/entryPdf.js';
+import { contentDispositionAttachment } from '../utils/httpHeaders.js';
+import {
+  parseLineImportCsv,
+  LINE_IMPORT_TEMPLATE,
+  MAX_IMPORT_ROWS,
+} from '../services/lineImport.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -110,6 +131,55 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   });
 });
 
+// ── GET /overlay-hts?q= — Chapter 99 overlay subheading lookup ─────
+//
+// Section 301/232/reciprocal duties are declared as a ch.99 subheading
+// alongside the base classification. This searches the ingested USITC
+// chapter-99 lines by code or description so a filer picks a real
+// subheading with its actual rate expression, instead of typing one from
+// memory.
+//
+// Deliberately NOT an "HTS 8507.60 from CN needs 9903.88.01" recommender:
+// that mapping lives in USTR action/exclusion lists we do not ingest, and
+// guessing it would be worse than useless on an entry summary.
+//
+// Registered BEFORE /:id so the static path isn't captured as an id.
+
+router.get('/overlay-hts', async (req: AuthRequest, res: Response): Promise<void> => {
+  const where = ch99SearchWhere(typeof req.query.q === 'string' ? req.query.q : '');
+  if (!where) {
+    res.json({ data: [] });
+    return;
+  }
+  const rows = await prisma.htsRateLine.findMany({
+    where,
+    select: { htsNumber: true, generalRate: true, description: true },
+    orderBy: { htsNumber: 'asc' },
+    take: 500,
+  });
+
+  res.json({
+    // 8-digit headings only: CERT accepts ch.99 numbers at 8 digits.
+    data: rankCh99Results(rows.filter((r) => r.htsNumber.length === 8), 25)
+      .map((r) => ({
+        htsNumber: r.htsNumber,
+        rate: r.generalRate,
+        semantics: ch99Semantics(r.htsNumber, r.generalRate),
+        description: r.description,
+      })),
+  });
+});
+
+// ── GET /line-import-template — CSV template for bulk line import ──
+// Registered BEFORE /:id so the static path isn't captured as an id.
+
+router.get('/line-import-template', (_req: AuthRequest, res: Response): void => {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', contentDispositionAttachment('mycargolens-line-import-template.csv'));
+  // BOM so Excel opens it as UTF-8.
+  res.send('﻿' + LINE_IMPORT_TEMPLATE);
+});
+
 // ── GET /:id — Detail (org-scoped) ─────────────────────
 
 router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
@@ -144,8 +214,12 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(404).json({ error: 'ABI document not found' });
     return;
   }
-  if (existing.status !== 'DRAFT') {
-    res.status(400).json({ error: `Cannot edit document in status ${existing.status}` });
+  if (!isEntryEditable(existing)) {
+    res.status(400).json({
+      error: existing.pendingAction
+        ? 'This entry is waiting for CBP; edit it once CBP has answered.'
+        : `Cannot edit document in status ${existing.status}`,
+    });
     return;
   }
 
@@ -192,6 +266,264 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
 // ── POST /:id/send — Transmit to CC ────────────────────
 
+// ── POST /draw-entry-number — Assign the next number from the org's block ──
+//
+// Atomic: the service's UPDATE…RETURNING serialises concurrent draws, so
+// two operators filing at once can never receive the same entry number.
+// Drawn numbers are consumed even if the draft is later abandoned —
+// burning a number is correct filer behaviour; re-issuing one never is.
+
+router.post('/draw-entry-number', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const drawn = await drawEntryNumber(req.user!.orgId);
+    await writeAuditLog({
+      orgId: req.user!.orgId,
+      userId: req.user!.id,
+      action: 'entry_number.draw',
+      entityType: 'entry_number_block',
+      entityId: drawn.blockId,
+      newValue: { entryNumber: drawn.entryNumber, remaining: drawn.remaining },
+      ...getRequestMeta(req),
+    });
+    res.json({ data: drawn });
+  } catch (err) {
+    if (err instanceof EntryNumberDrawError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    logger.error({ err }, '[AbiDocuments] entry number draw failed');
+    res.status(500).json({ error: 'Failed to draw an entry number' });
+  }
+});
+
+// ── POST /validate-entry-number — Check-digit validation for typed numbers ──
+
+router.post('/validate-entry-number', (req: AuthRequest, res: Response): void => {
+  const raw = typeof req.body?.entryNumber === 'string' ? req.body.entryNumber : '';
+  if (!raw || raw.length > 20) {
+    res.status(400).json({ error: 'entryNumber (string, ≤20 chars) is required' });
+    return;
+  }
+  res.json({ data: validateEntryNumber(raw) });
+});
+
+// ── POST /:id/estimate-duty — Transmit-time duty & fee preview ──
+//
+// Prices the CURRENT draft payload on the native pipeline (migrate →
+// duty engine over ingested USITC rates). No external call, no state
+// change, no billing. Incomplete drafts return 200 with
+// `{ estimable: false, issues }` — the wizard renders what's missing;
+// only a missing document is an error.
+
+router.post('/:id/estimate-duty', async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+  const doc = await prisma.abiDocument.findFirst({
+    where: { id, orgId: req.user!.orgId },
+    select: { id: true, payload: true },
+  });
+  if (!doc) {
+    res.status(404).json({ error: 'ABI document not found' });
+    return;
+  }
+
+  const result = await estimateDutyForBody(
+    doc.payload,
+    new DbHtsRateSource(prisma.htsRateLine),
+    { convertToUsd: convertInvoiceValuesToUsd },
+  );
+  res.json({ data: result });
+});
+
+// ── Bulk invoice-line import ───────────────────────────────────────
+//
+// GET  /line-import-template     — the CSV template (opens in Excel)
+// POST /:id/import-lines         — { invoiceIndex, csv, dryRun? }
+//
+// dryRun validates and returns the row report without touching the
+// draft; the real run appends only the valid rows (invalid ones come
+// back per-row so the user fixes the sheet, never loses it). Imported
+// items pass the same schema as hand-typed ones.
+
+// NOTE: the template route is registered near the top of this file
+// (before GET /:id) so the static path isn't captured as an :id.
+
+router.post('/:id/import-lines', async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const { csv, invoiceIndex = 0, dryRun = false } = req.body ?? {};
+
+  if (typeof csv !== 'string' || csv.length === 0) {
+    res.status(400).json({ error: 'csv (string) is required' });
+    return;
+  }
+  if (csv.length > 1_000_000) {
+    res.status(400).json({ error: 'CSV too large (1 MB max)' });
+    return;
+  }
+  if (!Number.isInteger(invoiceIndex) || invoiceIndex < 0) {
+    res.status(400).json({ error: 'invoiceIndex must be a non-negative integer' });
+    return;
+  }
+
+  const doc = await prisma.abiDocument.findFirst({
+    where: { id, orgId: req.user!.orgId },
+  });
+  if (!doc) {
+    res.status(404).json({ error: 'ABI document not found' });
+    return;
+  }
+  if (doc.status !== 'DRAFT') {
+    res.status(400).json({ error: `Cannot import lines into a ${doc.status} document` });
+    return;
+  }
+
+  const result = parseLineImportCsv(csv);
+
+  if (dryRun) {
+    res.json({
+      data: {
+        dryRun: true,
+        validRows: result.items.length,
+        totalRows: result.totalRows,
+        errors: result.errors,
+        maxRows: MAX_IMPORT_ROWS,
+        // Full validated items: the wizard applies them through its own
+        // local state + autosave (its array-replacement merge would
+        // clobber a server-side append), so it needs everything.
+        items: result.items,
+      },
+    });
+    return;
+  }
+
+  if (result.items.length === 0) {
+    res.status(422).json({
+      error: 'No valid rows to import',
+      data: { validRows: 0, totalRows: result.totalRows, errors: result.errors },
+    });
+    return;
+  }
+
+  // Append valid items to the target invoice inside the stored payload.
+  const payload: any = doc.payload ?? {};
+  const manifest = Array.isArray(payload.manifest) && payload.manifest[0] ? payload.manifest[0] : null;
+  const invoice = manifest?.invoices?.[invoiceIndex];
+  if (!invoice) {
+    res.status(400).json({
+      error: `Invoice ${invoiceIndex + 1} does not exist on this draft yet — add the invoice header in the wizard first.`,
+    });
+    return;
+  }
+  invoice.items = [...(Array.isArray(invoice.items) ? invoice.items : []), ...result.items];
+
+  const updated = await prisma.abiDocument.update({
+    where: { id: doc.id },
+    data: { payload, ...extractDenormFromPayload(payload) },
+  });
+
+  await writeAuditLog({
+    orgId: req.user!.orgId,
+    userId: req.user!.id,
+    action: 'abi_document.import_lines',
+    entityType: 'abi_document',
+    entityId: doc.id,
+    newValue: { imported: result.items.length, rejected: result.errors.length, invoiceIndex },
+    ...getRequestMeta(req),
+  });
+
+  res.json({
+    data: {
+      dryRun: false,
+      imported: result.items.length,
+      totalRows: result.totalRows,
+      errors: result.errors,
+      doc: updated,
+    },
+  });
+});
+
+// ── GET /:id/pdf — CBP Form 7501-format PDF ────────────────────────
+//
+// The record document (banks, auditors, drawback, 19 CFR 163 retention).
+// Non-accepted statuses render with a diagonal watermark; CANCELLED is
+// refused — a PDF of a cancelled entry is a document waiting to mislead.
+
+router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+  const doc = await prisma.abiDocument.findFirst({
+    where: { id, orgId: req.user!.orgId },
+    include: { organization: { select: { name: true } } },
+  });
+  if (!doc) {
+    res.status(404).json({ error: 'ABI document not found' });
+    return;
+  }
+  if (doc.status === 'CANCELLED') {
+    res.status(409).json({ error: 'This entry was cancelled — no 7501 can be produced for it.' });
+    return;
+  }
+
+  try {
+    const estimate = await estimateDutyForBody(doc.payload, new DbHtsRateSource(prisma.htsRateLine), { convertToUsd: convertInvoiceValuesToUsd });
+    // Block 32/35 show dollars: the same CBP-rate conversion the duty uses.
+    // A currency that cannot be converted prints as entered (the estimate
+    // then shows dashes and its issue).
+    const pdfBody = await convertInvoiceValuesToUsd(doc.payload as unknown as AbiDocumentBody)
+      .then((c) => c.body)
+      .catch(() => doc.payload);
+    // Column 33 rate text: exact 10-digit rate line, falling back to the
+    // 8-digit parent — same resolution DbHtsRateSource uses.
+    const rateText = async (hts: string): Promise<string | null> => {
+      const flat = hts.replace(/\D/g, '');
+      let row = await prisma.htsRateLine.findUnique({ where: { htsNumber: flat }, select: { generalRate: true } });
+      if (!row && flat.length === 10) {
+        row = await prisma.htsRateLine.findUnique({ where: { htsNumber: flat.slice(0, 8) }, select: { generalRate: true } });
+      }
+      return row?.generalRate || null;
+    };
+
+    const buffer = await renderEntry7501Pdf({
+      doc: { id: doc.id, status: doc.status, entryNumber: doc.entryNumber, sentAt: doc.sentAt },
+      body: pdfBody,
+      estimate,
+      rateText,
+      orgName: doc.organization.name,
+    });
+
+    const filename = `7501-${(doc.entryNumber ?? doc.id.slice(0, 8)).replace(/[^A-Za-z0-9-]/g, '')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', contentDispositionAttachment(filename));
+    res.send(buffer);
+  } catch (err) {
+    logger.error({ err, docId: id }, '[AbiDocuments] 7501 PDF render failed');
+    res.status(500).json({ error: 'Failed to generate the 7501 PDF' });
+  }
+});
+
+// ─── POST /:id/preflight — would CBP accept this entry? ──────────
+// Runs the full native build (filer identity, currency conversion, CATAIR
+// build and the engine's validator) without claiming or sending anything,
+// so the review step can show every issue before the user transmits.
+router.post('/:id/preflight', async (req: AuthRequest, res: Response): Promise<void> => {
+  const doc = await prisma.abiDocument.findFirst({ where: { id: String(req.params.id), orgId: req.user!.orgId }, select: { cbpState: true } });
+  if (!doc) {
+    res.status(404).json({ error: 'Entry not found' });
+    return;
+  }
+  const built = await buildNativeEntry({
+    docId: String(req.params.id),
+    orgId: req.user!.orgId,
+    userId: req.user!.id,
+    action: doc.cbpState === 'ON_FILE' ? 'REPLACE' : 'ADD',
+  });
+  if (!built.ok) {
+    res.json({ ready: false, ...built.body });
+    return;
+  }
+  res.json({ ready: true, filerCode: built.filerCode, releaseRequested: built.releaseRequested, conversions: built.conversions });
+});
+
 router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const outcome = await sendAbiDocumentToCBP({
@@ -201,6 +533,45 @@ router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled,
     requestMeta: getRequestMeta(req),
   });
   res.status(outcome.httpStatus).json(outcome.body);
+});
+
+// ── POST /:id/cbp-action — Replace or delete the summary CBP holds ──
+//
+// Native entries only. REPLACE sends the entry's current data as an AE
+// replace; DELETE asks CBP to delete the summary. CBP's AX settles both.
+router.post('/:id/cbp-action', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
+  const action = req.body?.action;
+  if (action !== 'REPLACE' && action !== 'DELETE') {
+    res.status(400).json({ error: "action must be 'REPLACE' or 'DELETE'" });
+    return;
+  }
+  const outcome = await transmitEntryNative({ docId: String(req.params.id), orgId: req.user!.orgId, userId: req.user!.id, action });
+  res.status(outcome.httpStatus).json(outcome.body);
+});
+
+// ── GET /:id/cbp — Every transmission to CBP and CBP's answers ──
+router.get('/:id/cbp', async (req: AuthRequest, res: Response): Promise<void> => {
+  const entry = await prisma.abiDocument.findFirst({
+    where: { id: String(req.params.id), orgId: req.user!.orgId },
+    select: {
+      id: true, status: true, cbpState: true, pendingAction: true, entryNumber: true,
+      entrySummaryStatus: true, cargoReleaseStatus: true, releaseRequested: true,
+    },
+  });
+  if (!entry) {
+    res.status(404).json({ error: 'Entry not found' });
+    return;
+  }
+  const transmissions = await prisma.cbpTransmission.findMany({
+    where: { entityType: 'abi_document', entityId: entry.id, orgId: req.user!.orgId },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true, environment: true, application: true, action: true, filerCode: true, status: true,
+      sentAt: true, respondedAt: true, createdAt: true, lastError: true,
+      inbound: { orderBy: { receivedAt: 'asc' }, select: { id: true, application: true, receivedAt: true, parsed: true } },
+    },
+  });
+  res.json({ entry, transmissions: transmissions.map((t) => ({ ...t, overdue: isOverdue(t) })) });
 });
 
 // ── POST /:id/poll — Manual re-poll ────────────────────
@@ -216,6 +587,12 @@ router.post('/:id/poll', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled,
     return;
   }
 
+  // Native entries need no polling: CBP's answers arrive on our queue and
+  // settle the entry as they land (audit FNA-12).
+  if (doc.lastTransmissionId) {
+    res.status(400).json({ error: 'This entry updates automatically as CBP answers.', code: 'NATIVE_NO_POLL' });
+    return;
+  }
   if (doc.status !== 'SENT' && doc.status !== 'SENDING') {
     res.status(400).json({ error: `Cannot poll document in status ${doc.status}` });
     return;

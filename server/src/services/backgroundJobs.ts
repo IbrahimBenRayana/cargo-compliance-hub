@@ -13,6 +13,7 @@
  *    "submitted" for > 72 hours without a CBP response (possible issue)
  */
 
+import { tracked, jobHealthSnapshot } from './jobHealth.js';
 import cron, { type ScheduledTask } from 'node-cron';
 import { prisma } from '../config/database.js';
 import { abiGateway } from './abi/gateway.js';
@@ -26,12 +27,16 @@ import {
 } from './notifications.js';
 import { drainEmailDeliveries } from './notificationDeliveryWorker.js';
 import { recordScoreSnapshot, triggerForStatus } from './compliance/scoreSnapshot.js';
-import { billShipmentForFiling, retryFailedCharges } from './shipmentBilling.js';
+import { billShipmentForFiling, sweepUnsettledCharges } from './shipmentBilling.js';
 import { syncFromFederalRegister } from './compliance/addCvdSync.js';
 import { invalidateAddCvdCache } from './compliance/addCvd.js';
 import { CRON, ABI_SENDING_TIMEOUT_MS } from '../config/schedules.js';
 import { pollSentAbiDocuments } from './abiPolling.js';
 import { withAdvisoryLock } from './distributedLock.js';
+import { env } from '../config/env.js';
+import { processInbound } from './cbp/inboundJob.js';
+import { flagUnansweredTransmissions } from './cbp/unanswered.js';
+import { retryLeadNotifications } from './leads.js';
 
 // ─── Job State ─────────────────────────────────────────────
 
@@ -62,10 +67,13 @@ async function pollSubmittedFilings(): Promise<void> {
   let errors = 0;
 
   try {
-    // Get all submitted filings across all organizations
+    // Get all submitted filings across all organizations. Native filings
+    // (lastTransmissionId set) are settled by CBP's own responses through the
+    // inbound dispatcher, never by polling CustomsCity.
     const submittedFilings = await prisma.filing.findMany({
       where: {
         status: 'submitted',
+        lastTransmissionId: null,
       },
       include: {
         organization: { select: { id: true, name: true } },
@@ -428,7 +436,7 @@ async function reapStuckAbiDocuments(): Promise<void> {
   try {
     const cutoff = new Date(Date.now() - ABI_SENDING_TIMEOUT_MS);
     const stuck = await prisma.abiDocument.findMany({
-      where: { status: 'SENDING', sentAt: { lt: cutoff } },
+      where: { status: 'SENDING', sentAt: { lt: cutoff }, lastTransmissionId: null },
       select: { id: true, orgId: true, ccDocumentId: true, sentAt: true },
     });
     if (stuck.length === 0) return;
@@ -471,21 +479,17 @@ let deliveryDrainTask: ScheduledTask | null = null;
 let addCvdSyncTask: ScheduledTask | null = null;
 let abiReaperTask: ScheduledTask | null = null;
 let abiStatusPollTask: ScheduledTask | null = null;
+let cbpInboundTask: ScheduledTask | null = null;
+let cbpNoAnswerTask: ScheduledTask | null = null;
 let chargeRetryTask: ScheduledTask | null = null;
+let leadNotifyRetryTask: ScheduledTask | null = null;
 
-/** Retry per-shipment charges that failed, for every delinquent org. */
-async function retryDelinquentCharges(): Promise<void> {
-  const delinquent = await prisma.subscription.findMany({
-    where: { status: 'delinquent' },
-    select: { orgId: true },
-  });
-  let settled = 0;
-  for (const s of delinquent) {
-    const r = await retryFailedCharges(s.orgId);
-    settled += r.settled;
-  }
-  if (delinquent.length > 0) {
-    logger.info({ orgs: delinquent.length, settled }, '[Jobs:ChargeRetry] Done');
+/** Retry every unsettled per-shipment charge (failed, 3DS, or stuck after a
+ *  Stripe error), for any org — not only delinquent ones (billing audit G1/G2). */
+async function retryUnsettledCharges(): Promise<void> {
+  const r = await sweepUnsettledCharges();
+  if (r.orgs > 0 || r.stuck > 0) {
+    logger.info(r, '[Jobs:ChargeRetry] Done');
   }
 }
 
@@ -502,19 +506,19 @@ export function startBackgroundJobs(): void {
   // Each tick wraps the underlying job in `withAdvisoryLock` so multi-replica
   // deployments don't N-fire the same cron — only the lock holder runs.
   statusPollTask = cron.schedule(CRON.STATUS_POLL, () => {
-    withAdvisoryLock('jobs:status-poll', pollSubmittedFilings)
+    withAdvisoryLock('jobs:status-poll', tracked('status-poll', pollSubmittedFilings))
       .catch(err => logger.error({ err }, '[Jobs:StatusPoll] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Status polling scheduled — every 5 minutes (UTC)');
 
   deadlineTask = cron.schedule(CRON.DEADLINE_ALERTS, () => {
-    withAdvisoryLock('jobs:deadlines', checkDeadlines)
+    withAdvisoryLock('jobs:deadlines', tracked('deadlines', checkDeadlines))
       .catch(err => logger.error({ err }, '[Jobs:Deadlines] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Deadline alerts scheduled — every hour at :30 (UTC)');
 
   staleCheckTask = cron.schedule(CRON.STALE_CHECK, () => {
-    withAdvisoryLock('jobs:stale-check', checkStaleFilings)
+    withAdvisoryLock('jobs:stale-check', tracked('stale-check', checkStaleFilings))
       .catch(err => logger.error({ err }, '[Jobs:StaleCheck] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Stale filing check scheduled — every 6 hours (UTC)');
@@ -523,7 +527,7 @@ export function startBackgroundJobs(): void {
   // re-entrant (skips if a previous tick is still running) so this
   // cadence is safe even if a single batch takes longer than 30s.
   deliveryDrainTask = cron.schedule(CRON.EMAIL_DELIVERY_DRAIN, () => {
-    withAdvisoryLock('jobs:email-delivery', drainEmailDeliveries)
+    withAdvisoryLock('jobs:email-delivery', tracked('email-delivery', drainEmailDeliveries))
       .catch(err => logger.error({ err }, '[Jobs:Delivery] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Email delivery drain scheduled — every 30 seconds (UTC)');
@@ -532,12 +536,12 @@ export function startBackgroundJobs(): void {
   // with status='pending' for admin review. Runs at 04:00 UTC so it
   // happens during the lowest-traffic window for North American users.
   addCvdSyncTask = cron.schedule(CRON.ADD_CVD_SYNC, () => {
-    withAdvisoryLock('jobs:add-cvd-sync', async () => {
+    withAdvisoryLock('jobs:add-cvd-sync', tracked('add-cvd-sync', async () => {
       const result = await syncFromFederalRegister();
       if (result.inserted > 0) invalidateAddCvdCache();
       lastAddCvdSync = new Date();
       logger.info({ result }, '[Jobs:AddCvdSync] Done');
-    }).catch(err => logger.error({ err }, '[Jobs:AddCvdSync] Unhandled'));
+    })).catch(err => logger.error({ err }, '[Jobs:AddCvdSync] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] ADD/CVD Federal Register sync scheduled — daily at 04:00 UTC');
 
@@ -545,7 +549,7 @@ export function startBackgroundJobs(): void {
   // documents back to DRAFT so the dashboard never carries a permanently
   // in-flight row. See reapStuckAbiDocuments above for the rationale.
   abiReaperTask = cron.schedule(CRON.ABI_REAPER, () => {
-    withAdvisoryLock('jobs:abi-reaper', reapStuckAbiDocuments)
+    withAdvisoryLock('jobs:abi-reaper', tracked('abi-reaper', reapStuckAbiDocuments))
       .catch(err => logger.error({ err }, '[Jobs:AbiReaper] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] ABI document reaper scheduled — every 5 minutes (UTC)');
@@ -554,16 +558,46 @@ export function startBackgroundJobs(): void {
   // this cron carries SENT documents to their terminal status (and therefore
   // to notification, webhook, and billing) no matter when CBP responds.
   abiStatusPollTask = cron.schedule(CRON.ABI_STATUS_POLL, () => {
-    withAdvisoryLock('jobs:abi-status-poll', pollSentAbiDocuments)
+    withAdvisoryLock('jobs:abi-status-poll', tracked('abi-status-poll', pollSentAbiDocuments))
       .catch(err => logger.error({ err }, '[Jobs:AbiStatusPoll] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] ABI status sweep scheduled — every 5 minutes at :02 offset (UTC)');
 
+  // Native CBP inbound (go-live D1): the one consumer of the MQ response
+  // queue. Only where the live transport is configured; the mock loopback is
+  // pulled on demand by the cert console.
+  if (env.ABI_TRANSPORT === 'mqipt') {
+    cbpInboundTask = cron.schedule(CRON.CBP_INBOUND, () => {
+      withAdvisoryLock('jobs:cbp-inbound', tracked('cbp-inbound', async () => {
+        const run = await processInbound();
+        if (run.pull.received > 0 || run.dispatch.failed > 0) {
+          logger.info({ pull: { ...run.pull, batches: undefined }, dispatch: run.dispatch }, '[Jobs:CbpInbound] Processed CBP messages');
+        }
+      })).catch(err => logger.error({ err }, '[Jobs:CbpInbound] Unhandled'));
+    }, cronOpts);
+    logger.info(`[Jobs] CBP inbound pull scheduled — every minute (${env.CBP_ENVIRONMENT})`);
+
+    // Transmissions CBP never answered: tell the org and operations (BUG-022).
+    cbpNoAnswerTask = cron.schedule(CRON.CBP_NO_ANSWER, () => {
+      withAdvisoryLock('jobs:cbp-no-answer', tracked('cbp-no-answer', async () => {
+        const flagged = await flagUnansweredTransmissions();
+        if (flagged > 0) logger.warn({ flagged }, '[Jobs:CbpNoAnswer] Flagged unanswered CBP transmissions');
+      })).catch(err => logger.error({ err }, '[Jobs:CbpNoAnswer] Unhandled'));
+    }, cronOpts);
+    logger.info('[Jobs] CBP no-answer check scheduled — every 5 minutes (UTC)');
+  }
+
   chargeRetryTask = cron.schedule(CRON.CHARGE_RETRY, () => {
-    withAdvisoryLock('jobs:charge-retry', retryDelinquentCharges)
+    withAdvisoryLock('jobs:charge-retry', tracked('charge-retry', retryUnsettledCharges))
       .catch(err => logger.error({ err }, '[Jobs:ChargeRetry] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Failed-charge retry scheduled — hourly at :15 (UTC)');
+
+  leadNotifyRetryTask = cron.schedule(CRON.LEAD_NOTIFY_RETRY, () => {
+    withAdvisoryLock('jobs:lead-notify-retry', tracked('lead-notify-retry', retryLeadNotifications))
+      .catch(err => logger.error({ err }, '[Jobs:LeadNotifyRetry] Unhandled'));
+  }, cronOpts);
+  logger.info('[Jobs] Lead-notification retry scheduled — every 10 minutes (UTC)');
 
   setTimeout(() => {
     checkDeadlines().catch(err => logger.error({ err }, '[Jobs:Deadlines] Initial check error'));
@@ -581,7 +615,10 @@ export function stopBackgroundJobs(): void {
   addCvdSyncTask?.stop();
   abiReaperTask?.stop();
   abiStatusPollTask?.stop();
+  cbpInboundTask?.stop();
+  cbpNoAnswerTask?.stop();
   chargeRetryTask?.stop();
+  leadNotifyRetryTask?.stop();
   statusPollTask = null;
   deadlineTask = null;
   staleCheckTask = null;
@@ -589,7 +626,9 @@ export function stopBackgroundJobs(): void {
   addCvdSyncTask = null;
   abiReaperTask = null;
   abiStatusPollTask = null;
+  cbpInboundTask = null;
   chargeRetryTask = null;
+  leadNotifyRetryTask = null;
 }
 
 /**
@@ -636,6 +675,8 @@ export function getJobStatus() {
     addCvdSync: {
       lastRun: lastAddCvdSync?.toISOString() ?? null,
     },
+    /** Every scheduled job: last start/success/error (BUG-006). */
+    jobs: jobHealthSnapshot(),
   };
 }
 

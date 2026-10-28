@@ -6,6 +6,8 @@
  * secret (whsec_…) is returned in full only on create / rotate and masked
  * everywhere else.
  */
+import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
+import { requireMfaEnrolled } from '../middleware/requireMfaEnrolled.js';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
@@ -48,7 +50,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // POST /api/v1/webhooks — create an endpoint (owner/admin). Returns the secret once.
-router.post('/', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/', requireRole('owner', 'admin'), requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -81,7 +83,7 @@ router.post('/', requireRole('owner', 'admin'), async (req: AuthRequest, res: Re
 });
 
 // PATCH /api/v1/webhooks/:id — update url/events/active/description (owner/admin).
-router.patch('/:id', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.patch('/:id', requireRole('owner', 'admin'), requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -118,7 +120,7 @@ router.patch('/:id', requireRole('owner', 'admin'), async (req: AuthRequest, res
 });
 
 // POST /api/v1/webhooks/:id/rotate — regenerate the signing secret (owner/admin).
-router.post('/:id/rotate', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/rotate', requireRole('owner', 'admin'), requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = String(req.params.id);
   const existing = await prisma.webhookEndpoint.findFirst({ where: { id, orgId: req.user!.orgId } });
   if (!existing) {

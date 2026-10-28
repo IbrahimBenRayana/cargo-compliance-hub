@@ -41,7 +41,7 @@ const countries = [
   { code: 'DE', label: 'Germany', flag: '🇩🇪' },
 ];
 
-const statusOptions: ShipmentStatus[] = ['draft', 'submitted', 'accepted', 'rejected'];
+const statusOptions: ShipmentStatus[] = ['draft', 'submitted', 'accepted', 'rejected', 'cancelled'];
 
 // Inline chip that opens a popover listing the sibling filings of a
 // consolidation. Renders only when the row has a consolidationId — the
@@ -319,7 +319,7 @@ export default function ShipmentsList() {
           <span className="h-px flex-1 bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
         </div>
       </header>
-      <div className="flex items-end justify-between gap-4 animate-fade-in-up motion-reduce:animate-none" style={{ animationDelay: '40ms' }}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between animate-fade-in-up motion-reduce:animate-none" style={{ animationDelay: '40ms' }}>
         <div className="min-w-0">
           <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground inline-flex items-center gap-3">
             <Ship className="h-7 w-7 text-primary shrink-0" strokeWidth={2} />
@@ -328,7 +328,7 @@ export default function ShipmentsList() {
           </h1>
           <p className="text-[14px] text-muted-foreground mt-2">Manage and track your ISF filings</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button asChild className="shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
             <Link to="/shipments/new"><Plus className="h-4 w-4 mr-1" /> Create New ISF</Link>
           </Button>
@@ -390,7 +390,7 @@ export default function ShipmentsList() {
       </div>
 
       {/* Quick Status Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
         {statusOptions.map((status, i) => {
           const count = countByStatus(status);
           const isActive = selectedStatuses.includes(status);
@@ -399,12 +399,14 @@ export default function ShipmentsList() {
             submitted: 'border-primary/20 hover:border-primary/40',
             accepted: 'border-[hsl(var(--status-accepted))]/20 hover:border-[hsl(var(--status-accepted))]/40',
             rejected: 'border-destructive/20 hover:border-destructive/40',
+            cancelled: 'border-muted-foreground/20 hover:border-muted-foreground/40',
           };
           const activeBg: Record<string, string> = {
             draft: 'bg-muted-foreground/5 border-muted-foreground/40',
             submitted: 'bg-primary/5 border-primary/40',
             accepted: 'bg-[hsl(var(--status-accepted))]/5 border-[hsl(var(--status-accepted))]/40',
             rejected: 'bg-destructive/5 border-destructive/40',
+            cancelled: 'bg-muted-foreground/5 border-muted-foreground/40',
           };
           return (
             <button
@@ -430,7 +432,7 @@ export default function ShipmentsList() {
             <div className="relative flex-1 w-full md:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search BOL, importer, product, or ISF ID…"
+                placeholder="Search bill of lading, importer, vessel, or ISF ID…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-9 bg-secondary/50 border-transparent focus:bg-card focus:border-input transition-all duration-300"
@@ -569,7 +571,7 @@ export default function ShipmentsList() {
                 </AlertDialog>
               </>
             )}
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())} aria-label="Clear selection">
               <X className="h-3 w-3" />
             </Button>
           </div>
@@ -704,14 +706,14 @@ export default function ShipmentsList() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <div className="flex items-center justify-end gap-1 transition-opacity duration-200 can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:focus-within:opacity-100">
                       <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors" asChild>
-                        <Link to={`/shipments/${f.id}`}><Eye className="h-4 w-4" /></Link>
+                        <Link to={`/shipments/${f.id}`} aria-label="View shipment"><Eye className="h-4 w-4" /></Link>
                       </Button>
                       {f.status === 'draft' && (
                         <>
                           <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors" asChild>
-                            <Link to={`/shipments/${f.id}/edit`}><Pencil className="h-4 w-4" /></Link>
+                            <Link to={`/shipments/${f.id}/edit`} aria-label="Edit shipment"><Pencil className="h-4 w-4" /></Link>
                           </Button>
                           <Button
                             variant="ghost" size="icon"

@@ -1,7 +1,6 @@
 import { test as base, expect, BrowserContext, Page } from '@playwright/test';
 import { login } from './helpers';
-
-const BASE = 'http://localhost:8080';
+import { BASE_URL } from './env';
 
 // The login endpoint is rate-limited to 10 requests/min/IP, and refresh tokens
 // rotate single-use — so logging in per-test is both throttled and fragile.
@@ -13,7 +12,7 @@ type WorkerFixtures = { sharedCtx: BrowserContext };
 export const test = base.extend<{}, WorkerFixtures>({
   sharedCtx: [
     async ({ browser }, use) => {
-      const context = await browser.newContext({ baseURL: BASE, viewport: { width: 1440, height: 900 } });
+      const context = await browser.newContext({ baseURL: BASE_URL, viewport: { width: 1440, height: 900 } });
       const page = await context.newPage();
       await login(page); // exactly one login per worker
       (context as unknown as { _mclPage: Page })._mclPage = page;

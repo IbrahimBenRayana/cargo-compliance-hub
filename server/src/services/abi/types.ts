@@ -35,11 +35,16 @@ export interface AbiBond {
   type: string;
   suretyCode: string;
   taxId: string;
+  /** Single transaction bond (type 9) amount, whole dollars. */
+  stbAmount?: number;
 }
 
 export interface AbiPayment {
   typeCode: number;
-  preliminaryStatementDate: string;
+  /** Statement payments (types 2-8) only. */
+  preliminaryStatementDate?: string;
+  /** MM; periodic monthly statements (types 6-8) only. */
+  periodicStatementMonth?: string;
 }
 
 export interface AbiConsignee {
@@ -65,6 +70,8 @@ export interface AbiCarrier {
 
 export interface AbiPorts {
   portOfUnlading: string;
+  /** 5-digit Schedule K foreign port where the cargo was laden; vessel entries. */
+  foreignPortOfLading?: string;
 }
 
 export interface AbiParty {
@@ -96,6 +103,13 @@ export interface AbiItemWeight {
 export interface AbiItem {
   sku: string;
   htsNumber: string;
+  /** Chapter 99 numbers claimed on this line (Section 301, 232, NT52 and
+   *  other programs), 8 digits each; native engine only (CC cannot carry them). */
+  additionalHtsNumbers?: string[];
+  /** Trade agreement / special program claimed for this line (AE Table 8), e.g. 'S' for USMCA. */
+  spiClaimCode?: string;
+  /** AD/CVD cases on this line (entry type 03), at most two. */
+  adCvdCases?: AbiAdCvdCase[];
   description: string;
   origin: { country: string };
   values: AbiItemValues;
@@ -112,6 +126,20 @@ export interface AbiItem {
   agriculturalExemption?: 'Y' | 'N';
   semiConductorExemption?: number | null;
   parties: AbiParty[];
+}
+
+/** An antidumping (A-) or countervailing (C-) duty case on a line. */
+export interface AbiAdCvdCase {
+  /** Commerce case number, e.g. 'A-570-967-000' (hyphens optional). */
+  caseNumber: string;
+  /** B = bonded, C = cash deposit. */
+  bondOrCash: 'B' | 'C';
+  /** A = ad valorem percent of the line value; S = specific dollars per unit. */
+  rateType: 'A' | 'S';
+  /** Deposit rate: percent (ad valorem) or dollars per unit (specific). */
+  rate: number;
+  /** Quantity in the case's unit; specific rates only. */
+  quantity?: number;
 }
 
 export interface AbiInvoice {
@@ -136,7 +164,8 @@ export interface AbiManifest {
 
 /** ABI document body — the object inside `body: [<this>]`. */
 export interface AbiDocumentBody {
-  entryType: '01' | '11' | '86';
+  /** 01 consumption, 03 consumption with AD/CVD, 11 informal, 86 (suspended). */
+  entryType: '01' | '03' | '11' | '86';
   modeOfTransport: string;          // "40" vessel, "41" air
   entryNumber: string;              // filer-assigned; hyphens auto-stripped by CC
   dates: AbiDates;

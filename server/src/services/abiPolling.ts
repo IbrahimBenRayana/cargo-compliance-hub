@@ -182,12 +182,11 @@ export async function runSinglePoll(args: {
       mbolNumber,
     });
 
-    // Charge on acceptance (idempotent; never throws). Anchor on the linked ISF
-    // filing if present so a linked ISF+Entry bills once; else the standalone
-    // entry. A rejected entry is never charged.
+    // Charge on acceptance (idempotent; never throws). shipmentBilling prices it
+    // as a linked or entry-only entry from the document's ISF link. A rejected
+    // entry is never charged.
     if (nextStatus === 'ACCEPTED') {
-      const linked = await prisma.abiDocument.findUnique({ where: { id: docId }, select: { filingId: true } });
-      await billShipment(linked?.filingId ? { filingId: linked.filingId } : { abiDocumentId: docId }, orgId);
+      await billShipment({ abiDocumentId: docId }, orgId);
     }
   }
 
@@ -254,7 +253,8 @@ export async function pollSentAbiDocuments(): Promise<void> {
   try {
     const ageCutoff = new Date(Date.now() - ABI_STATUS_POLL_MAX_AGE_MS);
     const docs = await prisma.abiDocument.findMany({
-      where: { status: 'SENT', sentAt: { gte: ageCutoff } },
+      // Native entries settle from CBP's own responses, never CC polling.
+      where: { status: 'SENT', sentAt: { gte: ageCutoff }, lastTransmissionId: null },
       select: {
         id: true,
         orgId: true,

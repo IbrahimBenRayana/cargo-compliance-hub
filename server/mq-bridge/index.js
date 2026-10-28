@@ -1,0 +1,431 @@
+/**
+ * CBP MQIPT bridge — the one process that speaks IBM MQ.
+ *
+ * The main app image is Alpine (musl); IBM's MQ client is glibc-only, so the
+ * MQ binding lives in this Debian sidecar instead. The server's MqiptTransport
+ * calls this bridge over the internal Docker network; nothing here is ever
+ * exposed to the internet (no published ports, shared-token auth as depth).
+ *
+ * MQ specifics (CBP SIGMATP trade package, Aug 2026):
+ *   - Connection is CCDT-driven: MQCHLLIB/MQCHLTAB point at the environment's
+ *     channel table (QGC1_SIGMATP.TAB for CERT, QGP2_SIGMATP.TAB for PROD),
+ *     which carries channel, host:port, and cipher. MQCLNTCF points at CBP's
+ *     mqclient.ini (OCSP bypass). All three are plain MQ-client env vars.
+ *   - CBP_ENVIRONMENT (CERT|PROD) is required; envCheck.js derives or checks
+ *     the queue manager and channel table against it and refuses to start on
+ *     a mismatch, so a bridge can never serve the other environment.
+ *   - TLS keystore is CMS (sigmatp.kdb + .sth stash); MQ_KEY_REPOSITORY is
+ *     the path WITHOUT the .kdb extension, per GSKit convention.
+ *   - One MQ message = one complete ABI batch (A…Z records). Outbound we
+ *     join 80-char records with MQ_RECORD_DELIMITER (lf|crlf|none); inbound
+ *     we split on newlines. Delimiter is env-tunable so a CERT-floor surprise
+ *     is a config change, not a redeploy.
+ */
+'use strict';
+
+const http = require('http');
+const { resolveBridgeEnvironment } = require('./envCheck.js');
+
+// ── CBP environment (refuse to start on a CERT/PROD mismatch) ──────────
+// Checked before the MQ client library loads, so a misconfigured bridge
+// fails fast and never opens a connection.
+const cbp = resolveBridgeEnvironment(process.env);
+if (cbp.problems.length > 0) {
+  console.error(`mq-bridge: refusing to start: ${cbp.problems.join('; ')}`);
+  process.exit(1);
+}
+// The IBM MQ client reads MQCHLTAB from the environment at connect time.
+process.env.MQCHLTAB = cbp.chltab;
+
+const mq = require('ibmmq');
+const MQC = mq.MQC;
+
+// ── config ──────────────────────────────────────────────────────────────
+const env = (name, fallback) => {
+  const v = process.env[name];
+  return v === undefined || v === '' ? fallback : v;
+};
+
+const CONFIG = {
+  port: Number(env('PORT', '8080')),
+  token: env('MQ_BRIDGE_TOKEN', ''),
+  environment: cbp.environment,
+  qmgr: cbp.qmgr,
+  sendQueue: env('MQ_SEND_QUEUE', ''),
+  receiveQueue: env('MQ_RECEIVE_QUEUE', ''),
+  verifyPutQueue: env('MQ_VERIFY_PUT_QUEUE', 'TRADE.VERIFY.QR'),
+  verifyGetQueue: env('MQ_VERIFY_GET_QUEUE', 'TRADE.VERIFY.QL'),
+  keyRepository: env('MQ_KEY_REPOSITORY', ''),
+  recordDelimiter: env('MQ_RECORD_DELIMITER', 'lf'),
+};
+
+const REQUIRED = ['qmgr', 'sendQueue', 'receiveQueue', 'keyRepository'];
+const missing = REQUIRED.filter((k) => !CONFIG[k]);
+if (missing.length > 0) {
+  console.error(`mq-bridge: missing required config: ${missing.map((k) => 'MQ_' + k.replace(/[A-Z]/g, (c) => '_' + c).toUpperCase()).join(', ')}`);
+  process.exit(1);
+}
+
+const DELIMITERS = { lf: '\n', crlf: '\r\n', none: '' };
+if (!(CONFIG.recordDelimiter in DELIMITERS)) {
+  console.error(`mq-bridge: MQ_RECORD_DELIMITER must be lf|crlf|none, got '${CONFIG.recordDelimiter}'`);
+  process.exit(1);
+}
+const DELIMITER = DELIMITERS[CONFIG.recordDelimiter];
+
+// 4 MB receive buffer — ABI response batches are tens of KB at most.
+const GET_BUFFER_BYTES = 4 * 1024 * 1024;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ── MQ session (lazy connect, reconnect on next call after any error) ───
+class MqSession {
+  constructor() {
+    this.conn = null;
+    this.queues = new Map(); // name → { hObj, forInput }
+  }
+
+  async connect() {
+    if (this.conn) return this.conn;
+    const cno = new mq.MQCNO();
+    cno.Options = MQC.MQCNO_CLIENT_BINDING;
+    const sco = new mq.MQSCO();
+    sco.KeyRepository = CONFIG.keyRepository;
+    cno.SSLConfig = sco;
+    this.conn = await mq.ConnxPromise(CONFIG.qmgr, cno);
+    return this.conn;
+  }
+
+  async open(queueName, forInput) {
+    const key = `${queueName}:${forInput ? 'in' : 'out'}`;
+    const cached = this.queues.get(key);
+    if (cached) return cached;
+    const conn = await this.connect();
+    const od = new mq.MQOD();
+    od.ObjectName = queueName;
+    od.ObjectType = MQC.MQOT_Q;
+    // Input handles can also browse, so responses can be read without
+    // removing them and deleted by MsgId once the server has stored them.
+    const openOptions = forInput
+      ? MQC.MQOO_INPUT_AS_Q_DEF | MQC.MQOO_BROWSE | MQC.MQOO_FAIL_IF_QUIESCING
+      : MQC.MQOO_OUTPUT | MQC.MQOO_FAIL_IF_QUIESCING;
+    const hObj = await mq.OpenPromise(conn, od, openOptions);
+    this.queues.set(key, hObj);
+    return hObj;
+  }
+
+  /** Drop all handles so the next call reconnects from scratch. */
+  async reset() {
+    const conn = this.conn;
+    this.conn = null;
+    this.queues.clear();
+    if (conn) {
+      try {
+        await mq.DiscPromise(conn);
+      } catch {
+        /* already broken — that's why we're resetting */
+      }
+    }
+  }
+
+  async put(queueName, text, correlationId) {
+    const hObj = await this.open(queueName, false);
+    const mqmd = new mq.MQMD();
+    mqmd.Format = MQC.MQFMT_STRING;
+    if (correlationId) {
+      const corr = Buffer.alloc(24);
+      corr.write(String(correlationId).slice(0, 24), 'utf8');
+      mqmd.CorrelId = corr;
+    }
+    const pmo = new mq.MQPMO();
+    pmo.Options = MQC.MQPMO_NO_SYNCPOINT | MQC.MQPMO_NEW_MSG_ID | MQC.MQPMO_FAIL_IF_QUIESCING;
+    await mq.PutPromise(hObj, mqmd, pmo, Buffer.from(text, 'utf8'));
+    return mqmd.MsgId.toString('hex');
+  }
+
+  /** One non-blocking get; resolves null when the queue is empty. */
+  getOne(queueName) {
+    return this.open(queueName, true).then(
+      (hObj) =>
+        new Promise((resolve, reject) => {
+          const md = new mq.MQMD();
+          const gmo = new mq.MQGMO();
+          gmo.Options =
+            MQC.MQGMO_NO_SYNCPOINT |
+            MQC.MQGMO_NO_WAIT |
+            MQC.MQGMO_CONVERT |
+            MQC.MQGMO_FAIL_IF_QUIESCING;
+          gmo.MatchOptions = MQC.MQMO_NONE;
+          const buf = Buffer.alloc(GET_BUFFER_BYTES);
+          mq.GetSync(hObj, md, gmo, buf, (err, len) => {
+            if (err) {
+              if (err.mqrc === MQC.MQRC_NO_MSG_AVAILABLE) return resolve(null);
+              return reject(err);
+            }
+            resolve(buf.subarray(0, len).toString('utf8'));
+          });
+        })
+    );
+  }
+
+  /**
+   * Non-destructive read: browse the first (or next) message. The message
+   * stays on the queue until ackById removes it. Resolves null when none.
+   */
+  browseOne(queueName, first) {
+    return this.open(queueName, true).then(
+      (hObj) =>
+        new Promise((resolve, reject) => {
+          const md = new mq.MQMD();
+          const gmo = new mq.MQGMO();
+          gmo.Options =
+            (first ? MQC.MQGMO_BROWSE_FIRST : MQC.MQGMO_BROWSE_NEXT) |
+            MQC.MQGMO_NO_WAIT |
+            MQC.MQGMO_CONVERT |
+            MQC.MQGMO_FAIL_IF_QUIESCING;
+          gmo.MatchOptions = MQC.MQMO_NONE;
+          const buf = Buffer.alloc(GET_BUFFER_BYTES);
+          mq.GetSync(hObj, md, gmo, buf, (err, len) => {
+            if (err) {
+              if (err.mqrc === MQC.MQRC_NO_MSG_AVAILABLE) return resolve(null);
+              return reject(err);
+            }
+            // Copy the MsgId: the library reuses MQMD buffers (ibmmq mqi.js note).
+            resolve({ msgId: Buffer.from(md.MsgId).toString('hex'), text: buf.subarray(0, len).toString('utf8') });
+          });
+        })
+    );
+  }
+
+  /** Destructively remove one message by MsgId. Resolves false when it is already gone. */
+  ackById(queueName, msgIdHex) {
+    return this.open(queueName, true).then(
+      (hObj) =>
+        new Promise((resolve, reject) => {
+          const md = new mq.MQMD();
+          md.MsgId = Buffer.from(msgIdHex, 'hex');
+          const gmo = new mq.MQGMO();
+          gmo.Options = MQC.MQGMO_NO_SYNCPOINT | MQC.MQGMO_NO_WAIT | MQC.MQGMO_FAIL_IF_QUIESCING;
+          gmo.MatchOptions = MQC.MQMO_MATCH_MSG_ID;
+          mq.GetSync(hObj, md, gmo, Buffer.alloc(GET_BUFFER_BYTES), (err) => {
+            if (!err) return resolve(true);
+            if (err.mqrc === MQC.MQRC_NO_MSG_AVAILABLE) return resolve(false);
+            return reject(err);
+          });
+        })
+    );
+  }
+
+  /** Poll a queue until a message arrives or timeoutMs elapses. */
+  async getWithTimeout(queueName, timeoutMs) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const msg = await this.getOne(queueName);
+      if (msg !== null) return msg;
+      if (Date.now() >= deadline) return null;
+      await sleep(500);
+    }
+  }
+}
+
+const session = new MqSession();
+
+/** Run an MQ operation; on failure reset the session so the next call reconnects. */
+async function withSession(fn) {
+  try {
+    return await fn(session);
+  } catch (err) {
+    await session.reset();
+    throw err;
+  }
+}
+
+const describeMqError = (err) =>
+  err && err.mqrc !== undefined ? `MQRC ${err.mqrc} (${err.message})` : String((err && err.message) || err);
+
+// ── batch ↔ message codec ────────────────────────────────────────────────
+const linesToMessage = (lines) => lines.join(DELIMITER);
+// Keep records byte-for-byte (trailing pad spaces are significant in
+// fixed-width CATAIR); only drop lines that are entirely blank. Mainframe
+// batches often arrive as a pure 80-byte stream with NO delimiters (the
+// B&B spec forbids control characters), so when a message has no newlines
+// we chunk it into fixed 80-char records instead.
+const messageToLines = (text) => {
+  if (/\r|\n/.test(text)) {
+    return text.split(/\r?\n/).filter((l) => l.trim() !== '');
+  }
+  const lines = [];
+  for (let i = 0; i < text.length; i += 80) lines.push(text.slice(i, i + 80));
+  return lines.filter((l) => l.trim() !== '');
+};
+
+// ── HTTP layer ───────────────────────────────────────────────────────────
+const json = (res, status, body) => {
+  const payload = JSON.stringify(body);
+  res.writeHead(status, { 'content-type': 'application/json' });
+  res.end(payload);
+};
+
+const readBody = (req) =>
+  new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > 8 * 1024 * 1024) {
+        reject(new Error('request body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      if (chunks.length === 0) return resolve({});
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch {
+        reject(new Error('invalid JSON body'));
+      }
+    });
+    req.on('error', reject);
+  });
+
+const handlers = {
+  'GET /health': async () => {
+    try {
+      await withSession(async (s) => {
+        await s.open(CONFIG.sendQueue, false);
+        await s.open(CONFIG.receiveQueue, true);
+      });
+      return {
+        status: 200,
+        body: { ok: true, detail: `connected to ${CONFIG.qmgr}`, qmgr: CONFIG.qmgr, environment: CONFIG.environment },
+      };
+    } catch (err) {
+      return {
+        status: 200,
+        body: { ok: false, detail: describeMqError(err), qmgr: CONFIG.qmgr, environment: CONFIG.environment },
+      };
+    }
+  },
+
+  'POST /send': async (body) => {
+    if (!Array.isArray(body.lines) || body.lines.length === 0 || !body.lines.every((l) => typeof l === 'string')) {
+      return { status: 400, body: { error: 'lines must be a non-empty string array' } };
+    }
+    const messageId = await withSession((s) =>
+      s.put(CONFIG.sendQueue, linesToMessage(body.lines), body.correlationId)
+    );
+    return { status: 200, body: { messageId } };
+  },
+
+  'POST /receive': async (body) => {
+    const timeoutMs = Math.min(Math.max(Number(body.timeoutMs) || 15000, 0), 60000);
+    const max = Math.min(Math.max(Number(body.max) || 10, 1), 100);
+    const batches = await withSession(async (s) => {
+      const out = [];
+      // Wait (up to timeoutMs) for the first message, then drain without waiting.
+      const first = await s.getWithTimeout(CONFIG.receiveQueue, timeoutMs);
+      if (first !== null) {
+        out.push(messageToLines(first));
+        while (out.length < max) {
+          const next = await s.getOne(CONFIG.receiveQueue);
+          if (next === null) break;
+          out.push(messageToLines(next));
+        }
+      }
+      return out;
+    });
+    return { status: 200, body: { batches } };
+  },
+
+  // At-least-once receive (native go-live D2): browse leaves messages on the
+  // queue; the server stores them, then /ack removes exactly those MsgIds.
+  // A crash between the two re-delivers instead of losing CBP's response.
+  'POST /browse': async (body) => {
+    const timeoutMs = Math.min(Math.max(Number(body.timeoutMs) || 0, 0), 60000);
+    const max = Math.min(Math.max(Number(body.max) || 25, 1), 100);
+    const messages = await withSession(async (s) => {
+      const out = [];
+      const deadline = Date.now() + timeoutMs;
+      let first = await s.browseOne(CONFIG.receiveQueue, true);
+      while (first === null && Date.now() < deadline) {
+        await sleep(500);
+        first = await s.browseOne(CONFIG.receiveQueue, true);
+      }
+      if (first === null) return out;
+      out.push({ msgId: first.msgId, lines: messageToLines(first.text) });
+      while (out.length < max) {
+        const next = await s.browseOne(CONFIG.receiveQueue, false);
+        if (next === null) break;
+        out.push({ msgId: next.msgId, lines: messageToLines(next.text) });
+      }
+      return out;
+    });
+    return { status: 200, body: { messages } };
+  },
+
+  'POST /ack': async (body) => {
+    const ids = Array.isArray(body.msgIds) ? body.msgIds : [];
+    if (ids.length === 0 || ids.length > 100 || !ids.every((id) => typeof id === 'string' && /^[0-9a-f]{48}$/.test(id))) {
+      return { status: 400, body: { error: 'msgIds must be 1-100 hex MQ message ids (48 chars)' } };
+    }
+    const result = await withSession(async (s) => {
+      const acked = [];
+      const missing = [];
+      for (const id of ids) ((await s.ackById(CONFIG.receiveQueue, id)) ? acked : missing).push(id);
+      return { acked, missing };
+    });
+    return { status: 200, body: result };
+  },
+
+  // CBP's own connectivity check: put to TRADE.VERIFY.QR, the queue manager
+  // echoes onto TRADE.VERIFY.QL. Proves TLS, channel, and queue access.
+  'POST /verify': async () => {
+    try {
+      const result = await withSession(async (s) => {
+        const probe = `MYCARGOLENS CONNECTIVITY CHECK ${new Date().toISOString()}`;
+        await s.put(CONFIG.verifyPutQueue, probe);
+        const echoed = await s.getWithTimeout(CONFIG.verifyGetQueue, 20000);
+        return { probe, echoed };
+      });
+      if (result.echoed === null) {
+        return { status: 200, body: { ok: false, detail: 'put succeeded but nothing echoed on the verify queue within 20s' } };
+      }
+      return { status: 200, body: { ok: true, detail: 'round-trip verified', echoed: result.echoed } };
+    } catch (err) {
+      return { status: 200, body: { ok: false, detail: describeMqError(err) } };
+    }
+  },
+};
+
+const server = http.createServer(async (req, res) => {
+  if (CONFIG.token && req.headers['x-bridge-token'] !== CONFIG.token) {
+    return json(res, 401, { error: 'unauthorized' });
+  }
+  const route = `${req.method} ${req.url.split('?')[0]}`;
+  const handler = handlers[route];
+  if (!handler) return json(res, 404, { error: `no route ${route}` });
+  try {
+    const body = req.method === 'POST' ? await readBody(req) : {};
+    const result = await handler(body);
+    json(res, result.status, result.body);
+  } catch (err) {
+    console.error(`mq-bridge: ${route} failed:`, err);
+    json(res, 502, { error: describeMqError(err) });
+  }
+});
+
+server.listen(CONFIG.port, () => {
+  console.log(
+    `mq-bridge listening on :${CONFIG.port} — env=${CONFIG.environment} qmgr=${CONFIG.qmgr} chltab=${process.env.MQCHLTAB} send=${CONFIG.sendQueue} receive=${CONFIG.receiveQueue} delimiter=${CONFIG.recordDelimiter}`
+  );
+});
+
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => {
+    server.close(() => {
+      session.reset().finally(() => process.exit(0));
+    });
+  });
+}

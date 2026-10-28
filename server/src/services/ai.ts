@@ -139,26 +139,57 @@ export interface CompleteOptions {
   temperature?: number;
   /** Override the default max tokens. */
   maxTokens?: number;
+  /** Ask the provider for a JSON object reply. */
+  json?: boolean;
+  /** Reasoning models only (o-series, GPT-5+): how hard to think. */
+  reasoningEffort?: 'low' | 'medium' | 'high';
+  /**
+   * A separate daily budget for this feature (e.g. the HTS classifier makes
+   * several calls per request); defaults to the shared per-user cap.
+   */
+  rateBucket?: { key: string; limit: number };
+}
+
+// Reasoning models (o-series, GPT-5 and later) reject `temperature` (only the
+// default is allowed) and `max_tokens`; their completion budget also has to
+// cover hidden reasoning tokens. Probed against our key on 2026-10-21.
+const REASONING_MODEL = /^(o\d|gpt-5|gpt-6)/;
+const REASONING_HEADROOM = 8000;
+
+export function completionParams(
+  model: string,
+  p: { temperature: number; maxTokens: number; reasoningEffort?: 'low' | 'medium' | 'high' },
+): Record<string, unknown> {
+  if (!REASONING_MODEL.test(model)) return { temperature: p.temperature, max_tokens: p.maxTokens };
+  return {
+    max_completion_tokens: p.maxTokens + REASONING_HEADROOM,
+    ...(p.reasoningEffort ? { reasoning_effort: p.reasoningEffort } : {}),
+  };
 }
 
 export async function complete(opts: CompleteOptions): Promise<string> {
-  ensureWithinLimit(opts.userId);
+  const rateKey = opts.rateBucket ? `${opts.userId}:${opts.rateBucket.key}` : opts.userId;
+  ensureWithinLimit(rateKey, opts.rateBucket?.limit);
   const client = getClient();
   const started = Date.now();
   try {
     const res = await client.chat.completions.create({
-      model:       opts.model       ?? env.AI_MODEL,
-      temperature: opts.temperature ?? env.AI_TEMPERATURE,
-      max_tokens:  opts.maxTokens   ?? env.AI_MAX_TOKENS,
+      model: opts.model ?? env.AI_MODEL,
+      ...completionParams(opts.model ?? env.AI_MODEL, {
+        temperature: opts.temperature ?? env.AI_TEMPERATURE,
+        maxTokens: opts.maxTokens ?? env.AI_MAX_TOKENS,
+        reasoningEffort: opts.reasoningEffort,
+      }),
       messages: [
         { role: 'system', content: opts.systemPrompt },
         { role: 'user',   content: opts.userPrompt },
       ],
       // Don't let the provider store prompts for training when configured.
       store: env.AI_DISABLE_TRAINING_DATA ? false : undefined,
+      ...(opts.json ? { response_format: { type: 'json_object' as const } } : {}),
     });
     const text = res.choices[0]?.message?.content ?? '';
-    recordCall(opts.userId);
+    recordCall(rateKey);
     logger.info({
       userId: opts.userId,
       provider: env.AI_PROVIDER,
@@ -188,9 +219,11 @@ export async function* stream(opts: CompleteOptions): AsyncIterable<string> {
 
   try {
     const sse = await client.chat.completions.create({
-      model:       opts.model       ?? env.AI_MODEL,
-      temperature: opts.temperature ?? env.AI_TEMPERATURE,
-      max_tokens:  opts.maxTokens   ?? env.AI_MAX_TOKENS,
+      model: opts.model ?? env.AI_MODEL,
+      ...completionParams(opts.model ?? env.AI_MODEL, {
+        temperature: opts.temperature ?? env.AI_TEMPERATURE,
+        maxTokens: opts.maxTokens ?? env.AI_MAX_TOKENS,
+      }),
       messages: [
         { role: 'system', content: opts.systemPrompt },
         { role: 'user',   content: opts.userPrompt },
@@ -238,9 +271,11 @@ export async function vision(opts: VisionOptions): Promise<string> {
   const started = Date.now();
   try {
     const res = await client.chat.completions.create({
-      model:       opts.model       ?? env.AI_MODEL,
-      temperature: opts.temperature ?? env.AI_TEMPERATURE,
-      max_tokens:  opts.maxTokens   ?? env.AI_MAX_TOKENS,
+      model: opts.model ?? env.AI_MODEL,
+      ...completionParams(opts.model ?? env.AI_MODEL, {
+        temperature: opts.temperature ?? env.AI_TEMPERATURE,
+        maxTokens: opts.maxTokens ?? env.AI_MAX_TOKENS,
+      }),
       messages: [
         { role: 'system', content: opts.systemPrompt },
         {
@@ -304,9 +339,11 @@ export async function chatTurn(opts: ChatTurnOptions): Promise<OpenAI.Chat.Compl
   const started = Date.now();
   try {
     const res = await client.chat.completions.create({
-      model:       opts.model       ?? env.AI_MODEL,
-      temperature: opts.temperature ?? env.AI_TEMPERATURE,
-      max_tokens:  opts.maxTokens   ?? env.CHAT_MAX_TOKENS,
+      model: opts.model ?? env.AI_MODEL,
+      ...completionParams(opts.model ?? env.AI_MODEL, {
+        temperature: opts.temperature ?? env.AI_TEMPERATURE,
+        maxTokens: opts.maxTokens ?? env.CHAT_MAX_TOKENS,
+      }),
       messages:    opts.messages,
       ...(opts.tools && opts.tools.length > 0
         ? { tools: opts.tools, tool_choice: 'auto' as const }
@@ -345,9 +382,11 @@ export async function* streamMessages(opts: ChatTurnOptions): AsyncIterable<stri
   let completionTokens: number | undefined;
   try {
     const sse = await client.chat.completions.create({
-      model:       opts.model       ?? env.AI_MODEL,
-      temperature: opts.temperature ?? env.AI_TEMPERATURE,
-      max_tokens:  opts.maxTokens   ?? env.CHAT_MAX_TOKENS,
+      model: opts.model ?? env.AI_MODEL,
+      ...completionParams(opts.model ?? env.AI_MODEL, {
+        temperature: opts.temperature ?? env.AI_TEMPERATURE,
+        maxTokens: opts.maxTokens ?? env.CHAT_MAX_TOKENS,
+      }),
       messages:    opts.messages,
       stream: true,
       stream_options: { include_usage: true },

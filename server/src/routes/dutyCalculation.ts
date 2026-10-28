@@ -32,8 +32,8 @@ import logger from '../config/logger.js';
 const router = Router();
 router.use(authMiddleware);
 // The Duty Calculator is part of the gated HTS Classification capability
-// (Complete tier). Basic HTS code entry while filing an ISF uses the separate,
-// ungated /integrations/hts-classify endpoint, so ISF filers are unaffected.
+// (Complete tier), as is the AI lookup in the filing wizards
+// (/integrations/hts-classify); other tiers type HTS codes by hand.
 router.use(requireCapability(CAPABILITIES.HTS_CLASSIFICATION));
 
 /** Pull a human message out of CC's error responses (matches abiDocuments helper). */

@@ -8,8 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { useSubscription, useCreatePortalSession } from '@/hooks/useBilling';
 import { useAuthStore } from '@/hooks/useAuth';
 import { CardCapture } from '@/components/billing/CardCapture';
-
-const money = (cents: number) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+import { money, pricingLines } from '@/lib/pricing';
 
 export function BillingSettings() {
   const { data, isLoading } = useSubscription();
@@ -65,11 +64,12 @@ export function BillingSettings() {
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
                 <div className="text-lg font-semibold">{plan.name}</div>
-                <div className="text-sm text-muted-foreground">
-                  {plan.perFilingCents > 0 ? `${money(plan.perFilingCents)} per shipment filed` : 'Custom pricing'}
-                </div>
+                <ul className="text-sm text-muted-foreground">
+                  {pricingLines(data?.pricing).map((line) => <li key={line}>{line}</li>)}
+                </ul>
+                {plan.isPublic && <p className="mt-1 text-xs text-muted-foreground">Customs entries or volume pricing: talk to us.</p>}
               </div>
-              {canManage && (
+              {canManage && plan.isPublic && (
                 <Button variant="outline" size="sm" asChild>
                   <Link to="/upgrade">Change plan</Link>
                 </Button>
@@ -95,7 +95,7 @@ export function BillingSettings() {
             <div>
               <CardCapture
                 submitLabel={card ? 'Update card' : 'Save card'}
-                onSaved={() => { setEditingCard(false); toast.success('Card updated.'); }}
+                onSaved={() => { setEditingCard(false); toast.success(card ? 'Card updated.' : 'Card saved.'); }}
               />
               <button type="button" onClick={() => setEditingCard(false)} className="mt-3 w-full text-center text-xs text-muted-foreground hover:text-foreground">
                 Cancel

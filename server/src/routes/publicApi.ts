@@ -14,7 +14,7 @@ import express, { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { apiKeyAuth, requireScope, ApiRequest } from '../middleware/apiKeyAuth.js';
-import { generalLimiter, apiKeyLimiter } from '../middleware/rateLimiter.js';
+import { publicApiIpLimiter, apiKeyLimiter } from '../middleware/rateLimiter.js';
 import { xmlContentNegotiation } from '../middleware/xmlContent.js';
 import { CAPABILITIES } from '../config/plans.js';
 import { createFilingSchema } from '../schemas/filing.js';
@@ -28,7 +28,7 @@ const router = Router();
 // default. Mounted first so even auth/limiter errors honor the negotiated type.
 router.use(express.text({ type: ['application/xml', 'text/xml', 'application/*+xml'], limit: '1mb' }));
 router.use(xmlContentNegotiation);
-router.use(generalLimiter);
+router.use(publicApiIpLimiter);
 router.use(apiKeyAuth);
 // Per-key ceiling — runs after apiKeyAuth so req.apiContext.keyId is populated.
 router.use(apiKeyLimiter);

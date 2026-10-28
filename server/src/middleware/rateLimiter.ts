@@ -40,6 +40,24 @@ export const generalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  // API routes only: page loads, JS chunks and other static files are served
+  // by the same app (express.static + SPA fallback) and must not spend the
+  // API budget. The public API has its own limiter (publicApiIpLimiter, on
+  // its router so 429s honor XML); counting it here too made each call count
+  // twice (~50/min).
+  skip: (req) => !req.originalUrl.startsWith('/api/') || req.originalUrl.startsWith('/api/public/'),
+  message: {
+    error: 'Too many requests. Please try again shortly.',
+    code: 'RATE_LIMIT_GENERAL',
+  },
+});
+
+/** Per-IP bound for the public API, before key auth (same budget as general). */
+export const publicApiIpLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     error: 'Too many requests. Please try again shortly.',
     code: 'RATE_LIMIT_GENERAL',
@@ -53,6 +71,19 @@ export const generalLimiter = rateLimit({
 export const contactFormLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many contact-form submissions. Please email us directly.',
+    code: 'RATE_LIMIT_CONTACT',
+  },
+});
+
+// Step 2 of the /book-a-demo form updates the lead saved by step 1. Kept off
+// contactFormLimiter so a two-step submission costs one contact slot, not two.
+export const leadUpdateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -118,4 +149,13 @@ export const apiKeyLimiter = rateLimit({
     error: 'API rate limit exceeded for this key. Please slow down.',
     code: 'RATE_LIMIT_API_KEY',
   },
+});
+
+/** HTS classifier: each request can make several AI calls. */
+export const classifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many HTS suggestion requests. Please wait a minute.' },
 });

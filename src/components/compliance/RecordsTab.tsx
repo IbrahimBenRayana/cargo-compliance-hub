@@ -13,8 +13,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 /**
- * Records & Liquidation tab — every accepted filing's 314-day liquidation
- * countdown plus 270-day PSC window. Three layout sections:
+ * Records & Liquidation tab — every accepted entry's 314-day liquidation
+ * countdown plus 300-day PSC window. Three layout sections:
  *
  *   1. KPI strip (tracked / PSC open / awaiting / liquidated)
  *   2. Filter bar (search + status chips)
@@ -124,14 +124,14 @@ function RecordsKpiStrip({
       <KpiTile
         label="PSC open"
         value={counts.psc}
-        sub="≤ 270 days post-entry"
+        sub="≤ 300 days post-entry"
         tone="amber"
         Icon={Calendar}
       />
       <KpiTile
         label="Awaiting liquidation"
         value={counts.awaiting}
-        sub="270 – 314 days"
+        sub="300 – 314 days"
         tone="blue"
         Icon={Clock}
       />
@@ -253,7 +253,7 @@ function PipelineCard({
           No accepted entries yet
         </p>
         <p className="text-[12px] text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-          Once CBP accepts an entry, its 314-day liquidation countdown and 270-day PSC window will appear here.
+          Once CBP accepts an entry, its 314-day liquidation countdown and 300-day PSC window will appear here.
         </p>
       </article>
     );
@@ -280,7 +280,7 @@ function PipelineCard({
               Liquidation pipeline
             </h3>
             <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Sorted by urgency. PSC = Post-Summary Correction (270d); liquidation = entry finalization (314d).
+              Sorted by urgency. PSC = Post-Summary Correction (300d); liquidation = entry finalization (314d).
             </p>
           </div>
         </div>
@@ -292,7 +292,7 @@ function PipelineCard({
             <Input
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search BOL or filing type…"
+              placeholder="Search entry number or type…"
               className="pl-9 text-[13px]"
             />
           </div>
@@ -308,7 +308,7 @@ function PipelineCard({
           </div>
         ) : (
           <ul className="space-y-2">
-            {filtered.map((t) => <PipelineRow key={t.filingId} t={t} />)}
+            {filtered.map((t) => <PipelineRow key={t.id} t={t} />)}
           </ul>
         )}
       </div>
@@ -369,7 +369,7 @@ function PipelineRow({ t }: { t: LiquidationTracked }) {
   const TOTAL = 314;
   const elapsed = TOTAL - Math.max(0, t.daysUntilLiquidation);
   const pct = Math.max(0, Math.min(100, (elapsed / TOTAL) * 100));
-  const pscMarker = (270 / TOTAL) * 100; // PSC deadline at 270d
+  const pscMarker = (300 / TOTAL) * 100; // PSC deadline at 300d
   // Bar fill colour by remaining-days urgency, not status.
   const barFill =
     t.daysUntilLiquidation < 0 ? 'bg-slate-300 dark:bg-slate-700'
@@ -396,7 +396,7 @@ function PipelineRow({ t }: { t: LiquidationTracked }) {
       transition={{ duration: 0.18 }}
     >
       <Link
-        to={`/shipments/${t.filingId}`}
+        to={t.linkUrl}
         className={cn(
           'group relative block rounded-xl border bg-white dark:bg-slate-900/40 transition-colors',
           tone.ring,
@@ -419,7 +419,7 @@ function PipelineRow({ t }: { t: LiquidationTracked }) {
             <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
               entered {fmtDate(t.entryDate)}
             </span>
-            <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-primary transition-opacity can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:group-focus-visible:opacity-100">
               Open <ArrowRight className="h-3 w-3" />
             </span>
           </div>
@@ -459,12 +459,12 @@ function PipelineRow({ t }: { t: LiquidationTracked }) {
               aria-hidden
               className="absolute top-[-2px] h-[10px] w-px bg-slate-400 dark:bg-slate-500"
               style={{ left: `${pscMarker}%` }}
-              title="PSC deadline (270d)"
+              title="PSC deadline (300d)"
             />
-            <div className="flex justify-between text-[10px] tabular-nums text-slate-400 dark:text-slate-500 mt-1">
+            <div className="flex justify-between text-[10px] tabular-nums text-slate-500 dark:text-slate-400 mt-1">
               <span>entry</span>
-              <span style={{ marginLeft: `${pscMarker - 50}%` }}>PSC 270d</span>
-              <span>liquidation 314d</span>
+              {/* PSC (300d) sits too close to liquidation (314d) for its own floating label. */}
+              <span>PSC 300d · liquidation 314d</span>
             </div>
           </div>
         </div>
@@ -513,7 +513,7 @@ function DeadlineTile({
         {label}
       </span>
       <span className={cn('text-[12.5px] tabular-nums leading-tight', color)}>
-        {value} <span className="text-slate-400 dark:text-slate-500 font-normal">· {sub}</span>
+        {value} <span className="text-slate-500 dark:text-slate-400 font-normal">· {sub}</span>
       </span>
     </div>
   );

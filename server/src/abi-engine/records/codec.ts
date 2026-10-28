@@ -136,7 +136,12 @@ export function writeRecord(def: RecordDef, values: Record<string, string | unde
     }
 
     const justify = f.justify ?? defaultJustify(f.class);
-    const padded = justify === 'left' ? raw.padEnd(w, ' ') : raw.padStart(w, ' ');
+    // Numeric values are zero-filled: class N requires every position to be
+    // a digit, and although (S)N permits leading spaces, ACE's cargo-release
+    // derivation reads a space-padded 50-record value as zero (live SX
+    // 11022/11119 on scenario 061). CBP's own reference wires zero-fill both.
+    const numeric = f.class === 'N' || f.class === 'SN';
+    const padded = justify === 'left' ? raw.padEnd(w, ' ') : raw.padStart(w, numeric ? '0' : ' ');
     for (let i = 0; i < w; i++) chars[f.start - 1 + i] = padded[i];
   }
 

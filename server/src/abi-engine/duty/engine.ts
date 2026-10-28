@@ -12,7 +12,7 @@
  * throws instead.
  */
 import { RecordCodecError, type CodecIssue } from '../records/codec.js';
-import { parseRateExpression, pickSpecialRate, computeDutyCents } from './rateExpression.js';
+import { parseRateExpression, pickSpecialRate, computeDutyCents, ch99Semantics } from './rateExpression.js';
 import {
   computeLineMpfCents,
   applyMpfMinMax,
@@ -21,6 +21,7 @@ import {
   HMF_DE_MINIMIS_CENTS,
   informalEntryFeeCents,
   dutiableMailFeeCents,
+  MPF_EXEMPT_SPI,
 } from './fees.js';
 import type { AbiPayloadV2, LineV2 } from '../payload/schemaV2.js';
 
@@ -100,54 +101,96 @@ export async function enrichWithDuty(
   let cvCashCents = 0;
 
   for (const [index, line] of es.lines.entries()) {
-    // 1. Line duty per tariff. Ch.99 overlay surcharges ("duty of the
-    //    applicable subheading + X%") are computed on the combined value of
-    //    the line's OTHER tariffs — the ch.1–97 classification(s) the
-    //    overlay rides on.
-    for (const [tIndex, tariff] of line.tariffs.entries()) {
-      if (tariff.dutyCents === undefined) {
-        const where = `lines[${index}].tariffs[${tIndex}]`;
-        const rate = await rateSource.getRate(tariff.htsNumber, date);
-        if (!rate) {
-          fail(where, `no HTS rate available for ${tariff.htsNumber}`);
-        }
+    // 1. Line duty per tariff. A ch.99 heading reported with value 0 rides
+    //    on the line's ch.1-97 classification: its rate applies to the base
+    //    value, and its rate text says whether it adds to column 1 or
+    //    replaces it (ch99Semantics). Overlays resolve first so a
+    //    replacement can zero the base before the base is priced.
+    const isOverlay = (t: LineV2['tariffs'][number]) => t.valueDollars === 0 && t.htsNumber.startsWith('99');
+    const baseValueDollars = line.tariffs.reduce((sum, t) => (isOverlay(t) ? sum : sum + t.valueDollars), 0);
+    let replacesBase = false;
+    const order = line.tariffs
+      .map((tariff, tIndex) => ({ tariff, tIndex }))
+      .sort((a, b) => Number(isOverlay(b.tariff)) - Number(isOverlay(a.tariff)));
 
-        // SPI preference claim: use the Special-column rate for the claimed
-        // program. A claim the subheading does not list is a filer error.
-        let expression = rate.general;
-        if (line.spiClaimCode) {
-          const preferred = rate.special
-            ? pickSpecialRate(rate.special, line.spiClaimCode)
-            : null;
-          if (preferred === null && !tariff.htsNumber.startsWith('99')) {
+    for (const { tariff, tIndex } of order) {
+      const where = `lines[${index}].tariffs[${tIndex}]`;
+      const overlay = isOverlay(tariff) && baseValueDollars > 0;
+
+      if (overlay) {
+        const rate = await rateSource.getRate(tariff.htsNumber, date);
+        if (!rate && tariff.dutyCents === undefined) fail(where, `no HTS rate available for ${tariff.htsNumber}`);
+        if (rate) {
+          // Ch.99 rates are unaffected by an SPI claim; they keep their own
+          // general expression.
+          const semantics = ch99Semantics(tariff.htsNumber, rate.general);
+          if (semantics === 'unknown') {
             fail(
               where,
-              `SPI '${line.spiClaimCode}' is not a listed program for ${tariff.htsNumber} — remove the claim or supply dutyCents explicitly`
+              `Chapter 99 heading ${tariff.htsNumber} has no rate we can apply automatically ('${rate.general || 'blank'}'). Check the heading, or report its duty explicitly.`
             );
           }
-          // Ch.99 overlays are unaffected by the preference claim; they keep
-          // their own (general) expression.
-          if (preferred !== null && !tariff.htsNumber.startsWith('99')) {
-            expression = preferred;
+          if (semantics === 'replacement') replacesBase = true;
+          if (tariff.dutyCents === undefined) {
+            tariff.dutyCents =
+              semantics === 'none'
+                ? 0
+                : computeDutyCents(
+                    parseRateExpression(rate.general),
+                    { valueDollars: baseValueDollars, quantity1Hundredths: tariff.quantity1Hundredths, applicableSubheadingValueDollars: baseValueDollars },
+                    rate.general
+                  );
           }
         }
+      } else if (tariff.dutyCents === undefined) {
+        if (replacesBase && !tariff.htsNumber.startsWith('98')) {
+          // ACE's '[base] replaced': the ch.99 rate is the line's whole duty.
+          tariff.dutyCents = 0;
+        } else {
+          const rate = await rateSource.getRate(tariff.htsNumber, date);
+          if (!rate) {
+            fail(where, `no HTS rate available for ${tariff.htsNumber}`);
+          }
 
-        const othersValueDollars = line.tariffs.reduce(
-          (sum, t, i) => (i === tIndex ? sum : sum + t.valueDollars),
-          0
-        );
-        tariff.dutyCents = computeDutyCents(
-          parseRateExpression(expression),
-          {
-            valueDollars: tariff.valueDollars,
-            quantity1Hundredths: tariff.quantity1Hundredths,
-            applicableSubheadingValueDollars:
-              othersValueDollars > 0 ? othersValueDollars : tariff.valueDollars,
-          },
-          expression
-        );
+          // SPI preference claim: use the Special-column rate for the claimed
+          // program. A claim the subheading does not list is a filer error.
+          let expression = rate.general;
+          if (line.spiClaimCode) {
+            const preferred = rate.special
+              ? pickSpecialRate(rate.special, line.spiClaimCode)
+              : null;
+            // Duty-free subheadings list no programs in the Special column, yet
+            // an SPI claim on them is legitimate (made for fee/statistical
+            // treatment) — cert scenario 001 files SPI on a Free-rate HTS.
+            const generalFree = /^free$/i.test(rate.general.trim());
+            if (preferred === null && !generalFree && !tariff.htsNumber.startsWith('99')) {
+              fail(
+                where,
+                `The trade program claim '${line.spiClaimCode}' does not apply to HTS ${tariff.htsNumber}: the HTS does not list that program among its special rates. Remove the claim or check the classification.`
+              );
+            }
+            if (preferred !== null && !tariff.htsNumber.startsWith('99')) {
+              expression = preferred;
+            }
+          }
+
+          const othersValueDollars = line.tariffs.reduce(
+            (sum, t, i) => (i === tIndex ? sum : sum + t.valueDollars),
+            0
+          );
+          tariff.dutyCents = computeDutyCents(
+            parseRateExpression(expression),
+            {
+              valueDollars: tariff.valueDollars,
+              quantity1Hundredths: tariff.quantity1Hundredths,
+              applicableSubheadingValueDollars:
+                othersValueDollars > 0 ? othersValueDollars : tariff.valueDollars,
+            },
+            expression
+          );
+        }
       }
-      totalDutyCents += tariff.dutyCents;
+      totalDutyCents += tariff.dutyCents ?? 0;
     }
 
     // 2. Line fees (recomputed): keep non-499/501 fees the caller set.
@@ -155,15 +198,27 @@ export async function enrichWithDuty(
     const fees = [...keptFees];
     const value = lineValueDollars(line);
 
-    // The filer's explicit fee-exemption code (e.g. an MPF-exempt FTA
-    // program) suppresses the line MPF; the engine never infers exemption
-    // from the SPI claim alone.
-    if (!mpfExempt && !line.feeExemptionCode) {
+    // Line MPF is suppressed by the filer's explicit fee-exemption code OR
+    // by an SPI claim on CBP's MPF-exemption table (ACE enforces the latter
+    // itself — F632 FORMAL MPF NOT ALLOWED when the fee is reported anyway).
+    const spiMpfExempt = line.spiClaimCode !== undefined && MPF_EXEMPT_SPI.has(line.spiClaimCode);
+    // GRI set components (V) carry no line fees — the set header does
+    // (live F629 FORMAL MPF NOT ALLOWED / F480 HMF NOT ALLOWED - SET
+    // COMPONENT, 8/28).
+    const setComponent = line.articleSetIndicator === 'V';
+    // MPF-exempt ARTICLE provisions, each live-proven by F632 FORMAL MPF
+    // NOT ALLOWED - ARTICLE EXEMPT: 9802.00 repairs (048, 9/5) and
+    // 9820 Haiti preference (055, 9/8). Deliberately narrow — 9823 TRQ
+    // lines exempt via SPI instead (027).
+    const exemptProvision = line.tariffs.some(
+      (t) => t.htsNumber.startsWith('980200') || t.htsNumber.startsWith('9820') || t.htsNumber.startsWith('981785')
+    );
+    if (!mpfExempt && !line.feeExemptionCode && !spiMpfExempt && !setComponent && !exemptProvision) {
       const mpf = computeLineMpfCents(value);
       totalLineMpfCents += mpf;
       fees.push({ classCode: '499', amountCents: mpf });
     }
-    if (hmfOn) {
+    if (hmfOn && !setComponent) {
       const hmf = computeLineHmfCents(value);
       totalHmfCents += hmf;
       fees.push({ classCode: '501', amountCents: hmf });
@@ -198,7 +253,10 @@ export async function enrichWithDuty(
 
   // 5. Header fees (recomputed): informal 311; dutiable mail 496 (MOT 50).
   const headerFees: NonNullable<typeof es.headerFees> = [];
-  if (informal) headerFees.push({ classCode: '311', amountCents: informalEntryFeeCents(date) });
+  // Sample entries (9811.00 provisions) are exempt from even the informal
+  // MPF (live F635 INFRML MPF NOT ALLOWED - SUMMARY EXEMPT, scenario 056).
+  const sampleEntry = es.lines.every((l) => l.tariffs.some((t) => t.htsNumber.startsWith('981100')));
+  if (informal && !sampleEntry) headerFees.push({ classCode: '311', amountCents: informalEntryFeeCents(date) });
   if (es.motCode === '50' && totalDutyCents > 0) {
     headerFees.push({ classCode: '496', amountCents: dutiableMailFeeCents(date) });
   }
@@ -220,7 +278,10 @@ export async function enrichWithDuty(
   }
 
   // 7. AD/CVD subtotals (88-record) + grand totals (90-record, note x).
-  const hasAdCvd = adBondedCents + adCashCents + cvBondedCents + cvCashCents > 0;
+  // Presence of cases (not their amounts) drives the 88-record: an explicit
+  // AD/CVD summary with zero-deposit cases still reports the subtotals
+  // (mandatory for types 03/07/34/38, ESF-134 — cert scenario 043).
+  const hasAdCvd = es.lines.some((line) => (line.adCvdCases?.length ?? 0) > 0);
   if (hasAdCvd) {
     es.adCvdTotals = { bondedAdCents: adBondedCents, cashAdCents: adCashCents, bondedCvCents: cvBondedCents, cashCvCents: cvCashCents };
   } else {

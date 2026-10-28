@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useLogin, useMfaVerify } from '@/hooks/useAuth';
 import { useMutation } from '@tanstack/react-query';
 import { authApi } from '@/api/client';
@@ -263,9 +263,9 @@ export default function LoginPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="password">Password</Label>
-                      <span className="text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors duration-200">
+                      <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-200">
                         Forgot password?
-                      </span>
+                      </Link>
                     </div>
                     <Input
                       id="password"

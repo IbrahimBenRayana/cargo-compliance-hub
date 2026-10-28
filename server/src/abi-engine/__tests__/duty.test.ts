@@ -163,10 +163,34 @@ describe('enrichWithDuty', () => {
     expect(priced.entrySummary.grandTotals?.cvDutyCents).toBe(100000);
   });
 
+  it('suppresses line MPF when the SPI program is MPF-exempt (CBP MPF/preference table)', async () => {
+    // CERT floor enforces this: F632 FORMAL MPF NOT ALLOWED - ARTICLE EXEMPT
+    // came back on scenario 001 (Singapore FTA) when we reported the 499 fee.
+    const rates = new StaticRateSource({
+      '8507600020': { general: '3.41%', special: 'Free (AU,BH,CL,CO,IL,JO,KS,OM,P,PA,PE,S,SG)' },
+    });
+    const sg = unpriced();
+    sg.entrySummary.lines[0].spiClaimCode = 'SG';
+    const priced = await enrichWithDuty(sg, rates, { applicabilityDate: '20260820' });
+    expect(priced.entrySummary.lines[0].tariffs[0].dutyCents).toBe(0);
+    expect(priced.entrySummary.lines[0].fees).toEqual([
+      { classCode: '501', amountCents: 1250 }, // HMF still due — only MPF is program-exempt
+    ]);
+
+    // Israel FTA (IL) is NOT on the MPF-exemption table — the fee stays.
+    const il = unpriced();
+    il.entrySummary.lines[0].spiClaimCode = 'IL';
+    const pricedIl = await enrichWithDuty(il, rates, { applicabilityDate: '20260820' });
+    expect(pricedIl.entrySummary.lines[0].fees).toEqual([
+      { classCode: '499', amountCents: 3464 },
+      { classCode: '501', amountCents: 1250 },
+    ]);
+  });
+
   it('refuses unlisted SPI claims and unknown HTS numbers instead of guessing', async () => {
     const spi = unpriced();
     spi.entrySummary.lines[0].spiClaimCode = 'A';
-    await expect(enrichWithDuty(spi, RATES, { applicabilityDate: '20260820' })).rejects.toThrow(/SPI/);
+    await expect(enrichWithDuty(spi, RATES, { applicabilityDate: '20260820' })).rejects.toThrow(/trade program claim/);
 
     const unknown = unpriced();
     unknown.entrySummary.lines[0].tariffs[0].htsNumber = '9999999999';
@@ -197,9 +221,11 @@ describe('SPI preference rates (Special column)', () => {
     const priced = await enrichWithDuty(p, rates, { applicabilityDate: '20260820' });
     expect(priced.entrySummary.lines[0].tariffs[0].dutyCents).toBe(0);
     expect(priced.entrySummary.grandTotals?.dutyCents).toBe(0);
-    // MPF is NOT dropped by the claim alone — that takes an explicit
-    // fee-exemption code (next test).
-    expect(priced.entrySummary.lines[0].fees).toContainEqual({ classCode: '499', amountCents: 3464 });
+    // AU is on CBP's MPF-exemption table, so the claim itself drops the
+    // 499 fee (CERT F632 rejects it otherwise); HMF is unaffected.
+    expect(priced.entrySummary.lines[0].fees).not.toContainEqual(
+      expect.objectContaining({ classCode: '499' })
+    );
   });
 
   it('suppresses line MPF only via the explicit fee-exemption code', async () => {
@@ -271,5 +297,32 @@ describe('ch.99 overlay surcharges (Section 301/232)', () => {
     const [overlay, base] = priced.entrySummary.lines[0].tariffs;
     expect(base.dutyCents).toBe(0); // preference
     expect(overlay.dutyCents).toBe(250000); // 301 unaffected by the claim
+  });
+});
+
+describe('FY2027 user fees (CBP Dec. 26-14, FR 2026-15530, effective 2026-10-01)', () => {
+  it('clamps formal MPF to $34.58 / $670.86', () => {
+    expect(applyMpfMinMax(100, '20261001')).toBe(3458);
+    expect(applyMpfMinMax(10_000_000, '20261015')).toBe(67086);
+  });
+
+  it('keeps FY2026 limits for the day before', () => {
+    expect(applyMpfMinMax(100, '20260930')).toBe(3358);
+  });
+
+  it('charges $2.77 informal, $7.61 dutiable mail and $4.15 manual surcharge', () => {
+    expect(informalEntryFeeCents('20261001')).toBe(277);
+    expect(dutiableMailFeeCents('20261001')).toBe(761);
+    expect(manualEntrySurchargeCents('20261001')).toBe(415);
+  });
+});
+
+describe('user-fee table freshness', () => {
+  it('has an era no older than 12 months (CBP adjusts fees every October 1)', () => {
+    const now = new Date();
+    const yearAgo = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate()))
+      .toISOString().slice(0, 10).replace(/-/g, '');
+    // If this fails, add the new fiscal year's fees from CBP's July Federal Register notice.
+    expect(applyMpfMinMax(100, yearAgo)).not.toBe(applyMpfMinMax(100, '29991231'));
   });
 });

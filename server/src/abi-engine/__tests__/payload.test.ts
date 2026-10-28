@@ -150,9 +150,30 @@ describe('migrateV1ToV2', () => {
     });
     expect(line.tariffs[0].dutyCents).toBeUndefined(); // duty engine's job
     expect(line.grossWeightKg).toBe(1200); // 2646 lb → 1200 kg
-    expect(line.parties).toEqual([{ type: 'S', identifier: '26-164751100' }]); // buyer taxId only
+    expect(line.parties).toEqual([
+      { type: 'S', identifier: '26-164751100' },
+      { type: 'M', identifier: 'CNSHEBATSHE' }, // derived MID (Directive 3500-13)
+    ]);
     expect(v2.commercial?.invoices?.[0]).toMatchObject({ invoiceNumber: 'INV-1', itemSkus: ['BAT-01'] });
     expect(v2.commercial?.consignee?.name).toBe('SIGMA TECHNOLOGY PARTNERS LLC');
+  });
+
+  it('survives the full shadow pipeline: migrate \u2192 duty \u2192 validate \u2192 build', async () => {
+    // The exact chain services/abiShadow.ts runs after every CC submission.
+    const { enrichWithDuty, StaticRateSource } = await import('../duty/engine.js');
+    const { toAeEntrySummaryInput } = await import('../payload/toAeInput.js');
+    const { validateEntrySummary } = await import('../validate/entrySummary.js');
+    const priced = await enrichWithDuty(
+      migrateV1ToV2(V1),
+      new StaticRateSource({ '8507600020': '3.41%' }),
+      { applicabilityDate: '20260820' }
+    );
+    const input = toAeEntrySummaryInput(priced, 'A');
+    // MID derivation closes the manufacturer-party gap: clean validation.
+    expect(validateEntrySummary(input)).toEqual([]);
+    const lines = buildEntrySummary(input);
+    expect(lines[0].startsWith('10')).toBe(true);
+    expect(lines[lines.length - 1].startsWith('90')).toBe(true);
   });
 
   it('refuses unmappable values instead of degrading silently', () => {
@@ -161,6 +182,39 @@ describe('migrateV1ToV2', () => {
     expect(() =>
       migrateV1ToV2({ ...V1, manifest: [{ ...V1.manifest[0], quantity: 'lots' }] })
     ).toThrow(/manifested quantity/);
+  });
+});
+
+describe('deriveMid (Directive 3500-13)', () => {
+  it('constructs country + 3+3 name + street number + city', async () => {
+    const { deriveMid } = await import('../payload/mid.js');
+    expect(
+      deriveMid({ name: 'NICSAN APPLIANCE WORKS', address: '435 INDUSTRIAL RD', city: 'TAICHUNG', countryCode: 'TW' })
+    ).toBe('TWNICAPP435TAI');
+    // Ignored articles + hyphenated words merge (AMF/Directive rules).
+    expect(deriveMid({ name: 'THE FRITZ-WERNER GROUP', address: '12345 MAIN ST', city: 'BERLIN', countryCode: 'DE' })).toBe(
+      'DEFRIGRO1234BER' // street number capped at 4 digits
+    );
+    // Initials run counts as one word.
+    expect(deriveMid({ name: 'A B C COMPANY', city: 'OSAKA', countryCode: 'JP' })).toBe('JPABCCOMOSA');
+    // Single-word firm: first six characters (cert package: TWNICSAN435TAI).
+    expect(deriveMid({ name: 'NICSAN', address: '435 INDUSTRIAL RD', city: 'TAICHUNG', countryCode: 'TW' })).toBe(
+      'TWNICSAN435TAI'
+    );
+  });
+
+  it('applies the Canadian province rule and refuses CA without a province', async () => {
+    const { deriveMid } = await import('../payload/mid.js');
+    expect(
+      deriveMid({ name: 'MAPLE AUTO PARTS', address: '77 KING ST', city: 'TORONTO', countryCode: 'CA', stateOrProvince: 'ON' })
+    ).toBe('XOMAPAUT77TOR');
+    expect(() => deriveMid({ name: 'MAPLE AUTO', city: 'TORONTO', countryCode: 'CA' })).toThrow(RecordCodecError);
+  });
+
+  it('requires a usable name and country', async () => {
+    const { deriveMid } = await import('../payload/mid.js');
+    expect(() => deriveMid({ name: '', city: 'PARIS', countryCode: 'FR' })).toThrow(RecordCodecError);
+    expect(() => deriveMid({ name: 'ACME', city: 'PARIS', countryCode: '' })).toThrow(RecordCodecError);
   });
 });
 

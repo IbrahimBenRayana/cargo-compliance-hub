@@ -186,14 +186,13 @@ export function abiDocumentToDutyCalc(doc: AbiDocument): {
     filledFields.push('countryOfOrigin');
   }
 
-  // Mode of transport: CBP codes are "40" = vessel/ocean, "41" = air.
-  // Anything else stays unfilled (truck/rail are "30"/"32" but we don't
-  // see those in ocean import flows today).
+  // Mode of transport (CATAIR AE Table 3): 10/11/12 = vessel, 40/41 = air.
+  // Rail, truck and other modes stay unfilled.
   const mot = doc.modeOfTransport;
-  if (mot === '40') {
+  if (mot === '10' || mot === '11' || mot === '12') {
     prefill.modeOfTransportation = 'ocean';
     filledFields.push('modeOfTransportation');
-  } else if (mot === '41') {
+  } else if (mot === '40' || mot === '41') {
     prefill.modeOfTransportation = 'air';
     filledFields.push('modeOfTransportation');
   }

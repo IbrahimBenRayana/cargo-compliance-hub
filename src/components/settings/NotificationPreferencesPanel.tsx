@@ -99,7 +99,7 @@ const GROUPS: Group[] = [
     title: 'System',
     desc: 'Operational alerts about the platform itself.',
     kinds: [
-      { kind: 'api_error', label: 'API connection error', desc: 'A platform API call failed (e.g. CC unavailable).', critical: true },
+      { kind: 'api_error', label: 'API connection error', desc: 'A connection to a filing or data service failed.', critical: true },
     ],
   },
 ];

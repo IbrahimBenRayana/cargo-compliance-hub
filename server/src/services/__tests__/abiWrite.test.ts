@@ -13,10 +13,12 @@ const { prisma, abiGateway, mapper, schema, billing, entitlements } = vi.hoisted
       update: vi.fn(), updateMany: vi.fn(),
     },
     submissionLog: { create: vi.fn() },
+    orgCbpConfig: { findUnique: vi.fn() },
   },
   abiGateway: { createABIDocument: vi.fn(), sendABIDocument: vi.fn(), deleteABIDocument: vi.fn() },
   mapper: {
     mapABIDocumentToCC: vi.fn(() => ({})),
+    hasNativeOnlyData: vi.fn(() => false),
     buildSendPayload: vi.fn(() => ({})),
     canonicaliseEntryNumber: vi.fn((s: string) => s),
     extractCCErrorMessage: vi.fn(() => 'cc error'),
@@ -33,6 +35,8 @@ const { prisma, abiGateway, mapper, schema, billing, entitlements } = vi.hoisted
 }));
 
 vi.mock('../../config/database.js', () => ({ prisma }));
+const { nativeEntry } = vi.hoisted(() => ({ nativeEntry: { transmitEntryNative: vi.fn() } }));
+vi.mock('../cbp/nativeEntry.js', () => nativeEntry);
 vi.mock('../abi/gateway.js', () => ({ abiGateway }));
 vi.mock('../abiDocumentMapper.js', () => mapper);
 vi.mock('../../schemas/abiDocument.js', () => schema);
@@ -43,10 +47,14 @@ vi.mock('../auditLog.js', () => ({ writeAuditLog: vi.fn() }));
 vi.mock('../notifications.js', () => ({ notify: vi.fn(() => Promise.resolve()) }));
 vi.mock('../abiPolling.js', () => ({ pollABIDocumentStatus: vi.fn(() => Promise.resolve()) }));
 
-import { sendAbiDocumentToCBP } from '../abiWrite.js';
+import { sendAbiDocumentToCBP, isEntryEditable } from '../abiWrite.js';
 
 const ARGS = { docId: 'd1', orgId: 'o1', userId: 'u1' };
-const DRAFT = { id: 'd1', orgId: 'o1', status: 'DRAFT', payload: {}, filingId: null, entryType: '01', entryNumber: 'ENT1', mbolNumber: 'MBOL1' };
+// ABC-1234567 with its CATAIR check digit; the org's approved CBP setup uses ABC.
+const VALID_ENTRY = 'ABC-1234567-6';
+const DRAFT = { id: 'd1', orgId: 'o1', status: 'DRAFT', payload: { entryNumber: VALID_ENTRY }, filingId: null, entryType: '01', entryNumber: 'ENT1', mbolNumber: 'MBOL1' };
+// These tests cover the CustomsCity fallback gateway; the native branch has its own test.
+const APPROVED_CBP = { filerCode: 'ABC', isfFilerModeDefault: 'CLIENT', serviceCenterApprovedAt: new Date('2026-10-01'), gateway: 'CC' };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -56,14 +64,37 @@ beforeEach(() => {
   prisma.abiDocument.findUnique.mockResolvedValue(DRAFT);
   prisma.abiDocument.update.mockImplementation(({ data }: any) => Promise.resolve({ ...DRAFT, ...data }));
   prisma.submissionLog.create.mockResolvedValue({});
+  prisma.orgCbpConfig.findUnique.mockResolvedValue(APPROVED_CBP);
   schema.abiDocumentBodySchema.safeParse.mockReturnValue({ success: true });
   mapper.extractDenormFromPayload.mockReturnValue({ mbolNumber: 'MBOL1', entryNumber: 'ENT1', entryType: '01', modeOfTransport: '40' });
   abiGateway.createABIDocument.mockResolvedValue({ status: 201, data: { _id: 'cc1' }, latencyMs: 1 });
   abiGateway.sendABIDocument.mockResolvedValue({ status: 200, data: {}, latencyMs: 1 });
-  entitlements.getOrgEntitlements.mockResolvedValue({ canFile: true, hasActiveTier: true, capabilities: ['ABI_ENTRY'], planId: 'entry', delinquent: false });
+  entitlements.getOrgEntitlements.mockResolvedValue({ canFile: true, hasActiveTier: true, capabilities: ['ABI_ENTRY'], planId: 'entry', delinquent: false, entryPricingSet: true });
 });
 
 describe('sendAbiDocumentToCBP', () => {
+  it('422 for Type 86: CBP suspended de minimis entries on 2025-08-29 (indefinite since 2026-06-24)', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DRAFT, entryType: '86' });
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(out.httpStatus).toBe(422);
+    expect(out.body).toMatchObject({ code: 'entry_type_suspended' });
+    expect(abiGateway.createABIDocument).not.toHaveBeenCalled();
+  });
+
+  it('422 when the entry number uses another filer code (e.g. Sigma S7P)', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DRAFT, payload: { entryNumber: 'S7P-1234567-0' } });
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(out.httpStatus).toBe(422);
+    expect(out.body).toMatchObject({ code: 'ENTRY_FILER_MISMATCH' });
+    expect(abiGateway.createABIDocument).not.toHaveBeenCalled();
+  });
+
+  it('422 when the org has no CBP setup yet', async () => {
+    prisma.orgCbpConfig.findUnique.mockResolvedValue(null);
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(out.body).toMatchObject({ code: 'CBP_SETUP_INCOMPLETE' });
+  });
+
   it('404 when not found', async () => {
     prisma.abiDocument.findFirst.mockResolvedValue(null);
     const out = await sendAbiDocumentToCBP(ARGS);
@@ -111,6 +142,14 @@ describe('sendAbiDocumentToCBP', () => {
     expect(abiGateway.sendABIDocument).not.toHaveBeenCalled();
   });
 
+  it('402 when entry pricing has not been set for the org (entries have no public price)', async () => {
+    entitlements.getOrgEntitlements.mockResolvedValue({ canFile: true, hasActiveTier: true, capabilities: ['ABI_ENTRY'], planId: 'entry', delinquent: false, entryPricingSet: false });
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(out.httpStatus).toBe(402);
+    expect(out.body).toMatchObject({ code: 'entry_pricing_required' });
+    expect(abiGateway.sendABIDocument).not.toHaveBeenCalled();
+  });
+
   it('502 + rollback when CC create errors — not billed', async () => {
     abiGateway.createABIDocument.mockResolvedValue({ status: 500, data: { message: 'boom' }, latencyMs: 1 });
     const out = await sendAbiDocumentToCBP(ARGS);
@@ -120,5 +159,43 @@ describe('sendAbiDocumentToCBP', () => {
     expect(prisma.abiDocument.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'DRAFT' }) }),
     );
+  });
+
+  it('native gateway: sends through our engine instead of CustomsCity', async () => {
+    prisma.orgCbpConfig.findUnique.mockResolvedValue({ ...APPROVED_CBP, gateway: 'NATIVE' });
+    nativeEntry.transmitEntryNative.mockResolvedValue({ httpStatus: 202, body: { transmissionId: 't1', outcome: 'SENT' } });
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(nativeEntry.transmitEntryNative).toHaveBeenCalledWith(expect.objectContaining({ action: 'ADD' }));
+    expect(abiGateway.createABIDocument).not.toHaveBeenCalled();
+    expect(out.httpStatus).toBe(200);
+  });
+
+  it('native gateway: a rejected entry is corrected and sent again (FNA-12)', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DRAFT, status: 'REJECTED', lastTransmissionId: 't0', pendingAction: null, cbpState: 'NOT_ON_FILE' });
+    prisma.orgCbpConfig.findUnique.mockResolvedValue({ ...APPROVED_CBP, gateway: 'NATIVE' });
+    nativeEntry.transmitEntryNative.mockResolvedValue({ httpStatus: 202, body: { transmissionId: 't1', outcome: 'SENT' } });
+    await sendAbiDocumentToCBP(ARGS);
+    expect(nativeEntry.transmitEntryNative).toHaveBeenCalledWith(expect.objectContaining({ action: 'ADD' }));
+  });
+
+  it('a CustomsCity-era rejected entry is still not re-sent', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DRAFT, status: 'REJECTED', lastTransmissionId: null, pendingAction: null, cbpState: 'NOT_ON_FILE' });
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(out.body).toMatchObject({ note: 'Already in status REJECTED' });
+    expect(nativeEntry.transmitEntryNative).not.toHaveBeenCalled();
+  });
+});
+
+describe('isEntryEditable', () => {
+  const base = { status: 'DRAFT', lastTransmissionId: null, pendingAction: null, cbpState: 'NOT_ON_FILE' };
+  it.each([
+    ['a draft', base, true],
+    ['a native rejected entry', { ...base, status: 'REJECTED', lastTransmissionId: 't' }, true],
+    ['a native entry CBP holds (to replace it)', { ...base, status: 'ACCEPTED', lastTransmissionId: 't', cbpState: 'ON_FILE' }, true],
+    ['an entry waiting for CBP', { ...base, status: 'SENT', lastTransmissionId: 't', pendingAction: 'ADD' }, false],
+    ['a CustomsCity-era accepted entry', { ...base, status: 'ACCEPTED' }, false],
+    ['an entry deleted at CBP', { ...base, status: 'CANCELLED', lastTransmissionId: 't', cbpState: 'DELETED' }, false],
+  ])('%s: %s', (_label, doc, expected) => {
+    expect(isEntryEditable(doc)).toBe(expected);
   });
 });

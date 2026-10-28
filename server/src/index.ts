@@ -16,10 +16,13 @@ import { env } from './config/env.js';
 import { prisma } from './config/database.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
-import { authMiddleware, requireRole } from './middleware/auth.js';
+import { authMiddleware, requirePlatformAdmin } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
 import mfaRoutes from './routes/mfa.js';
 import adminRoutes from './routes/admin.js';
+import certConsoleRoutes from './routes/certConsole.js';
+import cbpTrafficRoutes from './routes/cbpTraffic.js';
+import inbondRoutes from './routes/inbond.js';
 import apiKeyRoutes from './routes/apiKeys.js';
 import webhookRoutes from './routes/webhooks.js';
 import publicApiRoutes from './routes/publicApi.js';
@@ -46,6 +49,7 @@ import { startBackgroundJobs, stopBackgroundJobs, getJobStatus, pollSubmittedFil
 import { startNotificationStream, stopNotificationStream } from './services/notificationStream.js';
 import { startChatStream, stopChatStream, getChatStreamStats } from './services/chat/chatStream.js';
 import { verifyEmailConnection } from './services/email.js';
+import { syncPlansFromTiers } from './services/planSync.js';
 
 const app = express();
 
@@ -133,6 +137,9 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/v1/auth/mfa', mfaRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/admin/cert', certConsoleRoutes);
+app.use('/api/v1/admin/cbp', cbpTrafficRoutes);
+app.use('/api/v1/inbond', inbondRoutes);
 app.use('/api/v1/api-keys', apiKeyRoutes);
 app.use('/api/v1/webhooks', webhookRoutes);
 // Public, API-key-authenticated surface for broker/3PL/ERP integrations.
@@ -171,11 +178,11 @@ app.use('/api/v1/chat', chatRoutes);
 // across every org. Now require an authenticated owner. If you need to
 // run these from outside a logged-in session, do it via a one-off
 // `npm run jobs:*` script on the server, not the public API.
-app.get('/api/v1/jobs/status', authMiddleware, requireRole('owner'), (_req, res) => {
+app.get('/api/v1/jobs/status', authMiddleware, requirePlatformAdmin, (_req, res) => {
   res.json(getJobStatus());
 });
 
-app.post('/api/v1/jobs/trigger-status-poll', authMiddleware, requireRole('owner'), async (_req, res) => {
+app.post('/api/v1/jobs/trigger-status-poll', authMiddleware, requirePlatformAdmin, async (_req, res) => {
   try {
     await pollSubmittedFilings();
     res.json({ success: true, ...getJobStatus() });
@@ -184,7 +191,7 @@ app.post('/api/v1/jobs/trigger-status-poll', authMiddleware, requireRole('owner'
   }
 });
 
-app.post('/api/v1/jobs/trigger-deadline-check', authMiddleware, requireRole('owner'), async (_req, res) => {
+app.post('/api/v1/jobs/trigger-deadline-check', authMiddleware, requirePlatformAdmin, async (_req, res) => {
   try {
     await checkDeadlines();
     res.json({ success: true, ...getJobStatus() });
@@ -226,6 +233,9 @@ async function main() {
   try {
     await prisma.$connect();
     console.log('✅ Database connected');
+
+    // Keep tier capabilities in the plans table aligned with the code.
+    await syncPlansFromTiers();
 
     const server = app.listen(env.PORT, () => {
       console.log(`🚀 MyCargoLens API running on http://localhost:${env.PORT}`);

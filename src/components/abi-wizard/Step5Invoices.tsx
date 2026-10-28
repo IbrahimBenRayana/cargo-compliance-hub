@@ -14,7 +14,7 @@ import type {
   ABIParty,
   AbiDocument,
 } from '@/api/client';
-import { PARTY_TYPES, WEIGHT_UOM, YES_NO } from '@/data/abiEnums';
+import { PARTY_TYPES, SPI_CLAIM_CODES, WEIGHT_UOM, YES_NO } from '@/data/abiEnums';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +44,9 @@ import {
   TextField,
   US_STATES,
 } from './shared';
+import { ImportLinesDialog } from './ImportLinesDialog';
+import { AdCvdCasesEditor } from './AdCvdCasesEditor';
+import { Ch99Picker } from './Ch99Picker';
 
 interface Props {
   value: ABIDocumentDraft;
@@ -112,7 +115,7 @@ function ConfirmDelete({
   );
 }
 
-export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
+export default function Step5Invoices({ value, onChange, doc, errors = {} }: Props) {
   const manifest = (value.manifest?.[0] || {}) as NonNullable<
     ABIDocumentDraft['manifest']
   >[number];
@@ -206,6 +209,7 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
         <div className="text-sm text-muted-foreground">
           No invoices yet. Add the first invoice to begin entering line items.
         </div>
+        {errors.invoices && <p role="alert" className="text-xs text-red-500">{errors.invoices}</p>}
         <Button onClick={addInvoice}>
           <Plus className="h-4 w-4 mr-1.5" /> Add invoice
         </Button>
@@ -279,13 +283,16 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                 <SelectField
                   label="Related Parties"
                   required
-                  value="N"
-                  onChange={() => {
-                    /* Phase 1: locked to N */
-                  }}
-                  options={[{ value: 'N', label: 'No' }]}
-                  disabled
-                  hint="Phase 1 supports unrelated-party transactions only. Related-party (Y) reporting will unlock in a later phase."
+                  value={inv.relatedParties || 'N'}
+                  onChange={(v) =>
+                    updateInvoice(invIdx, { relatedParties: v as 'Y' | 'N' })
+                  }
+                  options={[
+                    { value: 'N', label: 'No — unrelated buyer and seller' },
+                    { value: 'Y', label: 'Yes — related parties' },
+                  ]}
+                  hint="Declare 'Yes' when buyer and seller are related under 19 CFR 152.102(g) (e.g. an intercompany purchase from a parent or affiliate). This flags the entry for CBP valuation review; transaction value must still be arm's-length."
+                  error={errors[`invoices.${invIdx}.relatedParties`]}
                 />
                 <ComboboxField
                   label="Country of Export"
@@ -319,7 +326,7 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                     })
                   }
                   type="number"
-                  hint="Invoice-currency to USD exchange rate (CC max: 8)."
+                  hint="Invoice-currency to USD exchange rate (maximum 8)."
                   error={errors[`invoices.${invIdx}.exchangeRate`]}
                 />
               </div>
@@ -330,14 +337,31 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                   <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Line Items ({(inv.items || []).length})
                   </h4>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addItem(invIdx)}
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add item
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <ImportLinesDialog
+                      docId={doc?.id}
+                      invoiceIndex={invIdx}
+                      onImport={(imported) =>
+                        updateInvoice(invIdx, {
+                          items: [
+                            ...((inv.items || []) as ABIItem[]),
+                            ...imported,
+                          ],
+                        })
+                      }
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addItem(invIdx)}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add item
+                    </Button>
+                  </div>
                 </div>
+                {errors[`invoices.${invIdx}.items`] && (
+                  <p role="alert" className="text-xs text-red-500">{errors[`invoices.${invIdx}.items`]}</p>
+                )}
                 <div className="space-y-4">
                   {((inv.items || []) as PartialItem[]).map((item, itemIdx) => {
                     const hts = (item.htsNumber || '').replace(/\D/g, '');
@@ -415,6 +439,16 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                             error={errors[`${itemPath}.origin.country`]}
                           />
                           <SelectField
+                            label="Trade program claim"
+                            value={item.spiClaimCode || ''}
+                            onChange={(v) =>
+                              updateItem(invIdx, itemIdx, { spiClaimCode: v || undefined })
+                            }
+                            options={[{ value: '', label: 'None' }, ...SPI_CLAIM_CODES]}
+                            error={errors[`${itemPath}.spiClaimCode`]}
+                            hint="USMCA, FTA or other preference this line qualifies for. The duty uses the program's rate."
+                          />
+                          <SelectField
                             label="Item Currency"
                             required
                             value={item.values?.currency || 'USD'}
@@ -452,7 +486,7 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                               })
                             }
                             type="number"
-                            hint="CC max: 8."
+                            hint="Maximum 8."
                             error={errors[`${itemPath}.values.exchangeRate`]}
                           />
                           <TextField
@@ -521,6 +555,21 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                           </div>
                         </div>
 
+                        <Ch99Picker
+                          value={item.additionalHtsNumbers}
+                          onChange={(additionalHtsNumbers) => updateItem(invIdx, itemIdx, { additionalHtsNumbers })}
+                          error={errors[`${itemPath}.additionalHtsNumbers`]}
+                        />
+
+                        {value.entryType === '03' && (
+                          <AdCvdCasesEditor
+                            cases={item.adCvdCases}
+                            onChange={(adCvdCases) => updateItem(invIdx, itemIdx, { adCvdCases })}
+                            errors={errors}
+                            path={itemPath}
+                          />
+                        )}
+
                         {/* Parties per item */}
                         <div className="border-t pt-3">
                           <div className="flex items-center justify-between mb-2">
@@ -536,6 +585,9 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                               <Plus className="h-3.5 w-3.5 mr-1" /> Add party
                             </Button>
                           </div>
+                          {errors[`${itemPath}.parties`] && (
+                            <p role="alert" className="text-xs text-red-500 mb-2">{errors[`${itemPath}.parties`]}</p>
+                          )}
                           <div className="space-y-3">
                             {((item.parties || []) as PartialParty[]).map(
                               (p, pIdx) => {
@@ -820,7 +872,7 @@ export default function Step5Invoices({ value, onChange, errors = {} }: Props) {
                                     { value: '8', label: '8' },
                                     { value: '9', label: '9' },
                                   ]}
-                                  hint="CC accepts 1–9 or none. 0 is rejected."
+                                  hint="1 to 9, or none. 0 is not accepted."
                                 />
                               </div>
                             </AccordionContent>

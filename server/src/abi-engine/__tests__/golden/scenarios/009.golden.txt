@@ -1,0 +1,57 @@
+ALA  MCLPASSWD           AE                                                     
+B  2704ZZZAE                                               SCENARIO 009         
+10AZZZ  00000094 2704009         1211 XA          2083126                       
+1126-16475110026-164751100               082026081526       CA                  
+20MAEU3001081426    EVER GIVEN                                                  
+SE13IMRAN SIDDIQUE                          2135550100                          
+2200000100CTNS                                                                  
+23MMAEU123456789012                                                             
+318B 123                                                                        
+3431100000269                                                                   
+SE30SE ALBION CONFECTIONS LTD                                                   
+SE350112                                 02QUAY ROAD                            
+SE36FELIXSTOWE                                                 GB               
+SE30BY                                    EI 26-164751100                       
+40  001 GBGB080126        0000000500413230000001200                             
+44CHOCOLATE CONFECTIONERY, QUOTA                                                
+47MGBALBCON12FEL                                                                
+47S26-164751100                                                                 
+5099030581   0000000300 0000000000                                              
+501806901500 0000000105 0000000030 000000000500KG 000000000131CKG               
+OI        CHOCOLATE CONFECTIONERY, RETAIL PACKS                                 
+PG01001FDAFOOPRO                                                                
+PG02PFDP 33LGT07                                                                
+PG0639 GB                                                                       
+PG06CSHGB                                                                       
+PG10                   CHOCOLATE CANDY, RETAIL PACKS                            
+PG19MF                   ALBION CONFECTIONS LTD          12 QUAY ROAD           
+PG20                                     FELIXSTOWE              GB             
+PG23PFR  12345678901                                                            
+PG19DEQ                  ALBION CONFECTIONS LTD          12 QUAY ROAD           
+PG20                                     FELIXSTOWE              GB             
+PG19FD1                  SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG21FD1IMRAN SIDDIQUE         2135550100     ISIDDIQUE@SIGMATECHLLC.COM         
+PG19DFP                  SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG19UC                   SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG19PNS                  SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG21PNSIMRAN SIDDIQUE         2135550100     ISIDDIQUE@SIGMATECHLLC.COM         
+PG19PNT                  SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG21PNTIMRAN SIDDIQUE         2135550100     ISIDDIQUE@SIGMATECHLLC.COM         
+PG19FSV16 123456789      SIGMA TECHNOLOGY PARTNERS LLC   100 MARKET ST          
+PG20                                     LOS ANGELES          CA US90001        
+PG21FSVIMRAN SIDDIQUE                        ISIDDIQUE@SIGMATECHLLC.COM         
+PG23VES  EVER GIVEN                                                             
+PG23VFT  0823E                                                                  
+PG261000000000500KG                                                             
+PG27MAEU1234567                                                                 
+PG30A0820202609002   3001                                                       
+6211000000007                                                                   
+891100000000000731100000000269                                                  
+9000000000405 00000000276 00000000000 00000000000 00000000000 00000000000       
+Y  2704ZZZAE                                                                    
+ZLA  MCL                                                                        

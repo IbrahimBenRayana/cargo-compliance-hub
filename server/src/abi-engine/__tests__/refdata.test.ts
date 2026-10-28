@@ -2,7 +2,7 @@
  * USITC refdata tests — normalization fixture is a trimmed real response
  * from /reststop/exportList?from=8507&to=8508 (fetched Aug 2026).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { normalizeUsitcRows, ingestChapter, type UsitcRow, type HtsRateLineStore } from '../refdata/usitcHts.js';
 import { DbHtsRateSource } from '../refdata/dbRateSource.js';
 import { enrichWithDuty } from '../duty/engine.js';
@@ -39,6 +39,23 @@ describe('normalizeUsitcRows', () => {
 
     const liIon = lines.find((l) => l.htsNumber === '8507600020')!;
     expect(liIon.generalRate).toBe('3.4%');
+  });
+
+  it('records each line\'s full path: heading, subheading and grouping rows included', () => {
+    // The classifier needs the wording that only lives on the skipped rows
+    // ("Other lead-acid", "New:"); a leaf alone often just says "Other".
+    expect(lines.find((l) => l.htsNumber === '8507208031')!.pathText)
+      .toBe('Electric storage batteries… > Other lead-acid: > Other > For vehicles');
+    expect(lines.find((l) => l.htsNumber === '8507100030')!.pathText)
+      .toBe('Electric storage batteries… > Lead-acid, engine starting > New: > 12 V batteries');
+    expect(lines.find((l) => l.htsNumber === '85076000')!.pathText)
+      .toBe('Electric storage batteries… > Lithium-ion batteries');
+  });
+
+  it('a grouping row does not leak into a sibling subtree', () => {
+    // 8507.10.00.90 (indent 2) is a sibling of "New:" (indent 2), not its child.
+    expect(lines.find((l) => l.htsNumber === '8507100090')!.pathText)
+      .toBe('Electric storage batteries… > Lead-acid, engine starting > Other');
   });
 
   it('a sibling subtree does not leak its rate (stack pops on indent)', () => {
@@ -109,5 +126,34 @@ describe('ingestChapter', () => {
   it('rejects malformed chapter ids', async () => {
     const store: HtsRateLineStore = { deleteMany: async () => 0, createMany: async () => 0 };
     await expect(ingestChapter(store, '857', 'r')).rejects.toThrow(/2-digit chapter/);
+  });
+});
+
+describe('fetchUsitcRows', () => {
+  it('retries a dropped connection before giving up (Oct 21 staging ingest stopped mid-run)', async () => {
+    const { fetchUsitcRows } = await import('../refdata/usitcHts.js');
+    const ok = { ok: true, status: 200, json: async () => ROWS };
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } }))
+      .mockResolvedValueOnce(ok);
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      expect(await fetchUsitcRows('8507', '8508', { retryDelayMs: 0 })).toHaveLength(ROWS.length);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('gives up after three failed attempts', async () => {
+    const { fetchUsitcRows } = await import('../refdata/usitcHts.js');
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await expect(fetchUsitcRows('8507', '8508', { retryDelayMs: 0 })).rejects.toThrow();
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

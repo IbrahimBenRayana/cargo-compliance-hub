@@ -33,18 +33,37 @@ export interface NormalizedHtsLine {
   specialRate: string;
   otherRate: string;
   units: string[];
+  /**
+   * Every ancestor's description down to this line, ' > '-joined: heading,
+   * subheading and unnumbered grouping rows included. Leaves often just say
+   * "Other"; the HTS classifier needs the wording that lives on the parents.
+   */
+  pathText: string;
 }
 
 const USITC_BASE = 'https://hts.usitc.gov/reststop/exportList';
 
 /** Fetch raw USITC rows for a heading range (inclusive, e.g. '8507','8508'). */
-export async function fetchUsitcRows(from: string, to: string): Promise<UsitcRow[]> {
+export async function fetchUsitcRows(
+  from: string, to: string, opts: { attempts?: number; retryDelayMs?: number } = {},
+): Promise<UsitcRow[]> {
   const url = `${USITC_BASE}?from=${from}&to=${to}&format=JSON&styles=false`;
-  const res = await fetch(url, { headers: { accept: 'application/json' } });
-  if (!res.ok) {
-    throw new Error(`USITC export failed for ${from}-${to}: HTTP ${res.status}`);
+  const attempts = opts.attempts ?? 3;
+  const delay = opts.retryDelayMs ?? 3000;
+  // hts.usitc.gov drops the odd connection over a 99-chapter run; retry
+  // before failing (nothing is deleted until the fetch has succeeded).
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await fetch(url, { headers: { accept: 'application/json' } });
+      if (!res.ok) {
+        throw new Error(`USITC export failed for ${from}-${to}: HTTP ${res.status}`);
+      }
+      return (await res.json()) as UsitcRow[];
+    } catch (err) {
+      if (attempt >= attempts) throw err;
+      await new Promise((r) => setTimeout(r, delay * attempt));
+    }
   }
-  return (await res.json()) as UsitcRow[];
 }
 
 /**
@@ -56,6 +75,8 @@ export function normalizeUsitcRows(rows: UsitcRow[]): NormalizedHtsLine[] {
   const out: NormalizedHtsLine[] = [];
   // Stack of ancestors that carried rates: shallower indents first.
   const rateStack: { indent: number; general: string; special: string; other: string }[] = [];
+  // Stack of every ancestor row's description (rate line or not), same rule.
+  const pathStack: { indent: number; description: string }[] = [];
 
   for (const row of rows) {
     const indent = Number(row.indent);
@@ -63,6 +84,10 @@ export function normalizeUsitcRows(rows: UsitcRow[]): NormalizedHtsLine[] {
     while (rateStack.length > 0 && rateStack[rateStack.length - 1].indent >= indent) {
       rateStack.pop();
     }
+    while (pathStack.length > 0 && pathStack[pathStack.length - 1].indent >= indent) {
+      pathStack.pop();
+    }
+    pathStack.push({ indent, description: (row.description ?? '').trim() });
 
     const own = (row.general ?? '').trim();
     const isRateLine = own !== '';
@@ -83,6 +108,7 @@ export function normalizeUsitcRows(rows: UsitcRow[]): NormalizedHtsLine[] {
       specialRate: effective?.special ?? '',
       otherRate: effective?.other ?? '',
       units: row.units ?? [],
+      pathText: pathStack.map((p) => p.description).filter(Boolean).join(' > '),
     });
   }
 

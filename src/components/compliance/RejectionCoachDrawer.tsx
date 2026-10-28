@@ -186,7 +186,7 @@ export function RejectionCoachDrawer({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
-          <p className="text-[10.5px] text-slate-400 dark:text-slate-500 leading-snug">
+          <p className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-snug">
             AI guidance is a hint, not legal advice. Verify against current CBP regulations.
           </p>
           <Button

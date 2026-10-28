@@ -38,30 +38,67 @@ model Organization {
   abiDocuments      AbiDocument[]
   trackedShipments  TrackedShipment[]
   apiKeys           ApiKey[]
+  htsClassifications HtsClassification[]
   webhookEndpoints  WebhookEndpoint[]
   chatConversations ChatConversation[]
+  inbondFilings     InbondFiling[]
+  entryNumberBlocks EntryNumberBlock[]
+  cbpTransmissions  CbpTransmission[]
 
   @@map("organizations")
+  cbpConfig        OrgCbpConfig?
+}
+
+// ─── Entry number blocks ───────────────────────────────────
+// A filer's pre-issued entry-number ranges. Sequences are the 7-digit
+// filer-assigned part (check digit computed at draw time, AE Table 1).
+// Draws happen via a single UPDATE … RETURNING (services/entryNumberBlocks.ts)
+// so concurrent filings can never receive the same number.
+model EntryNumberBlock {
+  id           String   @id @default(uuid()) @db.Uuid
+  orgId        String   @map("org_id") @db.Uuid
+  filerCode    String   @map("filer_code") @db.VarChar(3)
+  /**
+   * First 7-digit sequence in the range (inclusive).
+   */
+  rangeStart   Int      @map("range_start")
+  /**
+   * Last 7-digit sequence in the range (inclusive).
+   */
+  rangeEnd     Int      @map("range_end")
+  /**
+   * Next sequence to hand out; > rangeEnd means exhausted.
+   */
+  nextSequence Int      @map("next_sequence")
+  active       Boolean  @default(true)
+  label        String?  @db.VarChar(100)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, active])
+  @@map("entry_number_blocks")
 }
 
 // ─── Users ─────────────────────────────────────────────────
 model User {
-  id              String    @id @default(uuid()) @db.Uuid
-  orgId           String    @map("org_id") @db.Uuid
-  email           String    @unique @db.VarChar(255)
-  passwordHash    String    @map("password_hash") @db.VarChar(255)
-  firstName       String?   @map("first_name") @db.VarChar(100)
-  lastName        String?   @map("last_name") @db.VarChar(100)
-  role            String    @default("operator") @db.VarChar(20)
+  id                  String    @id @default(uuid()) @db.Uuid
+  orgId               String    @map("org_id") @db.Uuid
+  email               String    @unique @db.VarChar(255)
+  passwordHash        String    @map("password_hash") @db.VarChar(255)
+  firstName           String?   @map("first_name") @db.VarChar(100)
+  lastName            String?   @map("last_name") @db.VarChar(100)
+  role                String    @default("operator") @db.VarChar(20)
   // Platform-level staff (MyCargoLens), distinct from the org-scoped role.
   // Grants access to the /admin area that provisions client organizations.
-  isPlatformAdmin Boolean   @default(false) @map("is_platform_admin")
-  isActive        Boolean   @default(true) @map("is_active")
-  emailVerified   Boolean   @default(false) @map("email_verified")
-  lastLoginAt     DateTime? @map("last_login_at") @db.Timestamptz()
-  failedAttempts  Int       @default(0) @map("failed_attempts")
-  lockedUntil     DateTime? @map("locked_until") @db.Timestamptz()
-  refreshToken    String?   @map("refresh_token")
+  isPlatformAdmin     Boolean   @default(false) @map("is_platform_admin")
+  isActive            Boolean   @default(true) @map("is_active")
+  emailVerified       Boolean   @default(false) @map("email_verified")
+  lastLoginAt         DateTime? @map("last_login_at") @db.Timestamptz()
+  failedAttempts      Int       @default(0) @map("failed_attempts")
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz()
+  refreshToken        String?   @map("refresh_token")
   // ── Multi-factor auth (TOTP + email OTP fallback + recovery codes) ──
   // Secrets are AES-256-GCM encrypted at rest (services/mfaCrypto.ts); the
   // pending secret is the verify-before-activate staging slot (15-min TTL).
@@ -75,8 +112,8 @@ model User {
   mfaEnrolledAt       DateTime? @map("mfa_enrolled_at") @db.Timestamptz()
   mfaEnforced         Boolean   @default(false) @map("mfa_enforced")
   mfaFailedAttempts   Int       @default(0) @map("mfa_failed_attempts")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   organization            Organization             @relation(fields: [orgId], references: [id], onDelete: Cascade)
   filings                 Filing[]                 @relation("FilingCreator")
@@ -96,8 +133,10 @@ model User {
   mfaEmailCodes           MfaEmailCode[]
   trackedShipments        TrackedShipment[]
   apiKeys                 ApiKey[]                 @relation("ApiKeyCreator")
+  htsClassifications      HtsClassification[]
   chatConversations       ChatConversation[]       @relation("ChatUser")
   assignedChats           ChatConversation[]       @relation("ChatAgent")
+  inbondFilings           InbondFiling[]           @relation("InbondCreator")
 
   @@index([orgId])
   @@index([email])
@@ -257,6 +296,20 @@ model Filing {
   orgId            String  @map("org_id") @db.Uuid
   createdById      String  @map("created_by") @db.Uuid
   filingType       String  @map("filing_type") @db.VarChar(10) // ISF-10 | ISF-5
+  /** Who files this ISF: SIGMA (S7P, Sigma as ISF filer) or CLIENT (the org's own filer code). Null = org default. */
+  isfFilerMode     String? @map("isf_filer_mode") @db.VarChar(8)
+  /** What CBP holds for this ISF: NOT_ON_FILE | ON_FILE | DELETED (services/cbp/isfLifecycle). */
+  cbpState           String  @default("NOT_ON_FILE") @map("cbp_state") @db.VarChar(12)
+  /** The ISF transaction in flight: ADD | REPLACE | DELETE; null when none. */
+  pendingAction      String? @map("pending_action") @db.VarChar(8)
+  /** Filer code CBP accepted the ISF under; frozen at the first accepted add. */
+  isfFilerCode       String? @map("isf_filer_code") @db.VarChar(3)
+  /** The latest native transmission for this filing (cbp_transmissions). */
+  lastTransmissionId String? @map("last_transmission_id") @db.Uuid
+  /** SCAC of the house-bill issuer (NVOCC); the carrier SCAC stays in scacCode (audit ENG-07). */
+  houseBillScac      String? @map("house_bill_scac") @db.VarChar(4)
+  /** Estimated lading at the foreign port; the ISF deadline is 24h before it (19 CFR 149.2(b)). */
+  estimatedLading    DateTime? @map("estimated_lading") @db.Timestamptz()
   status           String  @default("draft") @db.VarChar(30)
   ccFilingId       String? @map("cc_filing_id") @db.VarChar(100)
   cbpTransactionId String? @map("cbp_transaction_id") @db.VarChar(100)
@@ -298,6 +351,8 @@ model Filing {
   // Bond Info
   bondType       String? @map("bond_type") @db.VarChar(50)
   bondSuretyCode String? @map("bond_surety_code") @db.VarChar(10)
+  /** Single-transaction bond reference (SF20 SBN); required with bond type 9 (ISF-19 Note 7). */
+  bondReferenceNumber String? @map("bond_reference_number") @db.VarChar(35)
 
   // ISF-5 specific data (JSONB — booking party, ISF filer, etc.)
   isf5Data Json? @map("isf5_data")
@@ -622,12 +677,12 @@ model FilingDocument {
 // `capabilities` lists the product surfaces the tier unlocks. Source of truth
 // for the values: server/src/config/plans.ts.
 model Plan {
-  id              String   @id // "isf" | "entry" | "full" | "enterprise"
+  id              String   @id // "isf" | "entry" | "enterprise" (+ retired "full")
   name            String // "ISF Filing"
   description     String?
-  stripePriceId   String?  @unique @map("stripe_price_id") // metered Price; null until bootstrapped
-  stripeProductId String?  @map("stripe_product_id")
-  perFilingCents  Int      @map("per_filing_cents") // 4500 | 18000 | 28000 | 0 (enterprise/custom)
+  stripePriceId   String?  @unique @map("stripe_price_id") // legacy (metered model); unused
+  stripeProductId String?  @map("stripe_product_id") // legacy (metered model); unused
+  perFilingCents  Int      @map("per_filing_cents") // default price of one accepted ISF (an org's isfCents overrides it)
   currency        String   @default("usd") @db.VarChar(3)
   capabilities    String[] // unlocked capability keys (see CAPABILITIES)
   features        String[] // marketing bullet keys for the pricing UI
@@ -664,6 +719,17 @@ model Subscription {
   cardLast4              String?   @map("card_last4") @db.VarChar(4)
   cardExpMonth           Int?      @map("card_exp_month")
   cardExpYear            Int?      @map("card_exp_year")
+  // Per-org prices (cents), set by a platform admin. planSync never touches
+  // these, so a negotiated price survives every deploy. null = the default:
+  //   isfCents         — one accepted ISF (default: the plan's perFilingCents)
+  //   entryLinkedCents — an accepted entry linked to an ISF, ON TOP of that
+  //                      ISF's price (so ISF + linked entry = isf + linked)
+  //   entryOnlyCents   — an accepted entry with no ISF, or a 2nd+ entry on one ISF
+  // Entry prices are a pair (both set or both null). With no entry pricing the
+  // org cannot send entries: entries have no public price.
+  isfCents               Int?      @map("isf_cents")
+  entryLinkedCents       Int?      @map("entry_linked_cents")
+  entryOnlyCents         Int?      @map("entry_only_cents")
   currentPeriodStart     DateTime? @map("current_period_start") @db.Timestamptz()
   currentPeriodEnd       DateTime? @map("current_period_end") @db.Timestamptz()
   cancelAtPeriodEnd      Boolean   @default(false) @map("cancel_at_period_end")
@@ -679,29 +745,40 @@ model Subscription {
   @@map("subscriptions")
 }
 
-// ShipmentCharge: the per-filing billing ledger. One row per billed shipment.
-// The shipment is anchored on EITHER the ISF Filing (when present) OR a
-// standalone ABI Entry — exactly one of filingId / abiDocumentId is set. An ABI
-// Entry that is linked to an ISF Filing anchors on that filingId, so the ISF
-// submit and the Entry send resolve to the SAME charge (no double-billing). The
-// unique constraint on each anchor guarantees "one charge per shipment".
-// `amountCents` locks the tier rate at first-bill time so a later tier change
-// doesn't retro-price the shipment. Each row maps to one Stripe metered event;
-// `status` tracks whether that event was reported.
+// ShipmentCharge: the per-shipment billing ledger. One row per billed CBP
+// acceptance, anchored on EITHER an ISF Filing (kind "isf") OR an ABI Entry
+// (kind "entry_linked" | "entry") — exactly one of filingId / abiDocumentId is
+// set, and each anchor is unique, so a repeat acceptance is a no-op.
+// An entry linked to an ISF bills "entry_linked" (the linked add-on price) —
+// but only ONE entry per ISF can (partial unique index on linkedFilingId);
+// any further entry on that ISF bills "entry" (entry-only price).
+// `amountCents` locks the price at acceptance so a later price change doesn't
+// retro-price the shipment.
 model ShipmentCharge {
   id                    String   @id @default(uuid()) @db.Uuid
   orgId                 String   @map("org_id") @db.Uuid
   filingId              String?  @unique @map("filing_id") @db.Uuid
   abiDocumentId         String?  @unique @map("abi_document_id") @db.Uuid
-  planId                String   @map("plan_id") // tier at bill time
-  amountCents           Int      @map("amount_cents") // locked per-filing rate
+  // What was filed: "isf" | "entry_linked" | "entry". Prices by this, not the plan.
+  kind                  String   @default("isf") @db.VarChar(20)
+  // kind "entry_linked" only: the ISF this entry rides on (one per ISF).
+  linkedFilingId        String?  @map("linked_filing_id") @db.Uuid
+  planId                String   @map("plan_id") // plan at bill time (reporting only)
+  amountCents           Int      @map("amount_cents") // price locked at acceptance
   stripeCustomerId      String?  @map("stripe_customer_id")
   stripeMeterEventId    String?  @map("stripe_meter_event_id") // legacy (metered model)
   stripePaymentIntentId String?  @map("stripe_payment_intent_id") // immediate-charge model
-  // Immediate-charge model: pending → paid (PaymentIntent succeeded) | failed
-  //   (declined/error, retry later) | requires_action (3DS — needs the customer) |
-  //   skipped (no charge, e.g. $0 enterprise tier).
-  status                String   @default("pending") @db.VarChar(20)
+  // processing (a charge attempt is claimed / in flight, or its outcome is
+  //   unknown after a Stripe outage — retried with the SAME idempotency key)
+  //   → paid | failed (declined / card gone; retried with a new key once the
+  //   card changes, and hourly for 30 days) | requires_action (3DS) |
+  //   refunded | skipped (no charge: $0 price, or Stripe not configured).
+  //   "pending" is legacy (pre-v2 rows; migrated to processing).
+  status                String   @default("processing") @db.VarChar(20)
+  // Charge attempts made; the Stripe idempotency key derives from (id, attempt).
+  attemptCount          Int      @default(0) @map("attempt_count")
+  lastAttemptAt         DateTime? @map("last_attempt_at") @db.Timestamptz()
+  lastError             String?  @map("last_error") @db.VarChar(500)
   billedAt              DateTime @default(now()) @map("billed_at") @db.Timestamptz()
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
@@ -713,6 +790,9 @@ model ShipmentCharge {
 
   @@index([orgId, billedAt])
   @@index([status])
+  // + partial unique index "shipment_charges_one_linked_entry_per_isf" on
+  //   (linked_filing_id) WHERE kind = 'entry_linked' (raw SQL in the migration;
+  //   Prisma can't express partial indexes).
   @@map("shipment_charges")
 }
 
@@ -766,6 +846,22 @@ model AbiDocument {
   // Shipment denorm (for list search / filter)
   mbolNumber String? @map("mbol_number") @db.VarChar(100)
   hbolNumber String? @map("hbol_number") @db.VarChar(100)
+
+  // Phase-5 shadow run: the native CATAIR wire generated alongside each CC
+  // submission (cutover evidence), plus a note ('ok', validation issues, or
+  // the mapping/build failure). Best-effort — never blocks the CC path.
+  nativeWireText   String? @map("native_wire_text") @db.Text
+  nativeShadowNote String? @map("native_shadow_note") @db.Text
+
+  // ── Native lifecycle (native go-live Phase 4) ──
+  /** What CBP holds for the summary: NOT_ON_FILE | ON_FILE | DELETED. */
+  cbpState           String  @default("NOT_ON_FILE") @map("cbp_state") @db.VarChar(12)
+  /** The entry transaction in flight: ADD | REPLACE | DELETE; null when none. */
+  pendingAction      String? @map("pending_action") @db.VarChar(8)
+  /** The latest native transmission for this entry (cbp_transmissions). */
+  lastTransmissionId String? @map("last_transmission_id") @db.Uuid
+  /** True when this entry asked CBP to certify the summary for cargo release. */
+  releaseRequested   Boolean @default(false) @map("release_requested")
 
   // Parties denorm
   iorNumber     String? @map("ior_number") @db.VarChar(100)
@@ -970,6 +1066,89 @@ model ChatMessage {
 // One row per 8/10-digit HTS number (dots stripped). generalRate is
 // RESOLVED at ingest time: statistical 10-digit lines inherit from the
 // nearest ancestor rate line, so lookups never need to walk the tree.
+// ── In-bond (7512) filings ──────────────────────────
+// Native QP/WP in-bond movements (abi-engine/inbond). `payload` is the
+// engine's InbondAddInput (sans kind), validated by buildInbond on save;
+// events record the WP lifecycle (arrive/export/transfer/divert).
+model InbondFiling {
+  id                String   @id @default(uuid()) @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
+  createdById       String   @map("created_by") @db.Uuid
+  // DRAFT | READY | TRANSMITTED | AUTHORIZED | ARRIVED | EXPORTED | REJECTED | CANCELLED
+  status            String   @default("DRAFT") @db.VarChar(20)
+  entryType         String   @map("entry_type") @db.VarChar(2) // 61 IT | 62 T&E | 63 IE
+  inbondNumber      String?  @map("inbond_number") @db.VarChar(12)
+  carrierCode       String?  @map("carrier_code") @db.VarChar(4)
+  portOfDestination String?  @map("port_of_destination") @db.VarChar(4)
+  primaryBill       String?  @map("primary_bill") @db.VarChar(30)
+  payload           Json
+  wireText          String?  @map("wire_text") @db.Text
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy    User          @relation("InbondCreator", fields: [createdById], references: [id])
+  events       InbondEvent[]
+
+  @@index([orgId])
+  @@map("inbond_filings")
+}
+
+model InbondEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  filingId   String   @map("filing_id") @db.Uuid
+  // WP action: 1/2/3 arrive, 5/6/7 export, A transfer, Z diversion
+  action     String   @db.VarChar(1)
+  payload    Json
+  wireText   String?  @map("wire_text") @db.Text
+  status     String   @default("RECORDED") @db.VarChar(20)
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz()
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  filing InbondFiling @relation(fields: [filingId], references: [id], onDelete: Cascade)
+
+  @@index([filingId])
+  @@map("inbond_events")
+}
+
+// ── ABI certification console (workstream H) ──────────────
+// One row of cert-run parameters (singleton id 'default') + one row per
+// scenario transmission attempt during the CBP CERT test.
+model CertParamsConfig {
+  id                     String   @id @default("default")
+  filerCode              String   @default("ZZZ") @map("filer_code") @db.VarChar(3)
+  importerOfRecordNumber String   @default("26-164751100") @map("importer_of_record_number") @db.VarChar(12)
+  importerName           String   @default("SIGMA TECHNOLOGY PARTNERS LLC") @map("importer_name") @db.VarChar(60)
+  consigneeNumber        String   @default("26-164751100") @map("consignee_number") @db.VarChar(12)
+  suretyCompanyCode      String   @default("123") @map("surety_company_code") @db.VarChar(3)
+  districtPortOfEntry    String   @default("2704") @map("district_port_of_entry") @db.VarChar(4)
+  currentYear            String   @default("2026") @map("current_year") @db.VarChar(4)
+  applicabilityDate      String   @default("20260820") @map("applicability_date") @db.VarChar(8)
+  senderSiteCode         String   @default("LA") @map("sender_site_code") @db.VarChar(4)
+  senderIdCode           String   @default("MCL") @map("sender_id_code") @db.VarChar(4)
+  senderPassword         String   @default("PASSWD") @map("sender_password") @db.VarChar(6)
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("cert_params_config")
+}
+
+model CertTransmission {
+  id             String   @id @default(uuid()) @db.Uuid
+  scenarioId     String   @map("scenario_id") @db.VarChar(3)
+  // generated | rejected_clientside | transmitted | accepted | rejected | conditional
+  status         String   @default("generated") @db.VarChar(24)
+  wireText       String   @map("wire_text") @db.Text
+  evidenceText   String?  @map("evidence_text") @db.Text
+  responseText   String?  @map("response_text") @db.Text
+  responseParsed Json?    @map("response_parsed")
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([scenarioId])
+  @@map("cert_transmissions")
+}
+
 model HtsRateLine {
   htsNumber   String   @id @map("hts_number") @db.VarChar(10)
   description String   @db.Text
@@ -980,9 +1159,226 @@ model HtsRateLine {
   specialRate String   @map("special_rate") @db.Text
   otherRate   String   @map("other_rate") @db.Text
   units       String[]
+  // Heading > subheading > grouping rows > this line, for the HTS classifier
+  // (leaves often just say "Other"). Empty until the next ingest run.
+  pathText    String   @default("") @map("path_text") @db.Text
   // USITC edition tag, e.g. '2026-rev-15' — supplied by the ingest run.
   revision    String   @db.VarChar(40)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@map("hts_rate_lines")
+}
+
+// ─── Native CBP traffic (native go-live spec D1-D3, audit BPR-02) ──────────
+// Every batch we transmit and every message CBP sends back, kept as filed:
+// the wire/raw text is write-once (DB trigger) and rows survive org deletion
+// (org_id SET NULL), so the 5-year CBP recordkeeping copy (19 CFR 163) is
+// exactly what crossed the wire.
+
+model CbpTransmission {
+  id                   String    @id @default(uuid()) @db.Uuid
+  orgId                String?   @map("org_id") @db.Uuid
+  /**
+   * CERT | PROD — the CBP system this went to.
+   */
+  environment          String    @db.VarChar(4)
+  /**
+   * CATAIR application id: SF, AE, SE, QP, ...
+   */
+  application          String    @db.VarChar(2)
+  /**
+   * Action code on the transaction (A add, R replace, D delete, ...).
+   */
+  action               String?   @db.VarChar(2)
+  /**
+   * filing | abi_document | inbond_filing | cert_transmission
+   */
+  entityType           String?   @map("entity_type") @db.VarChar(32)
+  entityId             String?   @map("entity_id") @db.Uuid
+  filerCode            String    @map("filer_code") @db.VarChar(3)
+  /**
+   * B-record user data (cols 60-80) CBP echoes back; the correlation key.
+   */
+  userDataTag          String    @unique @map("user_data_tag") @db.VarChar(21)
+  entryNumber          String?   @map("entry_number") @db.VarChar(11)
+  isfTransactionNumber String?   @map("isf_transaction_number") @db.VarChar(15)
+  reference            String?   @db.VarChar(35)
+  wireText             String    @map("wire_text") @db.Text
+  mqMessageId          String?   @map("mq_message_id") @db.VarChar(48)
+  /**
+   * QUEUED | SENDING | SENT | UNKNOWN | ACCEPTED | REJECTED | CONDITIONAL | FAILED
+   */
+  status               String    @default("QUEUED") @db.VarChar(16)
+  sentAt               DateTime? @map("sent_at") @db.Timestamptz()
+  respondedAt          DateTime? @map("responded_at") @db.Timestamptz()
+  lastError            String?   @map("last_error") @db.Text
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization?       @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  inbound      CbpInboundMessage[]
+
+  @@index([entityType, entityId])
+  @@index([entryNumber])
+  @@index([isfTransactionNumber])
+  @@index([status])
+  @@map("cbp_transmissions")
+}
+
+model CbpInboundMessage {
+  id                String    @id @default(uuid()) @db.Uuid
+  environment       String    @db.VarChar(4)
+  /**
+   * Hex MQ MsgId: with environment, the at-least-once dedupe key.
+   */
+  mqMessageId       String    @map("mq_message_id") @db.VarChar(48)
+  rawText           String    @map("raw_text") @db.Text
+  /**
+   * Application id from the A record (SN, SA, AX, SX, SO, UC, ...).
+   */
+  application       String?   @db.VarChar(2)
+  /**
+   * B-record user data, when present (our tag or a cert SCENARIO tag).
+   */
+  userDataTag       String?   @map("user_data_tag") @db.VarChar(21)
+  receivedAt        DateTime  @default(now()) @map("received_at") @db.Timestamptz()
+  parsed            Json?
+  parseError        String?   @map("parse_error") @db.Text
+  transmissionId    String?   @map("transmission_id") @db.Uuid
+  matchedEntityType String?   @map("matched_entity_type") @db.VarChar(32)
+  matchedEntityId   String?   @map("matched_entity_id") @db.Uuid
+  dispatchedAt      DateTime? @map("dispatched_at") @db.Timestamptz()
+
+  transmission CbpTransmission? @relation(fields: [transmissionId], references: [id], onDelete: SetNull)
+
+  @@unique([environment, mqMessageId])
+  @@index([dispatchedAt])
+  @@index([transmissionId])
+  @@index([userDataTag])
+  @@map("cbp_inbound_messages")
+}
+
+// ─── Per-org CBP identity (native go-live Phase 2; audit BNA-01, FNA-04/07) ──
+// The only source of a client's filer identity. Set by platform admins, never
+// by the client: entries must carry this filer code, and ISF goes out under
+// it (CLIENT) or under Sigma's S7P (SIGMA, Sigma as ISF filer).
+model OrgCbpConfig {
+  id                      String    @id @default(uuid()) @db.Uuid
+  orgId                   String    @unique @map("org_id") @db.Uuid
+  /** NATIVE (our certified engine) | CC (CustomsCity emergency fallback). */
+  gateway                 String    @default("NATIVE") @db.VarChar(8)
+  /** The client's own CBP filer code; unique across orgs. Null until assigned. */
+  filerCode               String?   @unique @map("filer_code") @db.VarChar(3)
+  /** Default ISF filer for new filings: SIGMA | CLIENT. */
+  isfFilerModeDefault     String    @default("SIGMA") @map("isf_filer_mode_default") @db.VarChar(8)
+  /** When the client's CBP client rep approved our service-center queue (CBP, 10/15). */
+  serviceCenterApprovedAt DateTime? @map("service_center_approved_at") @db.Timestamptz()
+  /** Who at CBP approved it (rep name / email), for the record. */
+  serviceCenterApprovedBy String?   @map("service_center_approved_by") @db.VarChar(200)
+  notes                   String?   @db.Text
+  updatedById             String?   @map("updated_by") @db.Uuid
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("org_cbp_configs")
+}
+
+// ─── CBP certified currency rates (%R broadcasts; audit ENG-02, BNA-04) ──
+// Every rate CBP sends on our outbound queue. Foreign invoice values on
+// native entries are converted with these, never with a user-typed rate.
+model CbpCurrencyRate {
+  id               String   @id @default(uuid()) @db.Uuid
+  countryCode      String   @map("country_code") @db.VarChar(2)
+  currencyCode     String   @map("currency_code") @db.VarChar(3)
+  /** YYYY-MM-DD the rate applies to. */
+  rateDate         DateTime @map("rate_date") @db.Date
+  rate             Decimal  @db.Decimal(14, 6)
+  /** Q quarterly | D daily | N none published. */
+  indicator        String   @db.VarChar(1)
+  remarks          String?  @db.VarChar(50)
+  inboundMessageId String?  @map("inbound_message_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@unique([countryCode, currencyCode, rateDate, indicator])
+  @@index([currencyCode, rateDate])
+  @@map("cbp_currency_rates")
+}
+
+// ─── HTS classifier audit log (spec docs/specs/native-hts-classifier.md) ──
+// Every classification request and what we showed, so an importer can see
+// why a code was suggested and we can measure accuracy on real traffic.
+model HtsClassification {
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  userId      String?   @map("user_id") @db.Uuid
+  description String    @db.Text
+  // ok | needs_detail | keyword_only | no_match | error
+  status      String    @db.VarChar(20)
+  // The full response shown to the user (suggestions, questions, warnings).
+  result      Json
+  model       String    @db.VarChar(80)
+  revision    String    @db.VarChar(40)
+  latencyMs   Int       @map("latency_ms")
+  // The code the user went on to pick, when the client reports it back.
+  pickedCode  String?   @map("picked_code") @db.VarChar(10)
+  pickedAt    DateTime? @map("picked_at") @db.Timestamptz()
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt])
+  @@map("hts_classifications")
+}
+
+/// Inbound marketing lead: one row per contact-form or /book-a-demo
+/// submission, stored before any notification email is attempted so a lead is
+/// never lost to an SMTP failure (conversion plan §4.3). Platform admins only.
+model Lead {
+  id                   String    @id @default(uuid()) @db.Uuid
+  // contact | book_a_demo
+  formSource           String    @default("contact") @map("form_source") @db.VarChar(30)
+  // Contact-form subject: general | demo | enterprise | support | bug | other
+  subject              String    @db.VarChar(20)
+  name                 String    @db.VarChar(120)
+  email                String    @db.VarChar(255)
+  company              String?   @db.VarChar(200)
+  message              String?   @db.Text
+  // Qualification (two-step demo form, step 2)
+  persona              String?   @db.VarChar(30)
+  volumeBand           String?   @map("volume_band") @db.VarChar(30)
+  filesToday           String?   @map("files_today") @db.VarChar(40)
+  filerBond            String?   @map("filer_bond") @db.VarChar(20)
+  country              String?   @db.VarChar(2)
+  opsOwner             String?   @map("ops_owner") @db.VarChar(200)
+  route                String?   @db.VarChar(30)
+  stepReached          Int       @default(1) @map("step_reached")
+  // requested | booked
+  bookingStatus        String    @default("requested") @map("booking_status") @db.VarChar(20)
+  // Attribution (first touch)
+  src                  String?   @db.VarChar(100)
+  utmSource            String?   @map("utm_source") @db.VarChar(100)
+  utmMedium            String?   @map("utm_medium") @db.VarChar(100)
+  utmCampaign          String?   @map("utm_campaign") @db.VarChar(100)
+  utmTerm              String?   @map("utm_term") @db.VarChar(100)
+  utmContent           String?   @map("utm_content") @db.VarChar(100)
+  landingPage          String?   @map("landing_page") @db.VarChar(500)
+  referrerDomain       String?   @map("referrer_domain") @db.VarChar(255)
+  ip                   String?   @db.VarChar(64)
+  userAgent            String?   @map("user_agent") @db.VarChar(255)
+  // Team notification: pending | sent | failed (failed rows are retried by a job)
+  notificationStatus   String    @default("pending") @map("notification_status") @db.VarChar(20)
+  notificationAttempts Int       @default(0) @map("notification_attempts")
+  notificationError    String?   @map("notification_error") @db.VarChar(500)
+  notifiedAt           DateTime? @map("notified_at") @db.Timestamptz()
+  confirmationSentAt   DateTime? @map("confirmation_sent_at") @db.Timestamptz()
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([createdAt])
+  @@index([notificationStatus, createdAt])
+  @@index([email])
+  @@map("leads")
 }

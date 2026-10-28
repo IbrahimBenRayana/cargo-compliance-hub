@@ -12,6 +12,8 @@
 import { RecordCodecError, type CodecIssue } from '../records/codec.js';
 import type { AbiDocumentBody, AbiItem, AbiInvoice } from '../../services/abi/types.js';
 import { parseAbiPayloadV2, type AbiPayloadV2, type EntrySummaryV2, type LineV2 } from './schemaV2.js';
+import { deriveMid } from './mid.js';
+import { orderCh99 } from './ch99.js';
 
 function fail(field: string, message: string): never {
   const issue: CodecIssue = { record: 'PayloadV1', field, message };
@@ -51,14 +53,27 @@ function toKilograms(gross: string, uom: string): number | undefined {
   return uom === 'L' ? Math.round(value * 0.453592) : Math.round(value);
 }
 
-function migrateItem(item: AbiItem, invoice: AbiInvoice): LineV2 {
+function migrateItem(item: AbiItem, invoice: AbiInvoice, foreignPortOfLading?: string): LineV2 {
   const quantity = parseQuantity(item.quantity1);
   const parties: LineV2['parties'] = [];
   for (const party of item.parties) {
-    // Only IRS-format identifiers ride on the 47-record; manufacturer/seller
-    // name+address parties need MID derivation (CBP 3500-13) in enrichment.
     if (party.type === 'buyer' && party.taxId) parties.push({ type: 'S', identifier: party.taxId });
     if (party.type === 'shipTo' && party.taxId) parties.push({ type: 'C', identifier: party.taxId });
+    // Manufacturer: derive the MID (Directive 3500-13) from name+address.
+    // ACE remains the authority — the $I application verifies/corrects a
+    // derived MID once connected.
+    if (party.type === 'manufacturer' && party.name) {
+      parties.push({
+        type: 'M',
+        identifier: deriveMid({
+          name: party.name,
+          address: party.address,
+          city: party.city,
+          countryCode: (party.country || item.origin.country || '').toUpperCase(),
+          stateOrProvince: party.state,
+        }),
+      });
+    }
   }
   return {
     sku: item.sku || undefined,
@@ -66,19 +81,63 @@ function migrateItem(item: AbiItem, invoice: AbiInvoice): LineV2 {
     countryOfExport: invoice.countryOfExport || undefined,
     dateOfExportation: invoice.exportDate || undefined,
     relatedPartyIndicator: invoice.relatedParties,
+    // The engine prices the claim from the HTS Special column and applies
+    // the program's MPF exemption (duty/engine.ts, fees.ts).
+    spiClaimCode: item.spiClaimCode || undefined,
+    adCvdCases: item.adCvdCases?.length ? item.adCvdCases.map((c) => adCvdCase(c, item)) : undefined,
+    foreignPortOfLading: foreignPortOfLading || undefined,
     grossWeightKg: toKilograms(item.weight.gross, item.weight.uom),
     descriptions: item.description ? [item.description.slice(0, 70)] : undefined,
     parties: parties.length > 0 ? parties : undefined,
-    tariffs: [
-      {
-        htsNumber: item.htsNumber.replace(/\./g, ''),
-        // dutyCents deliberately absent — the duty engine computes it.
-        valueDollars: Math.round(item.values.totalValueOfGoods),
-        uomCode1: quantity.uom ?? 'NO',
-        quantity1Hundredths: quantity.hundredths,
-      },
-    ],
+    tariffs: buildTariffs(item, quantity),
   };
+}
+
+/**
+ * An AD/CVD case for the 53-record with its estimated deposit (usage note
+ * ff): ad valorem on the line's entered value, specific on the case
+ * quantity. CERT 043: $68,707 x 3.80% = 2,610.87.
+ */
+function adCvdCase(c: NonNullable<AbiItem['adCvdCases']>[number], item: AbiItem): NonNullable<LineV2['adCvdCases']>[number] {
+  const valueDollars = Math.round(item.values.totalValueOfGoods);
+  const rateHundredths = Math.round(c.rate * 100);
+  if (c.rateType === 'S' && c.quantity === undefined) fail('adCvdCases.quantity', 'a specific AD/CVD rate needs the quantity');
+  return {
+    caseNumber: c.caseNumber.replace(/-/g, '').toUpperCase(),
+    bondCashClaimCode: c.bondOrCash,
+    depositRateHundredths: rateHundredths,
+    rateTypeQualifier: c.rateType,
+    valueOfGoodsDollars: valueDollars,
+    ...(c.rateType === 'S' && { quantityTenThousandths: Math.round(c.quantity! * 10_000) }),
+    dutyCents:
+      c.rateType === 'A'
+        ? Math.round((valueDollars * rateHundredths) / 100)
+        : Math.round(c.quantity! * rateHundredths),
+  };
+}
+
+/**
+ * Build a line's tariff list: ch.99 overlays first, in CBP's program order
+ * and deduplicated (ch99.ts), then the base ch.1-97 classification.
+ *
+ * Value and quantity belong to the base. Each overlay is reported the way
+ * CERT accepted it: 8 digits, value 0, and no unit or quantity (a UOM on a
+ * zero-reporting-unit tariff draws F441/F442). The duty engine prices each
+ * overlay on the base value from its USITC rate text, and zeroes the base
+ * when the heading replaces column 1. dutyCents is deliberately absent.
+ */
+function buildTariffs(
+  item: AbiItem,
+  quantity: { hundredths?: number; uom?: string }
+): LineV2['tariffs'] {
+  const base = {
+    htsNumber: item.htsNumber.replace(/\./g, ''),
+    valueDollars: Math.round(item.values.totalValueOfGoods),
+    uomCode1: quantity.uom ?? 'NO',
+    quantity1Hundredths: quantity.hundredths,
+  };
+  const overlays = orderCh99(item.additionalHtsNumbers ?? []).map((htsNumber) => ({ htsNumber, valueDollars: 0 }));
+  return [...overlays, base];
 }
 
 /** Migrate a v1 CustomsCity-shaped payload to schema v2. Throws on unmappable data. */
@@ -86,7 +145,9 @@ export function migrateV1ToV2(v1: AbiDocumentBody): AbiPayloadV2 {
   const { filerCode, entryNumber } = splitV1EntryNumber(v1.entryNumber);
   const firstManifest = v1.manifest[0];
 
-  const lines = v1.manifest.flatMap((m) => m.invoices.flatMap((inv) => inv.items.map((item) => migrateItem(item, inv))));
+  const lines = v1.manifest.flatMap((m) =>
+    m.invoices.flatMap((inv) => inv.items.map((item) => migrateItem(item, inv, m.ports.foreignPortOfLading)))
+  );
   if (lines.length === 0) fail('manifest.invoices.items', 'v1 document has no line items to migrate');
 
   const bondType = v1.bond.type === '8' || v1.bond.type === '9' ? v1.bond.type : undefined;
@@ -114,11 +175,19 @@ export function migrateV1ToV2(v1: AbiDocumentBody): AbiPayloadV2 {
     consigneeNumber: v1.entryConsignee.taxId || undefined,
     usStateOfDestination: v1.location.destinationStateUS || undefined,
     bonds: bondType
-      ? [{ bondTypeCode: bondType, designationTypeCode: 'B', suretyCompanyCode: v1.bond.suretyCode }]
+      ? [
+          {
+            bondTypeCode: bondType,
+            designationTypeCode: 'B',
+            suretyCompanyCode: v1.bond.suretyCode,
+            ...(bondType === '9' && v1.bond.stbAmount ? { stbAmountDollars: v1.bond.stbAmount } : {}),
+          },
+        ]
       : undefined,
     payment: {
       typeCode: paymentTypeCode as '1' | '2' | '3' | '5' | '6' | '7' | '8',
       preliminaryStatementPrintDate: v1.payment.preliminaryStatementDate || undefined,
+      periodicStatementMonth: v1.payment.periodicStatementMonth || undefined,
     },
     cargo: {
       carrierCode: firstManifest?.carrier.code || undefined,

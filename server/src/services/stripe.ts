@@ -26,33 +26,6 @@ export function stripeConfigured(): boolean {
   return Boolean(env.STRIPE_SECRET_KEY);
 }
 
-/**
- * Report one per-filing usage event to the shared Stripe Billing Meter.
- * Stripe aggregates events per customer per billing period and the customer's
- * subscribed metered Price applies the tier's per-unit rate, producing one
- * monthly invoice.
- *
- * `identifier` is the Stripe-level idempotency key — passing the ShipmentCharge
- * id (one per filing) means a retried call never double-bills the shipment.
- * Returns the meter event identifier on success.
- */
-export async function recordFilingMeterEvent(opts: {
-  stripeCustomerId: string;
-  identifier: string;
-  quantity?: number;
-}): Promise<string> {
-  const stripe = getStripe();
-  const event = await stripe.billing.meterEvents.create({
-    event_name: env.STRIPE_FILING_METER_EVENT,
-    identifier: opts.identifier,
-    payload: {
-      stripe_customer_id: opts.stripeCustomerId,
-      value: String(opts.quantity ?? 1),
-    },
-  });
-  return event.identifier ?? opts.identifier;
-}
-
 // ─── Card-on-file + immediate per-shipment charging ────────────────────────
 // The model: each org keeps a Stripe Customer with a default payment method
 // (saved via SetupIntent, no charge). Each shipment CBP accepts is charged
@@ -125,9 +98,14 @@ export type ChargeOutcome = {
 
 /**
  * Charge a saved card immediately, off-session. Used to bill one shipment the
- * moment CBP accepts it. `idempotencyKey` (the ShipmentCharge id) guarantees a
- * retry never double-charges. A card that needs authentication (rare for US
- * cards) surfaces as `requires_action`; a decline as `failed`.
+ * moment CBP accepts it. `idempotencyKey` (stable per charge attempt) means a
+ * repeat of the same attempt never double-charges.
+ *
+ * Outcomes the customer must fix are returned: a decline → `failed`, a card
+ * needing authentication → `requires_action`, and a card or customer that is
+ * gone (removed in the Stripe portal: StripeInvalidRequestError) → `failed`.
+ * Anything else (Stripe outage, network, rate limit) THROWS: the outcome is
+ * unknown, so the caller must retry with the SAME key (billing audit P1 G1).
  */
 export async function chargeSavedCard(opts: {
   customerId: string;
@@ -167,6 +145,9 @@ export async function chargeSavedCard(opts: {
         paymentIntentId: pi?.id ?? null,
         error: err.message,
       };
+    }
+    if (err instanceof Stripe.errors.StripeInvalidRequestError) {
+      return { status: 'failed', paymentIntentId: null, error: err.message };
     }
     throw err;
   }

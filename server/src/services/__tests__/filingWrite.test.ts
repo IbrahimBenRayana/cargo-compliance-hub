@@ -30,6 +30,10 @@ vi.mock('../compliance/scoreSnapshot.js', () => ({ recordScoreSnapshot: vi.fn(),
 vi.mock('../errorTranslator.js', () => ({ translateValidationErrors: vi.fn(() => []) }));
 vi.mock('../auditLog.js', () => ({ writeAuditLog: vi.fn() }));
 vi.mock('../notifications.js', () => ({ notifyFilingSubmitted: vi.fn(), notifyFilingRejected: vi.fn(), notifyApiError: vi.fn() }));
+// Gateway selection: these tests cover the CustomsCity fallback unless a test says otherwise.
+const { cbpCfg, nativeIsf } = vi.hoisted(() => ({ cbpCfg: { loadOrgCbpConfig: vi.fn() }, nativeIsf: { transmitIsfNative: vi.fn() } }));
+vi.mock('../cbp/filerIdentity.js', () => cbpCfg);
+vi.mock('../cbp/nativeIsf.js', () => nativeIsf);
 
 import { submitFilingToCBP } from '../filingWrite.js';
 
@@ -37,6 +41,7 @@ const ARGS = { filingId: 'f1', orgId: 'o1', userId: 'u1' };
 const DRAFT = { id: 'f1', orgId: 'o1', status: 'draft', filingType: 'ISF-10', masterBol: 'MBOL1', houseBol: 'HBOL1' };
 
 beforeEach(() => {
+  cbpCfg.loadOrgCbpConfig.mockResolvedValue({ gateway: 'CC', filerCode: null, isfFilerModeDefault: 'SIGMA', serviceCenterApprovedAt: null });
   vi.clearAllMocks();
   // Happy defaults — individual tests override.
   prisma.filing.findFirst.mockResolvedValue(DRAFT);
@@ -115,5 +120,14 @@ describe('submitFilingToCBP', () => {
     const out = await submitFilingToCBP(ARGS);
     expect(out.httpStatus).toBe(502);
     expect(billing.billShipmentForFiling).not.toHaveBeenCalled();
+  });
+
+  it('native gateway: transmits through our engine instead of CustomsCity', async () => {
+    cbpCfg.loadOrgCbpConfig.mockResolvedValue({ gateway: 'NATIVE', filerCode: null, isfFilerModeDefault: 'SIGMA', serviceCenterApprovedAt: null });
+    nativeIsf.transmitIsfNative.mockResolvedValue({ httpStatus: 202, body: { transmissionId: 't1', outcome: 'SENT' } });
+    const out = await submitFilingToCBP(ARGS);
+    expect(nativeIsf.transmitIsfNative).toHaveBeenCalledWith(expect.objectContaining({ action: 'ADD' }));
+    expect(abiGateway.createDocument).not.toHaveBeenCalled();
+    expect(out.httpStatus).toBe(200);
   });
 });

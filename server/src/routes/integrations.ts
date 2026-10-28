@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { abiGateway } from '../services/abi/gateway.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest, requirePlatformAdmin } from '../middleware/auth.js';
 import { requireCapability } from '../middleware/requireCapability.js';
 import { CAPABILITIES } from '../config/plans.js';
+import { classifyLimiter } from '../middleware/rateLimiter.js';
+import { classifyHandler } from '../services/htsClassifier/http.js';
 import { sendTestEmail, verifyEmailConnection } from '../services/email.js';
 import { env } from '../config/env.js';
 
@@ -10,7 +12,8 @@ const router = Router();
 router.use(authMiddleware);
 
 // ─── POST /api/v1/integrations/test — Test CC API connection
-router.post('/test', async (req: AuthRequest, res: Response): Promise<void> => {
+// Gateway diagnostics (environment, base URL) are for MyCargoLens staff only (audit USA-09).
+router.post('/test', requirePlatformAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const connected = await abiGateway.testConnection();
     res.json({
@@ -26,84 +29,9 @@ router.post('/test', async (req: AuthRequest, res: Response): Promise<void> => {
   }
 });
 
-// ─── POST /api/v1/integrations/hts-classify — AI HTS ──────
-router.post('/hts-classify', requireCapability(CAPABILITIES.HTS_CLASSIFICATION), async (req: AuthRequest, res: Response): Promise<void> => {
-  const { description } = req.body;
-  if (!description || !description.trim()) {
-    res.status(400).json({ error: 'Description is required' });
-    return;
-  }
-  
-  try {
-    const result = await abiGateway.classifyHTS(description.trim());
-    const raw = result.data as any;
-
-    // Actual CC API response structure:
-    // {
-    //   items: [{
-    //     description: "...",
-    //     classification: { hts: "7318152061", name: "HEXAGONAL HEAD BOLT..." },
-    //     classifierResponse: {
-    //       selected_hts: "7318.15.20.61",
-    //       explanation: "...",
-    //       hts_review_result: {
-    //         recomendations: [{ hts: "7318.15.20.61", description: "..." }, ...]
-    //       },
-    //       coherence_validation?: { is_coherent: bool, explanation: "..." }
-    //     }
-    //   }]
-    // }
-
-    const item = raw?.items?.[0];
-    if (!item) {
-      res.json({ suggestions: [], message: 'No classification results returned.' });
-      return;
-    }
-
-    // Check coherence — CC API flags vague descriptions
-    const coherence = item?.classifierResponse?.coherence_validation;
-    if (coherence && !coherence.is_coherent) {
-      res.json({
-        suggestions: [],
-        message: coherence.explanation || 'Description is too vague for classification. Please be more specific.',
-      });
-      return;
-    }
-
-    const suggestions: { code: string; description: string; score: number | null }[] = [];
-
-    // Primary: grab recommendations from hts_review_result
-    const recommendations = item?.classifierResponse?.hts_review_result?.recomendations
-      || item?.classifierResponse?.hts_review_result?.recommendations // typo guard
-      || [];
-
-    if (recommendations.length > 0) {
-      for (const rec of recommendations.slice(0, 10)) {
-        suggestions.push({
-          code: rec.hts || '',
-          description: rec.description || '',
-          score: rec.score ?? null,
-        });
-      }
-    }
-
-    // Fallback: if no recommendations, use the top-level classification
-    if (suggestions.length === 0 && item?.classification?.hts) {
-      suggestions.push({
-        code: item.classifierResponse?.selected_hts || item.classification.hts,
-        description: item.classification.name || item.classifierResponse?.explanation || '',
-        score: null,
-      });
-    }
-
-    // Clean: filter out empty codes
-    const cleaned = suggestions.filter(s => s.code);
-
-    res.json({ suggestions: cleaned });
-  } catch (err: any) {
-    res.status(502).json({ error: 'HTS classification failed', message: err.message });
-  }
-});
+// ─── POST /api/v1/integrations/hts-classify — HTS suggestions ──────
+// Native classifier (services/htsClassifier); every plan, for now (2026-10-21).
+router.post('/hts-classify', classifyLimiter, classifyHandler);
 
 // ─── GET /api/v1/integrations/mid-list — MID lookup ───────
 router.get('/mid-list', requireCapability(CAPABILITIES.ABI_ENTRY), async (req: AuthRequest, res: Response): Promise<void> => {

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as OTPAuth from 'otpauth';
 import { DEMO, login } from './helpers';
+import { REMOTE } from './env';
 
 /**
  * MFA: settings enrollment → TOTP challenge login → disable.
@@ -64,6 +65,9 @@ async function typeOtp(page: Page, code: string): Promise<void> {
 }
 
 test.describe.serial('MFA (TOTP)', () => {
+  // Enrolls and disables MFA on the run's own account, resetting it through
+  // the local database: local demo account only.
+  test.skip(REMOTE, 'Needs local DB access and an account without MFA');
   let secret = '';
 
   test.beforeAll(() => resetDemoMfa());
@@ -117,7 +121,7 @@ test.describe.serial('MFA (TOTP)', () => {
     // Valid code → real session
     await typeOtp(page, await freshCode(secret));
     await page.waitForURL(/localhost:8080\/(?!login)/, { timeout: 15_000 });
-    await expect(page.getByText(/shipments in flight/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/shipments? in flight|your shipments will flow through here/i).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('disable requires password + code and restores password-only login', async ({ page }) => {

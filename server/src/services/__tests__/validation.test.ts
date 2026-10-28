@@ -181,3 +181,17 @@ describe('happy path', () => {
     expect(result.criticalCount).toBe(0);
   });
 });
+
+describe('ISF-5 booking party street (testing week: validator said 100/100, submit refused)', () => {
+  it('flags a missing booking-party street as critical', async () => {
+    const { validateFiling } = await import('../validation.js');
+    const r = validateFiling({
+      filingType: 'ISF-5', importerName: 'X', importerNumber: '57-123456789', scacCode: 'MAEU', masterBol: 'MAEU1',
+      shipToParty: { name: 'Whse', address1: '1 Rd', city: 'Hamburg', country: 'DE' },
+      manufacturer: { name: 'Maker', address1: '1 Rd', city: 'Shenzhen', country: 'CN' },
+      isf5Data: { bookingPartyName: 'BKP', bookingPartyCountry: 'NL', ISFFilerName: 'X', ISFFilerNumber: '57-123456789' },
+      commodities: [{ htsCode: '850760', countryOfOrigin: 'CN' }],
+    } as any);
+    expect(r.errors.find((e: { field: string }) => e.field === 'isf5Data.bookingPartyAddress1')?.severity).toBe('critical');
+  });
+});

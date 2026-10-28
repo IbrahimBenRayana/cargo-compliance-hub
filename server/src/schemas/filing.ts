@@ -23,6 +23,8 @@ export const addressSchema = z.object({
 }).or(z.string()); // Plain string accepted for legacy / partial drafts
 
 export const commoditySchema = z.object({
+  /** Which manufacturer produced this line when the ISF lists several (0 = the first). */
+  manufacturerIndex: z.number().int().min(0).max(49).optional(),
   // Wizard sends digits-only, max 6 chars (ISF requires HTS-6 prefix).
   // We accept 4-10 digits at the boundary so callers other than the wizard
   // (e.g., AI prefill, API) work too. Strict format check at /submit time.
@@ -51,7 +53,7 @@ export const containerSchema = z.object({
   number: z.string().min(1).max(20, 'Container number must be 20 characters or fewer'),
   // CC container types (CN = standard, NC = none/no-container, 20/40/40HC = sizes).
   // Wizard defaults to 'CN' when type is missing — schema reflects that.
-  type: z.enum(['CN', 'NC', '20', '40', '40HC', '20GP', '40GP', 'TW', 'CL', 'R0']).optional(),
+  type: z.enum(['CN', 'NC', '20', '40', '40HC', '45HC', '20GP', '40GP', 'TW', 'CL', 'R0']).optional(),
   sealNumber: z.string().max(50).optional(),
 });
 
@@ -81,16 +83,25 @@ export const createFilingSchema = z.object({
   masterBol: z.string().max(100).optional(),
   houseBol: z.string().max(100).optional(),
   scacCode: z.string().max(10).optional(),
+  /** SCAC of the house-bill issuer (NVOCC), when it differs from the carrier (audit ENG-07). */
+  houseBillScac: z.string().trim().toUpperCase().regex(/^[A-Z]{2,4}$/, 'SCAC is 2-4 letters').optional().or(z.literal('')),
   vesselName: z.string().max(100).optional(),
   voyageNumber: z.string().max(50).optional(),
   foreignPortOfUnlading: z.string().max(10).optional(),
   placeOfDelivery: z.string().max(10).optional(),
   estimatedDeparture: z.string().optional(),
+  /** Estimated lading at the foreign port; makes the ISF deadline exact. */
+  estimatedLading: z.string().optional(),
   estimatedArrival: z.string().optional(),
 
   // Bond
   bondType: z.string().max(50).optional(),
   bondSuretyCode: z.string().max(10).optional(),
+  /** Single-transaction bond reference number (SF20 SBN), required with bond type 9. */
+  bondReferenceNumber: z.string().trim().max(35).optional(),
+
+  /** Who files this ISF: SIGMA (MyCargoLens under S7P) or CLIENT (the org's own code). Omit for the org default. */
+  isfFilerMode: z.enum(['SIGMA', 'CLIENT']).nullable().optional(),
 
   // ISF-5 specific data (JSONB) — kept loose since the shape is heterogeneous;
   // validateFiling() does the field-by-field checks at /submit.

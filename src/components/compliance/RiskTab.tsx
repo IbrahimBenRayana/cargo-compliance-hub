@@ -303,7 +303,7 @@ function SeverityChips({
             {c.count !== undefined && (
               <span className={cn(
                 'tabular-nums text-[11px] font-semibold',
-                isActive ? 'opacity-90' : 'opacity-60',
+                isActive ? 'opacity-90' : '',
               )}>
                 {c.count}
               </span>
@@ -472,7 +472,7 @@ function PgaLookupCard() {
         />
         <div className="mt-3 min-h-[100px]">
           {debounced.length < 2 ? (
-            <p className="text-[11.5px] text-slate-400 dark:text-slate-500 text-center pt-6">
+            <p className="text-[11.5px] text-slate-500 dark:text-slate-400 text-center pt-6">
               Type ≥2 digits to scan PGA requirements.
             </p>
           ) : isFetching ? (

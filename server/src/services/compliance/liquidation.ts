@@ -4,12 +4,19 @@
  * CBP "liquidates" an entry — i.e. finalizes the duty/fee/tax amount — by
  * default 314 days after the entry summary is filed (19 CFR § 159.11).
  * Within the 314-day window, the importer can file a Post-Summary Correction
- * (PSC) up to 270 days after entry. After liquidation, the importer has 180
- * days to file a Protest (19 USC § 1514) to challenge the final amount.
+ * (PSC) up to 300 days after entry (CBP Federal Register notice of Jul 6
+ * 2026, FR Doc. 2026-13574: "the regular 300-day timeframe for filing a
+ * PSC"). After liquidation, the importer has 180 days to file a Protest
+ * (19 USC § 1514) to challenge the final amount.
+ *
+ * Not modelled: the same notice also caps a PSC at 15 days before the
+ * scheduled liquidation date ("whichever date is earlier"), and allows PSCs
+ * past day 300 for entries whose liquidation is suspended (AD/CVD, EAPA,
+ * court injunction).
  *
  * Reference dates we compute:
  *   • estimatedLiquidationAt = entryDate + 314 days
- *   • pscDeadline            = entryDate + 270 days
+ *   • pscDeadline            = entryDate + 300 days
  *   • protestDeadline        = liquidationAt + 180 days  (if liquidated)
  *
  * All math is done in UTC to avoid timezone drift.
@@ -18,7 +25,7 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const LIQUIDATION_WINDOW_DAYS = 314;
-export const PSC_WINDOW_DAYS = 270;
+export const PSC_WINDOW_DAYS = 300;
 export const PROTEST_WINDOW_DAYS = 180;
 
 export interface LiquidationDates {
@@ -69,4 +76,36 @@ export function computeProtestDeadline(liquidationDate: Date): {
     daysRemaining,
     expired: daysRemaining < 0,
   };
+}
+
+export interface LiquidationSource {
+  id: string;
+  /** Entry number as CBP prints it (XXX-NNNNNNN-N), else the bill. */
+  ref: string;
+  entryType: string;
+  entryDate: Date;
+  linkUrl: string;
+}
+
+/**
+ * Accepted entry summaries to track for PSC and liquidation. Liquidation is
+ * an entry concept, dated from the entry date (falling back to CBP's answer,
+ * then the send); ISF filings never liquidate.
+ */
+export function liquidationSources(docs: Array<{
+  id: string; entryNumber: string | null; mbolNumber: string | null; entryType: string;
+  payload: unknown; respondedAt: Date | null; sentAt: Date | null;
+}>): LiquidationSource[] {
+  const out: LiquidationSource[] = [];
+  for (const d of docs) {
+    const ymd = (d.payload as { dates?: { entryDate?: unknown } } | null)?.dates?.entryDate;
+    const entryDate = typeof ymd === 'string' && /^\d{8}$/.test(ymd)
+      ? new Date(`${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}T00:00:00Z`)
+      : d.respondedAt ?? d.sentAt;
+    if (!entryDate) continue;
+    const n = (d.entryNumber ?? '').replace(/-/g, '');
+    const ref = n.length === 11 ? `${n.slice(0, 3)}-${n.slice(3, 10)}-${n.slice(10)}` : d.entryNumber || d.mbolNumber || d.id.slice(0, 8);
+    out.push({ id: d.id, ref, entryType: d.entryType, entryDate, linkUrl: `/abi-documents/${d.id}` });
+  }
+  return out;
 }

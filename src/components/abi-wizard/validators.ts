@@ -61,12 +61,23 @@ export function validateStep2(d: ABIDocumentDraft): FieldErrors {
 
   if (!d.bond?.type) e['bond.type'] = 'Required';
   if (!d.bond?.suretyCode) e['bond.suretyCode'] = 'Required';
+  else if (!/^[A-Z0-9]{3}$/.test(d.bond.suretyCode)) e['bond.suretyCode'] = 'Surety codes are 3 characters';
+  if (d.bond?.type === '9' && !(d.bond.stbAmount && d.bond.stbAmount > 0)) e['bond.stbAmount'] = 'Required for a single transaction bond';
   if (!d.bond?.taxId) e['bond.taxId'] = 'Required';
 
   if (d.payment?.typeCode === undefined || d.payment?.typeCode === null) {
     e['payment.typeCode'] = 'Required';
   }
-  if (!d.payment?.preliminaryStatementDate) {
+  // Statement fields follow the payment type (CATAIR note y): none for
+  // individual payment (1), a statement date for 2-8, a month for 6-8.
+  const type = d.payment?.typeCode;
+  const statement = type !== undefined && type !== null && type !== 1;
+  if ((type === 6 || type === 7 || type === 8) && !d.payment?.periodicStatementMonth) {
+    e['payment.periodicStatementMonth'] = 'Required';
+  }
+  if (!statement) {
+    // nothing more to check
+  } else if (!d.payment?.preliminaryStatementDate) {
     e['payment.preliminaryStatementDate'] = 'Required';
   } else if (
     d.dates?.entryDate &&
@@ -97,6 +108,15 @@ export function validateStep3(d: ABIDocumentDraft): FieldErrors {
 }
 
 // ─── Step 4 — Manifest (Bill + Carrier + Ports) ──────────────
+
+/** Vessel entries need the Schedule K foreign port of lading (ACE F429)
+ *  unless every invoice is exported from the US. */
+export function needsForeignPortOfLading(d: ABIDocumentDraft): boolean {
+  if (d.modeOfTransport !== '10' && d.modeOfTransport !== '11') return false;
+  const invoices = d.manifest?.[0]?.invoices ?? [];
+  return invoices.length === 0 || invoices.some((inv) => inv?.countryOfExport !== 'US');
+}
+
 export function validateStep4(d: ABIDocumentDraft): FieldErrors {
   const e: FieldErrors = {};
   const m = d.manifest?.[0];
@@ -105,6 +125,9 @@ export function validateStep4(d: ABIDocumentDraft): FieldErrors {
   if (!m?.bill?.hBOL) e['bill.hBOL'] = 'Required (use Master BOL if no separate house bill)';
   if (!m?.carrier?.code) e['carrier.code'] = 'Required';
   if (!m?.ports?.portOfUnlading) e['ports.portOfUnlading'] = 'Required';
+  const lading = m?.ports?.foreignPortOfLading;
+  if (lading && !/^\d{5}$/.test(lading)) e['ports.foreignPortOfLading'] = 'Use the 5-digit Schedule K code';
+  else if (!lading && needsForeignPortOfLading(d)) e['ports.foreignPortOfLading'] = 'Required for vessel entries';
   if (!m?.quantity) e.quantity = 'Required';
   if (!m?.quantityUOM) {
     e.quantityUOM = 'Required';
@@ -164,10 +187,28 @@ export function validateStep5(d: ABIDocumentDraft): FieldErrors {
         if (!it?.weight?.gross) e[`${ip}.weight.gross`] = 'Required';
         if (!(it?.parties?.length)) {
           e[`${ip}.parties`] = 'Add at least one party';
+        } else if ((d.entryType === '01' || d.entryType === '03')
+          && !it.parties.some((p) => p?.type === 'buyer' && p.taxId?.trim())) {
+          // CBP's "sold to" party (ESF-134): mandatory on 01/03 lines.
+          e[`${ip}.parties`] = 'Add a Buyer party with its tax ID (CBP needs the "sold to" party on this entry type)';
+        }
+        if (d.entryType === '03') {
+          (it?.adCvdCases ?? []).forEach((c, k) => {
+            const cp = `${ip}.adCvdCases.${k}`;
+            if (!/^[AC]-?\d{3}-?\d{3}-?\d{3}$/i.test(c.caseNumber || '')) e[`${cp}.caseNumber`] = 'Format A-570-967-000';
+            if (!(c.rate > 0)) e[`${cp}.rate`] = 'Required';
+            if (c.rateType === 'S' && !(c.quantity && c.quantity > 0)) e[`${cp}.quantity`] = 'Required for a specific rate';
+          });
         }
       });
     }
   });
+
+  // Type 03 is the AD/CVD entry: at least one line carries a case.
+  if (d.entryType === '03') {
+    const hasCase = invoices.some((inv) => (inv?.items ?? []).some((it) => (it?.adCvdCases?.length ?? 0) > 0));
+    if (!hasCase) e['invoices.0.items.0.adCvdCases'] = 'Entry type 03 needs at least one AD/CVD case';
+  }
 
   return e;
 }

@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
+import { cbpEnvShape, cbpConfigProblems } from '../services/cbp/environment.js';
 
 dotenv.config();
 
@@ -36,16 +37,6 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().default(''),
   STRIPE_PUBLISHABLE_KEY: z.string().default(''),
-  // Per-filing pricing (metered billing). Each tier is a $0-base Stripe
-  // subscription to a metered Price; every billed shipment reports one event
-  // to the shared meter (STRIPE_FILING_METER_EVENT) at the tier's per-unit
-  // rate, and Stripe invoices the sum monthly. Run `npm run stripe:bootstrap`
-  // to create the meter + products + prices, then paste the price ids here.
-  // Empty default → billing self-disables (checkout returns "not configured").
-  STRIPE_PRICE_ISF: z.string().default(''),
-  STRIPE_PRICE_ENTRY: z.string().default(''),
-  STRIPE_PRICE_FULL: z.string().default(''),
-  STRIPE_FILING_METER_EVENT: z.string().default('filing'),
   // Sentry (audit Phase 10). Empty default → Sentry is off in dev / CI
   // and the SDK never initializes. Set to a real DSN in prod via GitHub
   // Secrets → upsert_env → VPS .env. Release tag flows from the deploy
@@ -65,6 +56,27 @@ const envSchema = z.object({
   AI_TEMPERATURE:           z.coerce.number().min(0).max(2).default(0.3),
   // Per-user daily call cap. Resets at UTC midnight.
   AI_RATE_LIMIT_PER_USER:   z.coerce.number().int().positive().default(50),
+  // Native HTS classifier (docs/specs/native-hts-classifier.md): its own
+  // model (empty = AI_MODEL) and its own daily call budget per user, since one
+  // classification makes up to three calls.
+  HTS_AI_MODEL:             z.string().default(''),
+  HTS_AI_DAILY_CALLS:       z.coerce.number().int().positive().default(450),
+  // Reasoning models only (o-series, GPT-5+): how hard each classifier call thinks.
+  HTS_AI_REASONING_EFFORT:  z.enum(['low', 'medium', 'high']).default('medium'),
+  // Model for the blind second opinion (default: HTS_AI_MODEL). A different
+  // model means agreement is evidence from two models, not one model twice.
+  HTS_AI_VERIFY_MODEL:      z.string().default(''),
+  // CBP CROSS rulings as precedent in the classifier's prompts ('off' for
+  // evaluation runs without precedent).
+  HTS_PRECEDENT:            z.enum(['on', 'off']).default('on'),
+  // Usage limits, in classifications (~$0.12 of AI each). Plans will set the
+  // organization allowance later; see docs/specs/native-hts-classifier.md.
+  // Defaults fit a ~$50/month classifier budget on gpt-4o (~$0.055 each).
+  HTS_LIMIT_PER_MINUTE:     z.coerce.number().int().positive().default(3),
+  HTS_LIMIT_USER_DAILY:     z.coerce.number().int().positive().default(20),
+  HTS_LIMIT_ORG_MONTHLY:    z.coerce.number().int().positive().default(100),
+  HTS_LIMIT_GLOBAL_DAILY:   z.coerce.number().int().positive().default(150),
+  HTS_LIMIT_GLOBAL_MONTHLY: z.coerce.number().int().positive().default(900),
   // When true, sets OpenAI's `store: false` flag so prompts can't enter
   // their training corpus (zero-retention policy for trade data).
   AI_DISABLE_TRAINING_DATA: z.coerce.boolean().default(true),
@@ -83,6 +95,14 @@ const envSchema = z.object({
   CHAT_ANON_DAILY_CAP:   z.coerce.number().int().positive().default(30),
   // Where marketing-surface escalations are emailed (reuses the ACS sender).
   CHAT_SUPPORT_EMAIL:    z.string().default('support@mycargolens.com'),
+  // Marketing leads (routes/contact.ts, services/leads.ts). Every contact-form
+  // and /book-a-demo submission is stored in `leads` first, then the team is
+  // emailed. LEADS_NOTIFY_TO: comma-separated recipients for sales leads
+  // (demo + enterprise); other subjects still go to support@.
+  LEADS_NOTIFY_TO: z.string().default('ibrahim.rayana@mycargolens.com'),
+  // Prospect confirmation email (conversion plan §4.6 email 1). OFF until the
+  // founder approves its copy. Parsed literally: only "true" turns it on.
+  LEAD_CONFIRMATION_EMAIL: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   // Multi-factor auth — AES-256-GCM key that encrypts TOTP secrets at rest
   // (services/mfaCrypto.ts). 32 bytes as 64 hex chars. Optional in dev (a
   // JWT-derived key is used as a fallback), REQUIRED in production (enforced
@@ -93,6 +113,9 @@ const envSchema = z.object({
       message: 'MFA_ENC_KEY must be 64 hex characters (32 bytes)',
     })
     .optional(),
+  // Native CBP connection (services/cbp/environment.ts): ABI_TRANSPORT,
+  // CBP_ENVIRONMENT (staging = CERT, production = PROD), mq-bridge URL+token.
+  ...cbpEnvShape,
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -104,6 +127,15 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+// CBP environment safety (all NODE_ENVs: staging also runs as production).
+// The live MQ transport must declare which CBP environment it talks to, so
+// staging can never reach CBP PROD and production never CBP CERT.
+const cbpProblems = cbpConfigProblems(env);
+if (cbpProblems.length > 0) {
+  console.error(`❌ Unsafe CBP connection configuration: ${cbpProblems.join('; ')}`);
+  process.exit(1);
+}
 
 // Production-only hard requirements — fail fast at boot rather than at runtime
 if (env.NODE_ENV === 'production') {

@@ -14,17 +14,29 @@
  * of the per-user daily AI cap.
  */
 
+import { isfFilingDeadline } from '../services/isfDeadline.js';
+import { classifyHandler } from '../services/htsClassifier/http.js';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
-import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest, requirePlatformAdmin } from '../middleware/auth.js';
 import { requireCapability } from '../middleware/requireCapability.js';
 import { CAPABILITIES } from '../config/plans.js';
-import { authLimiter } from '../middleware/rateLimiter.js';
+import { authLimiter, classifyLimiter } from '../middleware/rateLimiter.js';
 import * as ai from '../services/ai.js';
 import { lookupPgaFlags, lookupMetadata as pgaMeta } from '../services/compliance/pgaFlags.js';
 import { assessUflpaRisk } from '../services/compliance/uflpa.js';
-import { computeLiquidation } from '../services/compliance/liquidation.js';
+import { computeLiquidation, liquidationSources } from '../services/compliance/liquidation.js';
+
+/** Accepted entry summaries: what PSC windows and liquidation apply to (never ISF filings). */
+function loadAcceptedEntries(orgId: string) {
+  return prisma.abiDocument.findMany({
+    where: { orgId, status: 'ACCEPTED' },
+    select: { id: true, entryNumber: true, mbolNumber: true, entryType: true, payload: true, respondedAt: true, sentAt: true },
+    orderBy: { respondedAt: 'desc' },
+    take: 200,
+  });
+}
 import { lookupAddCvd, getAddCvdMeta, invalidateAddCvdCache } from '../services/compliance/addCvd.js';
 import { syncFromFederalRegister } from '../services/compliance/addCvdSync.js';
 import { lookupFtaForCountry, getFtaMeta } from '../services/compliance/fta.js';
@@ -32,6 +44,14 @@ import { abiGateway } from '../services/abi/gateway.js';
 import { parseRejectionReason } from '../services/errorTranslator.js';
 import { validateFiling } from '../services/validation.js';
 import logger from '../config/logger.js';
+
+/** Party name(s): manufacturers are stored as a list (an ISF can name several). */
+function partyNames(p: unknown): string {
+  if (!p) return '';
+  if (typeof p === 'string') return p;
+  if (Array.isArray(p)) return p.map(partyNames).filter(Boolean).join(', ');
+  return String((p as { name?: unknown }).name ?? '');
+}
 
 const router = Router();
 router.use(authMiddleware);
@@ -64,6 +84,7 @@ router.get('/health-summary', async (req: AuthRequest, res: Response): Promise<v
         submittedAt: true,
         rejectedAt: true,
         estimatedDeparture: true,
+        estimatedLading: true,
       },
       orderBy: { createdAt: 'desc' },
     }),
@@ -122,7 +143,7 @@ router.get('/health-summary', async (req: AuthRequest, res: Response): Promise<v
   for (const f of recent) {
     if (!f.submittedAt || !f.estimatedDeparture) continue;
     trackable++;
-    const cutoff = new Date(new Date(f.estimatedDeparture).getTime() - 24 * 60 * 60 * 1000);
+    const cutoff = isfFilingDeadline(f.estimatedDeparture, f.estimatedLading);
     if (f.submittedAt.getTime() <= cutoff.getTime()) onTime++;
   }
   const deadlineAdherence = trackable > 0 ? Math.round((onTime / trackable) * 100) : null;
@@ -222,40 +243,15 @@ router.get('/pga-lookup', (req: AuthRequest, res: Response): void => {
 // a calendar / countdown table.
 
 router.get('/liquidation-tracker', async (req: AuthRequest, res: Response): Promise<void> => {
-  const orgId = req.user!.orgId;
-  const filings = await prisma.filing.findMany({
-    where: {
-      orgId,
-      status: { in: ['accepted', 'amended'] },
-      acceptedAt: { not: null },
-    },
-    select: {
-      id: true,
-      masterBol: true,
-      houseBol: true,
-      acceptedAt: true,
-      filingType: true,
-    },
-    orderBy: { acceptedAt: 'desc' },
-    take: 200,
-  });
-
-  const tracked = filings.map((f) => {
-    // computeLiquidation returns { entryDate, estimatedLiquidationAt, ... }
-    // already, so we don't re-set entryDate ourselves — would shadow & confuse.
-    const dates = computeLiquidation(f.acceptedAt!);
-    return {
-      filingId: f.id,
-      bol: f.houseBol || f.masterBol || f.id.slice(0, 8),
-      filingType: f.filingType,
-      ...dates,
-    };
-  });
-
-  res.json({
-    total: tracked.length,
-    tracked,
-  });
+  const sources = liquidationSources(await loadAcceptedEntries(req.user!.orgId));
+  const tracked = sources.map((e) => ({
+    id: e.id,
+    bol: e.ref,
+    filingType: `Entry ${e.entryType}`,
+    linkUrl: e.linkUrl,
+    ...computeLiquidation(e.entryDate),
+  }));
+  res.json({ total: tracked.length, tracked });
 });
 
 // ─── GET /action-queue ───────────────────────────────────────────────
@@ -295,6 +291,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       rejectedAt: true,
       rejectionReason: true,
       estimatedDeparture: true,
+        estimatedLading: true,
       manufacturer: true,
       seller: true,
       buyer: true,
@@ -424,7 +421,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
   for (const f of filings) {
     if (f.status !== 'draft') continue;
     if (!f.estimatedDeparture) continue;
-    const cutoff = new Date(f.estimatedDeparture).getTime() - 24 * 60 * 60 * 1000;
+    const cutoff = isfFilingDeadline(f.estimatedDeparture, f.estimatedLading).getTime();
     const hoursToCutoff = (cutoff - now) / (60 * 60 * 1000);
     if (hoursToCutoff < -24 || hoursToCutoff > 72) continue;
     const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
@@ -509,62 +506,31 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
     });
   }
 
-  // 4. PSC deadlines — Post-Summary Correction windows about to close.
-  //    Accepted/amended filings with PSC deadline ≤ 14 days away.
-  for (const f of filings) {
-    if (!['accepted', 'amended'].includes(f.status) || !f.acceptedAt) continue;
-    const liq = computeLiquidation(f.acceptedAt);
-    if (liq.status !== 'psc-window-open') continue;
-    if (liq.daysUntilPscDeadline > 14) continue;
-    const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
-    const en = enrich(f);
+  // 4 + 5. PSC windows closing and liquidation imminent: accepted entries only.
+  for (const e of liquidationSources(await loadAcceptedEntries(orgId))) {
+    const liq = computeLiquidation(e.entryDate);
+    const psc = liq.status === 'psc-window-open' && liq.daysUntilPscDeadline <= 14;
+    const liquidating = liq.status === 'awaiting-liquidation' && liq.daysUntilLiquidation >= 0 && liq.daysUntilLiquidation <= 14;
+    if (!psc && !liquidating) continue;
     items.push({
-      id: `psc:${f.id}`,
-      kind: 'psc',
-      severity: liq.daysUntilPscDeadline <= 7 ? 'high' : 'medium',
-      title: `PSC window closes in ${liq.daysUntilPscDeadline}d — ${bol}`,
-      context: 'File a Post-Summary Correction within the window, or accept the current duty assessment.',
-      filingId: f.id,
-      bol,
-      timestamp: f.acceptedAt.getTime(),
+      id: `${psc ? 'psc' : 'liquidation'}:${e.id}`,
+      kind: psc ? 'psc' : 'liquidation',
+      severity: psc ? (liq.daysUntilPscDeadline <= 7 ? 'high' : 'medium') : 'medium',
+      title: psc ? `PSC window closes in ${liq.daysUntilPscDeadline}d — ${e.ref}` : `Liquidation in ${liq.daysUntilLiquidation}d — ${e.ref}`,
+      context: psc
+        ? 'File a Post-Summary Correction within the window, or accept the current duty assessment.'
+        : 'After liquidation you have 180 days to file a protest if the duty assessment is contested.',
+      bol: e.ref,
+      timestamp: e.entryDate.getTime(),
       isNew: false,
-      score: en.score,
-      status: f.status,
-      originCompany: en.company,
-      originCountry: en.country,
-      actions: [
-        { label: 'Open', kind: 'open', href: `/shipments/${f.id}` },
-      ],
+      score: null,
+      status: 'accepted',
+      originCompany: null,
+      originCountry: null,
+      actions: [{ label: 'Open', kind: 'open', href: e.linkUrl }],
     });
   }
 
-  // 5. Liquidation imminent — entries whose 314-day liquidation is ≤14d.
-  for (const f of filings) {
-    if (!['accepted', 'amended'].includes(f.status) || !f.acceptedAt) continue;
-    const liq = computeLiquidation(f.acceptedAt);
-    if (liq.status !== 'awaiting-liquidation') continue;
-    if (liq.daysUntilLiquidation > 14 || liq.daysUntilLiquidation < 0) continue;
-    const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
-    const en = enrich(f);
-    items.push({
-      id: `liquidation:${f.id}`,
-      kind: 'liquidation',
-      severity: 'medium',
-      title: `Liquidation in ${liq.daysUntilLiquidation}d — ${bol}`,
-      context: 'After liquidation you have 180 days to file a protest if the duty assessment is contested.',
-      filingId: f.id,
-      bol,
-      timestamp: f.acceptedAt.getTime(),
-      isNew: false,
-      score: en.score,
-      status: f.status,
-      originCompany: en.company,
-      originCountry: en.country,
-      actions: [
-        { label: 'Open', kind: 'open', href: `/shipments/${f.id}` },
-      ],
-    });
-  }
 
   // 6. Bulk-fix detector — 3+ recent rejections sharing the same parsed
   //    rejection-summary string indicates the importer is making one
@@ -738,7 +704,7 @@ Filing context:
   • Master BOL: ${filing.masterBol ?? '—'}
   • House BOL:  ${filing.houseBol ?? '—'}
   • Consignee:  ${filing.consigneeName ?? '—'}
-  • Manufacturer: ${(filing.manufacturer as any)?.name ?? '—'}
+  • Manufacturer: ${partyNames(filing.manufacturer) || '—'}
   • Commodities: ${commoditiesSummary ?? '—'}
 
 Rejection details from CBP:
@@ -963,59 +929,9 @@ Be concrete and brief. Refer to the filing's actual values when relevant ("Maste
 
 // ─── Classification tab endpoints ────────────────────────────────────
 
-// POST /classify-hts — standalone HTS classifier wrapper around CC's
-// /api/ht-classification. Takes a free-text product description, returns
-// the best HTS match + alternative suggestions + GRI-style explanation.
-const classifyHtsSchema = z.object({
-  description: z.string().min(3).max(500),
-});
-
-router.post('/classify-hts', authLimiter, requireCapability(CAPABILITIES.HTS_CLASSIFICATION), async (req: AuthRequest, res: Response): Promise<void> => {
-  const parsed = classifyHtsSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: 'Description must be 3-500 characters' });
-    return;
-  }
-  try {
-    const result = await abiGateway.classifyHTS(parsed.data.description.trim());
-    const raw = result.data as any;
-    const item = raw?.items?.[0];
-    if (!item) {
-      res.json({ matched: false, message: 'No classification returned. Try a more specific description.' });
-      return;
-    }
-    // Coherence check — CC flags vague inputs.
-    const coherence = item?.classifierResponse?.coherence_validation;
-    if (coherence && !coherence.is_coherent) {
-      res.json({
-        matched: false,
-        message: coherence.explanation || 'Description too vague — add material, function, or industry context.',
-      });
-      return;
-    }
-    // Primary recommendation.
-    const cr = item.classifierResponse ?? {};
-    const primaryHts: string | null = cr.selected_hts ?? item.classification?.hts ?? null;
-    const explanation: string | null = cr.explanation ?? null;
-    const alternatives: Array<{ hts: string; description: string }> =
-      Array.isArray(cr.hts_review_result?.recomendations)
-        ? cr.hts_review_result.recomendations
-            .filter((r: any) => r?.hts && r?.description)
-            .map((r: any) => ({ hts: String(r.hts), description: String(r.description) }))
-        : [];
-    res.json({
-      matched: !!primaryHts,
-      primary: primaryHts
-        ? { hts: primaryHts, description: item.classification?.name ?? item.description ?? '' }
-        : null,
-      explanation,
-      alternatives,
-    });
-  } catch (err: any) {
-    logger.error({ err: err?.message }, '[Compliance] classify-hts failed');
-    res.status(502).json({ error: 'Classifier upstream failed. Please try again.' });
-  }
-});
+// POST /classify-hts — HTS suggestions from a product description, from the
+// native classifier (services/htsClassifier); every plan, for now (2026-10-21).
+router.post('/classify-hts', classifyLimiter, classifyHandler);
 
 // GET /add-cvd-lookup?q=...  — seed-data lookup of active Commerce orders.
 const addCvdQuery = z.object({ q: z.string().min(1).max(100) });
@@ -1269,11 +1185,11 @@ router.get('/health-narrative', async (req: AuthRequest, res: Response): Promise
     if (risk.severity === 'high') uflpaHigh++;
     else if (risk.severity === 'elevated') uflpaElevated++;
 
-    if (f.status === 'accepted' && f.acceptedAt) {
-      const liq = computeLiquidation(new Date(f.acceptedAt));
-      if (liq.daysUntilPscDeadline >= 0 && liq.daysUntilPscDeadline <= 14) pscClosingSoon++;
-      if (liq.daysUntilLiquidation >= 0 && liq.daysUntilLiquidation <= 14) liquidatingSoon++;
-    }
+  }
+  for (const e of liquidationSources(await loadAcceptedEntries(orgId))) {
+    const liq = computeLiquidation(e.entryDate);
+    if (liq.daysUntilPscDeadline >= 0 && liq.daysUntilPscDeadline <= 14) pscClosingSoon++;
+    if (liq.daysUntilLiquidation >= 0 && liq.daysUntilLiquidation <= 14) liquidatingSoon++;
   }
 
   const signals: NarrativeSignals = {
@@ -1324,16 +1240,18 @@ router.get('/health-narrative', async (req: AuthRequest, res: Response): Promise
 });
 
 // ─── Admin: ADD/CVD candidate review ─────────────────────────────────
-// Federal Register sync writes pending candidates; admins inspect, fill
+// The AD/CVD order table is shared by every org, so only platform admins
+// may change it (testing week BUG-001). Federal Register sync writes
+// pending candidates; admins inspect, fill
 // in case # + HTS prefixes, then promote to active (or dismiss).
 
-router.post('/admin/add-cvd/sync', requireRole('admin', 'owner'), async (_req: AuthRequest, res: Response): Promise<void> => {
+router.post('/admin/add-cvd/sync', requirePlatformAdmin, async (_req: AuthRequest, res: Response): Promise<void> => {
   const result = await syncFromFederalRegister();
   invalidateAddCvdCache();
   res.json(result);
 });
 
-router.get('/admin/add-cvd/pending', requireRole('admin', 'owner'), async (_req: AuthRequest, res: Response): Promise<void> => {
+router.get('/admin/add-cvd/pending', requirePlatformAdmin, async (_req: AuthRequest, res: Response): Promise<void> => {
   const rows = await prisma.addCvdOrder.findMany({
     where:   { status: 'pending' },
     orderBy: { sourceDate: 'desc' },
@@ -1347,7 +1265,7 @@ const promoteSchema = z.object({
   note:        z.string().max(500).optional(),
 });
 
-router.post('/admin/add-cvd/pending/:id/approve', requireRole('admin', 'owner'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/admin/add-cvd/pending/:id/approve', requirePlatformAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = typeof req.params.id === 'string' ? req.params.id : '';
   if (!/^[0-9a-f-]{36}$/i.test(id)) {
     res.status(400).json({ error: 'Invalid id' });
@@ -1371,7 +1289,7 @@ router.post('/admin/add-cvd/pending/:id/approve', requireRole('admin', 'owner'),
   res.json(updated);
 });
 
-router.post('/admin/add-cvd/pending/:id/dismiss', requireRole('admin', 'owner'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/admin/add-cvd/pending/:id/dismiss', requirePlatformAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = typeof req.params.id === 'string' ? req.params.id : '';
   if (!/^[0-9a-f-]{36}$/i.test(id)) {
     res.status(400).json({ error: 'Invalid id' });

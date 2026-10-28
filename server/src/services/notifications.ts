@@ -62,6 +62,8 @@ const SEVERITY_BY_KIND: Record<string, NotificationSeverity> = {
   billing_payment_failed:        'critical',
   // Team
   team_member_joined: 'info',
+  // CBP never answered a transmission (ISF deadline at risk)
+  cbp_no_answer: 'critical',
   // System
   api_error: 'critical',
 };

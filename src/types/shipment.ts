@@ -137,6 +137,18 @@ export interface Filing {
 
   bondType?: string | null;
   bondSuretyCode?: string | null;
+  bondReferenceNumber?: string | null;
+  houseBillScac?: string | null;
+  estimatedLading?: string | null;
+  /** Per-filing ISF filer: SIGMA (S7P) | CLIENT (own code); null = org default. */
+  isfFilerMode?: 'SIGMA' | 'CLIENT' | null;
+  /** What CBP holds: NOT_ON_FILE | ON_FILE | DELETED. */
+  cbpState?: string;
+  /** ISF transaction in flight: ADD | REPLACE | DELETE. */
+  pendingAction?: string | null;
+  /** Filer code CBP accepted the ISF under. */
+  isfFilerCode?: string | null;
+  lastTransmissionId?: string | null;
 
   // ISF-5 specific data
   isf5Data?: ISF5Data | null;
@@ -216,9 +228,11 @@ export interface ApiSubmissionLog {
 }
 
 // ─── Helpers ───────────────────────────────────────────────
-export function getPartyName(party: PartyInfo | string | null | undefined): string {
+/** A party's name; a list (an ISF can name several manufacturers) gives every name. */
+export function getPartyName(party: PartyInfo | PartyInfo[] | string | null | undefined): string {
   if (!party) return '';
   if (typeof party === 'string') return party;
+  if (Array.isArray(party)) return party.map((p) => getPartyName(p)).filter(Boolean).join(', ');
   return party.name || '';
 }
 

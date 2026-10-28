@@ -47,3 +47,19 @@ landing/next-env.d.ts
 # bun lockfiles (we use npm; bun was a brief experiment)
 bun.lock
 bun.lockb
+
+# CBP MQIPT trade package — DHS-restricted credentials (TLS keystore, channel
+# tables, MQDEF). Lives on the VM at /opt/mycargolens/mqipt, NEVER in git.
+docs/abi-engine/SIGMATP_trade_package/
+docs/abi-engine/Sigma Technology Partners.xlsx
+docs/abi-engine/CBP_MQIPT_Install-and-Run_Instructions.txt
+*.kdb
+*.sth
+*.TAB
+
+# Testing-week screen sweep output (screenshots + report.json)
+tests/e2e/sweep-output/
+
+# Testing-week bot credentials (local only)
+tests/e2e/.env.staging
+tests/e2e/.qa/

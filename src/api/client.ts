@@ -2,8 +2,10 @@
  * API Client — Typed fetch wrapper with auto-refresh JWT tokens
  */
 
+import type { HtsClassifyResult } from '@/types/htsClassify';
 import type { AuthSession, LoginResult, MfaMethod, User } from '@/types/auth';
 import type { Filing } from '@/types/shipment';
+import type { OrgPricing } from '@/lib/pricing';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -73,6 +75,15 @@ export function getAccessToken() {
 }
 
 // ─── Core Fetch with Auth ─────────────────────────────────
+// Endpoints where a 401 means "these credentials were rejected", not "your
+// session expired". Refresh-and-redirect there reloads the login page and
+// swallows the error the user needs to see (wrong password, stale MFA token).
+const CREDENTIAL_PATHS = new Set([
+  '/api/v1/auth/login',
+  '/api/v1/auth/mfa/verify',
+  '/api/v1/auth/mfa/email/send',
+]);
+
 async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {}
@@ -93,7 +104,7 @@ async function apiFetch<T = any>(
   // If 401, attempt a refresh — the browser will send the httpOnly
   // mcl_refresh cookie if it has one. If it doesn't, the refresh call
   // will fail fast (401) and we surface the original 401 unchanged.
-  if (response.status === 401) {
+  if (response.status === 401 && !CREDENTIAL_PATHS.has(path)) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
       headers['Authorization'] = `Bearer ${accessToken}`;
@@ -263,6 +274,14 @@ export const authApi = {
     );
   },
 
+  /** Email a 1-hour password reset link (same response whether or not the account exists). */
+  forgotPassword(email: string) {
+    return apiFetch<{ success: true; message: string }>('/api/v1/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
   setPassword(token: string, password: string) {
     return apiFetch<{ success: true }>('/api/v1/auth/set-password', {
       method: 'POST',
@@ -304,6 +323,58 @@ export interface FilingListParams {
   sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+}
+
+/** A CBP condition as the server describes it (services/cbp/conditions). */
+export interface CbpConditionView {
+  source: string;
+  code: string;
+  severity?: string;
+  narrative: string;
+  explanation?: string;
+  /** Plain-language "what this means / what to do". */
+  guidance?: string;
+  blocking: boolean;
+  audience: 'filer' | 'operations';
+  pointers?: { type: string; text: string }[];
+}
+
+export interface CbpResponseSummary {
+  application: string;
+  verdict: 'ACCEPTED' | 'REJECTED' | 'CONDITIONAL' | 'INFO';
+  conditions: CbpConditionView[];
+  keys: { entryNumber?: string; isfTransactionNumber?: string };
+  narrative?: string;
+}
+
+export interface FilingCbpActivity {
+  filing: { id: string; status: string; cbpState: string; pendingAction: string | null; isfFilerCode: string | null; cbpTransactionId: string | null };
+  transmissions: Array<{
+    id: string;
+    environment: string;
+    action: string | null;
+    filerCode: string;
+    status: string;
+    sentAt: string | null;
+    respondedAt: string | null;
+    createdAt: string;
+    lastError: string | null;
+    isfTransactionNumber: string | null;
+    inbound: Array<{ id: string; application: string | null; receivedAt: string; parsed: CbpResponseSummary | null }>;
+    /** Sent, and CBP hasn't answered within the expected time (BUG-022). */
+    overdue?: boolean;
+  }>;
+}
+
+/** One transmission to CBP and the messages CBP sent back for it. */
+export type CbpTransmissionView = FilingCbpActivity['transmissions'][number] & { application?: string };
+
+export interface EntryCbpActivity {
+  entry: {
+    id: string; status: string; cbpState: string; pendingAction: string | null; entryNumber: string | null;
+    entrySummaryStatus: string | null; cargoReleaseStatus: string | null; releaseRequested: boolean;
+  };
+  transmissions: CbpTransmissionView[];
 }
 
 export const filingsApi = {
@@ -377,6 +448,8 @@ export const filingsApi = {
       filing: Filing;
       ccFilingId: string | null;
       sendResponse?: { success?: boolean; 'Documents sent'?: number } & Record<string, unknown>;
+      /** Present when the org files through the native engine. */
+      native?: { transmissionId: string; outcome: 'SENT' | 'UNKNOWN'; filerCode: string; status: string; pendingAction: string | null };
     }>(`/api/v1/filings/${id}/submit`, { method: 'POST' });
   },
 
@@ -407,6 +480,11 @@ export const filingsApi = {
 
   validate(id: string) {
     return apiFetch<{ valid: boolean; errors: ValidationIssue[]; score: number; criticalCount: number; warningCount: number; infoCount: number }>(`/api/v1/filings/${id}/validate`, { method: 'POST' });
+  },
+
+  /** Native CBP activity: transmissions with CBP's decoded responses. */
+  cbpActivity(id: string) {
+    return apiFetch<FilingCbpActivity>(`/api/v1/filings/${id}/cbp`);
   },
 
   checkStatus(id: string) {
@@ -513,11 +591,7 @@ export const integrationsApi = {
   },
 
   classifyHTS(description: string) {
-    return apiFetch<{
-      suggestions: Array<{ hts: string; description: string; confidence?: number }>;
-      message?: string;
-      raw?: unknown;
-    }>('/api/v1/integrations/hts-classify', {
+    return apiFetch<HtsClassifyResult>('/api/v1/integrations/hts-classify', {
       method: 'POST',
       body: JSON.stringify({ description }),
     });
@@ -620,6 +694,7 @@ export interface SettingsOrganization {
   einNumber: string | null;
   ccEnvironment: string;
   address: OrgAddress | null;
+  phone: string | null;
   createdAt: string;
   _count: { users: number; filings: number; filingTemplates: number };
 }
@@ -660,7 +735,7 @@ export const settingsApi = {
     return apiFetch<SettingsOrganization>('/api/v1/settings/organization');
   },
 
-  updateOrganization(data: { name?: string; iorNumber?: string; einNumber?: string; address?: OrgAddress }) {
+  updateOrganization(data: { name?: string; iorNumber?: string; einNumber?: string; address?: OrgAddress; phone?: string }) {
     return apiFetch<SettingsOrganization>('/api/v1/settings/organization', {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -710,7 +785,41 @@ export const settingsApi = {
       body: JSON.stringify({ password }),
     });
   },
+
+  // ── Entry number blocks (filer-assigned ranges) ──
+  listEntryBlocks() {
+    return apiFetch<{ data: EntryNumberBlock[] }>('/api/v1/settings/entry-blocks');
+  },
+
+  createEntryBlock(data: { rangeStart: number; rangeEnd: number; label?: string }) {
+    return apiFetch<{ data: EntryNumberBlock }>('/api/v1/settings/entry-blocks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateEntryBlock(id: string, data: { active?: boolean; label?: string | null; rangeEnd?: number }) {
+    return apiFetch<{ data: EntryNumberBlock }>(`/api/v1/settings/entry-blocks/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
 };
+
+/** A filer's pre-issued entry-number range (settings/entry-blocks). */
+export interface EntryNumberBlock {
+  id: string;
+  filerCode: string;
+  rangeStart: number;
+  rangeEnd: number;
+  nextSequence: number;
+  active: boolean;
+  label: string | null;
+  createdAt: string;
+  used: number;
+  remaining: number;
+  exhausted: boolean;
+}
 
 // ─── Bulk Operations API ──────────────────────────────────
 export const bulkApi = {
@@ -863,6 +972,7 @@ export const exportApi = {
 };
 
 // ─── Billing API (card-on-file, immediate per-shipment charge) ─────────────
+export type { OrgPricing };
 export type BillingCard = { brand: string | null; last4: string | null; expMonth: number | null; expYear: number | null };
 
 export const billingApi = {
@@ -872,11 +982,16 @@ export const billingApi = {
         id: string;
         name: string;
         description: string | null;
+        /** This org's price of one accepted ISF (cents). */
         perFilingCents: number;
+        /** Self-serve plan (false = set up by MyCargoLens). */
+        isPublic: boolean;
         capabilities: string[];
         features: string[];
       } | null;
       capabilities: string[];
+      /** This org's prices by what was filed; entry prices null = entries not offered. */
+      pricing: OrgPricing | null;
       /** May submit/file: a card is on file (or a $0 tier) and no unpaid charge. */
       canFile: boolean;
       status: string | null;
@@ -978,9 +1093,39 @@ export interface AdminOrganization {
   createdAt: string;
   plan: { id: string; name: string } | null;
   subscriptionStatus: string | null;
+  /** The org's own prices (cents; null = default) and what they resolve to. */
+  pricing: (AdminPriceOverrides & { effective: OrgPricing }) | null;
+  cardOnFile: boolean;
   owner: { email: string; firstName: string | null; lastName: string | null; emailVerified: boolean } | null;
   userCount: number;
   filingCount: number;
+  cbp: OrgCbpSetup | null;
+}
+
+/** A client's CBP identity, set by MyCargoLens (native go-live Phase 2). */
+export interface OrgCbpSetup {
+  gateway: 'NATIVE' | 'CC';
+  filerCode: string | null;
+  isfFilerModeDefault: 'SIGMA' | 'CLIENT';
+  serviceCenterApprovedAt: string | null;
+  serviceCenterApprovedBy: string | null;
+  notes: string | null;
+}
+
+/** What a member sees about their org's CBP identity. */
+export interface OrgCbpIdentity {
+  filerCode: string | null;
+  gateway: 'NATIVE' | 'CC';
+  isfFilerModeDefault: 'SIGMA' | 'CLIENT';
+  serviceCenterApprovedAt: string | null;
+  sigmaFilerCode: string;
+  environment: 'NONE' | 'CERT' | 'PROD';
+}
+
+export interface AdminPriceOverrides {
+  isfCents: number | null;
+  entryLinkedCents: number | null;
+  entryOnlyCents: number | null;
 }
 
 export interface AdminPlan {
@@ -990,6 +1135,7 @@ export interface AdminPlan {
   perFilingCents: number;
   capabilities: string[];
   isPublic: boolean;
+  sellsEntries: boolean;
 }
 
 export const adminApi = {
@@ -1017,10 +1163,24 @@ export const adminApi = {
     }>('/api/v1/admin/organizations', { method: 'POST', body: JSON.stringify(body) });
   },
 
+  setCbpSetup(orgId: string, body: Partial<Omit<OrgCbpSetup, 'serviceCenterApprovedAt'>> & { serviceCenterApprovedAt?: string | null }) {
+    return apiFetch<{ cbp: OrgCbpSetup }>(`/api/v1/admin/organizations/${orgId}/cbp`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  },
+
   changePlan(orgId: string, planId: string) {
     return apiFetch<{ orgId: string; plan: { id: string; name: string } }>(
       `/api/v1/admin/organizations/${orgId}/plan`,
       { method: 'PATCH', body: JSON.stringify({ planId }) },
+    );
+  },
+
+  setPricing(orgId: string, body: AdminPriceOverrides) {
+    return apiFetch<{ orgId: string; pricing: AdminPriceOverrides & { effective: OrgPricing } }>(
+      `/api/v1/admin/organizations/${orgId}/pricing`,
+      { method: 'PUT', body: JSON.stringify(body) },
     );
   },
 
@@ -1066,6 +1226,256 @@ export interface AdminUserLookup {
   organization: { id: string; name: string };
   activity: Record<string, number>;
 }
+
+// ─── ABI Certification Console API (platform admin) ───────
+// Ops console for the CBP CERT test — scenario generation, transmission
+// lifecycle tracking, and response parsing (server/src/routes/certConsole.ts).
+export interface CertParamsRow {
+  filerCode: string;
+  importerOfRecordNumber: string;
+  importerName: string;
+  consigneeNumber: string;
+  suretyCompanyCode: string;
+  districtPortOfEntry: string;
+  currentYear: string;
+  applicabilityDate: string;
+  senderSiteCode: string;
+  senderIdCode: string;
+  senderPassword: string;
+  updatedAt: string;
+}
+
+export type CertParamsInput = Omit<CertParamsRow, 'updatedAt'>;
+
+export type CertTransmissionStatus =
+  | 'generated'
+  | 'rejected_clientside'
+  | 'transmitted'
+  | 'accepted'
+  | 'rejected'
+  | 'conditional';
+
+export interface CertScenario {
+  id: string;
+  title: string;
+  application: string;
+  kind: 'transmit' | 'reject';
+  notes: string | null;
+  encoded: boolean;
+  latest: { id: string; status: CertTransmissionStatus; updatedAt: string } | null;
+}
+
+export interface CertTransmission {
+  id: string;
+  scenarioId: string;
+  status: CertTransmissionStatus;
+  wireText: string;
+  evidenceText: string | null;
+  responseText: string | null;
+  responseParsed: unknown;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── CBP traffic console (platform admins) ──────────────────
+export interface CbpConnectionInfo {
+  environment: 'CERT' | 'PROD' | 'MOCK';
+  transport: 'mock' | 'mqipt';
+  health: { ok: boolean; detail?: string; qmgr?: string; expectedQmgr?: string | null };
+  lastInboundAt: string | null;
+  counts: { pendingDispatch: number; unmatched: number; unknownOutcome: number };
+}
+export interface CbpInboundRow {
+  id: string;
+  application: string | null;
+  userDataTag: string | null;
+  receivedAt: string;
+  dispatchedAt: string | null;
+  matchedEntityType: string | null;
+  matchedEntityId: string | null;
+  transmissionId: string | null;
+  parseError: string | null;
+}
+export interface CbpTransmissionRow {
+  id: string;
+  orgId: string | null;
+  application: string;
+  action: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  filerCode: string;
+  userDataTag: string;
+  entryNumber: string | null;
+  isfTransactionNumber: string | null;
+  status: string;
+  sentAt: string | null;
+  respondedAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  _count: { inbound: number };
+}
+
+export const cbpTrafficApi = {
+  connection() {
+    return apiFetch<CbpConnectionInfo>('/api/v1/admin/cbp/connection');
+  },
+  inbound(filter: 'all' | 'unmatched' | 'pending' = 'all') {
+    return apiFetch<{ messages: CbpInboundRow[] }>(`/api/v1/admin/cbp/inbound?filter=${filter}`);
+  },
+  inboundMessage(id: string) {
+    return apiFetch<{ message: CbpInboundRow & { rawText: string; parsed: unknown } }>(`/api/v1/admin/cbp/inbound/${encodeURIComponent(id)}`);
+  },
+  transmissions(status?: string) {
+    return apiFetch<{ transmissions: CbpTransmissionRow[] }>(`/api/v1/admin/cbp/transmissions${status ? `?status=${encodeURIComponent(status)}` : ''}`);
+  },
+  transmission(id: string) {
+    return apiFetch<{ transmission: CbpTransmissionRow & { wireText: string; mqMessageId: string | null; inbound: (CbpInboundRow & { rawText: string; parsed: unknown })[] } }>(
+      `/api/v1/admin/cbp/transmissions/${encodeURIComponent(id)}`,
+    );
+  },
+};
+
+export const certApi = {
+  params() {
+    return apiFetch<{ params: CertParamsRow }>('/api/v1/admin/cert/params');
+  },
+
+  updateParams(body: CertParamsInput) {
+    return apiFetch<{ params: CertParamsRow }>('/api/v1/admin/cert/params', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  },
+
+  scenarios() {
+    return apiFetch<{ scenarios: CertScenario[] }>('/api/v1/admin/cert/scenarios');
+  },
+
+  generate(scenarioId: string) {
+    return apiFetch<{ transmission: CertTransmission }>(
+      `/api/v1/admin/cert/scenarios/${scenarioId}/generate`,
+      { method: 'POST' },
+    );
+  },
+
+  transmissions(scenarioId: string) {
+    return apiFetch<{ transmissions: CertTransmission[] }>(
+      `/api/v1/admin/cert/scenarios/${scenarioId}/transmissions`,
+    );
+  },
+
+  updateTransmission(
+    id: string,
+    body: { status?: CertTransmissionStatus; responseText?: string; notes?: string },
+  ) {
+    return apiFetch<{ transmission: CertTransmission; parseError?: string }>(
+      `/api/v1/admin/cert/transmissions/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    );
+  },
+
+  /** Send a generated transmission to CBP over the configured transport. */
+  transmit(id: string) {
+    return apiFetch<{ transmission: CertTransmission; transport: string; messageId: string }>(
+      `/api/v1/admin/cert/transmissions/${id}/transmit`,
+      { method: 'POST' },
+    );
+  },
+
+  /**
+   * Transport kind + health (mock, or mqipt → live CBP connection), the CBP
+   * environment this server is declared for, the bridge's queue manager, and
+   * whether certification traffic is allowed here (CERT only).
+   */
+  transport() {
+    return apiFetch<{
+      transport: 'mock' | 'mqipt';
+      ok: boolean;
+      detail?: string;
+      environment?: 'NONE' | 'CERT' | 'PROD';
+      qmgr?: string;
+      expectedQmgr?: string | null;
+      certTrafficAllowed?: boolean;
+    }>('/api/v1/admin/cert/transport');
+  },
+
+  /** Drain waiting CBP response batches off the live queue (audit-logged server-side). */
+  receiveResponses(timeoutMs = 5000) {
+    return apiFetch<{ transport: string; batches: string[][] }>(
+      '/api/v1/admin/cert/transport/receive',
+      { method: 'POST', body: JSON.stringify({ timeoutMs }) },
+    );
+  },
+
+  /** Background data: query ACE's own HTS table (HA/HY) — send + parse in one round-trip. */
+  htsQuery(htsNumbers: string[], asOfDate?: string) {
+    return apiFetch<{
+      transport: string;
+      messageId: string;
+      raw: string[][];
+      parsed: {
+        batchRejected: boolean;
+        envelopeConditions: Array<{ conditionCode: string; narrative: string }>;
+        response: {
+          queries: Array<{
+            fromTariffNumber: string;
+            narrativeMessage: string;
+            tariffs: Array<{
+              tariffNumber: string;
+              beginEffectiveDate?: string;
+              endEffectiveDate?: string;
+              unitsOfMeasure: string[];
+              commodityDescription?: string;
+            }>;
+          }>;
+        };
+      } | null;
+      note?: string;
+    }>('/api/v1/admin/cert/transport/hts-query', {
+      method: 'POST',
+      body: JSON.stringify({ htsNumbers, asOfDate }),
+    });
+  },
+  adcvdQuery(caseNumbers: string[]) {
+    return apiFetch<{ transport: string; messageId: string; raw: string[][]; note?: string }>(
+      '/api/v1/admin/cert/transport/adcvd-query',
+      { method: 'POST', body: JSON.stringify({ caseNumbers }) }
+    );
+  },
+
+  /** Backfill: replay every audit-logged received batch through the response auto-attach. */
+  attachLoggedResponses() {
+    return apiFetch<{ replayed: number; attached: Array<{ scenarioId: string; transmissionId: string; status: string }> }>(
+      '/api/v1/admin/cert/transport/attach-logged',
+      { method: 'POST' },
+    );
+  },
+
+  /** Background data: add ALL pending scenario manufacturers to CERT in chunked $I batches. */
+  addAllManufacturers() {
+    return apiFetch<{ transport: string; sent: number; batches?: number; messageIds?: string[]; note?: string }>(
+      '/api/v1/admin/cert/transport/amf-bulk',
+      { method: 'POST' },
+    );
+  },
+
+  /** Background data: add a manufacturer (MID) to CERT via the $I application. */
+  addManufacturer(body: {
+    name: string;
+    street?: string;
+    city: string;
+    countryCode: string;
+    stateOrProvince?: string;
+    zipOrPostalCode?: string;
+    expectedMid?: string;
+  }) {
+    return apiFetch<{ mid: string; transport: string; messageId: string; lines: string[] }>(
+      '/api/v1/admin/cert/transport/amf',
+      { method: 'POST', body: JSON.stringify(body) },
+    );
+  },
+};
 
 // ─── Manifest Query API ───────────────────────────────────
 // ─── Container Tracking (Terminal 49) ─────────────────────
@@ -1437,6 +1847,17 @@ export interface OrgInvitation {
 }
 
 export const organizationApi = {
+  cbpIdentity() {
+    return apiFetch<{ cbp: OrgCbpIdentity }>('/api/v1/organization/cbp');
+  },
+
+  setIsfFilerDefault(isfFilerModeDefault: 'SIGMA' | 'CLIENT') {
+    return apiFetch<{ cbp: { isfFilerModeDefault: 'SIGMA' | 'CLIENT' } }>('/api/v1/organization/cbp', {
+      method: 'PATCH',
+      body: JSON.stringify({ isfFilerModeDefault }),
+    });
+  },
+
   getOverview() {
     return apiFetch<{
       id: string; name: string; slug: string | null; iorNumber: string | null;
@@ -1512,11 +1933,16 @@ export interface ABIBond {
   type: '8' | '9';   // "8" continuous, "9" single-transaction
   suretyCode: string; // CBP-issued surety company code (3 chars)
   taxId: string;
+  /** Single transaction bond (type 9) amount, whole dollars. */
+  stbAmount?: number;
 }
 
 export interface ABIPayment {
   typeCode: number;
-  preliminaryStatementDate: string;
+  /** Statement payments (types 2-8) only. */
+  preliminaryStatementDate?: string;
+  /** MM; periodic monthly statements (types 6-8) only. */
+  periodicStatementMonth?: string;
 }
 
 export interface ABIConsignee {
@@ -1551,9 +1977,26 @@ export interface ABIParty {
   pointOfContact?: string;
 }
 
+/** An antidumping (A-) or countervailing (C-) duty case on a line. */
+export interface ABIAdCvdCase {
+  caseNumber: string;
+  bondOrCash: 'B' | 'C';
+  /** A = ad valorem percent; S = specific dollars per unit. */
+  rateType: 'A' | 'S';
+  rate: number;
+  /** Specific rates only. */
+  quantity?: number;
+}
+
 export interface ABIItem {
   sku: string;
   htsNumber: string;
+  /** Trade agreement / special program claim (AE Table 8), e.g. 'S' for USMCA. */
+  spiClaimCode?: string;
+  /** AD/CVD cases on this line (entry type 03), at most two. */
+  adCvdCases?: ABIAdCvdCase[];
+  /** Chapter 99 numbers (8 digits) claimed with the base classification. */
+  additionalHtsNumbers?: string[];
   description: string;
   origin: { country: string };
   values: {
@@ -1580,7 +2023,8 @@ export interface ABIInvoice {
   purchaseOrder: string;
   invoiceNumber: string;
   exportDate: string;    // YYYYMMDD
-  relatedParties: 'N';   // Phase 1: only "N" accepted by CC
+  /** 19 CFR 152.102(g) — 'Y' when buyer and seller are related. */
+  relatedParties: 'Y' | 'N';
   countryOfExport: string;
   currency: string;
   exchangeRate: number;
@@ -1590,7 +2034,8 @@ export interface ABIInvoice {
 export interface ABIManifest {
   bill: ABIBill;
   carrier: { code: string };
-  ports: { portOfUnlading: string };
+  /** Foreign port of lading: 5-digit Schedule K, required for vessel entries. */
+  ports: { portOfUnlading: string; foreignPortOfLading?: string };
   quantity: string;
   quantityUOM: string;
   invoices: ABIInvoice[];
@@ -1602,8 +2047,8 @@ export interface ABIManifest {
  * with `Partial<ABIDocumentBody>` / DeepPartial while editing drafts.
  */
 export interface ABIDocumentBody {
-  entryType: '01' | '11' | '86'; // 86 = de minimis (Section 321), cargo-release only
-  modeOfTransport: string;   // "40" vessel, "41" air
+  entryType: '01' | '03' | '11' | '86'; // 03 = with AD/CVD; 86 = de minimis, suspended by CBP
+  modeOfTransport: string;   // CATAIR AE Table 3, e.g. "11" vessel containerized, "40" air
   entryNumber: string;       // filer-assigned (not CBP-assigned)
   dates: ABIDates;
   location: ABILocation;
@@ -1640,6 +2085,12 @@ export interface AbiDocument {
   status: AbiDocumentStatus;
   entrySummaryStatus: string | null;
   cargoReleaseStatus: string | null;
+  /** Native lifecycle: what CBP holds, and what is waiting for its answer. */
+  cbpState?: 'NOT_ON_FILE' | 'ON_FILE' | 'DELETED';
+  pendingAction?: 'ADD' | 'REPLACE' | 'DELETE' | null;
+  /** Set once the entry went through the native engine. */
+  lastTransmissionId?: string | null;
+  releaseRequested?: boolean;
 
   entryType: string;
   modeOfTransport: string;
@@ -1701,7 +2152,82 @@ export interface AbiDocumentEnvelope {
   note?: string;
 }
 
+// ─── Duty estimate (POST /:id/estimate-duty) ──────────────
+// Mirrors server/src/services/dutyEstimate.ts. The server prices the
+// CURRENT saved payload on the native engine; incomplete drafts come back
+// as `{ estimable: false, issues }` with HTTP 200.
+
+export interface DutyEstimateIssue {
+  field: string;
+  message: string;
+}
+
+export interface DutyEstimateFee {
+  classCode: string;
+  label: string;
+  amountCents: number;
+}
+
+export interface DutyEstimateLine {
+  lineNumber: number;
+  htsNumbers: string[];
+  /** Each tariff in wire order (ch.99 first) with its own duty. */
+  tariffs: Array<{ htsNumber: string; valueDollars: number; dutyCents: number }>;
+  valueDollars: number;
+  dutyCents: number;
+  mpfCents: number;
+  hmfCents: number;
+  adCvdCents: number;
+}
+
+export interface DutyEstimateTotals {
+  dutyCents: number;
+  mpfCents: number;
+  hmfCents: number;
+  fees: DutyEstimateFee[];
+  adCvdCents: number;
+  totalCents: number;
+}
+
+export type DutyEstimateResult =
+  | {
+      estimable: true;
+      applicabilityDate: string;
+      totals: DutyEstimateTotals;
+      lines: DutyEstimateLine[];
+    }
+  | { estimable: false; issues: DutyEstimateIssue[] };
+
+/** Result of the native preflight: what CBP would make of this entry. */
+export interface EntryPreflight {
+  ready: boolean;
+  error?: string;
+  code?: string;
+  issues?: Array<{ field?: string; record?: string; message: string }>;
+  filerCode?: string;
+  releaseRequested?: boolean;
+  conversions?: Array<{ currency: string; amount: number; usd: number; rate: number; rateDate: string }>;
+}
+
 export const abiDocumentsApi = {
+  /** Full native build + CBP-rule validation, without sending anything. */
+  preflight(id: string) {
+    return apiFetch<EntryPreflight>(`/api/v1/abi-documents/${id}/preflight`, { method: 'POST' });
+  },
+
+  /** Every transmission to CBP for this entry and CBP's answers. */
+  cbpActivity(id: string) {
+    return apiFetch<EntryCbpActivity>(`/api/v1/abi-documents/${id}/cbp`);
+  },
+
+  /** Replace or delete the entry summary CBP holds (native entries). */
+  cbpAction(id: string, action: 'REPLACE' | 'DELETE') {
+    return apiFetch<{ transmissionId: string; outcome: string }>(`/api/v1/abi-documents/${id}/cbp-action`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    });
+  },
+
   list(params?: AbiDocumentListParams) {
     const query = new URLSearchParams();
     if (params) {
@@ -1751,6 +2277,331 @@ export const abiDocumentsApi = {
     return apiFetch<AbiDocumentEnvelope>(`/api/v1/abi-documents/${id}/poll`, {
       method: 'POST',
     });
+  },
+
+  estimateDuty(id: string) {
+    return apiFetch<{ data: DutyEstimateResult }>(
+      `/api/v1/abi-documents/${id}/estimate-duty`,
+      { method: 'POST' },
+    );
+  },
+
+  /** Atomically draw the next entry number from the org's active block. */
+  drawEntryNumber() {
+    return apiFetch<{ data: DrawnEntryNumber }>(
+      '/api/v1/abi-documents/draw-entry-number',
+      { method: 'POST' },
+    );
+  },
+
+  /** Download the CBP Form 7501-format PDF (watermarked unless ACCEPTED). */
+  downloadPdf(id: string) {
+    return apiDownload(`/api/v1/abi-documents/${id}/pdf`);
+  },
+
+  /** CSV template for bulk line import. */
+  downloadLineImportTemplate() {
+    return apiDownload('/api/v1/abi-documents/line-import-template');
+  },
+
+  /** Search ingested chapter-99 overlay subheadings by code or description. */
+  searchOverlayHts(q: string) {
+    return apiFetch<{ data: OverlayHts[] }>(
+      `/api/v1/abi-documents/overlay-hts?q=${encodeURIComponent(q)}`,
+    );
+  },
+
+  /**
+   * Validate a bulk line-import CSV (dryRun) or append server-side.
+   * The wizard always uses dryRun and applies items via local state —
+   * its autosave replaces arrays wholesale, which would clobber a
+   * server-side append.
+   */
+  importLines(id: string, body: { csv: string; invoiceIndex?: number; dryRun?: boolean }) {
+    return apiFetch<{ data: LineImportResponse }>(
+      `/api/v1/abi-documents/${id}/import-lines`,
+      { method: 'POST', body: JSON.stringify(body) },
+    );
+  },
+};
+
+/** A chapter-99 overlay subheading from the ingested USITC table. */
+export interface OverlayHts {
+  htsNumber: string;
+  /** General-column rate expression, e.g. "The duty provided in the applicable subheading + 25%". */
+  rate: string;
+  /** How the heading relates to column 1: adds to it, replaces it, adds nothing, or cannot be priced. */
+  semantics: 'additional' | 'replacement' | 'none' | 'unknown';
+  description: string;
+}
+
+export interface LineImportError {
+  /** Spreadsheet row (header = 1). */
+  row: number;
+  field: string;
+  message: string;
+}
+
+export interface LineImportResponse {
+  dryRun: boolean;
+  validRows?: number;
+  imported?: number;
+  totalRows: number;
+  errors: LineImportError[];
+  /** Present on dryRun: the full validated items, wizard-shaped. */
+  items?: ABIItem[];
+}
+
+/** Result of POST /abi-documents/draw-entry-number. */
+export interface DrawnEntryNumber {
+  /** Canonical hyphenated form, e.g. 'S7P-0000001-4'. */
+  entryNumber: string;
+  filerCode: string;
+  sequence: string;
+  checkDigit: number;
+  blockId: string;
+  /** Numbers left in the block after this draw. */
+  remaining: number;
+}
+
+// ─── In-Bond (7512) API ───────────────────────────────────
+//
+// Server contract: server/src/routes/inbond.ts. The stored `payload` is the
+// abi-engine's InbondAddInput WITHOUT `kind` (the route adds kind:'add' at
+// build time) and WITH `entryType` merged in by the route on every write.
+// POST /:id/build and POST /:id/events return structured 422s of shape
+// { error, issues: [{ field, message }] } when the engine rejects the data.
+
+/** 61 IT (arrive only) | 62 T&E (arrive then export) | 63 IE (export only). */
+export type InbondEntryType = '61' | '62' | '63';
+
+export type InbondStatus =
+  | 'DRAFT'
+  | 'READY'
+  | 'TRANSMITTED'
+  | 'AUTHORIZED'
+  | 'ARRIVED'
+  | 'EXPORTED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+/** WP action: 1/2/3 arrive, 5/6/7 export, A transfer of liability, Z diversion. */
+export type InbondEventAction = '1' | '2' | '3' | '5' | '6' | '7' | 'A' | 'Z';
+
+export type InbondWeightUnit = 'LB' | 'KG' | 'LT' | 'ST' | 'ET' | 'MT';
+
+/** Engine validation issue returned in 422 bodies. */
+export interface InbondIssue {
+  field: string;
+  message: string;
+}
+
+export interface InbondPartyDraft {
+  name?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  addressLine3?: string;
+  telephoneOrTelex?: string;
+}
+
+export interface InbondCommodityDraft {
+  /** 6-10 digits. */
+  htsNumber?: string;
+  /** Whole USD, > 0. */
+  valueDollars?: number;
+  /** Net weight, whole number > 0. */
+  weight?: number;
+  weightUnit?: InbondWeightUnit;
+}
+
+export interface InbondCargoLineDraft {
+  pieceCount?: number;
+  description?: string;
+  manifestUnitCode?: string;
+}
+
+export interface InbondCargoGroupDraft {
+  commodities?: InbondCommodityDraft[];
+  descriptions?: InbondCargoLineDraft[];
+  marksAndNumbers?: string[];
+}
+
+export interface InbondContainerDraft {
+  containerNumber?: string;
+  sealNumber1?: string;
+  sealNumber2?: string;
+  cargo?: InbondCargoGroupDraft[];
+}
+
+export interface InbondBillDetailsDraft {
+  /** 5-digit Schedule K ('99999' only for FTZ withdrawals). */
+  foreignPortOfLading?: string;
+  /** Must equal the sum of all container piece counts. */
+  manifestQuantity?: number;
+  manifestUnits?: string;
+  weight?: number;
+  weightUnit?: InbondWeightUnit;
+  foreignShipper?: InbondPartyDraft;
+  consignee?: InbondPartyDraft;
+  containers?: InbondContainerDraft[];
+}
+
+export interface InbondBillDraft {
+  /** SCAC or 3-char AWB prefix. */
+  issuerCode?: string;
+  billNumber?: string;
+  /** Air only. */
+  houseBillNumber?: string;
+  previousInBondNumber?: string;
+  /** Partial quantity — only valid against a bill already on file (short form). */
+  inBondQuantity?: number;
+  /** Present = full bill details (QP-Long); absent = bill already on file (QP-Short). */
+  details?: InbondBillDetailsDraft;
+}
+
+export interface InbondConveyanceDraft {
+  /** SCAC / ICAO / IATA — or the FTZ FIRMS code for withdrawals. */
+  importingCarrierCode?: string;
+  /** 30 truck / 40 air / 70 pipeline. */
+  importMotCode?: string;
+  /** Schedule D port of unlading. */
+  portOfArrival?: string;
+  /** MMDDYY. */
+  estimatedDateOfArrival?: string;
+  /** FIRMS of the FTZ/warehouse — required when the FTZ flag is set. */
+  ftzFirmsCode?: string;
+}
+
+/**
+ * The filing payload — maps 1:1 onto the engine's InbondAddInput minus `kind`.
+ * `inBondCarrierCode` duplicates `carrierCode`: the engine reads `carrierCode`,
+ * while the server's list denormalizer reads `inBondCarrierCode`; the client
+ * writes both so search/list columns populate.
+ */
+export interface InbondPayloadDraft {
+  entryType?: InbondEntryType;
+  /** Conventional 9-digit number with a MOD-7 check digit (validated at build). */
+  inBondNumber?: string;
+  /** QP10 in-bond carrier SCAC (or FTZ FIRMS code). */
+  carrierCode?: string;
+  /** Denormalization mirror of carrierCode — keep in sync. */
+  inBondCarrierCode?: string;
+  /** Schedule D: termination (61), export (62) or arrival (63) port. */
+  usPortOfDestination?: string;
+  /** Schedule K — required for 62/63, forbidden for 61. */
+  portOfForeignDestination?: string;
+  /** Whole USD, > 0. */
+  valueDollars?: number;
+  /** IRS / CBP-assigned / SSN number of the bonded carrier. */
+  bondedCarrierId?: string;
+  /** FTZ or bonded-warehouse withdrawal. */
+  ftzWithdrawal?: boolean;
+  /** 63 and FTZ moves must be 'N'. */
+  btaIndicator?: 'Y' | 'N';
+  conveyance?: InbondConveyanceDraft;
+  bills?: InbondBillDraft[];
+}
+
+/** Row returned by GET /api/v1/inbond (list). */
+export interface InbondListItem {
+  id: string;
+  status: InbondStatus;
+  entryType: InbondEntryType;
+  inbondNumber: string | null;
+  carrierCode: string | null;
+  portOfDestination: string | null;
+  primaryBill: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count: { events: number };
+}
+
+export interface InbondEvent {
+  id: string;
+  filingId: string;
+  action: InbondEventAction;
+  payload: Record<string, unknown>;
+  wireText: string | null;
+  status: string;
+  occurredAt: string;
+  createdAt: string;
+}
+
+/** Full filing returned by GET /:id (events included) and mutations. */
+export interface InbondFiling {
+  id: string;
+  orgId: string;
+  createdById: string;
+  status: InbondStatus;
+  entryType: InbondEntryType;
+  inbondNumber: string | null;
+  carrierCode: string | null;
+  portOfDestination: string | null;
+  primaryBill: string | null;
+  payload: InbondPayloadDraft;
+  wireText: string | null;
+  createdAt: string;
+  updatedAt: string;
+  events?: InbondEvent[];
+}
+
+export interface InbondListParams {
+  search?: string;
+  status?: InbondStatus;
+}
+
+export interface InbondRecordEventBody {
+  action: InbondEventAction;
+  /** ISO datetime — the server derives the wire YYMMDD/HHMMSS from it (UTC). */
+  occurredAt: string;
+  /** Action-specific InbondEventInput fields (firmsCode, port, bill, …). */
+  payload: Record<string, unknown>;
+}
+
+export const inbondApi = {
+  list(params?: InbondListParams) {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.status) query.set('status', params.status);
+    const qs = query.toString();
+    return apiFetch<{ filings: InbondListItem[] }>(`/api/v1/inbond${qs ? `?${qs}` : ''}`);
+  },
+
+  create(body: { entryType: InbondEntryType; payload?: InbondPayloadDraft }) {
+    return apiFetch<{ filing: InbondFiling }>('/api/v1/inbond', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  get(id: string) {
+    return apiFetch<{ filing: InbondFiling }>(`/api/v1/inbond/${id}`);
+  },
+
+  update(id: string, body: { entryType?: InbondEntryType; payload?: InbondPayloadDraft }) {
+    return apiFetch<{ filing: InbondFiling }>(`/api/v1/inbond/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  },
+
+  remove(id: string) {
+    return apiFetch<{ success: true }>(`/api/v1/inbond/${id}`, { method: 'DELETE' });
+  },
+
+  /** Validate the payload through the abi-engine; 422 carries InbondIssue[]. */
+  build(id: string) {
+    return apiFetch<{ filing: InbondFiling; wireLines: string[] }>(
+      `/api/v1/inbond/${id}/build`,
+      { method: 'POST' },
+    );
+  },
+
+  recordEvent(id: string, body: InbondRecordEventBody) {
+    return apiFetch<{ event: InbondEvent; wireLines: string[] }>(
+      `/api/v1/inbond/${id}/events`,
+      { method: 'POST', body: JSON.stringify(body) },
+    );
   },
 };
 
@@ -1869,14 +2720,6 @@ export interface ActionQueueResponse {
   counts: { total: number; critical: number; high: number; medium: number };
 }
 
-export interface HtsClassificationResponse {
-  matched: boolean;
-  message?: string;
-  primary: { hts: string; description: string } | null;
-  explanation: string | null;
-  alternatives: Array<{ hts: string; description: string }>;
-}
-
 export interface AddCvdOrder {
   case: string;
   type: 'AD' | 'CVD' | 'ADCVD';
@@ -1909,7 +2752,9 @@ export interface FtaPreferenceResponse {
 }
 
 export interface LiquidationTracked {
-  filingId: string;
+  /** Accepted entry (abiDocument) id: liquidation applies to entries, not ISF filings. */
+  id: string;
+  linkUrl: string;
   bol: string;
   filingType: string;
   entryDate: string;
@@ -1948,7 +2793,7 @@ export const complianceApi = {
     return apiFetch<ActionQueueResponse>('/api/v1/compliance/action-queue');
   },
   classifyHts(description: string) {
-    return apiFetch<HtsClassificationResponse>('/api/v1/compliance/classify-hts', {
+    return apiFetch<HtsClassifyResult>('/api/v1/compliance/classify-hts', {
       method: 'POST',
       body: JSON.stringify({ description }),
     });

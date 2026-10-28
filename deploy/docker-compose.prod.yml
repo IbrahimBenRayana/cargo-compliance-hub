@@ -100,6 +100,10 @@ services:
       EMAIL_PASS: ${EMAIL_PASS:-}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@mycargolens.com}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-MyCargoLens}
+      # Marketing leads: sales-lead notification recipients (comma-separated)
+      # and the prospect confirmation email (off until the founder approves copy).
+      LEADS_NOTIFY_TO: ${LEADS_NOTIFY_TO:-ibrahim.rayana@mycargolens.com}
+      LEAD_CONFIRMATION_EMAIL: ${LEAD_CONFIRMATION_EMAIL:-false}
 
       # AI — provider-agnostic. AI_PROVIDER chooses backend; AI_API_KEY is matching credential.
       AI_ASSESSMENT_ENABLED:    ${AI_ASSESSMENT_ENABLED:-false}
@@ -136,13 +140,6 @@ services:
       STRIPE_SECRET_KEY:      ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET:  ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
-      # Per-filing metered pricing. Price ids come from `npm run stripe:bootstrap`
-      # (run per Stripe mode); the meter event name must match the bootstrapped
-      # meter. Empty defaults → checkout self-disables until set in .env.
-      STRIPE_PRICE_ISF:          ${STRIPE_PRICE_ISF:-}
-      STRIPE_PRICE_ENTRY:        ${STRIPE_PRICE_ENTRY:-}
-      STRIPE_PRICE_FULL:         ${STRIPE_PRICE_FULL:-}
-      STRIPE_FILING_METER_EVENT: ${STRIPE_FILING_METER_EVENT:-filing}
 
       # Sentry (audit Phase 10). Server-side only; empty DSN disables init.
       # The SPA bundle needs VITE_SENTRY_DSN at *build* time (Vite bakes
@@ -152,6 +149,21 @@ services:
       SENTRY_DSN:         ${SENTRY_DSN:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
       SENTRY_RELEASE:     ${SENTRY_RELEASE:-}
+
+      # Native ABI transport (CBP MQIPT). Default 'mock'; a VM flips to
+      # 'mqipt' via .env once the mq-bridge sidecar runs (COMPOSE_PROFILES=mqipt).
+      # CBP_ENVIRONMENT declares which CBP system this VM talks to and is
+      # required with mqipt: staging = CERT (QGC1), production = PROD (QGP2).
+      # The server refuses to boot without it and refuses to send through a
+      # bridge on the other environment's queue manager.
+      ABI_TRANSPORT:      ${ABI_TRANSPORT:-mock}
+      CBP_ENVIRONMENT:    ${CBP_ENVIRONMENT:-}
+      # Our ABI transmitter identity for the batch A record (CBP-issued secrets).
+      CBP_SENDER_SITE:     ${CBP_SENDER_SITE:-}
+      CBP_SENDER_ID:       ${CBP_SENDER_ID:-}
+      CBP_SENDER_PASSWORD: ${CBP_SENDER_PASSWORD:-}
+      MQIPT_BRIDGE_URL:   ${MQIPT_BRIDGE_URL:-http://mq-bridge:8080}
+      MQIPT_BRIDGE_TOKEN: ${MQIPT_BRIDGE_TOKEN:-}
     volumes:
       - uploads_data:/app/uploads
     healthcheck:
@@ -196,6 +208,41 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+
+  # ── CBP MQIPT bridge (opt-in per VM via profile) ─────────
+  # The one process with IBM MQ client libs (glibc; can't live in the Alpine
+  # app image). Starts ONLY where COMPOSE_PROFILES=mqipt is set in .env.
+  # CBP_ENVIRONMENT (CERT|PROD) selects the queue manager and channel table
+  # (QGC1_SIGMATP.TAB / QGP2_SIGMATP.TAB) unless MQ_QMGR / MQCHLTAB are set,
+  # and the bridge refuses to start on a mismatch. No published ports: the
+  # server reaches it on the internal compose network. The CBP trade package
+  # (CCDT .TAB, CMS keystore, mqclient.ini) is DHS-restricted, lives at
+  # /opt/mycargolens/mqipt on the VM (scp'd, never in git), mounted read-only.
+  mq-bridge:
+    image: ghcr.io/ibrahimbenrayana/cargo-compliance-hub-mq-bridge:${MQ_BRIDGE_IMAGE_TAG:-latest}
+    container_name: mycargolens-mq-bridge
+    restart: unless-stopped
+    profiles: ["mqipt"]
+    environment:
+      PORT: 8080
+      MQ_BRIDGE_TOKEN: ${MQIPT_BRIDGE_TOKEN:-}
+      CBP_ENVIRONMENT:  ${CBP_ENVIRONMENT:-}
+      # Derived from CBP_ENVIRONMENT when empty; set only to override (checked).
+      MQ_QMGR:          ${MQ_QMGR:-}
+      MQ_SEND_QUEUE:    ${MQ_SEND_QUEUE:-ACS.BRK.INBOUND}
+      MQ_RECEIVE_QUEUE: ${MQ_RECEIVE_QUEUE:-ACS.BRK.1303S7P.OUTBOUND}
+      # CERT-proven framing: 80-byte records with no delimiter.
+      MQ_RECORD_DELIMITER: ${MQ_RECORD_DELIMITER:-none}
+      # CMS keystore path WITHOUT the .kdb extension (GSKit convention).
+      MQ_KEY_REPOSITORY: /opt/mqipt/sigmatp
+      # Standard IBM MQ client env: CCDT location + client ini (OCSP bypass).
+      MQCHLLIB: /opt/mqipt
+      MQCHLTAB: ${MQCHLTAB:-}
+      MQCLNTCF: /opt/mqipt/mqclient.ini
+    volumes:
+      - /opt/mycargolens/mqipt:/opt/mqipt:ro
+    cpus: '0.5'
+    mem_limit: 512m
 
 volumes:
   postgres_data:

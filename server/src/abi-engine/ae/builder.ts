@@ -12,10 +12,12 @@
  * Quantities carry their implied-decimal factor in the name.
  */
 import { writeRecord, RecordCodecError, type CodecIssue } from '../records/codec.js';
+import { buildPgaLine, type PgaLineInput } from '../pga/builder.js';
 import {
   INPUT_10,
   INPUT_11,
   INPUT_20,
+  INPUT_SE13,
   INPUT_21,
   INPUT_22,
   INPUT_23,
@@ -26,6 +28,12 @@ import {
   INPUT_34,
   INPUT_35,
   INPUT_36,
+  INPUT_SE30,
+  INPUT_SE35,
+  INPUT_SE36,
+  INPUT_SE50,
+  INPUT_SE55,
+  INPUT_SE56,
 } from './headerRecordDefs.js';
 import {
   INPUT_40,
@@ -85,7 +93,8 @@ export interface AeTariff {
   /** Article value, whole U.S. dollars. */
   valueDollars: number;
   /** UOM code 1 is mandatory per the HTS even when quantity 1 is not. */
-  uomCode1: string;
+  /** Omit entirely for zero-reporting-unit tariffs (CERT F441/F442). */
+  uomCode1?: string;
   /** Quantity 1 in hundredths (two implied decimals). */
   quantity1Hundredths?: number;
   uomCode2?: string;
@@ -116,6 +125,44 @@ export interface AeParty {
   /** M manufacturer/supplier, C delivered-to, S sold-to, E foreign exporter. */
   type: 'M' | 'C' | 'S' | 'E';
   identifier: string;
+}
+
+/**
+ * Certify-for-cargo-release contact (SE13, between the 20- and 21-Records;
+ * ESF-41). Spec-mandatory when Replace + certify; CERT's SX also demands it
+ * on an Add certify (live condition 11208 MISSING CONTACT INFO, 8/2026).
+ */
+export interface AeCertifyContact {
+  name: string;
+  phone: string;
+  /** Emits '1': a DIS submission supports the correction request (Note 1). */
+  disIndicator?: boolean;
+}
+
+export interface AeCargoEntityAddressComponent {
+  /** SE35 Note 1: 01 street number, 02 street name, 15 unstructured, … */
+  qualifier: string;
+  information: string;
+}
+
+/**
+ * Header Level Cargo Entity (SE30 [+SE35 ×≤3][+SE36]; ESF-58..64).
+ * Certify-only: the derived ACE Cargo Release mandates Seller (SE) and
+ * Buyer (BY). Name route requires SE35 + SE36; the identifier route
+ * (EI / ANI / 34, IOR-number formats) is allowed for BY and ST only.
+ */
+export interface AeCargoEntity {
+  /** CN, SE, BY, ST, LG, CS (+ GBI test SH/EX/DR/PK) — SE30 Note 1. */
+  code: string;
+  name?: string;
+  identifier?: { qualifier: 'EI' | 'ANI' | '34'; value: string };
+  addressComponents?: AeCargoEntityAddressComponent[];
+  geography?: {
+    city: string;
+    countrySubEntityCode?: string;
+    postalCode?: string;
+    countryCode: string;
+  };
 }
 
 export interface AeFee {
@@ -162,6 +209,14 @@ export interface AeLine {
   fees?: AeFee[];
   pscReasonCodes?: string[];
   censusOverrides?: { conditionCode: string; overrideCode: string }[];
+  /** PGA message-set data for the line (OI + PG records follow the 50s). */
+  pga?: PgaLineInput;
+  /**
+   * Line Level Cargo Entity Grouping (SE50 [+SE55][+SE56]) — certify-only
+   * entities the derived release needs that the summary does not
+   * (MF/SE/CS/LG by name; BY/ST may use the identifier route).
+   */
+  cargoEntities?: AeCargoEntity[];
 }
 
 export interface AeEntrySummaryInput {
@@ -177,6 +232,8 @@ export interface AeEntrySummaryInput {
   /** Present = bond waived ('0' indicator), with optional reason (AE Table 4). */
   bondWaiver?: { reasonCode?: string };
   cargoReleaseCertification?: boolean;
+  /** SE13 contact — only with cargoReleaseCertification (ESF-41). */
+  certifyContact?: AeCertifyContact;
   indicators?: {
     electronicInvoice?: boolean;
     consolidatedSummary?: boolean;
@@ -234,6 +291,11 @@ export interface AeEntrySummaryInput {
   /** Up to two header-level fees (311/496/500). */
   headerFees?: AeFee[];
   psc?: { headerReasonCodes: string[]; explanationLines: string[] };
+  /**
+   * Header Level Cargo Entity Grouping (≤12) — the last header grouping
+   * before the lines; only with cargoReleaseCertification (ESF-58).
+   */
+  cargoEntities?: AeCargoEntity[];
   lines?: AeLine[];
   adCvdTotals?: {
     bondedAdCents?: number;
@@ -283,6 +345,10 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
+// Bills lead, in-bond references trail — three live F187s (8/27) ruled out
+// the printed I-first reading; M/H/S then I is the wire truth being tested.
+// In-bond (I) components lead, bills follow — Karl's accepted 011 wire
+// (9/2) emits 23I before 23M.
 const BILL_ORDER: Record<AeManifestBill['type'], number> = { I: 0, M: 1, H: 2, S: 3 };
 
 // ── Builder ────────────────────────────────────────────────
@@ -363,6 +429,24 @@ export function buildEntrySummary(input: AeEntrySummaryInput): string[] {
         inBondInTransitDate: input.cargo.inBondDate,
       })
     );
+  }
+
+  // SE13 sits between the 20- and 21-Records (ES header structure map,
+  // ESF-21). Spec-mandatory when Replace + certify (ESF-41); CERT's SX
+  // also wants it on an Add certify (11208 MISSING CONTACT INFO, live).
+  if (input.certifyContact) {
+    if (!input.cargoReleaseCertification) {
+      fail('certifyContact', 'the SE13 contact is only transmitted when certifying for cargo release (ESF-41)');
+    }
+    lines.push(
+      writeRecord(INPUT_SE13, {
+        contactName: input.certifyContact.name,
+        contactPhone: input.certifyContact.phone,
+        disIndicator: input.certifyContact.disIndicator ? '1' : undefined,
+      })
+    );
+  } else if (input.action === 'R' && input.cargoReleaseCertification) {
+    fail('certifyContact', 'the SE13 contact detail is mandatory on a Replace that certifies for cargo release (ESF-41)');
   }
 
   if (input.tripIdentifier) {
@@ -459,6 +543,70 @@ export function buildEntrySummary(input: AeEntrySummaryInput): string[] {
     }
   }
 
+  // Header Level Cargo Entity Grouping (SE30 [+SE35 ×≤3][+SE36]) — the
+  // last header grouping before the lines (ES header structure map,
+  // ESF-22). Certify-only: the derived ACE Cargo Release mandates Seller
+  // (SE, name+address) and Buyer (BY, name+address or an EI/ANI/34
+  // identifier) at the header or line level (ESF-58).
+  const cargoEntities = input.cargoEntities ?? [];
+  if (cargoEntities.length > 0 && !input.cargoReleaseCertification) {
+    fail('cargoEntities', 'header cargo entities are only transmitted when certifying for cargo release (ESF-58)');
+  }
+  if (cargoEntities.length > 12) {
+    fail('cargoEntities', 'at most 12 header cargo entities (ES header structure map, ESF-22)');
+  }
+  const seenEntityCodes = new Set<string>();
+  cargoEntities.forEach((entity, i) => {
+    const at = `cargoEntities[${i}]`;
+    if (seenEntityCodes.has(entity.code)) {
+      fail(at, `each Entity Code may be reported at most once at the header level; ${entity.code} repeats (ESF-58)`);
+    }
+    seenEntityCodes.add(entity.code);
+    const hasName = entity.name !== undefined;
+    if (hasName === (entity.identifier !== undefined)) {
+      fail(at, 'provide either an Entity Name or an Entity Identifier, never both (ESF-63)');
+    }
+    if (entity.identifier && entity.code !== 'BY' && entity.code !== 'ST') {
+      fail(at, 'an Entity Identifier may only be used with Entity Codes BY or ST (SE30 Note 2)');
+    }
+    lines.push(
+      writeRecord(INPUT_SE30, {
+        entityCode: entity.code,
+        entityName: entity.name,
+        entityIdentifierQualifier: entity.identifier?.qualifier,
+        entityIdentifier: entity.identifier?.value,
+      })
+    );
+    if (hasName) {
+      const components = entity.addressComponents ?? [];
+      if (components.length === 0 || !entity.geography) {
+        fail(at, 'the SE35 address and SE36 city/country records are mandatory when an Entity Name is reported (ESF-63/64)');
+      }
+      if (components.length > 6) {
+        fail(at, 'at most 3 SE35 records (6 address components) per entity (ES header structure map, ESF-22)');
+      }
+      for (const pair of chunk(components, 2)) {
+        lines.push(
+          writeRecord(INPUT_SE35, {
+            addressComponentQualifier1: pair[0].qualifier,
+            addressInformation1: pair[0].information,
+            addressComponentQualifier2: pair[1]?.qualifier,
+            addressInformation2: pair[1]?.information,
+          })
+        );
+      }
+      const geo = entity.geography!;
+      lines.push(
+        writeRecord(INPUT_SE36, {
+          cityName: geo.city,
+          countrySubEntityCode: geo.countrySubEntityCode,
+          postalCode: geo.postalCode,
+          countryCode: geo.countryCode,
+        })
+      );
+    }
+  });
+
   const summaryLines = input.lines ?? [];
   if (summaryLines.length === 0) {
     fail('lines', 'at least one line item is mandatory on Add/Replace');
@@ -516,6 +664,57 @@ export function buildEntrySummary(input: AeEntrySummaryInput): string[] {
       );
     }
 
+    // Line Level Cargo Entity Grouping (SE50/SE55/SE56) — certify-only
+    // (live SE90 11038 MISSING MANUFACTURER, 9/17): mirrors the header
+    // grouping at line scope.
+    const lineEntities = line.cargoEntities ?? [];
+    if (lineEntities.length > 0 && !input.cargoReleaseCertification) {
+      fail(`lines[${index}].cargoEntities`, 'line cargo entities are only transmitted when certifying for cargo release');
+    }
+    lineEntities.forEach((entity, ei) => {
+      const eAt = `lines[${index}].cargoEntities[${ei}]`;
+      const hasName = entity.name !== undefined;
+      if (hasName === (entity.identifier !== undefined)) {
+        fail(eAt, 'provide either an Entity Name or an Entity Identifier, never both');
+      }
+      if (entity.identifier && entity.code !== 'BY' && entity.code !== 'ST') {
+        fail(eAt, 'an Entity Identifier may only be used with Entity Codes BY or ST (SE50 note)');
+      }
+      lines.push(
+        writeRecord(INPUT_SE50, {
+          entityCode: entity.code,
+          entityName: entity.name,
+          entityIdentifierQualifier: entity.identifier?.qualifier,
+          entityIdentifier: entity.identifier?.value,
+        })
+      );
+      if (hasName) {
+        const components = entity.addressComponents ?? [];
+        if (components.length === 0 || !entity.geography) {
+          fail(eAt, 'the SE55 address and SE56 city/country records are mandatory when an Entity Name is reported');
+        }
+        for (const pair of chunk(components, 2)) {
+          lines.push(
+            writeRecord(INPUT_SE55, {
+              addressComponentQualifier1: pair[0].qualifier,
+              addressInformation1: pair[0].information,
+              addressComponentQualifier2: pair[1]?.qualifier,
+              addressInformation2: pair[1]?.information,
+            })
+          );
+        }
+        const geo = entity.geography!;
+        lines.push(
+          writeRecord(INPUT_SE56, {
+            cityName: geo.city,
+            countrySubEntityCode: geo.countrySubEntityCode,
+            postalCode: geo.postalCode,
+            countryCode: geo.countryCode,
+          })
+        );
+      }
+    });
+
     if (line.tariffs.length === 0) {
       fail(`lines[${index}].tariffs`, 'the tariff grouping is mandatory for a line item');
     }
@@ -533,6 +732,12 @@ export function buildEntrySummary(input: AeEntrySummaryInput): string[] {
           uomCode3: tariff.uomCode3,
         })
       );
+    }
+
+    // PGA message set attaches directly after the 50-records (MS p.13:
+    // "AE Entry Summary \u2192 50-record then PGA set").
+    if (line.pga) {
+      lines.push(...buildPgaLine(line.pga));
     }
 
     if (line.visaNumber) {

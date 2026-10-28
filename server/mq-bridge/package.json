@@ -1,0 +1,17 @@
+{
+  "name": "mycargolens-mq-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CBP MQIPT sidecar — owns the IBM MQ client binding (glibc-only, can't live in the Alpine app image). Exposes a minimal internal HTTP API consumed by the server's MqiptTransport.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ibmmq": "2.1.9"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}

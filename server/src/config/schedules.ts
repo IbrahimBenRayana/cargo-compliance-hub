@@ -28,8 +28,14 @@ export const CRON = {
   /** Every 5 min at :02 offset — sweep SENT ABI documents for CBP responses.
    *  Offset from STATUS_POLL so the two CC sweeps don't burst together. */
   ABI_STATUS_POLL: '2-57/5 * * * *',
+  /** Every minute: pull CBP responses off the MQ queue (store, ack, dispatch). */
+  CBP_INBOUND: '* * * * *',
+  /** Every 5 min at :04 offset: flag transmissions CBP hasn't answered (BUG-022). */
+  CBP_NO_ANSWER: '4-59/5 * * * *',
   /** Hourly at :15 — retry per-shipment charges that failed (delinquent orgs). */
   CHARGE_RETRY: '15 * * * *',
+  /** Every 10 minutes — retry failed marketing-lead notifications. */
+  LEAD_NOTIFY_RETRY: '*/10 * * * *',
 } as const;
 
 /**

@@ -1,0 +1,5 @@
+ALA  MCLPASSWD           CJ                                                     
+B  2704ZZZCJ                                               SCENARIO 021         
+CJ12704            ZZZ  00000201                                                
+Y  2704ZZZCJ                                                                    
+ZLA  MCL                                                                        

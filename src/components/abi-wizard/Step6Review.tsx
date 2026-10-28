@@ -6,11 +6,19 @@
  * full Zod schema at transmit time). The parent wizard reads validation via
  * the exported `validateAbiDraft` helper to gate the Transmit button.
  */
-import { CheckCircle2, AlertCircle, FileCheck, Package, Receipt, Scale } from 'lucide-react';
-import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
+import {
+  CheckCircle2, AlertCircle, FileCheck, Package, Receipt, Scale, Users,
+  Landmark, Loader2, RefreshCw,
+} from 'lucide-react';
+import type { ABIDocumentDraft, AbiDocument, DutyEstimateResult } from '@/api/client';
+import { useDutyEstimate } from '@/hooks/useAbiDocument';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { SectionHeader } from './shared';
+import { CbpPreflightCard } from './CbpPreflightCard';
+import { needsForeignPortOfLading } from './validators';
 
 export interface ValidationResult {
   valid: boolean;
@@ -44,12 +52,19 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
 
   if (!draft.bond?.type) missing.push('Bond Type');
   if (!draft.bond?.suretyCode) missing.push('Bond Surety Code');
+  if (draft.bond?.type === '9' && !draft.bond.stbAmount) missing.push('Single Transaction Bond Amount');
   if (!draft.bond?.taxId) missing.push('Bond Tax ID');
 
   if (draft.payment?.typeCode === undefined || draft.payment?.typeCode === null) {
     missing.push('Payment Type');
   }
-  if (!draft.payment?.preliminaryStatementDate) {
+  const paymentType = draft.payment?.typeCode;
+  const statement = paymentType !== undefined && paymentType !== null && paymentType !== 1;
+  const monthly = paymentType === 6 || paymentType === 7 || paymentType === 8;
+  if (monthly && !draft.payment?.periodicStatementMonth) missing.push('Statement Month');
+  if (!statement) {
+    // Individual payment (type 1): no statement fields.
+  } else if (!draft.payment?.preliminaryStatementDate) {
     missing.push('Preliminary Statement Date');
   } else if (
     draft.dates?.entryDate &&
@@ -86,6 +101,7 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
     if (!m.bill?.hBOL) missing.push('House BOL (use Master BOL value if no separate house bill)');
     if (!m.carrier?.code) missing.push('Carrier SCAC');
     if (!m.ports?.portOfUnlading) missing.push('Port of Unlading');
+    if (!m.ports?.foreignPortOfLading && needsForeignPortOfLading(draft)) missing.push('Foreign Port of Lading');
     if (!m.quantity) missing.push('Manifest Quantity');
     if (!m.quantityUOM) {
       missing.push('Manifest Quantity UOM');
@@ -161,6 +177,10 @@ export default function Step6Review({ value, doc }: Props) {
 
   const invoiceCount = invoices.length;
   const itemCount = invoices.reduce((sum, inv) => sum + (inv?.items?.length ?? 0), 0);
+  // Declared related-party transactions get called out below — CBP treats
+  // this as a valuation-review flag, so a filer should see it before
+  // transmitting rather than discover it in a CF28.
+  const relatedInvoices = invoices.filter((inv) => inv?.relatedParties === 'Y');
 
   // Total declared value in USD (exchange rate applied per invoice).
   const totalValueUSD = invoices.reduce((sum, inv) => {
@@ -189,6 +209,7 @@ export default function Step6Review({ value, doc }: Props) {
         title="Review & transmit"
         description="Verify the summary below, then save as draft or transmit to CBP."
       />
+      {doc?.id && <CbpPreflightCard docId={doc.id} />}
 
       {/* Totals grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -227,6 +248,27 @@ export default function Step6Review({ value, doc }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Related-party declaration — a valuation-review flag worth seeing */}
+      {relatedInvoices.length > 0 && (
+        <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-4 flex items-start gap-3">
+          <Users className="h-5 w-5 text-sky-600 dark:text-sky-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">
+              Related-party transaction declared
+              {invoiceCount > 1 && ` on ${relatedInvoices.length} of ${invoiceCount} invoices`}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              You&apos;ve declared that buyer and seller are related under 19 CFR
+              152.102(g). CBP may review whether the transaction value is
+              acceptable — keep your transfer-pricing support on file.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Estimated duties & fees — the number a filer signs for */}
+      <DutyEstimateCard docId={doc?.id} />
 
       {/* Validation block */}
       {validation.valid ? (
@@ -375,6 +417,181 @@ export default function Step6Review({ value, doc }: Props) {
           Draft ID {doc.id.slice(0, 8)}…
         </p>
       )}
+    </div>
+  );
+}
+
+// ─── Estimated duties & fees ─────────────────────────────────────────
+//
+// Priced server-side on the native engine (same math a native transmit
+// would carry) from the last SAVED payload. Autosave invalidation keeps
+// it current; the refresh button covers "I don't trust it" moments.
+
+const fmtCents = (cents: number) =>
+  (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+
+/** Humanize a dot-path issue field ("manifest.0.invoices.0.items.1.htsNumber"). */
+function humanizeIssueField(field: string): string {
+  if (!field) return 'Draft';
+  return field
+    .split('.')
+    .map((seg) => (/^\d+$/.test(seg) ? `#${Number(seg) + 1}` : seg
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/^./, (c) => c.toUpperCase())))
+    .join(' › ');
+}
+
+function DutyEstimateCard({ docId }: { docId?: string }) {
+  const estimate = useDutyEstimate(docId);
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Landmark className="h-4 w-4 text-primary" />
+            <h4 className="text-sm font-semibold">Estimated duties &amp; fees</h4>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => estimate.refetch()}
+            disabled={!docId || estimate.isFetching}
+          >
+            {estimate.isFetching ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            <span className="ml-1.5">Recalculate</span>
+          </Button>
+        </div>
+
+        {!docId || estimate.isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-8 w-40" />
+          </div>
+        ) : estimate.isError ? (
+          <p className="text-xs text-muted-foreground">
+            Couldn&apos;t reach the duty engine. Use Recalculate to retry.
+          </p>
+        ) : estimate.data ? (
+          <DutyEstimateBody result={estimate.data} />
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** 99038803 -> 9903.88.03; 8507600030 -> 8507.60.0030. */
+function fmtHtsNumber(n: string): string {
+  return `${n.slice(0, 4)}.${n.slice(4, 6)}.${n.slice(6)}`;
+}
+
+function DutyEstimateBody({ result }: { result: DutyEstimateResult }) {
+  // Explicit comparison: the app tsconfig runs non-strict, where truthiness
+  // checks don't narrow boolean-literal discriminants.
+  if (result.estimable === false) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">
+          Not enough of the filing is complete to price it yet. Duties and fees
+          will appear once these are resolved:
+        </p>
+        <ul className="flex flex-wrap gap-1.5">
+          {result.issues.slice(0, 12).map((issue, i) => (
+            <li key={`${issue.field}-${i}`}>
+              <Badge
+                variant="outline"
+                className="text-xs font-normal"
+                title={issue.message}
+              >
+                {humanizeIssueField(issue.field)}
+              </Badge>
+            </li>
+          ))}
+          {result.issues.length > 12 && (
+            <Badge variant="outline" className="text-xs font-normal">
+              +{result.issues.length - 12} more
+            </Badge>
+          )}
+        </ul>
+      </div>
+    );
+  }
+
+  const { totals } = result;
+  // Fee classes beyond MPF/HMF (informal 311, mail 496…) shown by label.
+  const otherFees = totals.fees.filter(
+    (f) => f.classCode !== '499' && f.classCode !== '501',
+  );
+
+  return (
+    <div className="space-y-3">
+      <dl className="space-y-1.5 text-sm">
+        <div className="flex items-center justify-between">
+          <dt className="text-muted-foreground">Duty</dt>
+          <dd className="font-medium tabular-nums">{fmtCents(totals.dutyCents)}</dd>
+        </div>
+        {totals.mpfCents > 0 && (
+          <div className="flex items-center justify-between">
+            <dt className="text-muted-foreground">Merchandise Processing Fee</dt>
+            <dd className="font-medium tabular-nums">{fmtCents(totals.mpfCents)}</dd>
+          </div>
+        )}
+        {totals.hmfCents > 0 && (
+          <div className="flex items-center justify-between">
+            <dt className="text-muted-foreground">Harbor Maintenance Fee</dt>
+            <dd className="font-medium tabular-nums">{fmtCents(totals.hmfCents)}</dd>
+          </div>
+        )}
+        {otherFees.map((fee) => (
+          <div key={fee.classCode} className="flex items-center justify-between">
+            <dt className="text-muted-foreground">{fee.label}</dt>
+            <dd className="font-medium tabular-nums">{fmtCents(fee.amountCents)}</dd>
+          </div>
+        ))}
+        {totals.adCvdCents > 0 && (
+          <div className="flex items-center justify-between">
+            <dt className="text-muted-foreground">AD/CVD deposits</dt>
+            <dd className="font-medium tabular-nums">{fmtCents(totals.adCvdCents)}</dd>
+          </div>
+        )}
+      </dl>
+      {result.lines.some((l) => l.tariffs.length > 1) && (
+        <details className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Duty by line and tariff number</summary>
+          <ul className="mt-2 space-y-2">
+            {result.lines.map((line) => (
+              <li key={line.lineNumber}>
+                <div className="text-xs text-muted-foreground">Line {line.lineNumber}</div>
+                <dl className="mt-0.5 space-y-0.5">
+                  {line.tariffs.map((t) => (
+                    <div key={t.htsNumber} className="flex items-center justify-between gap-3">
+                      <dt className="font-mono text-xs">{fmtHtsNumber(t.htsNumber)}</dt>
+                      <dd className="tabular-nums text-xs">{fmtCents(t.dutyCents)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <div className="flex items-baseline justify-between border-t pt-2">
+        <span className="text-sm font-semibold">Estimated total</span>
+        <span className="text-2xl font-bold tabular-nums">
+          {fmtCents(totals.totalCents)}
+        </span>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Estimate priced by the MyCargoLens duty engine from current USITC rates
+        (CBP assesses the final amounts at liquidation). Rate date:{' '}
+        {fmtDate(result.applicabilityDate)}.
+      </p>
     </div>
   );
 }

@@ -7,6 +7,8 @@
  * Covers CREATE (createAbiDocumentForOrg) and SEND (sendAbiDocumentToCBP).
  * The send path's polling subsystem lives in ./abiPolling.ts.
  */
+import { transmitEntryNative } from './cbp/nativeEntry.js';
+import { checkEntryFiler, loadOrgCbpConfig } from './cbp/filerIdentity.js';
 import type { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { abiGateway } from './abi/gateway.js';
@@ -16,6 +18,7 @@ import {
   extractDenormFromPayload,
   extractCCErrorMessage,
   mapABIDocumentToCC,
+  hasNativeOnlyData,
   buildSendPayload,
   canonicaliseEntryNumber,
 } from './abiDocumentMapper.js';
@@ -24,6 +27,7 @@ import { createABIDocumentSchema, abiDocumentBodySchema } from '../schemas/abiDo
 import { writeAuditLog } from './auditLog.js';
 import { notify } from './notifications.js';
 import { getOrgEntitlements } from './entitlements.js';
+import { captureNativeShadow } from './abiShadow.js';
 import { pollABIDocumentStatus } from './abiPolling.js';
 import { emitWebhook } from './webhooks.js';
 import logger from '../config/logger.js';
@@ -98,6 +102,25 @@ export async function createAbiDocumentForOrg(params: {
 
 type AuditMeta = Record<string, unknown>;
 
+type EntryEditState = { status: string; lastTransmissionId: string | null; pendingAction: string | null; cbpState: string };
+
+/** A native entry CBP rejected, with nothing pending: correct it and resend. */
+export function isNativeResendable(doc: EntryEditState): boolean {
+  return doc.status === 'REJECTED' && doc.lastTransmissionId !== null && doc.pendingAction === null && doc.cbpState !== 'ON_FILE';
+}
+
+/**
+ * Whether the entry's data may be edited: any draft; a native entry CBP
+ * rejected (to resend it); or a native entry CBP holds, to send a
+ * replacement. Never while CBP's answer is pending.
+ */
+export function isEntryEditable(doc: EntryEditState): boolean {
+  if (doc.pendingAction) return false;
+  if (doc.status === 'DRAFT') return true;
+  if (doc.lastTransmissionId === null) return false;
+  return isNativeResendable(doc) || doc.cbpState === 'ON_FILE';
+}
+
 // ─── Send (transmit) an ABI Entry to CBP ───────────────────
 // Two-step CC flow (create document → send), with atomic DRAFT→SENDING claim,
 // duplicate cleanup-and-retry, billing on success, fire-and-forget polling, and
@@ -115,12 +138,37 @@ export async function sendAbiDocumentToCBP(params: {
     return { httpStatus: 404, body: { error: 'ABI document not found' } };
   }
 
+  // A native entry CBP rejected is corrected and sent again under the same
+  // entry number (audit FNA-12).
+  const nativeResend = isNativeResendable(doc);
   // Idempotency — already transmitted / in-flight → return current state.
-  if (doc.status === 'SENDING' || doc.status === 'SENT' || doc.status === 'ACCEPTED' || doc.status === 'REJECTED') {
+  if (!nativeResend && (doc.status === 'SENDING' || doc.status === 'SENT' || doc.status === 'ACCEPTED' || doc.status === 'REJECTED')) {
     return { httpStatus: 200, body: { data: doc, note: `Already in status ${doc.status}` } };
   }
-  if (doc.status !== 'DRAFT') {
+  if (doc.status !== 'DRAFT' && !nativeResend) {
     return { httpStatus: 400, body: { error: `Cannot send document in status ${doc.status}` } };
+  }
+
+  // CBP suspended de minimis (Section 321 / Type 86) on 2025-08-29 under
+  // EO 14324 and made it indefinite by interim final rule on 2026-06-24;
+  // ACE rejects every Type 86. Low-value shipments need a formal (01) or
+  // informal (11) entry.
+  if (doc.entryType === '86') {
+    return {
+      httpStatus: 422,
+      body: {
+        error: 'CBP no longer accepts Type 86 (de minimis) entries. File this shipment as a formal (01) or informal (11) entry.',
+        code: 'entry_type_suspended',
+      },
+    };
+  }
+
+  // Filer identity (audit BNA-01): the entry number must carry this org's
+  // own filer code (from its CBP setup, never S7P or another org's code),
+  // a valid check digit, and an approved service-center queue.
+  const filerCheck = checkEntryFiler(await loadOrgCbpConfig(orgId), String((doc.payload as { entryNumber?: unknown } | null)?.entryNumber ?? ''));
+  if (!filerCheck.ok) {
+    return { httpStatus: 422, body: { error: filerCheck.message, code: filerCheck.code } };
   }
 
   // Full payload validation (deep) before we touch CC.
@@ -140,6 +188,14 @@ export async function sendAbiDocumentToCBP(params: {
         : { error: 'Add a payment method to submit entries.', code: 'card_required', upgradeUrl: '/settings?tab=billing' },
     };
   }
+  // Entries have no public price (pricing v2): each org's entry prices are set
+  // by MyCargoLens. Until they are, an accepted entry would go unbilled.
+  if (!ent.entryPricingSet) {
+    return {
+      httpStatus: 402,
+      body: { error: 'Entry pricing has not been set up for your account yet. Contact us to start filing entries.', code: 'entry_pricing_required' },
+    };
+  }
 
   const denorm = extractDenormFromPayload(doc.payload);
   if (!denorm.mbolNumber) {
@@ -147,6 +203,27 @@ export async function sendAbiDocumentToCBP(params: {
   }
   if (!denorm.entryNumber) {
     return { httpStatus: 400, body: { error: 'ABI document payload is missing filer-assigned entry number' } };
+  }
+
+  // Native gateway (the default): our own certified engine. CustomsCity
+  // remains only as a per-org fallback (OrgCbpConfig.gateway = 'CC').
+  if (((await loadOrgCbpConfig(orgId))?.gateway ?? 'NATIVE') === 'NATIVE') {
+    // Keep the list columns (entry number, MBOL, ports) in step with the payload.
+    await prisma.abiDocument.updateMany({ where: { id: doc.id, status: doc.status }, data: denorm });
+    const native = await transmitEntryNative({ docId: doc.id, orgId, userId, action: 'ADD' });
+    if (native.httpStatus >= 300) return { httpStatus: native.httpStatus, body: native.body };
+    const updated = await prisma.abiDocument.findUnique({ where: { id: doc.id } });
+    emitWebhook(orgId, 'entry.sent', { abiDocumentId: doc.id, entryNumber: doc.entryNumber, entryType: doc.entryType, mbolNumber: doc.mbolNumber });
+    return { httpStatus: 200, body: { data: updated, native: native.body } };
+  }
+
+  // CustomsCity has no fields for ch.99 numbers, trade program claims or
+  // AD/CVD cases, so they would silently not reach CBP (audit MHT-06).
+  if (hasNativeOnlyData(bodyResult.data)) {
+    return {
+      httpStatus: 422,
+      body: { error: 'The legacy filing route cannot carry Chapter 99, trade program or AD/CVD claims. Transmit this entry through the native engine.', code: 'NATIVE_ONLY_DATA' },
+    };
   }
 
   // Atomic DRAFT→SENDING (single UPDATE with a status predicate — exactly one
@@ -255,6 +332,11 @@ export async function sendAbiDocumentToCBP(params: {
       where: { id: postCreateDoc.id },
       data: { status: 'SENT' },
     });
+
+    // Phase-5 parallel-run evidence: generate the native CATAIR equivalent
+    // of what was just filed through CC. Fire-and-forget — a shadow failure
+    // is recorded on the document, never surfaced to this flow.
+    captureNativeShadow(sentDoc.id).catch(() => { /* recorded internally */ });
 
     writeAuditLog({
       orgId, userId,

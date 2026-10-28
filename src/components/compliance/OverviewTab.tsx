@@ -167,9 +167,9 @@ function HealthBriefCard({
           <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-amber-700 dark:text-amber-400 mb-0.5">
             Today's brief
             {isAi ? (
-              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 normal-case tracking-normal">· AI-generated</span>
+              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 normal-case tracking-normal">· AI-generated</span>
             ) : (
-              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 normal-case tracking-normal">· rules-based</span>
+              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 normal-case tracking-normal">· rules-based</span>
             )}
           </div>
           <p className="text-[13.5px] text-slate-800 dark:text-slate-100 leading-relaxed truncate sm:whitespace-normal">
@@ -284,7 +284,7 @@ function ScoreHero({ data }: { data: ActionQueueResponse }) {
             >
               {data.score === null ? '—' : display}
             </span>
-            <span className="text-[20px] font-medium text-slate-400 dark:text-slate-500 tabular-nums">
+            <span className="text-[20px] font-medium text-slate-500 dark:text-slate-400 tabular-nums">
               / 100
             </span>
           </div>

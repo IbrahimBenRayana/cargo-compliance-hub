@@ -1,0 +1,1 @@
+F ScenarioValidation.lines[0].countryOfOrigin: imports originating in 'CU' are embargoed (OFAC 31 CFR 510/515) — transmission refused

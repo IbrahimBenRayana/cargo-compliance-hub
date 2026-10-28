@@ -346,7 +346,7 @@ export default function ManifestQueryPage() {
             <div className="sm:w-44 space-y-1.5">
               <Label className="text-xs font-medium">BOL Type</Label>
               <Select value={bolType} onValueChange={(v) => setBolType(v as 'BOLNUMBER' | 'AWBNUMBER')}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="BOL type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

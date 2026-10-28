@@ -1,124 +1,106 @@
-// ─── Per-Filing Pricing: Tiers & Capabilities ───────────────────────────────
+// ─── Plans: capability bundles + the self-serve ISF price ───────────────────
 //
-// SINGLE SOURCE OF TRUTH for the pricing model. The seed (prisma/seed.ts), the
-// billing routes, and the capability middleware all import from here. The app
-// (src/lib/planMeta.ts) and the landing site mirror these numbers — keep them
-// in sync when editing.
+// SINGLE SOURCE OF TRUTH for the plan catalogue. planSync copies TIERS into the
+// DB `plans` table on boot; the app (src/lib/planMeta.ts) mirrors the public
+// numbers — keep them in sync when editing.
 //
-// Model: there is NO monthly subscription fee. A customer subscribes to ONE
-// tier; the tier sets (a) the per-shipment rate billed via Stripe metered
-// billing and (b) which product capabilities are unlocked. Billing is keyed on
-// the Filing record (which IS the shipment): the first successful CBP
-// submission on a filing — the ISF submit OR a linked ABI Entry send — reports
-// exactly one metered event at the tier's rate. Re-submits/amendments never
-// re-charge (idempotent on filingId; rate locked at first-bill time).
-
-import { env } from './env.js';
+// Pricing v2 ("price for proof", Oct 2026):
+//   • There is no monthly subscription fee on the public card. A shipment is
+//     charged when CBP ACCEPTS it (never on submission, never when rejected),
+//     by an off-session card charge (services/shipmentBilling.ts).
+//   • The price follows WHAT WAS FILED, not the plan: an accepted ISF bills the
+//     org's ISF price; an accepted entry bills the org's entry price (linked to
+//     an ISF, or entry-only). See services/pricing.ts.
+//   • ISF is the only self-serve price: $45 per accepted ISF.
+//   • Entries have no public price ("talk to us"). They are priced per org by
+//     a platform admin in /admin, on the private `entry` plan.
+//   • Per-org overrides live on the org's Subscription row, so planSync (which
+//     rewrites these defaults on every boot) never touches a negotiated price.
+//
+// Retired: `full` (Complete, $280) and `entry` as a $180 public tier. Orgs on
+// them were moved by migration z_billing_v2_charge_integrity.
 
 // ─── Capabilities ───────────────────────────────────────────
-// The four gateable product surfaces. ISF_FILING is the base capability every
-// paid tier has. NOTE: HTS_CLASSIFICATION gates the *dedicated* classification
-// tooling (AI classify, the Classification tab, the Duty Calculator) — NOT the
-// HTSAutocomplete used to enter a 6-digit code while filing an ISF, which every
-// tier needs to produce a valid ISF-10.
+// The gateable product surfaces. ISF_FILING is the base capability every plan
+// has. HTS_CLASSIFICATION gates the dedicated classification tooling (the Duty
+// Calculator); HTS suggestions are on every plan (founder decision, Oct 2026),
+// so every plan carries it.
 export const CAPABILITIES = {
   ISF_FILING: 'ISF_FILING',
   ABI_ENTRY: 'ABI_ENTRY',
   CONTAINER_TRACKING: 'CONTAINER_TRACKING',
   HTS_CLASSIFICATION: 'HTS_CLASSIFICATION',
+  // Native in-bond (7512) movements — admin-assigned plans only.
+  IN_BOND: 'IN_BOND',
 } as const;
 
 export type Capability = (typeof CAPABILITIES)[keyof typeof CAPABILITIES];
 
-// ─── Tier definitions ───────────────────────────────────────
+// ─── Plan definitions ───────────────────────────────────────
 export interface TierDef {
-  /** Plan row id / Stripe metadata `planId`. */
+  /** Plan row id. */
   id: string;
   /** Display name. */
   name: string;
   description: string;
-  /** Per-shipment rate in cents (the metered Price unit_amount). */
+  /** Default price (cents) of one accepted ISF. An org's own price overrides it. */
   perFilingCents: number;
   /** Unlocked product surfaces. */
   capabilities: Capability[];
-  /** Resolves the Stripe metered Price id from env (null until bootstrapped). */
-  stripePriceId: () => string | null;
-  /** Shown in the public pricing UI (false = private/contact-sales). */
+  /** Self-selectable in the app (false = assigned by a platform admin). */
   isPublic: boolean;
   sortOrder: number;
   /** Marketing bullet keys for the pricing/upgrade UI. */
   features: string[];
 }
 
+const ALL_CAPABILITIES: Capability[] = [
+  CAPABILITIES.ISF_FILING,
+  CAPABILITIES.ABI_ENTRY,
+  CAPABILITIES.CONTAINER_TRACKING,
+  CAPABILITIES.HTS_CLASSIFICATION,
+  CAPABILITIES.IN_BOND,
+];
+
 export const TIERS: TierDef[] = [
   {
     id: 'isf',
     name: 'ISF Filing',
-    description: 'File ISF-10 / ISF-5 security filings. Pay only when you file.',
-    perFilingCents: 4500, // $45 / shipment
-    capabilities: [CAPABILITIES.ISF_FILING],
-    stripePriceId: () => env.STRIPE_PRICE_ISF || null,
+    description: 'File ISF-10 / ISF-5 security filings. Pay only when CBP accepts.',
+    perFilingCents: 4500, // $45 per accepted ISF
+    capabilities: [CAPABILITIES.ISF_FILING, CAPABILITIES.HTS_CLASSIFICATION],
     isPublic: true,
     sortOrder: 1,
-    features: ['isf_10_2', 'isf_5', 'templates', 'manifest_query', 'email_support'],
+    features: ['isf_10_2', 'isf_5', 'templates', 'manifest_query', 'hts_suggestions', 'email_support'],
   },
   {
     id: 'entry',
     name: 'ISF + Entry',
-    description: 'Everything in ISF Filing, plus ABI Entry Summary (7501/3461).',
-    perFilingCents: 18000, // $180 / shipment
-    capabilities: [CAPABILITIES.ISF_FILING, CAPABILITIES.ABI_ENTRY],
-    stripePriceId: () => env.STRIPE_PRICE_ENTRY || null,
-    isPublic: true,
+    description: 'ISF plus customs entries (7501/3461). Entry pricing is set per account.',
+    perFilingCents: 4500, // ISF price; entry prices are per org (Subscription)
+    capabilities: ALL_CAPABILITIES,
+    isPublic: false,
     sortOrder: 2,
-    features: ['everything_in_isf', 'abi_entry_7501', 'abi_entry_3461', 'cargo_release', 'chat_support'],
-  },
-  {
-    id: 'full',
-    name: 'Complete',
-    description: 'The full suite: ISF, ABI Entry, container tracking, and HTS classification.',
-    perFilingCents: 28000, // $280 / shipment
-    capabilities: [
-      CAPABILITIES.ISF_FILING,
-      CAPABILITIES.ABI_ENTRY,
-      CAPABILITIES.CONTAINER_TRACKING,
-      CAPABILITIES.HTS_CLASSIFICATION,
-    ],
-    stripePriceId: () => env.STRIPE_PRICE_FULL || null,
-    isPublic: true,
-    sortOrder: 3,
-    features: [
-      'everything_in_entry',
-      'container_tracking',
-      'hts_classification',
-      'duty_calculator',
-      'priority_support',
-    ],
+    features: ['everything_in_isf', 'abi_entry_7501', 'abi_entry_3461', 'cargo_release', 'container_tracking', 'chat_support'],
   },
   {
     id: 'enterprise',
     name: 'Enterprise',
-    description: 'Volume pricing, SSO, SLA, and dedicated support. Contact sales.',
-    perFilingCents: 0, // negotiated per contract
-    capabilities: [
-      CAPABILITIES.ISF_FILING,
-      CAPABILITIES.ABI_ENTRY,
-      CAPABILITIES.CONTAINER_TRACKING,
-      CAPABILITIES.HTS_CLASSIFICATION,
-    ],
-    stripePriceId: () => null, // negotiated; not a self-serve metered price
+    description: 'Contract pricing, invoiced. Contact us.',
+    perFilingCents: 0, // per contract
+    capabilities: ALL_CAPABILITIES,
     isPublic: false,
     sortOrder: 4,
-    features: ['everything_in_complete', 'sso', 'dedicated_csm', 'uptime_sla', 'custom_integrations'],
+    features: ['everything_in_entry', 'dedicated_csm', 'custom_integrations'],
   },
 ];
 
+/** Plan ids that no longer exist. Their DB rows stay (old charges reference
+ *  them) but planSync marks them inactive so nobody can be put on them. */
+export const RETIRED_TIER_IDS = ['full'] as const;
+
 // ─── Helpers ─────────────────────────────────────────────────
 const TIER_BY_ID = new Map(TIERS.map((t) => [t.id, t]));
-
-/** The tier a brand-new / unsubscribed org defaults to. No capabilities, no
- *  billing — they must pick a tier + add a card before they can submit. */
-export const DEFAULT_TIER_ID = 'isf';
 
 export function tierById(id: string | null | undefined): TierDef | undefined {
   return id ? TIER_BY_ID.get(id) : undefined;
@@ -130,11 +112,4 @@ export function capabilitiesForTier(id: string | null | undefined): Capability[]
 
 export function tierHasCapability(id: string | null | undefined, cap: Capability): boolean {
   return capabilitiesForTier(id).includes(cap);
-}
-
-/** Reverse lookup used by the Stripe webhook: map a metered Price id back to a
- *  tier so subscription.created/updated events can set the org's plan. */
-export function tierByStripePriceId(priceId: string | null | undefined): TierDef | undefined {
-  if (!priceId) return undefined;
-  return TIERS.find((t) => t.stripePriceId() === priceId);
 }

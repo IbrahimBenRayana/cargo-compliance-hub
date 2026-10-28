@@ -14,7 +14,7 @@ import {
   setDefaultCard,
 } from '../services/stripe.js';
 import { getOrgEntitlements } from '../services/entitlements.js';
-import { retryFailedCharges } from '../services/shipmentBilling.js';
+import { retryOrgCharges } from '../services/shipmentBilling.js';
 import { notify } from '../services/notifications.js';
 import { writeAuditLog } from '../services/auditLog.js';
 import { env } from '../config/env.js';
@@ -26,7 +26,8 @@ const router = Router();
 // Billing model: card-on-file + immediate per-shipment charge.
 // The org keeps a Stripe Customer with a default payment method (saved via a
 // SetupIntent — no charge). Each shipment CBP ACCEPTS is charged immediately
-// (services/shipmentBilling.ts). There are NO Stripe subscriptions / invoices.
+// (services/shipmentBilling.ts), priced by what was filed from the org's own
+// prices (services/pricing.ts). There are NO Stripe subscriptions.
 // ════════════════════════════════════════════════════════════════════════
 
 // ─── Webhook (MUST be before authMiddleware and before any body-parsing) ───
@@ -68,7 +69,7 @@ router.post(
 // Stripe delivers at-least-once. We INSERT event.id ON CONFLICT DO NOTHING; an
 // empty result means we already processed it. processedAt is set only after the
 // handler finishes (and nulled on failure) so a crashed handler can be retried.
-async function handleStripeEvent(event: Stripe.Event): Promise<void> {
+export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
   const inserted = await prisma.$queryRaw<Array<{ event_id: string }>>`
     INSERT INTO "stripe_webhook_events" ("event_id", "type", "received_at")
     VALUES (${event.id}, ${event.type}, NOW())
@@ -130,7 +131,7 @@ async function onSetupIntentSucceeded(si: Stripe.SetupIntent): Promise<void> {
       status: 'card_on_file',
     },
   });
-  await retryFailedCharges(sub.orgId);
+  await retryOrgCharges(sub.orgId, { cardChanged: true });
   logger.info({ orgId: sub.orgId }, '✓ Card saved (via setup_intent webhook)');
 }
 
@@ -140,28 +141,32 @@ async function onPaymentIntentSucceeded(pi: Stripe.PaymentIntent): Promise<void>
   const charge = chargeId
     ? await prisma.shipmentCharge.findUnique({ where: { id: chargeId } })
     : await prisma.shipmentCharge.findFirst({ where: { stripePaymentIntentId: pi.id } });
-  if (!charge || charge.status === 'paid') return;
+  // Only an unsettled row moves to paid (a replayed event must not undo a refund).
+  if (!charge || !UNSETTLED.includes(charge.status)) return;
   await prisma.shipmentCharge.update({
     where: { id: charge.id },
-    data: { status: 'paid', stripePaymentIntentId: pi.id },
+    data: { status: 'paid', stripePaymentIntentId: pi.id, lastError: null },
   });
 }
 
-/** A charge failed — mark it, flag the org delinquent, and alert owners/admins. */
+const UNSETTLED = ['processing', 'pending', 'failed', 'requires_action'];
+
+/** A charge failed — mark it, flag the org delinquent, and alert owners/admins.
+ *  Only for an unsettled charge whose CURRENT attempt this is: a late failure
+ *  of an older attempt must not undo a later success (or leave the org
+ *  delinquent with nothing left to retry). */
 async function onPaymentIntentFailed(pi: Stripe.PaymentIntent): Promise<void> {
   const chargeId = pi.metadata?.chargeId;
-  const metaOrgId = pi.metadata?.orgId;
   const charge = chargeId
     ? await prisma.shipmentCharge.findUnique({ where: { id: chargeId } })
     : await prisma.shipmentCharge.findFirst({ where: { stripePaymentIntentId: pi.id } });
-  if (charge && charge.status !== 'paid') {
-    await prisma.shipmentCharge.update({
-      where: { id: charge.id },
-      data: { status: 'failed', stripePaymentIntentId: pi.id },
-    });
-  }
-  const targetOrg = charge?.orgId ?? metaOrgId;
-  if (!targetOrg) return;
+  if (!charge || !UNSETTLED.includes(charge.status)) return;
+  if (charge.stripePaymentIntentId && charge.stripePaymentIntentId !== pi.id) return;
+  await prisma.shipmentCharge.update({
+    where: { id: charge.id },
+    data: { status: 'failed', stripePaymentIntentId: pi.id, lastError: pi.last_payment_error?.message?.slice(0, 500) ?? 'Payment failed' },
+  });
+  const targetOrg = charge.orgId;
   await prisma.subscription
     .updateMany({ where: { orgId: targetOrg }, data: { status: 'delinquent' } })
     .catch(() => {});
@@ -195,8 +200,10 @@ router.get('/config', (_req: AuthRequest, res: Response): void => {
 });
 
 // POST /api/v1/billing/select-tier  { planId }
-// Choose / change the plan tier. No charge, no card re-entry — the new rate
-// applies to shipments accepted after the change. Self-serve tiers only.
+// Choose the self-serve plan. No charge, no card re-entry. Prices follow what
+// is filed, not the plan, so switching can't change what a shipment costs.
+// Self-serve plans only, and an org on a plan we assigned (ISF + Entry,
+// Enterprise) can't switch itself off it: that would drop its entries.
 router.post('/select-tier', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = z.object({ planId: z.string().min(1) }).safeParse(req.body);
   if (!parsed.success) {
@@ -213,7 +220,11 @@ router.post('/select-tier', requireRole('owner', 'admin'), async (req: AuthReque
     return;
   }
   const orgId = req.user!.orgId;
-  const existing = await prisma.subscription.findUnique({ where: { orgId } });
+  const existing = await prisma.subscription.findUnique({ where: { orgId }, include: { plan: true } });
+  if (existing?.plan && !existing.plan.isPublic && existing.status !== 'canceled' && existing.planId !== plan.id) {
+    res.status(409).json({ error: 'Your plan is managed by MyCargoLens. Contact us to change it.', code: 'plan_managed' });
+    return;
+  }
   const hasCard = !!existing?.defaultPaymentMethodId;
   // Preserve a delinquency; otherwise card-on-file if a card exists, else incomplete.
   const status = existing?.status === 'delinquent' ? 'delinquent' : hasCard ? 'card_on_file' : 'incomplete';
@@ -304,7 +315,7 @@ router.post('/card', requireRole('owner', 'admin'), requireVerifiedEmail, requir
     newValue: { brand: card.brand, last4: card.last4 },
   });
   // Now that a card is on file, settle anything that previously failed.
-  await retryFailedCharges(orgId);
+  await retryOrgCharges(orgId, { cardChanged: true });
   const ent = await getOrgEntitlements(orgId);
   res.json({ card, canFile: ent.canFile });
 });
@@ -316,10 +327,10 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
   const ent = await getOrgEntitlements(orgId);
   const plan = ent.hasActiveTier ? sub?.plan ?? null : null;
 
-  // Usage = shipments charged this calendar month + the running total.
+  // Usage = shipments charged this calendar month (UTC) + the running total.
   const now = new Date();
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const agg = await prisma.shipmentCharge.aggregate({
     where: { orgId, status: 'paid', billedAt: { gte: periodStart, lt: periodEnd } },
     _count: { _all: true },
@@ -332,12 +343,15 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
           id: plan.id,
           name: plan.name,
           description: plan.description,
-          perFilingCents: plan.perFilingCents,
+          perFilingCents: ent.perFilingCents,
+          isPublic: plan.isPublic,
           capabilities: plan.capabilities,
           features: plan.features,
         }
       : null,
     capabilities: ent.capabilities,
+    // This org's prices by what was filed (cents; entry prices null = not offered).
+    pricing: ent.hasActiveTier ? ent.pricing : null,
     canFile: ent.canFile,
     status: ent.status,
     delinquent: ent.delinquent,

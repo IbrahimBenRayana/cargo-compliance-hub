@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, memo, useId, useRef } from 'react';
+import { billTypeOf } from '@/lib/isfBillType';
+import { perHblPartyKeys, tradePartyErrors } from '@/lib/isfTradeParties';
+import { CONTAINER_TYPES, toCommodityForms, toContainerForms, isImporterIdentifier } from '@/lib/isfForm';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useFiling, useCreateFiling, useCreateConsolidation, useUpdateFiling, useFilingAutosave } from '@/hooks/useFilings';
 import { useManifestQuery } from '@/hooks/useManifestQuery';
@@ -28,6 +31,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { SCHEDULE_D_PORTS, CBP_PORTS_4DIGIT } from '@/data/schedule-d-ports';
 import { HTSAutocomplete } from '@/components/HTSAutocomplete';
+import { useQuery } from '@tanstack/react-query';
+import { organizationApi } from '@/api/client';
 
 // ─── Reference Data for Dropdowns ──────────────────────────
 
@@ -36,14 +41,6 @@ const BOND_TYPES = [
   { value: 'single', label: '9 — Single Transaction Bond' },
 ];
 
-const CONTAINER_TYPES = [
-  { value: 'CN', label: 'CN — Container' },
-  { value: 'NC', label: 'NC — No Container' },
-  { value: '20', label: '20 — 20ft Standard' },
-  { value: '40', label: '40 — 40ft Standard' },
-  { value: '40H', label: '40H — 40ft High Cube' },
-  { value: '45', label: '45 — 45ft High Cube' },
-];
 
 const WEIGHT_UOMS = [
   { value: 'K', label: 'KG — Kilograms' },
@@ -91,6 +88,8 @@ interface PartyFormData {
 }
 
 interface CommodityFormData {
+  /** Which manufacturer produced this line: 0 = the main one, n = additional n-1. */
+  manufacturerIndex?: number;
   htsCode: string;
   description: string;
   countryOfOrigin: string;
@@ -153,6 +152,15 @@ interface ISFFormState {
     containers?: ContainerFormData[];
   }>;
   bondType: string;
+  /** Single-transaction bond (type 9): surety code and bond reference (SF20 V1 / SBN). */
+  bondSuretyCode: string;
+  bondReferenceNumber: string;
+  /** REGULAR = straight/master bill only (SF15 OB); HOUSE = house bill (BM) under the master. */
+  billType: 'HOUSE' | 'REGULAR';
+  /** SCAC of the house-bill issuer (NVOCC); blank = the carrier SCAC. */
+  houseBillScac: string;
+  /** Who files this ISF: '' = org default, SIGMA = MyCargoLens under S7P, CLIENT = own code. */
+  isfFilerMode: '' | 'SIGMA' | 'CLIENT';
 
   // IOR & Filer
   importerName: string;
@@ -168,6 +176,8 @@ interface ISFFormState {
   seller: PartyFormData;
   shipToParty: PartyFormData;
   manufacturer: PartyFormData;
+  /** ISF-10 shipments with more than one manufacturer (each HTS line names its own). */
+  additionalManufacturers: PartyFormData[];
   consolidator: PartyFormData;
   containerStuffingLocation: PartyFormData;
 
@@ -177,6 +187,8 @@ interface ISFFormState {
   voyageNumber: string;
   foreignPortOfUnlading: string;
   estimatedDeparture: string;
+  /** Estimated lading at the foreign port: the ISF deadline is 24h before it. */
+  estimatedLading: string;
   estimatedArrival: string;
 
   // Cargo
@@ -225,6 +237,11 @@ const initialForm = (): ISFFormState => ({
   consolidationMode: 'buyer',
   perHblOverrides: [{}],
   bondType: 'continuous',
+  bondSuretyCode: '',
+  bondReferenceNumber: '',
+  billType: 'HOUSE',
+  houseBillScac: '',
+  isfFilerMode: '',
   importerName: '',
   importerNumber: '',
   consigneeName: '',
@@ -234,6 +251,7 @@ const initialForm = (): ISFFormState => ({
   seller: emptyParty(),
   shipToParty: emptyParty(),
   manufacturer: emptyParty(),
+  additionalManufacturers: [],
   consolidator: emptyParty(),
   containerStuffingLocation: emptyParty(),
   scacCode: '',
@@ -241,6 +259,7 @@ const initialForm = (): ISFFormState => ({
   voyageNumber: '',
   foreignPortOfUnlading: '',
   estimatedDeparture: '',
+  estimatedLading: '',
   estimatedArrival: '',
   commodities: [emptyCommodity()],
   containers: [emptyContainer()],
@@ -393,11 +412,12 @@ const PortSelectField = memo(function PortSelectField({
 // ─── Party Card Component ──────────────────────────────────
 
 const PartyCard = memo(function PartyCard({
-  title, icon: Icon, party, onChange, showTaxId, taxIdLabel, taxIdHint, nameMaxLen = 35,
+  title, icon: Icon, party, onChange, showTaxId, taxIdLabel, taxIdHint, nameMaxLen = 35, errors,
 }: {
   title: string; icon: React.ElementType; party: PartyFormData;
   onChange: (p: PartyFormData) => void; showTaxId?: boolean;
   taxIdLabel?: string; taxIdHint?: string; nameMaxLen?: number;
+  errors?: Partial<Record<'name' | 'address1' | 'city' | 'country', string>>;
 }) {
   const up = (field: keyof PartyFormData, val: string) => onChange({ ...party, [field]: val });
   return (
@@ -413,23 +433,23 @@ const PartyCard = memo(function PartyCard({
       <CardContent className="px-4 pb-4 space-y-3">
         <TextField label="Company / Name" required value={party.name} onChange={v => up('name', v)}
           maxLength={nameMaxLen} placeholder="Letters, numbers, spaces, dashes only"
-          hint={`Max ${nameMaxLen} chars. No periods or special characters.`} />
+          hint={`Max ${nameMaxLen} chars. No periods or special characters.`} error={errors?.name} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <TextField label="Address Line 1" required value={party.address1} onChange={v => up('address1', v)}
-            maxLength={35} placeholder="Street address" hint="Max 35 characters" />
+            maxLength={35} placeholder="Street address" hint="Max 35 characters" error={errors?.address1} />
           <TextField label="Address Line 2" value={party.address2} onChange={v => up('address2', v)}
             maxLength={35} placeholder="Suite, unit, floor" hint="Optional. Don't use a single period." />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <TextField label="City" required value={party.city} onChange={v => up('city', v)}
-            placeholder="City" maxLength={35} />
+            placeholder="City" maxLength={35} error={errors?.city} />
           <TextField label="State" value={party.state} onChange={v => up('state', v)}
             placeholder="ST" maxLength={4} />
           <TextField label="Postal Code" value={party.zip} onChange={v => up('zip', v)}
             placeholder="00000" maxLength={10} />
           <PortSelectField label="Country" required value={party.country} onChange={v => up('country', v)}
             options={ALL_COUNTRIES} placeholder="Search country…"
-            searchPlaceholder="Country, ISO code, or alias…" emptyMessage="No country found." />
+            searchPlaceholder="Country, ISO code, or alias…" emptyMessage="No country found." error={errors?.country} />
         </div>
       </CardContent>
     </Card>
@@ -474,6 +494,10 @@ export default function ShipmentWizard() {
   const isEdit = !!id;
 
   const { data: existing, isLoading: isLoadingFiling } = useFiling(id);
+  // The org's CBP identity: decides whether filing under its own code is available.
+  const { data: cbpData } = useQuery({ queryKey: ['org', 'cbp'], queryFn: () => organizationApi.cbpIdentity() });
+  const cbpIdentity = cbpData?.cbp;
+  const clientFilerReady = !!cbpIdentity?.filerCode && !!cbpIdentity?.serviceCenterApprovedAt;
   const createFiling = useCreateFiling();
   const createConsolidation = useCreateConsolidation();
   const updateFiling = useUpdateFiling();
@@ -549,7 +573,6 @@ export default function ShipmentWizard() {
   useEffect(() => {
     if (isEdit) return; // editing path uses the other useEffect below
     if (!sourceFiling) return;
-    const c0 = sourceFiling.commodities?.[0];
     setForm({
       filingType: sourceFiling.filingType || 'ISF-10',
       // Identity fields blanked — user must supply per-shipment values.
@@ -560,9 +583,15 @@ export default function ShipmentWizard() {
       perHblOverrides: [{}],
       voyageNumber: '',
       estimatedDeparture: '',
+  estimatedLading: '',
       estimatedArrival: '',
       // Carry over reusable bond + party info.
       bondType: sourceFiling.bondType || 'continuous',
+      bondSuretyCode: sourceFiling.bondSuretyCode || '',
+      bondReferenceNumber: '',
+      billType: 'HOUSE',
+      houseBillScac: sourceFiling.houseBillScac || '',
+      isfFilerMode: sourceFiling.isfFilerMode || '',
       importerName: sourceFiling.importerName || '',
       importerNumber: sourceFiling.importerNumber || '',
       consigneeName: sourceFiling.consigneeName || '',
@@ -572,20 +601,13 @@ export default function ShipmentWizard() {
       seller: parseParty(sourceFiling.seller),
       shipToParty: parseParty(sourceFiling.shipToParty),
       manufacturer: parseParty(Array.isArray(sourceFiling.manufacturer) ? sourceFiling.manufacturer[0] : sourceFiling.manufacturer),
+      additionalManufacturers: Array.isArray(sourceFiling.manufacturer) ? (sourceFiling.manufacturer as unknown[]).slice(1).map(parseParty) : [],
       consolidator: parseParty(sourceFiling.consolidator),
       containerStuffingLocation: parseParty(sourceFiling.containerStuffingLocation),
       scacCode: sourceFiling.scacCode || '',
       vesselName: sourceFiling.vesselName || '',
       foreignPortOfUnlading: sourceFiling.foreignPortOfUnlading || '',
-      commodities: c0 ? [{
-        htsCode: c0.htsCode || '',
-        description: c0.description || '',
-        countryOfOrigin: c0.countryOfOrigin || '',
-        quantity: c0.quantity != null ? String(c0.quantity) : '',
-        quantityUOM: c0.quantityUOM || c0.weight?.unit === 'L' ? 'PCS' : 'PKG',
-        weight: c0.weight?.value != null ? String(c0.weight.value) : '',
-        weightUOM: c0.weight?.unit || 'K',
-      }] : [emptyCommodity()],
+      commodities: toCommodityForms(sourceFiling.commodities, emptyCommodity),
       // Containers blanked — different per shipment.
       containers: [emptyContainer()],
       isf5: sourceFiling.isf5Data ? {
@@ -662,8 +684,6 @@ export default function ShipmentWizard() {
   useEffect(() => {
     if (!existing) return;
     if (hydratedIdRef.current === existing.id) return;
-    const c0 = existing.commodities?.[0];
-    const ct0 = existing.containers?.[0];
     setForm({
       filingType: existing.filingType || 'ISF-10',
       masterBol: existing.masterBol || '',
@@ -673,6 +693,11 @@ export default function ShipmentWizard() {
       consolidationMode: 'buyer',
       perHblOverrides: [{}],
       bondType: existing.bondType || 'continuous',
+      bondSuretyCode: existing.bondSuretyCode || '',
+      bondReferenceNumber: existing.bondReferenceNumber || '',
+      billType: billTypeOf(existing),
+      houseBillScac: existing.houseBillScac || '',
+      isfFilerMode: existing.isfFilerMode || '',
       importerName: existing.importerName || '',
       importerNumber: existing.importerNumber || '',
       consigneeName: existing.consigneeName || '',
@@ -682,6 +707,7 @@ export default function ShipmentWizard() {
       seller: parseParty(existing.seller),
       shipToParty: parseParty(existing.shipToParty),
       manufacturer: parseParty(Array.isArray(existing.manufacturer) ? existing.manufacturer[0] : existing.manufacturer),
+      additionalManufacturers: Array.isArray(existing.manufacturer) ? (existing.manufacturer as unknown[]).slice(1).map(parseParty) : [],
       consolidator: parseParty(existing.consolidator),
       containerStuffingLocation: parseParty(existing.containerStuffingLocation),
       scacCode: existing.scacCode || '',
@@ -689,17 +715,10 @@ export default function ShipmentWizard() {
       voyageNumber: existing.voyageNumber || '',
       foreignPortOfUnlading: existing.foreignPortOfUnlading || '',
       estimatedDeparture: existing.estimatedDeparture ? existing.estimatedDeparture.split('T')[0] : '',
+      estimatedLading: existing.estimatedLading ? existing.estimatedLading.split('T')[0] : '',
       estimatedArrival: existing.estimatedArrival ? existing.estimatedArrival.split('T')[0] : '',
-      commodities: c0 ? [{
-        htsCode: c0.htsCode || '',
-        description: c0.description || '',
-        countryOfOrigin: c0.countryOfOrigin || '',
-        quantity: c0.quantity != null ? String(c0.quantity) : '',
-        quantityUOM: c0.quantityUOM || c0.weight?.unit === 'L' ? 'PCS' : 'PKG',
-        weight: c0.weight?.value != null ? String(c0.weight.value) : '',
-        weightUOM: c0.weight?.unit || 'K',
-      }] : [emptyCommodity()],
-      containers: ct0 ? [{ number: ct0.number || '', type: ct0.type || 'CN' }] : [emptyContainer()],
+      commodities: toCommodityForms(existing.commodities, emptyCommodity),
+      containers: toContainerForms(existing.containers, emptyContainer),
       isf5: existing.isf5Data ? {
         bookingPartyName: existing.isf5Data.bookingPartyName || '',
         bookingPartyTaxID: existing.isf5Data.bookingPartyTaxID || '',
@@ -826,6 +845,9 @@ export default function ShipmentWizard() {
   const isSaving = createFiling.isPending || createConsolidation.isPending || updateFiling.isPending;
 
   // ─── Validation per step ───────────
+  /** Which per-house-bill tab is open on Trade Parties; jumps to the first one with an error. */
+  const [partyHblTab, setPartyHblTab] = useState('hbl-0');
+
   const validateStep = useCallback((s: number): boolean => {
     const e: Record<string, string> = {};
     const stepId = STEPS[s]?.id;
@@ -833,7 +855,18 @@ export default function ShipmentWizard() {
     if (stepId === 'filing') {
       if (!form.masterBol.trim()) e.masterBol = 'Master BOL is required';
       // House BOL is only required for ISF-10; ISF-5 derives it from the master BOL
-      if (form.filingType === 'ISF-10' && !form.houseBol.trim()) e.houseBol = 'House BOL is required';
+      if (form.filingType === 'ISF-10' && form.billType === 'HOUSE') {
+        if (!form.houseBol.trim()) e.houseBol = 'House BOL is required for a house bill (or choose "Regular bill")';
+        else if (form.houseBol.trim().toUpperCase() === form.masterBol.trim().toUpperCase())
+          e.houseBol = 'The house BOL cannot be the same as the master BOL; choose "Regular bill" instead';
+        if (form.houseBillScac.trim() && !/^[A-Z]{2,4}$/i.test(form.houseBillScac.trim()))
+          e.houseBillScac = 'SCAC is 2 to 4 letters';
+      }
+      // A single-transaction ISF bond needs its surety and bond reference (ISF-19 Note 7).
+      if (form.bondType === 'single') {
+        if (!/^[A-Z0-9]{3}$/i.test(form.bondSuretyCode.trim())) e.bondSuretyCode = 'Surety code is 3 characters';
+        if (!form.bondReferenceNumber.trim()) e.bondReferenceNumber = 'Bond reference number is required';
+      }
 
       // Consolidation mode: validate each extra HBL + reject in-list dupes.
       // The primary houseBol is included in the seen-set so users can't enter
@@ -860,10 +893,14 @@ export default function ShipmentWizard() {
     // ISF-10: IOR & Consignee step
     if (stepId === 'importer') {
       if (!form.importerName.trim()) e.importerName = 'Importer name is required';
-      if (!form.importerNumber.trim()) e.importerNumber = 'IOR number is required (XX-XXXXXXXXX)';
-      else if (!/^\d{2}-[A-Z0-9]{7,9}$/i.test(form.importerNumber.trim()))
-        e.importerNumber = 'Format: XX-XXXXXXXXX (e.g., 20-493538700)';
+      if (!form.importerNumber.trim()) e.importerNumber = 'IOR number is required';
+      else if (!isImporterIdentifier(form.importerNumber))
+        e.importerNumber = 'Use an EIN (XX-XXXXXXXXX), CBP-assigned number (YYDDPP-NNNNN) or SSN (NNN-NN-NNNN)';
       if (!form.consigneeName.trim()) e.consigneeName = 'Consignee name is required';
+      // CBP needs the consignee number even when it is the importer's (ISF-28).
+      if (!form.consigneeNumber.trim()) e.consigneeNumber = 'Consignee number is required (repeat the IOR number if it is the same)';
+      else if (!isImporterIdentifier(form.consigneeNumber))
+        e.consigneeNumber = 'Use an EIN (XX-XXXXXXXXX), CBP-assigned number (YYDDPP-NNNNN) or SSN (NNN-NN-NNNN)';
     }
 
     // ISF-5: Filer & Booking Party step
@@ -899,6 +936,17 @@ export default function ShipmentWizard() {
     }
 
     // ISF-5 parties step: Ship-To & Manufacturer
+    // ISF-10: every trade party needs a name, street, city and country (SF30/35/36,
+    // ISF-28..35); the native mapper refuses to file without them.
+    if (stepId === 'parties' && form.filingType === 'ISF-10') {
+      const isConsolidation = !isEdit && form.additionalHouseBills.length > 0;
+      Object.assign(e, tradePartyErrors({
+        ...form,
+        consolidationMode: isConsolidation ? form.consolidationMode : null,
+        houseBillCount: isConsolidation ? 1 + form.additionalHouseBills.length : 0,
+      }));
+    }
+
     if (stepId === 'parties' && form.filingType === 'ISF-5') {
       if (!form.shipToParty.name.trim()) e['shipToParty.name'] = 'Ship-To Party name is required';
       if (!form.manufacturer.name.trim()) e['manufacturer.name'] = 'Manufacturer name is required';
@@ -906,8 +954,10 @@ export default function ShipmentWizard() {
     }
 
     setErrors(e);
+    const firstHbl = Object.keys(e).map((k) => /^perHbl\.(\d+)\./.exec(k)?.[1]).find(Boolean);
+    if (firstHbl !== undefined && !Object.keys(e).some((k) => !k.startsWith('perHbl.'))) setPartyHblTab(`hbl-${firstHbl}`);
     return Object.keys(e).length === 0;
-  }, [form, STEPS]);
+  }, [form, STEPS, isEdit]);
 
   const goNext = useCallback(() => {
     if (step < STEPS.length - 1) {
@@ -917,6 +967,11 @@ export default function ShipmentWizard() {
   }, [step, validateStep, STEPS]);
 
   const goBack = useCallback(() => { if (step > 0) setStep(step - 1); }, [step]);
+
+  const partyErrors = (key: string) => ({
+    name: errors[`${key}.name`], address1: errors[`${key}.address1`],
+    city: errors[`${key}.city`], country: errors[`${key}.country`],
+  });
 
   // Lifted out of buildPayload so the consolidation perHbl builder can
   // reuse it. Returns undefined for empty (name-less) parties.
@@ -929,6 +984,23 @@ export default function ShipmentWizard() {
   }, []);
 
   // ─── Build payload ─────────────────
+  /**
+   * Manufacturers for the payload. With more than one, each carries the HTS
+   * lines it produced (items), which the native mapper files as its own MF
+   * group (audit UFF-M2); with one, it covers every line.
+   */
+  const buildManufacturers = () => {
+    if (!form.manufacturer.name.trim()) return undefined;
+    const all = [form.manufacturer, ...(form.filingType === 'ISF-10' ? form.additionalManufacturers : [])];
+    if (all.length === 1) return [partyObj(form.manufacturer)];
+    return all.map((m, idx) => ({
+      ...partyObj(m),
+      items: form.commodities
+        .filter((c) => c.htsCode.trim() && (c.manufacturerIndex ?? 0) === idx)
+        .map((c) => ({ htsCode: c.htsCode.replace(/[\.\-\s]/g, ''), countryOfOrigin: c.countryOfOrigin })),
+    }));
+  };
+
   const buildPayload = useCallback(() => {
     const commodities: CommodityInfo[] = form.commodities
       .filter(c => c.htsCode.trim())
@@ -939,6 +1011,7 @@ export default function ShipmentWizard() {
         // 10-digit code is preserved in our DB and is available for the
         // duty calculator's filing-prefill flow.
         htsCode: c.htsCode.replace(/[\.\-\s]/g, ''),
+        manufacturerIndex: form.additionalManufacturers.length > 0 ? (c.manufacturerIndex ?? 0) : undefined,
         description: c.description || undefined,
         countryOfOrigin: c.countryOfOrigin,
         quantity: c.quantity ? Number(c.quantity) : undefined,
@@ -952,8 +1025,12 @@ export default function ShipmentWizard() {
     return {
       filingType: form.filingType,
       masterBol: form.masterBol || undefined,
-      houseBol: form.houseBol || undefined,
+      houseBol: form.billType === 'REGULAR' ? undefined : form.houseBol || undefined,
+      houseBillScac: form.billType === 'HOUSE' && form.houseBillScac.trim() ? form.houseBillScac.trim().toUpperCase() : undefined,
       bondType: form.bondType || undefined,
+      bondSuretyCode: form.bondType === 'single' ? form.bondSuretyCode.trim().toUpperCase() || undefined : undefined,
+      bondReferenceNumber: form.bondType === 'single' ? form.bondReferenceNumber.trim() || undefined : undefined,
+      isfFilerMode: form.isfFilerMode || null,
       importerName: form.importerName || undefined,
       importerNumber: form.importerNumber || undefined,
       consigneeName: form.consigneeName || undefined,
@@ -970,7 +1047,7 @@ export default function ShipmentWizard() {
       buyer: partyObj(form.buyer),
       seller: partyObj(form.seller),
       shipToParty: partyObj(form.shipToParty),
-      manufacturer: form.manufacturer.name.trim() ? [partyObj(form.manufacturer)] : undefined,
+      manufacturer: buildManufacturers(),
       consolidator: partyObj(form.consolidator),
       containerStuffingLocation: partyObj(form.containerStuffingLocation),
       scacCode: form.scacCode || undefined,
@@ -978,6 +1055,7 @@ export default function ShipmentWizard() {
       voyageNumber: form.voyageNumber || undefined,
       foreignPortOfUnlading: form.foreignPortOfUnlading || undefined,
       estimatedDeparture: form.estimatedDeparture || undefined,
+      estimatedLading: form.estimatedLading || undefined,
       estimatedArrival: form.estimatedArrival || undefined,
       commodities,
       containers,
@@ -1094,7 +1172,17 @@ export default function ShipmentWizard() {
         const msgs = body.validationErrors.map((e: any) => e.message).join('\n');
         toast.error(`Validation failed:\n${msgs}`, { duration: 8000 });
       } else if (body?.details) {
-        toast.error(`Validation: ${JSON.stringify(body.details)}`, { duration: 8000 });
+        // Zod flatten shape: { formErrors: string[], fieldErrors: Record<string, string[]> }.
+        // Render human-readable lines, never raw JSON.
+        const fieldErrors: Record<string, string[]> = body.details.fieldErrors ?? {};
+        const lines = [
+          ...((body.details.formErrors ?? []) as string[]),
+          ...Object.entries(fieldErrors).map(([field, msgs]) => `${field}: ${msgs.join('; ')}`),
+        ];
+        toast.error(
+          lines.length > 0 ? `Please fix before submitting:\n${lines.join('\n')}` : 'Validation failed',
+          { duration: 8000 }
+        );
       } else {
         toast.error(body?.error || 'Failed to save filing');
       }
@@ -1124,19 +1212,86 @@ export default function ShipmentWizard() {
           onChange={v => set('bondType', v)} options={BOND_TYPES}
           hint="Continuous bond (type 8) covers multiple shipments; Single transaction (type 9) for one-time" />
       </div>
+      {form.filingType === 'ISF-10' && form.bondType === 'single' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <TextField label="Surety Code" required value={form.bondSuretyCode}
+            onChange={v => set('bondSuretyCode', v.toUpperCase())} placeholder="e.g., 891"
+            hint="3-character CBP surety code of the single-transaction bond" error={errors.bondSuretyCode} maxLength={3} />
+          <TextField label="Bond Reference Number" required value={form.bondReferenceNumber}
+            onChange={v => set('bondReferenceNumber', v)} placeholder="e.g., AB12345678"
+            hint="Reference number of the single-transaction bond" error={errors.bondReferenceNumber} maxLength={35} />
+        </div>
+      )}
+      {form.filingType === 'ISF-10' && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Who files this ISF with CBP?</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {([
+              { value: 'SIGMA', title: `MyCargoLens files as ISF filer (${cbpIdentity?.sigmaFilerCode ?? 'S7P'})`, desc: 'No filer code of your own needed.', disabled: false },
+              {
+                value: 'CLIENT',
+                title: `We file under our own code${cbpIdentity?.filerCode ? ` (${cbpIdentity.filerCode})` : ''}`,
+                desc: clientFilerReady ? 'Through our approved service-center queue.' : 'Available once your filer code is set up and CBP approves our queue.',
+                disabled: !clientFilerReady,
+              },
+            ] as const).map((opt) => {
+              const effective = form.isfFilerMode || cbpIdentity?.isfFilerModeDefault || 'SIGMA';
+              const selected = effective === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={opt.disabled}
+                  aria-pressed={selected}
+                  onClick={() => set('isfFilerMode', opt.value)}
+                  className={cn(
+                    'rounded-lg border p-3 text-left transition-colors',
+                    selected ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted/50',
+                    opt.disabled && 'cursor-not-allowed opacity-60 hover:bg-transparent',
+                  )}
+                >
+                  <div className="text-sm font-medium">{opt.title}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">{opt.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+          {!form.isfFilerMode && (
+            <p className="text-xs text-muted-foreground">Using your organization&apos;s default. You can change it in Settings, CBP identity.</p>
+          )}
+        </div>
+      )}
       <Separator />
       <div>
         <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
           <FileText className="h-4 w-4 text-primary" /> Bills of Lading
         </h3>
+        {form.filingType === 'ISF-10' && (
+          <div className="mb-4 max-w-md">
+            <SelectField label="Bill type" required value={form.billType}
+              onChange={v => set('billType', v as 'HOUSE' | 'REGULAR')}
+              options={[
+                { value: 'HOUSE', label: 'House bill (issued by a forwarder / NVOCC)' },
+                { value: 'REGULAR', label: 'Regular bill (straight master bill, no house bill)' },
+              ]}
+              hint="CBP files a house bill as BM and a regular bill as OB" />
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <TextField label="Master Bill of Lading" required value={form.masterBol}
             onChange={v => set('masterBol', v)} placeholder="e.g., MAEU1234567890"
             hint="Master BOL issued by the ocean carrier" error={errors.masterBol} maxLength={50} />
-          <TextField label="House Bill of Lading" required={form.filingType === 'ISF-10'} value={form.houseBol}
-            onChange={v => set('houseBol', v)} placeholder="e.g., HCLA12345678"
-            hint={form.filingType === 'ISF-5' ? 'Optional for ISF-5 — will be auto-derived from Master BOL if left blank.' : 'House BOL from your freight forwarder. This is used to send documents to CBP.'}
-            error={errors.houseBol} maxLength={50} />
+          {(form.filingType === 'ISF-5' || form.billType === 'HOUSE') && (
+            <TextField label="House Bill of Lading" required={form.filingType === 'ISF-10'} value={form.houseBol}
+              onChange={v => set('houseBol', v)} placeholder="e.g., HCLA12345678"
+              hint={form.filingType === 'ISF-5' ? 'Optional for ISF-5 — will be auto-derived from Master BOL if left blank.' : 'House BOL from your freight forwarder.'}
+              error={errors.houseBol} maxLength={50} />
+          )}
+          {form.filingType === 'ISF-10' && form.billType === 'HOUSE' && (
+            <TextField label="House bill issuer SCAC" value={form.houseBillScac}
+              onChange={v => set('houseBillScac', v.toUpperCase())} placeholder="e.g., NVOC"
+              hint="SCAC of the forwarder that issued the house bill. Leave blank if the house bill number already starts with it (e.g. HLCU1234567890) or if the carrier issued it." error={errors.houseBillScac} maxLength={4} />
+          )}
         </div>
 
         {/* Multi-HBL consolidation editor. Hidden in edit mode (per-filing) and
@@ -1190,7 +1345,7 @@ export default function ShipmentWizard() {
               type="button"
               variant="outline"
               size="sm"
-              className="gap-1.5"
+              className="gap-1.5 h-auto min-h-9 max-w-full whitespace-normal text-left"
               onClick={() =>
                 setForm((prev) => ({
                   ...prev,
@@ -1293,7 +1448,7 @@ export default function ShipmentWizard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <TextField label="Importer Name" required value={form.importerName}
               onChange={v => set('importerName', v)} maxLength={35} error={errors.importerName}
-              placeholder="e.g., Acme Imports Inc" hint="Max 35 chars. No periods — CC rejects them." />
+              placeholder="e.g., Acme Imports Inc" hint="Max 35 characters. Leave out periods." />
             <TextField label="IOR Number (EIN)" required value={form.importerNumber}
               onChange={v => set('importerNumber', v)} placeholder="XX-XXXXXXXXX"
               hint="Employer Identification Number. Format: 2 digits, dash, 9 digits." error={errors.importerNumber} maxLength={12} />
@@ -1318,9 +1473,10 @@ export default function ShipmentWizard() {
             <TextField label="Consignee Name" required value={form.consigneeName}
               onChange={v => set('consigneeName', v)} maxLength={35} error={errors.consigneeName}
               placeholder="e.g., Acme Imports Inc" hint="Max 35 chars. No periods." />
-            <TextField label="Consignee Number (EIN)" value={form.consigneeNumber}
+            <TextField label="Consignee Number" required value={form.consigneeNumber}
               onChange={v => set('consigneeNumber', v)} placeholder="XX-XXXXXXXXX"
-              hint="EIN for the consignee. Same format as IOR." maxLength={12} />
+              hint="EIN, CBP-assigned number or SSN. Repeat the IOR number if the consignee is the importer."
+              error={errors.consigneeNumber} maxLength={14} />
           </div>
           <Separator className="my-2" />
           <p className="text-xs font-medium text-muted-foreground">Consignee Address</p>
@@ -1464,33 +1620,66 @@ export default function ShipmentWizard() {
     //   Buyer mode: seller + manufacturer differ per HBL (Adnan's "vendors differ").
     //   LCL mode:   all of buyer + seller + shipToParty + manufacturer differ.
     // Consolidator + Container Stuffing Location are ALWAYS shared.
-    const perHblPartyKeys = isLcl
-      ? (['buyer', 'seller', 'shipToParty', 'manufacturer'] as const)
-      : isConsolidation
-        ? (['seller', 'manufacturer'] as const)
-        : ([] as const);
+    const perHblKeys = perHblPartyKeys(isConsolidation ? form.consolidationMode : null);
+    const hblHasError = (idx: number) => Object.keys(errors).some((k) => k.startsWith(`perHbl.${idx}.`));
 
     return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Always shared: Consolidator + Container Stuffing Location. */}
         {!isLcl && (
-          <PartyCard title="Buyer" icon={Users} party={form.buyer} onChange={p => setParty('buyer', p)} />
+          <PartyCard title="Buyer" icon={Users} party={form.buyer} onChange={p => setParty('buyer', p)} errors={partyErrors('buyer')} />
         )}
         {!isConsolidation && (
-          <PartyCard title="Seller" icon={Users} party={form.seller} onChange={p => setParty('seller', p)} />
+          <PartyCard title="Seller" icon={Users} party={form.seller} onChange={p => setParty('seller', p)} errors={partyErrors('seller')} />
         )}
         {!isLcl && (
-          <PartyCard title="Ship-To Party" icon={MapPin} party={form.shipToParty} onChange={p => setParty('shipToParty', p)} />
+          <PartyCard title="Ship-To Party" icon={MapPin} party={form.shipToParty} onChange={p => setParty('shipToParty', p)} errors={partyErrors('shipToParty')} />
         )}
         {!isConsolidation && (
-          <PartyCard title="Manufacturer / Supplier" icon={Building2} party={form.manufacturer} onChange={p => setParty('manufacturer', p)} />
+          <PartyCard title={form.additionalManufacturers.length ? 'Manufacturer / Supplier 1' : 'Manufacturer / Supplier'} icon={Building2} party={form.manufacturer} onChange={p => setParty('manufacturer', p)} errors={partyErrors('manufacturer')} />
         )}
-        <PartyCard title="Consolidator" icon={Container} party={form.consolidator} onChange={p => setParty('consolidator', p)} />
-        <PartyCard title="Container Stuffing Location" icon={Package} party={form.containerStuffingLocation} onChange={p => setParty('containerStuffingLocation', p)} />
+        {!isConsolidation && form.additionalManufacturers.map((m, i) => (
+          <div key={`mfr-${i}`} className="relative">
+            <PartyCard
+              title={`Manufacturer / Supplier ${i + 2}`}
+              icon={Building2}
+              party={m}
+              onChange={(p) => setForm((prev) => ({ ...prev, additionalManufacturers: prev.additionalManufacturers.map((x, k) => (k === i ? p : x)) }))}
+              errors={partyErrors(`additionalManufacturers.${i}`)}
+            />
+            <Button
+              type="button" variant="ghost" size="sm"
+              className="absolute right-3 top-3 h-7 px-2 text-destructive hover:text-destructive"
+              onClick={() => setForm((prev) => ({
+                ...prev,
+                additionalManufacturers: prev.additionalManufacturers.filter((_, k) => k !== i),
+                // Lines that pointed at the removed manufacturer go back to the first; later ones shift down.
+                commodities: prev.commodities.map((c) => {
+                  const idx = c.manufacturerIndex ?? 0;
+                  return { ...c, manufacturerIndex: idx === i + 1 ? 0 : idx > i + 1 ? idx - 1 : idx };
+                }),
+              }))}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+            </Button>
+          </div>
+        ))}
+        {!isConsolidation && form.filingType === 'ISF-10' && (
+          <div className="md:col-span-2">
+            <Button type="button" variant="outline" size="sm" className="gap-1.5"
+              onClick={() => setForm((prev) => ({ ...prev, additionalManufacturers: [...prev.additionalManufacturers, emptyParty()] }))}
+              disabled={form.additionalManufacturers.length >= 9}>
+              <Plus className="h-3.5 w-3.5" /> Add another manufacturer
+            </Button>
+            <p className="mt-1 text-xs text-muted-foreground">If the goods come from several manufacturers, add each one; you will link every HTS line to its manufacturer on the Cargo step.</p>
+          </div>
+        )}
+        <PartyCard title="Consolidator" icon={Container} party={form.consolidator} onChange={p => setParty('consolidator', p)} errors={partyErrors('consolidator')} />
+        <PartyCard title="Container Stuffing Location" icon={Package} party={form.containerStuffingLocation} onChange={p => setParty('containerStuffingLocation', p)} errors={partyErrors('containerStuffingLocation')} />
       </div>
 
-      {isConsolidation && perHblPartyKeys.length > 0 && (
+      {isConsolidation && perHblKeys.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Layers className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
@@ -1504,13 +1693,16 @@ export default function ShipmentWizard() {
             </span>
           </div>
 
-          <Tabs defaultValue="hbl-0" className="w-full">
+          <Tabs value={partyHblTab} onValueChange={setPartyHblTab} className="w-full">
             <TabsList className="w-full justify-start h-auto flex-wrap gap-1 bg-muted/60 p-1">
               {allHouseBills.map((hbl, idx) => {
                 const o = form.perHblOverrides[idx];
-                const customCount = perHblPartyKeys.filter((k) => !!o?.[k]).length;
+                const customCount = perHblKeys.filter((k) => !!o?.[k]).length;
+                const hasError = hblHasError(idx);
                 return (
-                  <TabsTrigger key={idx} value={`hbl-${idx}`} className="text-xs">
+                  <TabsTrigger key={idx} value={`hbl-${idx}`} className={hasError ? 'text-xs text-red-600 dark:text-red-400' : 'text-xs'}
+                    aria-label={hasError ? `HBL ${idx + 1}: ${hbl}, has missing parties` : undefined}>
+                    {hasError && <AlertCircle className="h-3 w-3 mr-1" aria-hidden="true" />}
                     HBL {idx + 1}: {hbl.length > 14 ? hbl.slice(0, 14) + '…' : hbl}
                     {customCount > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">·{customCount}</span>}
                   </TabsTrigger>
@@ -1524,7 +1716,7 @@ export default function ShipmentWizard() {
                   "Customize for this HBL" to fill in a value just for this filing.
                 </p>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {perHblPartyKeys.map((field) => {
+                  {perHblKeys.map((field) => {
                     const labelMap: Record<typeof field, { title: string; icon: React.ElementType }> = {
                       buyer:       { title: 'Buyer',                    icon: Users },
                       seller:      { title: 'Seller',                   icon: Users },
@@ -1533,11 +1725,15 @@ export default function ShipmentWizard() {
                     };
                     const cfg = labelMap[field];
                     const override = form.perHblOverrides[idx]?.[field];
+                    const errKey = `perHbl.${idx}.${field}`;
                     if (!override) {
+                      // Missing card, or an inherited shared value that is incomplete.
+                      const cardError = errors[errKey]
+                        ?? (Object.keys(errors).some((k) => k.startsWith(`${errKey}.`)) ? `The shared ${cfg.title} is incomplete; customize it for this house bill` : undefined);
                       return (
                         <div
                           key={field}
-                          className="rounded-md border border-dashed border-border/60 px-3 py-4 flex flex-col items-start gap-2 bg-muted/20"
+                          className={`rounded-md border border-dashed px-3 py-4 flex flex-col items-start gap-2 bg-muted/20 ${cardError ? 'border-red-400' : 'border-border/60'}`}
                         >
                           <div className="flex items-center gap-1.5 text-xs font-semibold">
                             <cfg.icon className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1557,6 +1753,7 @@ export default function ShipmentWizard() {
                           >
                             Customize for this HBL
                           </Button>
+                          {cardError && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{cardError}</p>}
                         </div>
                       );
                     }
@@ -1567,6 +1764,7 @@ export default function ShipmentWizard() {
                           icon={cfg.icon}
                           party={override}
                           onChange={(p) => setHblField(idx, field, p)}
+                          errors={partyErrors(errKey)}
                         />
                         <Button
                           type="button"
@@ -1609,12 +1807,16 @@ export default function ShipmentWizard() {
           onChange={v => set('foreignPortOfUnlading', v)} options={CBP_PORTS_4DIGIT}
           placeholder="Search ports…" hint="4-digit CBP port code for the US port of arrival." />
         <div className="space-y-1.5">
-          <HintLabel label="Est. Departure Date" hint="When the vessel departs the foreign port" />
-          <Input type="date" value={form.estimatedDeparture} onChange={e => set('estimatedDeparture', e.target.value)} />
+          <HintLabel label="Est. Departure Date" hint="When the vessel departs the foreign port" htmlFor="isf-est-departure" />
+          <Input id="isf-est-departure" type="date" value={form.estimatedDeparture} onChange={e => set('estimatedDeparture', e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <HintLabel label="Est. Arrival Date" required hint="When the vessel arrives at the US port" />
-          <Input type="date" value={form.estimatedArrival} onChange={e => set('estimatedArrival', e.target.value)}
+          <HintLabel label="Est. Lading Date" hint="When the cargo is loaded at the foreign port. The ISF is due 24 hours before lading; without this date we estimate it conservatively from departure." htmlFor="isf-est-lading" />
+          <Input id="isf-est-lading" type="date" value={form.estimatedLading} onChange={e => set('estimatedLading', e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <HintLabel label="Est. Arrival Date" required hint="When the vessel arrives at the US port" htmlFor="isf-est-arrival" />
+          <Input id="isf-est-arrival" type="date" value={form.estimatedArrival} onChange={e => set('estimatedArrival', e.target.value)}
             className={cn(errors.estimatedArrival && 'border-red-500')} />
           {errors.estimatedArrival && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.estimatedArrival}</p>}
         </div>
@@ -1649,6 +1851,20 @@ export default function ShipmentWizard() {
                   </Button>
                 )}
               </div>
+              {errorPrefix === 'commodities' && form.additionalManufacturers.length > 0 && (
+                <div className="max-w-sm">
+                  <SelectField
+                    label="Manufacturer"
+                    required
+                    value={String(c.manufacturerIndex ?? 0)}
+                    onChange={(v) => onChange(commodities.map((x, idx) => (idx === i ? { ...x, manufacturerIndex: Number(v) } : x)))}
+                    options={[form.manufacturer, ...form.additionalManufacturers].map((m, k) => ({
+                      value: String(k),
+                      label: m.name.trim() || `Manufacturer ${k + 1}`,
+                    }))}
+                  />
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <TextField label="Description" value={c.description}
                   onChange={v => onChange(commodities.map((x, idx) => idx === i ? { ...x, description: v } : x))}
@@ -1927,8 +2143,8 @@ export default function ShipmentWizard() {
         <CardContent className="px-4 pb-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <HintLabel label="Est. Arrival Date" required hint="When the shipment arrives at the US port" />
-              <Input type="date" value={form.estimatedArrival} onChange={e => set('estimatedArrival', e.target.value)} />
+              <HintLabel label="Est. Arrival Date" required hint="When the shipment arrives at the US port" htmlFor="isf5-est-arrival" />
+              <Input id="isf5-est-arrival" type="date" value={form.estimatedArrival} onChange={e => set('estimatedArrival', e.target.value)} />
             </div>
             <PortSelectField label="Foreign Port of Unlading" value={form.foreignPortOfUnlading}
               onChange={v => set('foreignPortOfUnlading', v)} options={SCHEDULE_D_PORTS}
@@ -1985,7 +2201,20 @@ export default function ShipmentWizard() {
         <Section title="Filing & BOL">
           <Item label="Filing Type" value={form.filingType} />
           <Item label="Master BOL" value={form.masterBol} />
-          <Item label="House BOL" value={form.houseBol} />
+          {form.filingType === 'ISF-10' && (
+            <Item label="Bill type" value={form.billType === 'HOUSE' ? 'House bill (BM)' : 'Regular bill (OB)'} />
+          )}
+          {form.billType === 'HOUSE' && <Item label="House BOL" value={form.houseBol} />}
+          {form.billType === 'HOUSE' && form.houseBillScac && <Item label="House bill SCAC" value={form.houseBillScac} />}
+          {form.filingType === 'ISF-10' && (
+            <Item
+              label="ISF filer"
+              value={(form.isfFilerMode || cbpIdentity?.isfFilerModeDefault || 'SIGMA') === 'CLIENT'
+                ? `Your filer code${cbpIdentity?.filerCode ? ` (${cbpIdentity.filerCode})` : ''}`
+                : `MyCargoLens (${cbpIdentity?.sigmaFilerCode ?? 'S7P'})`}
+            />
+          )}
+          {form.bondType === 'single' && <Item label="Surety / bond ref." value={`${form.bondSuretyCode} / ${form.bondReferenceNumber}`} />}
           <Item label="Bond Type" value={BOND_TYPES.find(b => b.value === form.bondType)?.label} />
         </Section>
 
@@ -2010,6 +2239,7 @@ export default function ShipmentWizard() {
                 <PartyReview title="Seller" p={form.seller} />
                 <PartyReview title="Ship-To" p={form.shipToParty} />
                 <PartyReview title="Manufacturer" p={form.manufacturer} />
+                {form.additionalManufacturers.map((m, i) => <PartyReview key={i} title={`Manufacturer ${i + 2}`} p={m} />)}
                 <PartyReview title="Consolidator" p={form.consolidator} />
                 <PartyReview title="Container Stuffing" p={form.containerStuffingLocation} />
               </div>
@@ -2095,7 +2325,7 @@ export default function ShipmentWizard() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild className="shrink-0">
-          <Link to="/shipments"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link to="/shipments" aria-label="Back to shipments"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -2130,7 +2360,7 @@ export default function ShipmentWizard() {
             <p className="text-lg font-bold text-primary">{progress}%</p>
           </div>
           <div className="w-20">
-            <Progress value={progress} className="h-2" />
+            <Progress value={progress} className="h-2" aria-label="Form completion" />
           </div>
         </div>
       </div>
@@ -2213,7 +2443,7 @@ export default function ShipmentWizard() {
         </div>
         {/* Mobile progress */}
         <div className="sm:hidden mt-2">
-          <Progress value={progress} className="h-1.5" />
+          <Progress value={progress} className="h-1.5" aria-label="Form completion" />
           <p className="text-xs text-muted-foreground mt-1 text-center">{progress}% complete</p>
         </div>
       </div>

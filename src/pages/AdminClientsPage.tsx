@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,11 +22,15 @@ import {
 } from '@/components/ui/table';
 import {
   Building2, UserPlus, Loader2, MoreHorizontal, CheckCircle2, Clock,
-  Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck,
+  Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck, Radio, Landmark,
+  Activity, DollarSign,
 } from 'lucide-react';
+import { CbpSetupDialog } from '@/components/admin/CbpSetupDialog';
+import { PricingDialog } from '@/components/admin/PricingDialog';
 import { adminApi } from '@/api/client';
 import type { AdminOrganization, AdminUserLookup } from '@/api/client';
 import { PLAN_META } from '@/lib/planMeta';
+import { money } from '@/lib/pricing';
 import { toast } from 'sonner';
 
 function formatDate(ts: string | null) {
@@ -40,10 +45,19 @@ function planLabel(planId: string | undefined, fallbackName: string | undefined)
   return fallbackName ?? '—';
 }
 
-/** Price label for a plan: PLAN_META if known, else derive from perFilingCents. */
-function planPrice(planId: string, perFilingCents: number) {
-  if (PLAN_META[planId]) return PLAN_META[planId].priceLabel;
-  return `$${Math.round(perFilingCents / 100)}`;
+/** Short price note for a plan in the pickers. Entry prices are per org. */
+function planPrice(p: { perFilingCents: number; sellsEntries: boolean }) {
+  const isf = p.perFilingCents > 0 ? `${money(p.perFilingCents)} / ISF` : 'contract';
+  return p.sellsEntries ? `${isf} · entries priced per client` : isf;
+}
+
+/** One-line summary of an org's prices for the clients table. */
+function pricingSummary(org: AdminOrganization) {
+  const e = org.pricing?.effective;
+  if (!e) return null;
+  const isf = `ISF ${money(e.isfCents)}`;
+  if (e.entryLinkedCents == null || e.entryOnlyCents == null) return isf;
+  return `${isf} · entry +${money(e.entryLinkedCents)} / ${money(e.entryOnlyCents)}`;
 }
 
 interface ProvisionForm {
@@ -279,6 +293,8 @@ export function AdminClientsPage() {
 
   // ─── Change plan dialog ─────────────────────────────────
   const [planDialogOrg, setPlanDialogOrg] = useState<AdminOrganization | null>(null);
+  const [cbpDialogOrg, setCbpDialogOrg] = useState<AdminOrganization | null>(null);
+  const [pricingDialogOrg, setPricingDialogOrg] = useState<AdminOrganization | null>(null);
   const [selectedPlan, setSelectedPlan] = useState('');
 
   const openPlanDialog = (org: AdminOrganization) => {
@@ -315,7 +331,20 @@ export function AdminClientsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
           <p className="text-muted-foreground">Provision and manage client accounts</p>
         </div>
-        <Dialog open={provisionOpen} onOpenChange={setProvisionOpen}>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/admin/cbp">
+              <Activity className="mr-2 h-3.5 w-3.5" />
+              CBP traffic
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/admin/cert">
+              <Radio className="mr-2 h-3.5 w-3.5" />
+              Certification console
+            </Link>
+          </Button>
+          <Dialog open={provisionOpen} onOpenChange={setProvisionOpen}>
           <DialogTrigger asChild>
             <Button>
               <UserPlus className="mr-2 h-4 w-4" />
@@ -391,7 +420,7 @@ export function AdminClientsPage() {
                         <span className="flex items-center gap-2">
                           <span>{planLabel(p.id, p.name)}</span>
                           <span className="text-xs text-muted-foreground">
-                            {planPrice(p.id, p.perFilingCents)} / shipment
+                            {planPrice(p)}
                           </span>
                         </span>
                       </SelectItem>
@@ -421,7 +450,8 @@ export function AdminClientsPage() {
               </Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {/* Clients table */}
@@ -452,6 +482,7 @@ export function AdminClientsPage() {
                   <TableHead>Company</TableHead>
                   <TableHead>Plan</TableHead>
                   <TableHead>Owner</TableHead>
+                  <TableHead>CBP</TableHead>
                   <TableHead>Users</TableHead>
                   <TableHead>Filings</TableHead>
                   <TableHead>Created</TableHead>
@@ -476,9 +507,12 @@ export function AdminClientsPage() {
                     </TableCell>
                     <TableCell>
                       {org.plan ? (
-                        <Badge variant="secondary" className="text-xs">
-                          {planLabel(org.plan.id, org.plan.name)}
-                        </Badge>
+                        <div className="space-y-1">
+                          <Badge variant="secondary" className="text-xs">
+                            {planLabel(org.plan.id, org.plan.name)}
+                          </Badge>
+                          <p className="text-[11px] text-muted-foreground tabular-nums">{pricingSummary(org)}</p>
+                        </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">No plan</span>
                       )}
@@ -503,6 +537,23 @@ export function AdminClientsPage() {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
+                    <TableCell>
+                      {org.cbp?.filerCode ? (
+                        <div className="space-y-1">
+                          <p className="font-mono text-sm">{org.cbp.filerCode}</p>
+                          <Badge
+                            variant="secondary"
+                            className={`text-[10px] ${org.cbp.serviceCenterApprovedAt
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'}`}
+                          >
+                            {org.cbp.serviceCenterApprovedAt ? 'Queue approved' : 'Awaiting rep'}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">ISF via S7P only</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm tabular-nums">
                       {org.userCount} / {org.maxUsers}
                     </TableCell>
@@ -511,14 +562,22 @@ export function AdminClientsPage() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${org.name}`}>
+                            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setCbpDialogOrg(org)}>
+                            <Landmark className="h-3.5 w-3.5 mr-2" />
+                            CBP setup…
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openPlanDialog(org)}>
                             <ArrowRightLeft className="h-3.5 w-3.5 mr-2" />
                             Change plan
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setPricingDialogOrg(org)} disabled={!org.plan}>
+                            <DollarSign className="h-3.5 w-3.5 mr-2" />
+                            Pricing…
                           </DropdownMenuItem>
                           {org.owner && (
                             <DropdownMenuItem
@@ -542,13 +601,17 @@ export function AdminClientsPage() {
 
       <UserLookupCard />
 
+      <CbpSetupDialog org={cbpDialogOrg} onClose={() => setCbpDialogOrg(null)} />
+      <PricingDialog org={pricingDialogOrg} onClose={() => setPricingDialogOrg(null)} />
+
       {/* Change plan dialog */}
       <Dialog open={!!planDialogOrg} onOpenChange={(open) => !open && setPlanDialogOrg(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Change plan</DialogTitle>
             <DialogDescription>
-              Update the pricing tier for {planDialogOrg?.name}.
+              Update the plan for {planDialogOrg?.name}. The plan sets which features they can use; what they
+              pay is set under Pricing. An unpaid charge stays owed after a plan change.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
@@ -563,7 +626,7 @@ export function AdminClientsPage() {
                     <span className="flex items-center gap-2">
                       <span>{planLabel(p.id, p.name)}</span>
                       <span className="text-xs text-muted-foreground">
-                        {planPrice(p.id, p.perFilingCents)} / shipment
+                        {planPrice(p)}
                       </span>
                     </span>
                   </SelectItem>

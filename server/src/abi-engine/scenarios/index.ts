@@ -1,0 +1,3042 @@
+/**
+ * CBP ABI certification scenarios (Phase 3) — executable fixtures.
+ *
+ * Values come verbatim from the CBP test package ("ABI Test complete list
+ * of scenarios (Trade).docx"); "Client Rep will supply" values flow in via
+ * CertParams. HTS rates are pinned from the ingested USITC 2026-aug-06
+ * revision so the harness is hermetic. Package standing rules applied by
+ * the aeScenario helper: $10,000 line values, statement payment, scenario
+ * number in the B-record (pos 60) AND the Broker Reference Number.
+ *
+ * First batch: 001–005, 007, 008, 010, 015–017. The remaining scenarios
+ * land batch by batch; companion-app scenarios (006/021/022/050/062–066/
+ * 080) reuse the apps/ builders.
+ */
+import { type Scenario, aeScenario, aeRejectScenario, appScenario, statementDateFrom } from './aeBase.js';
+import { buildEntrySummaryQuery } from '../apps/esQuery/builder.js';
+import { buildAdCvdCaseQuery } from '../apps/adcvd/builder.js';
+import { buildQuotaQuery } from '../apps/quota/builder.js';
+import { buildTibExtension } from '../apps/tib/builder.js';
+import { buildCensusOverride } from '../apps/census/cwBuilder.js';
+import { buildBatch, scenarioTag } from '../envelope/batch.js';
+import { buildCensusWarningQuery } from '../apps/census/cjBuilder.js';
+import { buildIsf, type IsfInput } from '../isf/builder.js';
+import type { CertParams } from './params.js';
+import { parseIsfResponseBatch } from '../isf/responseParser.js';
+
+// ── NT52 reciprocal adjustment (F771) + F429 foreign port of lading ──
+// Proven by live CERT ACCEPTs on 001/002: every AE entry line carries its
+// ORIGIN country's 9903.05.xx reciprocal number as a value-0 tariff placed
+// after any 9999/98xx provision marker and before the substantive
+// classification. Numbers/rates come from CERT's own HTS table (HA sweeps,
+// Aug 2026); where a country has a 0% subdivision-qualified twin (JP/EU/
+// KR/CH/TW/CN) the duty-bearing row is used. Vessel scenarios (MOT
+// 10/11/12) additionally carry the EXPORT country's Schedule K foreign
+// port of lading, verified against CBP ACE Appendix F (April 2, 2026).
+// Section 301 List 3 (technology-transfer action) — Chinese goods stack
+// this ON TOP of the NT52 forced-labor row (chapter note ii wants the
+// commodity's exact remedy number; batteries confirmed List 3 25%).
+const S301_LIST3 = 'The duty provided in the applicable subheading + 25%';
+// 9903.91.06 = Jan-2026 four-year-review action ("perm magnets, lithium
+// non-EV batteries", 25%, CERT-confirmed 8/25) — the battery line's 301
+// number. The 2018 list numbers (9903.88.xx) do NOT satisfy F771 for
+// commodities moved to review actions (live: F771 with .88.03 on batteries,
+// while propane accepted with it).
+const S301_REVIEW_BATT = 'The duty provided in the applicable subheading + 25%';
+// 9903.94.06 = Section 232 autos/auto-parts note 33(g)/(h) special-treatment
+// subdivision, 0% (CERT-confirmed). Li-ion batteries are 232 auto parts —
+// the battery line's THIRD required program, per Karl 8/25 (order:
+// 9903.91.06 / 9903.05.31 / 9903.94.06 / substantive).
+const S232_AUTO_PARTS_SPECIAL = 'Free';
+const NT52_125 = 'The duty provided in the applicable subheading + 12.5%';
+const NT52_100 = 'The duty provided in the applicable subheading + 10%';
+// Verbatim USITC General texts (2026-aug-06 edition) for headings the
+// fixtures once hand-wrote as plain or 'Free' rates (audit MHT-01/02).
+const NO_ADDITIONAL = 'The duty provided in the applicable subheading';
+const S232_CONTENT_50 = 'The duty provided in the applicable subheading + 50%';
+const S232_DERIVATIVE_25 = 'The duty provided in the applicable subheading + 25%';
+const NT52_JP_125 = '12.5%';
+
+export const SCENARIOS: Scenario[] = [
+  aeScenario('001', 'Singapore Free Trade Agreement', {
+    // 9999.00.84 is the Singapore FTA provision marker the package pairs
+    // with the substantive classification; both rates are Free (USITC).
+    // CERT-floor findings (live, Aug 21 2026, via the HA query of CERT's
+    // own HTS table): 9903.01.25 is NOT ON FILE there (their table predates
+    // the IEEPA reciprocal regime — omitted; one not-on-file tariff cascades
+    // F642 onto every tariff of the line), and 9999.00.84 carries ZERO
+    // reporting units — any UOM is rejected ('X' → F441, 'NO' → F442), so
+    // quantity AND uom are omitted entirely.
+    // 9903.05.68 fills the F771 adjustment slot — per Karl Fischer
+    // (client rep, 8/24/2026): Singapore country-specific reciprocal rate,
+    // 12.5%, effective 7/24/2026, CSMS #69326983. The Jul-2026 9903.05.xx
+    // country-rate family IS loaded in CERT (unlike the Apr-2025 9903.01.xx
+    // family, NOT ON FILE per our HA sweeps).
+    rates: {
+      '99990084': 'Free',
+      '99030568': 'The duty provided in the applicable subheading + 12.5%',
+      '8443992050': 'Free',
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'SG';
+      line.countryOfExport = 'SG';
+      line.spiClaimCode = 'SG';
+      line.descriptions = ['PRINTER PARTS'];
+      // F429: MOT 11 requires the foreign port of lading (Schedule K).
+      line.foreignPortOfLading = '55976'; // Singapore
+      line.parties = [
+        { type: 'M', identifier: 'SGSIGPRI123SIN' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // Tariff order per ACE's live verdicts: 9999 marker FIRST (marker-
+      // second draws F852 HTS OUT OF SEQUENCE + F613 RELATIONSHIP MISMATCH),
+      // substantive last. The F771 adjustment slot sits between them once
+      // CERT tells us which 9903 number its table carries for this pairing.
+      line.tariffs = [
+        { htsNumber: '99990084', valueDollars: 0 },
+        { htsNumber: '99030568', valueDollars: 0 },
+        { htsNumber: '8443992050', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 10000 },
+      ];
+    },
+  }),
+
+  aeScenario('002', 'US – Israel Free Trade Area Agreement', {
+    // NT52 adjustment = the ORIGIN COUNTRY number: Egypt 9903.05.36 at
+    // 12.5% (CERT HA sweep 8/25). The textiles row 9903.05.95 alone does
+    // NOT satisfy F771 (live-tested: accepted as valid but adjustment
+    // still 'missing') — the edit wants the country number, mirroring
+    // 001's accepted shape. QIZ preference kills the 32% column-1 duty
+    // only; the NT52 12.5% ($1,250) is paid.
+    rates: {
+      '99030536': 'The duty provided in the applicable subheading + 12.5%',
+      '6110303059': { general: '32%', special: 'Free (AU,BH, CL,CO,IL,JO,KR, MA,OM,P, PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'EG';
+      line.countryOfExport = 'EG';
+      // Package instructs SPI "N" (Israel FTA extension / QIZ). The USITC
+      // Special column does not print N, so the preference duty is pinned
+      // here rather than derived: eligible per the scenario ⇒ Free.
+      line.spiClaimCode = 'N';
+      line.descriptions = ['KNIT SWEATERS, MAN-MADE FIBERS'];
+      // F429 (vessel MOT): foreign port of lading — Alexandria, Egypt
+      // (Schedule K 72901), matching the QIZ/Egypt export.
+      line.foreignPortOfLading = '72901';
+      line.parties = [
+        { type: 'M', identifier: 'EGCAIKNI456CAI' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030536', valueDollars: 0 },
+        {
+          htsNumber: '6110303059',
+          valueDollars: 10000,
+          uomCode1: 'DOZ',
+          quantity1Hundredths: 10000,
+          uomCode2: 'KG',
+          quantity2Hundredths: 50000,
+          dutyCents: 0, // pinned: see SPI note above
+        },
+      ];
+      line.textileCategoryCode = '646';
+    },
+    notes: 'SPI N (Israel FTA) is not in the USITC Special column — duty pinned to Free per the scenario’s eligibility statement. Confirm SPI letter with client rep.',
+  }),
+
+  aeScenario('003', 'Live Entry Indicator', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    mutate: (p) => {
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, liveEntry: true };
+      const line = p.entrySummary.lines[0];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+    },
+  }),
+
+  aeScenario('004', 'Single Entry Bond with Surety and Bond Information', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      // Karl (8/25): use the $50k-bond test importer for the STB scenario —
+      // and per CBP internal notes, F752 NO STB FOUND is a PASS for software
+      // vendors when the 31-record data is otherwise correct.
+      p.entrySummary.importerOfRecord.number = '58-123456789';
+      p.entrySummary.consigneeNumber = '58-123456789';
+      const seller = line.parties?.find((pt) => pt.type === 'S');
+      if (seller) seller.identifier = '58-123456789';
+      p.entrySummary.bonds = [
+        {
+          bondTypeCode: '9',
+          designationTypeCode: 'B',
+          suretyCompanyCode: '891',
+          stbAmountDollars: 150000,
+          stbProducerAccountNumber: 'AB12345678',
+        },
+      ];
+    },
+    notes: 'IOR 58-123456789 per Karl (STB test importer, $50k bond). Expected outcome: F752 NO STB FOUND = vendor PASS when the 31-record is correct.',
+  }),
+
+  aeScenario('005', 'Census Warning Override within AE', {
+    // 9903.88.15 added: F771 persisted with NT52 alone (live 8/25) — CN
+    // propane is 301 List 4A, and the remedy edit wants the 301 number
+    // specifically (chapter note ii). Same 301→NT52→substantive stack as 089.
+    rates: {
+      '99038803': S301_LIST3, // List 3 (petroleum gases), not 4A — live F771 with .15
+      '99030531': NT52_125,
+      '2711120010': 'Free',
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['PROPANE, LIQUEFIED'];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [
+        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3 25%
+        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
+        { htsNumber: '2711120010', valueDollars: 30323, uomCode1: 'M3', quantity1Hundredths: 5078 },
+      ];
+      // Override code 49 = parameter change requested (package bonus info).
+      // The condition code being overridden arrives on the AX census warning
+      // at cert time; the dry-run pins a placeholder.
+      line.censusOverrides = [{ conditionCode: '27D', overrideCode: '49' }];
+    },
+    notes: 'Census condition code comes from the live AX warning during cert; 27D = live CERT warning for this line (W27D OR-HI VAL/QTY, seen 8/25).',
+  }),
+
+  // 006 is TWO-PHASE: first generate/transmit the AE half (the census
+  // warning bait: \$145,682 for qty 1); once its AX (with the census
+  // warning) is attached, the next generate builds the standalone CW
+  // carrying the LIVE warning code — the scenario's whole point is
+  // overriding without retransmitting the summary.
+  (() => {
+    const aeHalf = aeScenario('006', 'Census Warning Override — standalone transmission', {
+      rates: {
+        // Karl's 8/27 answer: 9903.05.90 IS the NT52-side 232 exclusion
+        // (correct all along, just not alone) and 9903.82.10 is the steel
+        // 232 number (15% per CERT — 'DER ALU & STL, COL 1 < 15%, NT16').
+        '99030590': NO_ADDITIONAL,
+        '99038210': '15%',
+        '8415820120': { general: '2.2%', special: 'Free (A,AU,B,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+      },
+      mutate: (p) => {
+        const line = p.entrySummary.lines[0];
+        // Origin unspecified by the package — MX avoids the China 301
+        // stack; NT52 MX 10% + 2.2% general.
+        line.countryOfOrigin = 'MX';
+        line.countryOfExport = 'MX';
+        line.descriptions = ['AIR CONDITIONING MACHINES'];
+        line.foreignPortOfLading = '20199'; // Veracruz (Schedule K)
+        line.parties = [
+          { type: 'M', identifier: 'MXMEXAPP159MEX' },
+          { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+        ];
+        line.tariffs = [
+          // Karl's 9/2 key, verbatim: "You don't need 99030555 if you have
+          // the 90. 9903.82.10 is 15% 21852.30. 0% on the 1-97 line." The
+          // NT52 country number is DROPPED (its mere presence makes ACE
+          // compute duty against it), the 232 bucket deposits its flat
+          // rate, and the 232 rate REPLACES column 1 (the ch.1-97 line
+          // deposits zero) — the same 'replaced' semantics as 019/024.
+          { htsNumber: '99030590', valueDollars: 0 },
+          { htsNumber: '99038210', valueDollars: 0 }, // computed: 15% x $145,682 = 21852.30
+          { htsNumber: '8415820120', valueDollars: 145682, uomCode1: 'NO', quantity1Hundredths: 100 },
+        ];
+        // Live F794 ADDTNL DEC TYPE RQRD FOR ARTICLE: A/C machines are 232
+        // steel AND aluminum derivatives, so the line carries Importer's
+        // Additional Declaration 54-records Type 07 (Aluminum Smelt and
+        // Cast, ESF-111/112) and Type 08 (Steel Melt and Pour, ESF-113/114).
+        // information = record positions 5-80. PLACEHOLDER countries (rep to
+        // confirm): all-MX smelt/cast and melt/pour matching the MX origin.
+        line.declarations = [
+          // Type 07 (aluminum) REMOVED: live F773 ADDTNL DEC TYPE NOT ALLWD
+          // when both metals were declared — A/C units are on the STEEL
+          // derivative list only (8/27).
+          // Type 08 sub-layout: pos 5-6 country of melt and pour 'MX' |
+          // 7-9 applicability code (blank — ISO code given) | 10-80 filler.
+          { typeCode: '08', information: 'MX' },
+        ];
+      },
+    });
+    const scenario: Scenario = {
+      id: '006',
+      title: 'Census Warning Override — standalone transmission',
+      application: 'CW',
+      kind: 'transmit',
+      notes:
+        'Two-phase: generate #1 = the AE half; after its AX census warning auto-attaches, generate #2 = the standalone CW with the live warning code. OPEN (F771): 232-derivative chapter-99 number(s) pending the CERT HA sweep of 99038100-99038199/99038500-99038599 — see TODO(232-derivative-number) at the tariffs. Rep to confirm the 54-record Type 07/08 countries (placeholders: aluminum primary smelt MX + cast MX; steel melt and pour MX).',
+      run: async (params, ctx) => {
+        const prior = ctx?.priorResponseText ?? '';
+        // Phase 2 only when the AE half was ACCEPTED with a census warning —
+        // a rejected AX can also carry W-codes (live lesson: the CW then
+        // references an entry ACE never added → C02 ENTRY SUMMARY NOT FOUND).
+        // Verdict letters: E1A 995 plain, E1AI (informationals), E1AW
+        // (warnings) — the census bait lands as E1AW995 (live 9/2), which
+        // the original [I ]? gate missed.
+        const accepted = /E1A[WI ]?\s*99[56]/.test(prior);
+        const warning = prior.match(/E1\s+(W[A-Z0-9]{2,3})\s/);
+        if (!accepted || !warning) return aeHalf.run(params, ctx);
+        return buildBatch({
+          sender: params.sender,
+          appId: 'CW',
+          blocks: [{
+            port: params.districtPortOfEntry,
+            filerCode: params.filerCode,
+            userData: scenarioTag('006'),
+            transactionLines: buildCensusOverride({
+              filerCode: params.filerCode,
+              entries: [{
+                entryNumber: '0000006',
+                lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: warning[1].slice(1), overrideCode: '49' }] }],
+              }],
+            }),
+          }],
+        });
+      },
+    };
+    return scenario;
+  })(),
+
+  aeScenario('009', 'Quota Informal', {
+    rates: {
+      '99030581': NT52_100,
+      '1806901500': { general: '3.5%', special: 'Free (A*,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '12';
+      // Quota requires certification for cargo release (package note).
+      p.entrySummary.cargoReleaseCertification = true;
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GB';
+      line.countryOfExport = 'GB';
+      line.relatedPartyIndicator = undefined;
+      line.descriptions = ['CHOCOLATE CONFECTIONERY, QUOTA'];
+      // F657: CERT's own HTS record for 1806.90.15 carries fee class 110
+      // (sugar assessment) at \$0.01327/kg, computation code 2 — 5 kg ⇒ \$0.07.
+      line.fees = [{ classCode: '110', amountCents: 7 }];
+      line.foreignPortOfLading = '41323'; // Felixstowe (Schedule K)
+      // Live SE90 (8/26): the requested cargo-release certification demands
+      // parties the informal AE itself may omit — 11038 MISSING MANUFACTURER
+      // rides the 47-record MID (GBALBCON12FEL = ALBION CONFECTIONS LTD,
+      // 12 QUAY ROAD, FELIXSTOWE — being added to CERT's manufacturer file
+      // via AMF), and the sold-to importer mirrors the accepted scenarios'
+      // 'S' party (the certify derivation's Buyer source at line level).
+      line.parties = [
+        { type: 'M', identifier: 'GBALBCON12FEL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030581', valueDollars: 0 }, // NT52 GB 10%
+        {
+          htsNumber: '1806901500',
+          valueDollars: 30,
+          uomCode1: 'KG',
+          quantity1Hundredths: 500,
+          uomCode2: 'CKG',
+          quantity2Hundredths: 131,
+        },
+      ];
+    },
+    postMap: (input, params) => {
+      // 1806901500 carries PGA flag FD4 (FDA data REQUIRED, not
+      // disclaimable) \u2014 live CERT reject FP00 'PGA DATA MISSING PER PGA
+      // FLAG FD4'. First pass filed the SG v2.6 ch.10 (Non-PN) set; CERT
+      // answered FPS1 'PN DATA REQUIRED', so this is now the ch.9 Food
+      // Commodity COMBINED Entry set (801(a)+801(m) in one message):
+      // - PG01 FOO/PRO (processed food, Table 9-1; IUC optional per 9.3
+      //   Note 3) + PG02 FDP 7-char product code (industry 33 \u21d2 subject
+      //   to PN per the 9.4 industry-code test).
+      // - PG06 twice (9.5 Note 1): 39 country of production (processed
+      //   food) AND CSH country of shipment \u2014 CSH is required for PN;
+      //   its absence drew FPE5 'MSNG OR INVLD SOURCE TYPE CODE'.
+      // - PG10 common/usual name.
+      // - Mandatory entity trios per Table 9-14: MF (39-country match),
+      //   DEQ shipper, FD1 importer, DFP owner, UC ultimate consignee,
+      //   PNS submitter + PNT transmitter (PG21 with name/phone/email
+      //   REQUIRED for both, 9.12) \u2014 missing roles drew FPDL 'MANDATORY
+      //   ENTITIES ARE MISSING'. DP is NOT in the ch.9 table and drew
+      //   FPDM 'ONLY MANDATORY ENTITIES ALLOWED' \u2014 dropped. FSV stays:
+      //   Table 9-15 keeps FSVP mandatory for all FOO lines unless
+      //   industry 16/32 or AoC FSX/RNE (chocolate is industry 33).
+      // - PG23 AoCs (Table 9-21) \u2014 FPN9 'MISSING AFFIRMATION OF COMP
+      //   CODE': PFR (manufacturer food facility registration, 11N) with
+      //   the MF entity ('Either FME or PFR is required when the
+      //   Manufacturer is transmitted'); shipment-level VES vessel name
+      //   (required, MOT ocean) + VFT voyage number. CAN omitted \u2014 only
+      //   needed when no SCAC is filed (carrier MAEU is on the bill).
+      // - PG26 (5 KG net; KG base unit).
+      // - PG27 container number (Table 9-28: required for PN when food
+      //   arrives as containerized cargo by water) \u2014 was FPW5 'MISSING
+      //   PG27'.
+      // - PG30 'A' arrival with location code '2' (= Schedule D port,
+      //   the ONLY value ch.9 Table 9-30 allows) + port 3001 (unlading
+      //   port \u2014 21 CFR 1.276(b)(11): arrival by water \u21d2 port of
+      //   unloading) \u2014 blank location drew FPT7 'MSNG OR INVLD INSP
+      //   ARVL LOC CD'.
+      // Not LACF/AF (no PIC F/E/I) \u21d2 no FCE/SID/VOL AoCs.
+      input.lines![0].pga = {
+        commercialDescription: 'CHOCOLATE CONFECTIONERY, RETAIL PACKS',
+        sets: [
+          {
+            kind: 'data',
+            agencyCode: 'FDA',
+            programCode: 'FOO',
+            processingCode: 'PRO',
+            // Product code borrowed from the guide's own candy example
+            // (Appendix A, p.306: '33LGT07' soft candy) \u2014 the true
+            // chocolate/cocoa code (industry 34) must come from FDA's
+            // Product Code Builder before cert transmission.
+            product: { codes: [{ qualifier: 'FDP', number: '33LGT07' }] },
+            sources: [
+              { typeCode: '39', countryCode: 'GB' }, // country of production (processed food)
+              { typeCode: 'CSH', countryCode: 'GB' }, // country of shipment \u2014 required for PN (9.5 Note 1)
+            ],
+            productName: 'CHOCOLATE CANDY, RETAIL PACKS',
+            entities: [
+              {
+                // Line has no MID party (informal entry) \u2014 GB maker is a
+                // dry-run placeholder pending the rep's cert data.
+                roleCode: 'MF',
+                name: 'ALBION CONFECTIONS LTD',
+                address1: '12 QUAY ROAD',
+                city: 'FELIXSTOWE',
+                country: 'GB',
+                // Table 9-21: PFR or FME is required with the MF. 11N FFR
+                // PLACEHOLDER \u2014 the maker's real FDA food facility
+                // registration number must come from the rep before cert.
+                affirmations: [{ code: 'PFR', qualifier: '12345678901' }],
+              },
+              {
+                roleCode: 'DEQ',
+                name: 'ALBION CONFECTIONS LTD',
+                address1: '12 QUAY ROAD',
+                city: 'FELIXSTOWE',
+                country: 'GB',
+              },
+              {
+                roleCode: 'FD1',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [
+                  {
+                    qualifier: 'FD1',
+                    name: 'IMRAN SIDDIQUE',
+                    telephone: '2135550100',
+                    emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM',
+                  },
+                ],
+              },
+              {
+                // Owner (Table 9-14) \u2014 importer owns the goods.
+                roleCode: 'DFP',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+              },
+              {
+                // Ultimate consignee = deliver-to party (Table 9-14 note 1).
+                roleCode: 'UC',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+              },
+              {
+                // PN Submitter \u2014 self-filer, so the importer (9.12: PG21
+                // with name, phone AND email is mandatory for PNS).
+                roleCode: 'PNS',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [
+                  {
+                    qualifier: 'PNS',
+                    name: 'IMRAN SIDDIQUE',
+                    telephone: '2135550100',
+                    emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM',
+                  },
+                ],
+              },
+              {
+                // PN Transmitter \u2014 the ABI filer (us). PG21 mandatory (9.12).
+                roleCode: 'PNT',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [
+                  {
+                    qualifier: 'PNT',
+                    name: 'IMRAN SIDDIQUE',
+                    telephone: '2135550100',
+                    emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM',
+                  },
+                ],
+              },
+              {
+                // FSVP importer (Table 10-13): DUNS placeholder \u2014 the
+                // importer's real D-U-N-S goes here at cert time.
+                roleCode: 'FSV',
+                identificationCode: '16',
+                number: '123456789',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [
+                  { qualifier: 'FSV', name: 'IMRAN SIDDIQUE', emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM' },
+                ],
+              },
+            ],
+            // Shipment-level AoCs (Table 9-21, MOT ocean): VES vessel name
+            // (base cargo conveyance) + VFT voyage. Voyage number is a
+            // PLACEHOLDER — no voyage exists in the package; confirm or
+            // drop at cert time. CAN omitted (SCAC MAEU is on the bill).
+            affirmations: [
+              { code: 'VES', qualifier: 'EVER GIVEN' },
+              { code: 'VFT', qualifier: '0823E' },
+            ],
+            quantities: [{ qualifier: 1, quantityHundredths: 500, uom: 'KG' }],
+            // PG27 (Table 9-28): container number matching the bill.
+            // PLACEHOLDER — dry-run container pending the rep's cert data.
+            containers: ['MAEU1234567'],
+            // PG30 (Table 9-30): location code '2' = Schedule D port (the
+            // only allowed value) + port of arrival 3001 (port of
+            // unlading — arrival by water ⇒ port of unloading, 21 CFR
+            // 1.276(b)(11)).
+            arrival: {
+              status: 'A',
+              dateMMDDCCYY: `0820${params.currentYear}`,
+              timeHHMM: '0900',
+              locationCode: '2',
+              location: '3001',
+            },
+          },
+        ],
+      };
+      // Live SE90 (8/26) — certify-only header data the AE otherwise never
+      // carries:
+      // - 11037 MISSING SELLER: the Seller must be reported by NAME AND
+      //   ADDRESS (SE30+SE35+SE36; the identifier route is BY/ST-only per
+      //   SE30 Note 2, ESF-60). Seller = the GB maker, matching the FDA MF
+      //   entity and the 47-record MID.
+      // - 11035 MISSING BUYER: BY may ride an EI-qualified identifier in
+      //   IOR-number format (SE30 Note 2) — the importer.
+      input.cargoEntities = [
+        {
+          code: 'SE',
+          name: 'ALBION CONFECTIONS LTD',
+          addressComponents: [
+            { qualifier: '01', information: '12' }, // street number
+            { qualifier: '02', information: 'QUAY ROAD' }, // street name
+          ],
+          geography: { city: 'FELIXSTOWE', countryCode: 'GB' },
+        },
+        { code: 'BY', identifier: { qualifier: 'EI', value: params.importerOfRecordNumber } },
+      ];
+      // - 11208 MISSING CONTACT INFO: the SE13 Correction Request Contact
+      //   Detail (ESF-41). The spec makes it mandatory on Replace+certify;
+      //   CERT's SX demands it on the Add certify too.
+      input.certifyContact = { name: 'IMRAN SIDDIQUE', phone: '2135550100' };
+      // - 11119 ENTRY VALUE LESS THAN ALL LINE ITEM VALUES + 11022 INVALID
+      //   SHIPMENT VALUE: the AE has NO entry-level value field — the
+      //   derived release's SE10 entry value and SE60 line values both come
+      //   from the 50-records, and the $30 already sits on the ch.1-97
+      //   commodity row exactly as SE60 Note 2 orders (ch.99 rows carry $0).
+      //   Read as a cascade of the failed entity/contact derivation; no
+      //   value change made (package-specified $30 stays).
+    },
+    notes:
+      'FD4 satisfied with the SG ch.9 Food Combined Entry (801a+801m) FOO/PRO set \u2014 CERT demanded PN inclusion (FPS1). Rep to confirm before cert: FDA product code (placeholder 33LGT07 from SG Appendix A \u2014 chocolate is industry 34 via the Product Code Builder), FSVP DUNS (placeholder 123456789), MF food facility registration (PFR placeholder 12345678901), voyage number (VFT placeholder 0823E), container number (PG27 placeholder MAEU1234567), GB manufacturer/shipper identity. SE90 certify data (8/26): MF MID GBALBCON12FEL (needs the AMF add on CERT first), Seller SE30 name+address = Albion Confections, Buyer BY = importer EI identifier, SE13 contact (placeholder Imran Siddique / 2135550100). 11119/11022 value conditions read as cascade of the missing entities \u2014 $30 line value untouched.',
+  }),
+
+  aeScenario('007', 'MOT/Port of Unlading', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    mutate: (p, params) => {
+      const line = p.entrySummary.lines[0];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K; export country CN)
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      p.entrySummary.motCode = '11';
+      // Package says 3205 — that's Honolulu INTL AIRPORT (Schedule D), and ACE
+      // refuses it for MOT 11 (F169, live 8/25). 3201 = Honolulu seaport:
+      // same district, preserves the vessel + in-transit intent.
+      p.entrySummary.cargo = { ...p.entrySummary.cargo, carrierCode: 'HLCU', districtPortOfUnlading: '3201' };
+      // In-bond movement claimed ⇒ the in-bond date is required (ESF-40)
+      // and must sit between import date and estimated entry (ESF-155).
+      p.entrySummary.dates = { ...p.entrySummary.dates, inBond: `${params.currentYear}0816` };
+      p.entrySummary.manifests = [
+        {
+          manifestedQuantity: 100,
+          uomCode: 'CTNS',
+          bills: [
+            { type: 'I', identifier: '615310393' },
+            { type: 'M', issuerCode: 'HLCU', identifier: 'HAM190603443' },
+            { type: 'H', issuerCode: 'DMAL', identifier: 'LEH260068' },
+          ],
+        },
+      ];
+    },
+    notes: 'Package prints the master bill as HLCUHAM190603443 — split per Appendix E into SCAC issuer HLCU + number HAM190603443.',
+  }),
+
+  aeScenario('008', 'GSP', {
+    rates: {
+      '99030564': NT52_125,
+      '3802100020': { general: '4.8%', special: 'Free (A*,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'PH';
+      line.countryOfExport = 'PH';
+      line.spiClaimCode = 'A';
+      line.descriptions = ['ACTIVATED CARBON'];
+      line.foreignPortOfLading = '56549'; // Manila (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'PHMANCAR789MNL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030564', valueDollars: 0 }, // NT52 PH 12.5%
+        // GSP is lapsed: per CBP's lapse procedure the SPI A claim stays on
+        // the line but estimated duty deposits at the column-1 general rate
+        // (4.8% × $10,000). Filing Free drew F624 EST/CALC'D DUTY MISMATCH
+        // (live 8/26) — ACE computes the general-rate deposit.
+        { htsNumber: '3802100020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 20000, dutyCents: 48000 },
+      ];
+    },
+  }),
+
+  aeRejectScenario('010', 'In-Transit Date Validation', {
+    rates: { '8507600030': '3.41%' },
+    mutate: (p, params) => {
+      const cy = params.currentYear;
+      // Package dates: importation 02/01, exportation 01/21, in-transit
+      // 01/22 — the in-transit date precedes the import date, which
+      // ESF-155 forbids. Our system must refuse to transmit this.
+      p.entrySummary.dates = { estimatedEntry: `${cy}0210`, importation: `${cy}0201`, inBond: `${cy}0122` };
+      p.entrySummary.lines[0].dateOfExportation = `${cy}0121`;
+      p.entrySummary.manifests = [
+        {
+          manifestedQuantity: 100,
+          uomCode: 'CTNS',
+          bills: [
+            { type: 'I', identifier: '111271425' },
+            { type: 'M', issuerCode: 'MAEU', identifier: '123456789012' },
+          ],
+        },
+      ];
+    },
+    notes: 'Intentionally invalid: in-transit 01/22 is earlier than importation 02/01 (ESF-155). Rejection evidence goes to the client rep.',
+  }),
+
+  aeScenario('015', 'Deletion of an Entry Summary', {
+    rates: {},
+    action: 'D',
+    // Package: "Submit a delete action for the entry summary accepted in
+    // Scenario Number 014" — the target is 014's entry (0000014), not
+    // 015's own sequence (FB25 NOT FOUND when we used it, live 8/28).
+    mutate: (p) => {
+      p.entrySummary.entryNumber = '0000014';
+    },
+  }),
+
+  aeRejectScenario('016', 'Invalid Entry Type for AE', {
+    rates: { '8507600030': '3.41%' },
+    mutate: (p) => {
+      // Type 86 (Section 321) is not a valid AE entry type — AE Table 2.
+      p.entrySummary.entryTypeCode = '86';
+    },
+    notes: 'Intentionally invalid: type 86 must be rejected client-side (AE Table 2).',
+  }),
+
+  aeScenario('017', 'Replacement of an Entry Summary', {
+    rates: { '99030581': NT52_100, '9014805000': 'Free' },
+    action: 'R',
+    mutate: (p) => {
+      // Step-2 replacement data from the package.
+      p.entrySummary.brokerReferenceNumber = '020REPLCE';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GB';
+      line.countryOfExport = 'GB';
+      line.descriptions = ['NAVIGATIONAL INSTRUMENTS'];
+      line.foreignPortOfLading = '41323'; // Felixstowe (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'GBLONNAV321LON' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030581', valueDollars: 0 }, // NT52 GB 10%
+        { htsNumber: '9014805000', valueDollars: 53000, uomCode1: 'NO', quantity1Hundredths: 100 },
+      ];
+    },
+    notes: 'Step 1 (original acceptance) is the live-cert half; this fixture is the step-2 Replace transmission.',
+  }),
+
+  aeScenario('011', 'Estimated Date of Arrival Validation', {
+    // Karl's answer key (8/27) for the Feb-dated entry, exact order:
+    // 9903.91.06 (301 review, 25%) / 9903.01.24 (IEEPA fentanyl-era, rate
+    // pinned 20% — not queryable in CERT's Aug view, era-scoped) /
+    // 9903.01.33 (reciprocal exclusion for 232-covered articles, pinned
+    // Free) / 9903.94.05 (232 auto parts, 25% CERT-confirmed) / substantive.
+    rates: {
+      '99039106': S301_REVIEW_BATT,
+      '99030124': 'The duty provided in the applicable subheading + 10%', // CN/HK EO — 10% per CERT's own Feb view (as-of 020126 query, 8/27)
+      '99030133': 'The duty provided in the applicable subheading',
+      '99039405': 'The duty provided in the applicable subheading + 25%',
+      '8507600030': '3.41%',
+    },
+    mutate: (p, params) => {
+      const line = p.entrySummary.lines[0];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [
+        { htsNumber: '99039106', valueDollars: 0 },
+        { htsNumber: '99030124', valueDollars: 0 },
+        { htsNumber: '99030133', valueDollars: 0 },
+        { htsNumber: '99039405', valueDollars: 0 },
+        ...line.tariffs,
+      ]; // Karl's key, his order
+      const cy = params.currentYear;
+      p.entrySummary.dates = {
+        estimatedEntry: `${cy}0820`,
+        importation: `${cy}0125`,
+        estimatedArrival: `${cy}0210`,
+        inBond: `${cy}0201`,
+      };
+      p.entrySummary.lines[0].dateOfExportation = `${cy}0110`;
+      // Karl's answer wire (9/2, "You had 2 inbonds / I got it through like
+      // this"): exactly ONE 23I carrying the IN-TRANSIT NUMBER itself, then
+      // the 23M master bill — the package's separate "manifest component
+      // identifier" 012345684978 does not appear anywhere.
+      p.entrySummary.manifests = [
+        {
+          manifestedQuantity: 100,
+          uomCode: 'CTNS',
+          bills: [
+            { type: 'I', identifier: '115581395' },
+            { type: 'M', issuerCode: 'MAEU', identifier: '123456789012' },
+          ],
+        },
+      ];
+    },
+  }),
+
+  aeScenario('012', 'Product Exclusion Number', {
+    rates: { '99030555': NT52_100, '7208900000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'MX';
+      line.countryOfExport = 'MX';
+      line.descriptions = ['FLAT-ROLLED STEEL PRODUCTS'];
+      line.foreignPortOfLading = '20199'; // Veracruz (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'MXMTYSTL654MTY' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030555', valueDollars: 0 }, // NT52 MX 10%
+        { htsNumber: '7208900000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
+      ];
+      // Steel product exclusion rides the 54-Record Importer Additional
+      // Declaration, type 02 (chapter change log #76 documents STXnnnnnn /
+      // STL… identifier formats).
+      line.declarations = [{ typeCode: '02', information: 'STL999995' }];
+    },
+  }),
+
+  aeScenario('013', 'Diamond Certificate', {
+    rates: { '99030523': NT52_125, '7102211020': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'AU';
+      line.countryOfExport = 'AU';
+      line.descriptions = ['UNWORKED INDUSTRIAL DIAMONDS'];
+      line.foreignPortOfLading = '60267'; // Sydney (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'AUPERDIA987PER' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030523', valueDollars: 0 }, // NT52 AU 12.5%
+        { htsNumber: '7102211020', valueDollars: 10000, uomCode1: 'CAR', quantity1Hundredths: 25000 },
+      ];
+      // 52-Record type 06 = Diamond Certificate (Kimberley process, ESF-167;
+      // OFAC-format number ≤9 chars — Admin Message 04-002229).
+      line.license = { typeCode: '06', number: 'AU0863015' };
+    },
+  }),
+
+  aeScenario('014', 'Airline Carrier Code', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    mutate: (p) => {
+      // Air MOT: no foreign port of lading (F429 is vessel-only).
+      const line = p.entrySummary.lines[0];
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      p.entrySummary.motCode = '40';
+      // Package value: the '*F' generic air-carrier convention. F167 (live
+      // 8/28): air entries need the district/port of unlading too — BWI
+      // 1305 (Schedule D, entry port district 13).
+      p.entrySummary.cargo = { carrierCode: '*F', conveyanceName: 'FLIGHT 100', districtPortOfUnlading: '1305' };
+      // Air rules (ESF-153): master bill identifier mandatory, issuer code
+      // never allowed for air.
+      p.entrySummary.manifests = [
+        { manifestedQuantity: 100, uomCode: 'CTNS', bills: [{ type: 'M', identifier: '12345678' }] },
+      ];
+    },
+  }),
+
+  aeScenario('018', 'Chile Free Trade Agreement', {
+    rates: {
+      '99030530': NT52_125,
+      '0811908040': { general: '14.5%', special: 'Free (A+,AU,BH,CL,CO,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CL';
+      line.countryOfExport = 'CL';
+      line.spiClaimCode = 'CL';
+      line.descriptions = ['FROZEN BERRIES'];
+      line.foreignPortOfLading = '33797'; // Valparaiso (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'CLSCLBER246SCL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030530', valueDollars: 0 }, // NT52 CL 12.5%
+        { htsNumber: '0811908040', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 400000 },
+      ];
+    },
+  }),
+
+  aeScenario('019', 'Sets under GRI 3(b)/(c) — X & V Article Set Indicators', {
+    // Export country CH is landlocked (no Schedule K entry) — the shipment
+    // routes via Hamburg 42876 (verified Apr-2026 Schedule K), satisfying
+    // F429 on every line (live 8/28).
+    rates: {
+      '99030574': '12.5%', // NT52 CH
+      '99030539': '10%', // NT52 EU (FR/IT lines)
+      '1902194000': '6.4%', '0712311000': '1.3¢/kg + 1.8%', '2002908020': '11.6%',
+    },
+    mutate: (p) => {
+      const ior = p.entrySummary.importerOfRecord.number;
+      // GRI 3(b) set: every component is dutiable at the set's essential-
+      // character rate (spaghetti, 6.4%) — the engine's article-set
+      // aggregation is deferred, so the set-rate duties are pinned:
+      // X 2400×6.4%=153.60, V 1300×6.4%=83.20 each.
+      p.entrySummary.lines = [
+        {
+          // Usage note (k): header value = SUM of components ($5,000);
+          // header carries conventional duty/MPF/HMF for the whole set.
+          articleSetIndicator: 'X',
+          countryOfOrigin: 'CH',
+          countryOfExport: 'CH',
+          dateOfExportation: p.entrySummary.lines[0].dateOfExportation,
+          relatedPartyIndicator: 'N',
+          descriptions: ['SPAGHETTI MEAL SET - GRI 3(B)'],
+          foreignPortOfLading: '42876', // Hamburg (CH routed)
+          parties: [
+            { type: 'M', identifier: 'CHZURPAS135ZUR' },
+            { type: 'S', identifier: ior },
+          ],
+          tariffs: [
+            // Karl's ESV trace (9/2): value[5000] * p1[0.125] = 625.00 and
+            // '[1902194000] replaced' — the NT52 12.5% IS the header's whole
+            // duty; the conventional 6.4% is REPLACED, not added. "Its just
+            // 12.5% on 99030574."
+            { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH on the set (computed 625.00)
+            { htsNumber: '1902194000', valueDollars: 5000, uomCode1: 'KG', quantity1Hundredths: 170000 },
+          ],
+        },
+        {
+          // Note (k): the FIRST component MUST repeat the header's
+          // classification (live F406 until it did) — spaghetti as its own
+          // component, at its own value, zero duty.
+          articleSetIndicator: 'V',
+          countryOfOrigin: 'CH',
+          countryOfExport: 'CH',
+          dateOfExportation: p.entrySummary.lines[0].dateOfExportation,
+          relatedPartyIndicator: 'N',
+          descriptions: ['SPAGHETTI MEAL SET - PASTA'],
+          foreignPortOfLading: '42876',
+          parties: [
+            { type: 'M', identifier: 'CHZURPAS135ZUR' },
+            { type: 'S', identifier: ior },
+          ],
+          tariffs: [
+            { htsNumber: '99030574', valueDollars: 0, dutyCents: 0 },
+            { htsNumber: '1902194000', valueDollars: 2400, uomCode1: 'KG', quantity1Hundredths: 120000, dutyCents: 0 },
+          ],
+        },
+        {
+          articleSetIndicator: 'V',
+          countryOfOrigin: 'FR',
+          countryOfExport: 'CH',
+          dateOfExportation: p.entrySummary.lines[0].dateOfExportation,
+          relatedPartyIndicator: 'N',
+          descriptions: ['SPAGHETTI MEAL SET - DRIED MUSHROOMS'],
+          foreignPortOfLading: '42876',
+          parties: [
+            { type: 'M', identifier: 'FRPARMUS791PAR' },
+            { type: 'S', identifier: ior },
+          ],
+          tariffs: [
+            { htsNumber: '99030539', valueDollars: 0, dutyCents: 0 },
+            { htsNumber: '0712311000', valueDollars: 1300, uomCode1: 'KG', quantity1Hundredths: 20000, dutyCents: 0 },
+          ],
+        },
+        {
+          articleSetIndicator: 'V',
+          countryOfOrigin: 'IT',
+          countryOfExport: 'CH',
+          dateOfExportation: p.entrySummary.lines[0].dateOfExportation,
+          relatedPartyIndicator: 'N',
+          descriptions: ['SPAGHETTI MEAL SET - TOMATO PASTE'],
+          foreignPortOfLading: '42876',
+          parties: [
+            { type: 'M', identifier: 'ITMILTOM468MIL' },
+            { type: 'S', identifier: ior },
+          ],
+          tariffs: [
+            { htsNumber: '99030539', valueDollars: 0, dutyCents: 0 },
+            { htsNumber: '2002908020', valueDollars: 1300, uomCode1: 'KG', quantity1Hundredths: 30000, dutyCents: 0 },
+          ],
+        },
+      ];
+    },
+    notes: 'Set-rate duties pinned (engine article-set aggregation deferred): all components at the 6.4% essential-character rate.',
+  }),
+
+  aeScenario('020', 'Census Warning', {
+    rates: { '99030530': NT52_125, '4703110000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CL';
+      line.countryOfExport = 'CL';
+      line.chargesDollars = 17810;
+      line.grossWeightKg = 245939;
+      line.descriptions = ['CHEMICAL WOODPULP, UNBLEACHED'];
+      line.foreignPortOfLading = '33797'; // Valparaiso (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'CLSCLPUL802SCL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // The absurd quantity/UOM pairing is the census-warning trigger; the
+      // transmission itself is valid and must go out (ACE responds with the
+      // warning that scenarios 021/022 then query and override).
+      line.tariffs = [
+        { htsNumber: '99030530', valueDollars: 0 }, // NT52 CL 12.5%
+        { htsNumber: '4703110000', valueDollars: 2054587, uomCode1: 'CTN', quantity1Hundredths: 2455580000 },
+      ];
+    },
+  }),
+
+  appScenario('021', 'Census Warning Query', 'CJ', (params) =>
+    buildCensusWarningQuery({
+      filerCode: params.filerCode,
+      queries: [{ districtPortOfEntry: params.districtPortOfEntry, entryNumbers: ['0000020'] }],
+    })
+  , 'Queries the census warning raised by the scenario-020 entry; run before 022.'),
+
+  appScenario('022', 'Census Warning Override', 'CW', (params) =>
+    buildCensusOverride({
+      filerCode: params.filerCode,
+      entries: [
+        {
+          entryNumber: '0000020',
+          lines: [{ lineItemIdentifier: '001', overrides: [{ warningCode: '27C', overrideCode: '49' }] }],
+        },
+      ],
+    })
+  , 'Overrides the warning surfaced by 020/021; warning code comes from the live CL response (27D placeholder pending that query).'),
+
+  aeScenario('023', 'Steel License', {
+    // 232 stack per the 9/2 sweep + Karl's 006 key: NT16(C) content bucket
+    // .82.02 (ALU/STL/COP + derivatives) carries the 50% steel rate (GB
+    // alone gets .82.04 at 25%); .05.90 excludes the 232-covered article
+    // from the NT52 country duty, so the KR NT52 deposits zero.
+    rates: { '99030590': NO_ADDITIONAL, '99038202': S232_CONTENT_50, '7222110006': 'Free' },
+    mutate: (p, params) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'KR';
+      line.countryOfExport = 'KR';
+      line.descriptions = ['STAINLESS STEEL BARS'];
+      line.foreignPortOfLading = '58023'; // Busan (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'KRSELSTE579SEL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        // Karl's 006 rule applied (9/2): the NT52 country number is DROPPED
+        // when .05.90 is present — its mere presence draws duty computation
+        // (the F624 despite a correct \$1,938 total). .05.90 + bucket only.
+        { htsNumber: '99030590', valueDollars: 0, dutyCents: 0 }, // NT52-side 232 exclusion
+        { htsNumber: '99038202', valueDollars: 0 }, // NT16(C) steel content bucket, 50%
+        { htsNumber: '7222110006', valueDollars: 3876, uomCode1: 'KG', quantity1Hundredths: 150000 },
+      ];
+      // 52-Record type 01 = Steel Import License (ESF-166). Package: replace
+      // MMDDYY with today's date — derived from the applicability date so
+      // dry-run goldens stay stable.
+      const d = params.applicabilityDate;
+      line.license = { typeCode: '01', number: `S23${d.slice(4, 8)}${d.slice(2, 4)}` };
+      // Live F794 9/1: ch.72 steel mill product needs the Type 08 steel
+      // melt-and-pour 54-record (same layout as 006's, KR origin).
+      line.declarations = [{ typeCode: '08', information: 'KR' }];
+    },
+  }),
+
+  aeScenario('024', 'Additional Duty Reporting', {
+    rates: { '99034110': '40%', '99030549': NT52_JP_125, '6403599045': '10%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'JP';
+      line.countryOfExport = 'JP';
+      line.descriptions = ['LEATHER FOOTWEAR'];
+      line.foreignPortOfLading = '58886'; // Tokyo (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'JPTYOSHO913TYO' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // 9903.41.10 additional duty rides first; the value/quantity report on
+      // the ch.64 base line and the 40% computes on that base value.
+      line.tariffs = [
+        // CERT W1: 9903.41.10 has ZERO reporting units — omit uom/quantity
+        // entirely (the 9999.00.84 F441/F442 lesson).
+        { htsNumber: '99034110', valueDollars: 0 },
+        { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
+        // 9903.41.10 (Proclamation 5601 JP footwear) is an IN-LIEU rate —
+        // the 40% REPLACES column 1, so the ch.64 line deposits zero
+        // (40% + 12.5% + 10% drew F624 live 9/1).
+        { htsNumber: '6403599045', valueDollars: 12290, uomCode1: 'PRS', quantity1Hundredths: 260000 },
+      ];
+    },
+  }),
+
+  aeScenario('025', 'Full Bill Data for Rail AMS Shipment', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    mutate: (p) => {
+      // Rail MOT: no foreign port of lading (F429 is vessel-only).
+      const line = p.entrySummary.lines[0];
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      p.entrySummary.motCode = '21';
+      p.entrySummary.cargo = { carrierCode: 'CNRU', districtPortOfUnlading: '3802' };
+      p.entrySummary.manifests = [
+        { manifestedQuantity: 100, uomCode: 'CTNS', bills: [{ type: 'M', issuerCode: 'CNRU', identifier: '32560834' }] },
+      ];
+    },
+  }),
+
+  aeScenario('026', 'Freely Associated States', {
+    rates: { '4602198000': { general: '2.3%', special: 'Free (A,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' } },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'FM';
+      line.countryOfExport = 'FM';
+      // SPI Z (Freely Associated States) is statutory (general note 10) and
+      // not printed in the USITC Special column — preference pinned to Free.
+      line.spiClaimCode = 'Z';
+      line.descriptions = ['BASKETWORK OF VEGETABLE MATERIALS'];
+      line.foreignPortOfLading = '68207'; // Pohnpei (Schedule K, Jul-2026 CAMIR App F) — live F429 9/2
+      line.parties = [
+        { type: 'M', identifier: 'FMPNIBAS753PNI' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '4602198000', valueDollars: 54575, uomCode1: 'NO', quantity1Hundredths: 500000, dutyCents: 0 },
+      ];
+    },
+    notes: 'SPI Z is statutory (HTS general note 10), not in the Special column — duty pinned to Free.',
+  }),
+
+  aeScenario('027', 'USMCA Apparel (TRQ)', {
+    // NT52: 9903.05.94 (USMCA-MX subdivision H) carries a W4 country
+    // restriction of MX — on an XQ-origin line that is an F603 waiting to
+    // happen (301 numbers are origin-enforced the same way). 9903.05.95
+    // 'TEXT OR APPAREL, NTE 52' at 0% has NO W4 restriction and matches the
+    // article exactly (9/2 CERT sweep).
+    rates: { '99030595': 'The duty provided in the applicable subheading', '98235202': 'Free', '6203315020': '17.5%' },
+    mutate: (p, params) => {
+      p.entrySummary.entryTypeCode = '02';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'XQ'; // Karl 9/3: "XQ is a Canadian Province"
+      line.countryOfExport = 'CA';
+      line.foreignPortOfLading = '01520'; // Halifax NS (Schedule K)
+      // S+ (USMCA textile TPL) is claimed against the 9823.52.02 TRQ
+      // provision; in-quota preferential rate pinned to Free (the Special
+      // column prints S, not S+).
+      line.spiClaimCode = 'S+';
+      line.descriptions = ['MENS WOOL TROUSERS'];
+      line.parties = [
+        { type: 'M', identifier: 'XOTORAPP159TOR' }, // XO = Ontario (CA MIDs carry the province X-code)
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        // CERT W1 (9/2): 9823.52.02 has ZERO reporting units — omit uom
+        // entirely (live F441 with 'X').
+        { htsNumber: '98235202', valueDollars: 0 },
+        { htsNumber: '99030595', valueDollars: 0 }, // NT52 textile/apparel exclusion, 0%, no origin restriction
+        // CERT W1: DOZ + KG — wool apparel reports both quantities (live
+        // F443 without the KG).
+        { htsNumber: '6203315020', valueDollars: 2500, uomCode1: 'DOZ', quantity1Hundredths: 2000, uomCode2: 'KG', quantity2Hundredths: 15000, dutyCents: 0 },
+      ];
+      line.textileCategoryCode = '447';
+      // Karl 9/3: type 29 (CANADIAN USMCA TPL cert — XQ is a Canadian
+      // province); first char = presentation-year digit, only the first
+      // three characters are validated ("For 2024 ... 4CA123456").
+      line.license = { typeCode: '29', number: `${params.applicabilityDate.slice(3, 4)}CA123456` };
+    },
+    notes: 'Package: UC response arrives only after end-of-day TRQ processing (~8pm). XQ = Canada/Mexico TPL origin convention.',
+  }),
+
+  aeScenario('028', 'State of Destination with Multiple Lines', {
+    rates: {
+      '99030531': NT52_125,
+      // 301 numbers per CERT's table (9/2 query): List 3 .88.03 = 25%,
+      // List 4A .88.15 = 7.5% — both CN-restricted, both still on file;
+      // stacking with NT52 + column 1 is the accepted 013 pattern.
+      '99038803': 'The duty provided in the applicable subheading + 25%',
+      '99038815': 'The duty provided in the applicable subheading + 7.5%',
+      '1205100090': { general: '0.58¢/kg', special: 'Free (A+,AU,BH,CL,CO,D,E, IL,JO,KR,MA,OM,P,PA,PE,S, SG)' },
+      '3306900000': 'Free',
+      '3702100060': { general: '3.7%', special: 'Free (A*,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const ior = p.entrySummary.importerOfRecord.number;
+      // Wire carries ONE header state: with multiple destination states the
+      // 7501 block-5 rule reports the state of greatest aggregate value —
+      // line 3 (WA, $15,000).
+      p.entrySummary.usStateOfDestination = 'WA';
+      const base = p.entrySummary.lines[0];
+      p.entrySummary.lines = [
+        {
+          ...base,
+          descriptions: ['RAPESEED, LOW ERUCIC ACID'],
+          parties: [{ type: 'M', identifier: 'CNSHERAP321SHA' }, { type: 'S', identifier: ior }],
+          // 20,000 kg ≈ market unit value for \$10k of rapeseed — the earlier
+          // 1,000,000 kg drew the OR-LO census warning (live W27C 9/2).
+          tariffs: [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '1205100090', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 2000000 }],
+        },
+        {
+          ...base,
+          descriptions: ['ORAL HYGIENE PREPARATIONS'],
+          parties: [{ type: 'M', identifier: 'CNSHEORA654SHA' }, { type: 'S', identifier: ior }],
+          // CERT W1: KG, not NO (live F442 9/2). 301: .88.15 did NOT satisfy
+          // the F771 edit for 3306.90 while the .88.03 lines cleared it
+          // (live 9/2 second round) — List 3 covers it in CERT's table.
+          tariffs: [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '3306900000', valueDollars: 5000, uomCode1: 'KG', quantity1Hundredths: 200000 }],
+        },
+        {
+          ...base,
+          descriptions: ['INSTANT PRINT FILM'],
+          parties: [{ type: 'M', identifier: 'CNSHEFLM987SHA' }, { type: 'S', identifier: ior }],
+          // CERT W1: M2, not NO (live F442 9/2).
+          tariffs: [{ htsNumber: '99038803', valueDollars: 0 }, { htsNumber: '3702100060', valueDollars: 15000, uomCode1: 'M2', quantity1Hundredths: 500000 }],
+        },
+      ];
+      for (const l of p.entrySummary.lines) {
+        l.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+        // 301 leads, NT52 second, substantive last — the accepted 013 order.
+        l.tariffs = [l.tariffs[0], { htsNumber: '99030531', valueDollars: 0 }, ...l.tariffs.slice(1)];
+      }
+    },
+    notes: 'Source data: line states MT/NY/WA — header reports WA (greatest aggregate value, 7501 block 5).',
+  }),
+
+  aeScenario('029', 'Charges Amount', {
+    rates: { '99030581': NT52_100, '3001900110': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GB';
+      line.countryOfExport = 'GB';
+      line.chargesDollars = 200;
+      line.descriptions = ['HEPARIN AND ITS SALTS'];
+      line.foreignPortOfLading = '41323'; // Felixstowe (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'GBLONHEP531LON' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030581', valueDollars: 0 }, // NT52 GB 10%
+        { htsNumber: '3001900110', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 10000 },
+      ];
+    },
+  }),
+
+  aeScenario('030', 'HTS Number/Date Restriction', {
+    rates: { '99030530': NT52_125, '0809402000': 'Free' },
+    mutate: (p, params) => {
+      const cy = params.currentYear;
+      // Package: importation + estimated entry = current date. 0809.40.20
+      // (fresh apricots) is valid for entry only Jan 1 – May 31; ACE
+      // enforces the date window server-side at cert time.
+      p.entrySummary.dates = { estimatedEntry: `${cy}0820`, importation: `${cy}0820`, estimatedArrival: `${cy}0819` };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CL';
+      line.countryOfExport = 'CL';
+      line.dateOfExportation = `${cy}0801`;
+      line.descriptions = ['APRICOTS, FRESH'];
+      line.foreignPortOfLading = '33797'; // Valparaiso (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'CLSCLAPR864SCL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030530', valueDollars: 0 }, // NT52 CL 12.5%
+        { htsNumber: '0809402000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
+      ];
+    },
+    notes: 'ACE enforces the Jan 1 – May 31 entry-date window for this HTS; at cert time the rep confirms expected disposition for an out-of-window date.',
+  }),
+
+  aeRejectScenario('031', 'Restricted Country', {
+    rates: { '6402191541': '5.1%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      // Cuba origin: comprehensively embargoed (31 CFR 515) — our system
+      // must refuse the transmission client-side.
+      line.countryOfOrigin = 'CU';
+      line.countryOfExport = 'MX';
+      line.descriptions = ['SPORTS FOOTWEAR'];
+      line.tariffs = [
+        { htsNumber: '6402191541', valueDollars: 10000, uomCode1: 'PRS', quantity1Hundredths: 100000 },
+      ];
+    },
+    notes: 'Intentionally invalid: embargoed country of origin (OFAC).',
+  }),
+
+  aeScenario('032', 'Knife Sets', {
+    rates: {
+      // Karl's 006 pattern for derivative steel, col1 < 15%: .05.90
+      // excludes the NT52, .82.10 deposits flat 15%, ch.1-97 zeroes.
+      '99030590': NO_ADDITIONAL,
+      '99038209': S232_DERIVATIVE_25,
+      '8211100000': 'Free',
+      '8211929045': '0.4¢ each + 6.1%',
+      '8211930035': '3¢ each + 5.4%',
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'DE';
+      line.countryOfExport = 'DE';
+      line.descriptions = ['KNIFE SETS, 5-PIECE'];
+      line.foreignPortOfLading = '42876'; // Hamburg (Schedule K, Apr 2026 revision)
+      line.parties = [
+        { type: 'M', identifier: 'DESOLKNI275SOL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // 4,000 sets: 16,000 knives @ $1 (8211.92.90) + 4,000 @ $2
+      // (8211.93.00). The 8211.10 set provision duties the WHOLE set at the
+      // highest-rate article's rate — 8211.93 (3¢ each + 5.4% ≈ 6.9% AVE
+      // beats 8211.92's ≈ 6.5%). That rate applied per component:
+      //   8211.92: 5.4%×$16,000 + 3¢×16,000 pcs = $864.00+$480.00 = $1,344.00
+      //   8211.93: 5.4%×$8,000  + 3¢×4,000 pcs  = $432.00+$120.00 =   $552.00
+      // Live 9/3 F771/F794: knives are DERIVATIVE STEEL under NT16 — the
+      // 232 stack replaces the highest-rate-article arithmetic entirely
+      // (Karl's 006 semantics: bucket deposits flat 15%, ch.1-97 zeroes).
+      // Karl 9/3 round 2: ".82.06 to 08 are cast/smelt US" — remaining
+      // eligible: .82.01/.03 (no/low-metal, 0%) and .82.09 (25%), .82.05
+      // being GB-only. Metal article ⇒ .82.09, stacked (034 semantics).
+      line.tariffs = [
+        { htsNumber: '99030590', valueDollars: 0 }, // NT52-side 232 exclusion
+        { htsNumber: '99038209', valueDollars: 0 }, // COP/DER ALU & STL bucket, 25%
+        // Karl's ESV trace 9/4: the set provision line carries THE HIGHEST
+        // COMPONENT'S OWN DUTY (8211.92: 0.4¢×16,000 + 6.1%×$16,000 =
+        // \$1,040.00); the other component is 'Excluded from final calc'
+        // at \$0. Winner-takes-all, not rate-applied-to-all.
+        { htsNumber: '8211100000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 2000000, dutyCents: 104000 },
+        // F624 with the stacked reading (bucket + set pins, live 9/3) —
+        // trying .82.10's replace semantics: the 25% IS the line duty.
+        { htsNumber: '8211929045', valueDollars: 16000, uomCode1: 'NO', quantity1Hundredths: 1600000, dutyCents: 0 },
+        { htsNumber: '8211930035', valueDollars: 8000, uomCode1: 'NO', quantity1Hundredths: 400000, dutyCents: 0 },
+      ];
+      // Live F794: steel melt-and-pour declaration, DE origin.
+      line.declarations = [{ typeCode: '08', information: 'DE' }];
+    },
+    notes: 'Set duty pinned at the highest-rate article (8211.93.00: 3¢ each + 5.4%) applied to each component — confirm interpretation with client rep.',
+  }),
+
+  aeScenario('033', 'Multiple Bonds', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    mutate: (p, params) => {
+      const line = p.entrySummary.lines[0];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      // Continuous basic + additional STB (allowable configuration 3,
+      // ESF-157), surety 054 per the package.
+      // Live 9/3 F145: the continuous bond must match CERT's bond file —
+      // our IOR's on-file surety is the params one (891), not the
+      // package's 054. The STB keeps 054 (nothing on file to mismatch;
+      // its F752 NO STB FOUND is the expected vendor evidence).
+      p.entrySummary.bonds = [
+        { bondTypeCode: '8', designationTypeCode: 'B', suretyCompanyCode: params.suretyCompanyCode },
+        { bondTypeCode: '9', designationTypeCode: 'A', suretyCompanyCode: '054', stbAmountDollars: 25000 },
+      ];
+    },
+  }),
+
+  aeScenario('034', 'Personal Shipment', {
+    rates: { '99030590': NO_ADDITIONAL, '99038202': S232_CONTENT_50, '7419803000': '3%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '11';
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, shipmentUsageTypeCode: 'P' };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'HK';
+      line.countryOfExport = 'HK';
+      line.relatedPartyIndicator = undefined;
+      line.descriptions = ['COPPER HOUSEHOLD ARTICLES'];
+      line.foreignPortOfLading = '58201'; // Hong Kong (Schedule K)
+      line.parties = [];
+      // Live 9/3 F771: copper is a 232 metal under NT16 (.05.90's own
+      // description: ALUM, STL, CPR) — the 023 pattern applies: drop the
+      // NT52 country row, .05.90 + the .82.02 content bucket (50%),
+      // substantive zeroes.
+      line.tariffs = [
+        { htsNumber: '99030590', valueDollars: 0 },
+        { htsNumber: '99038202', valueDollars: 0 },
+        // CERT W1 (9/3): KG, not NO. Duty: .82.02 STACKS on column 1 —
+        // zero drew F624 (live 9/3); Karl's '0% on the 1-97 line' was
+        // .82.10-specific. 3% x $3,000 = $90 alongside the bucket's $1,500.
+        { htsNumber: '7419803000', valueDollars: 3000, uomCode1: 'KG', quantity1Hundredths: 10000 },
+      ];
+    },
+  }),
+
+  aeScenario('035', 'Civil Aircraft', {
+    rates: {
+      '99038209': S232_DERIVATIVE_25,
+      '8302496055': { general: '5.7%', special: 'Free (A*,AU,BH,C,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GL';
+      line.countryOfExport = 'GL';
+      line.spiClaimCode = 'C'; // Agreement on Trade in Civil Aircraft
+      line.descriptions = ['CIVIL AIRCRAFT MOUNTINGS AND FITTINGS'];
+      line.foreignPortOfLading = '10125'; // Godthaab/Nuuk (Schedule K, Jul-2026 CAMIR App F)
+      line.parties = [
+        { type: 'M', identifier: 'GLGOHAIR428GOH' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // Base-metal mountings = NT16 metal article: .82.10 (derivative,
+      // col1 5.7% < 15%) + Type 08. GL is not NT52-listed, so no country
+      // row and no .05.90. If F771 persists this joins Karl's open 032
+      // bucket question.
+      line.tariffs = [
+        { htsNumber: '99038209', valueDollars: 0 }, // Karl 9/3 round 2: .82.06-.08 are smelt/cast-US — .82.09, 25%
+        { htsNumber: '8302496055', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 10000 },
+      ];
+      // Type 07 layout per ESF-111/112 (decoded live 9/3 via F826/F829/
+      // F849/F834): pos 5 primary-smelt applicability 'Y', 6-7 filler,
+      // 8-9 primary smelt 'GL', 10 secondary applicability 'N', 11-12
+      // filler, 13-14 secondary (blank), 15-16 cast 'GL'.
+      line.declarations = [
+        { typeCode: '07', information: 'Y  GLN    GL' },
+        { typeCode: '08', information: 'GL' },
+      ];
+    },
+  }),
+
+  aeScenario('036', 'Commercial Samples', {
+    // Live 9/3: the .05.95 textile exclusion did NOT satisfy F771 for a
+    // listed country — JP apparel wants the country row, 12.5% stacked
+    // (the accepted 024 JP-footwear treatment). .05.95 evidently belongs
+    // to the TRQ/9823 world (027), not general apparel.
+    rates: { '99030549': '12.5%', '6205202016': '19.7%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '11';
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, shipmentUsageTypeCode: 'X' };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'JP';
+      line.countryOfExport = 'JP';
+      line.relatedPartyIndicator = undefined;
+      line.descriptions = ['MENS COTTON SHIRTS - SAMPLES'];
+      line.foreignPortOfLading = '58886'; // Tokyo (Schedule K)
+      line.parties = [];
+      line.tariffs = [
+        // Karl's ESV trace 9/3: '[6205202016] replaced' — the NT52 12.5%
+        // IS the line duty (28.125 → 28.13, half-up), conventional zero.
+        { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5% (computed 28.13)
+        // Live F443: apparel reports DOZ + KG (the 027 lesson).
+        { htsNumber: '6205202016', valueDollars: 225, uomCode1: 'DOZ', quantity1Hundredths: 200, uomCode2: 'KG', quantity2Hundredths: 600 },
+      ];
+      line.textileCategoryCode = '340';
+    },
+  }),
+
+  aeScenario('037', 'Watches', {
+    // 9101.11.80 (USITC 2026-aug-06): 87¢ each + 6.25% on the case and
+    // strap, band or bracelet + 5.3% on the battery. One line, one
+    // 50-record per constituent tariff; the package's complete-watch
+    // quantity (59,600) is reported on EVERY tariff number, values as
+    // given. Compound constituent rates are outside the parser (cf. 041/
+    // 089), so the duties are pinned per constituent:
+    //   .8010 movements: 87¢ × 59,600      = $51,852.00
+    //   .8020 cases:     6.25% × $601,690  = $37,605.63
+    //   .8030 straps:    6.25% × $790,840  = $49,427.50
+    //   .8040 batteries: 5.3%  × $500,612  = $26,532.44
+    // NT52 CH 9903.05.74 (12.5%) computes on the combined constituent value
+    // ($3,383,342). Export CH is landlocked — no Schedule K port; the
+    // foreign port of lading stays unset (flagged for the client rep).
+    rates: { '99030574': '12.5%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CH';
+      line.countryOfExport = 'CH';
+      line.descriptions = ['WRIST WATCHES, PRECIOUS METAL CASE, MECHANICAL DISPLAY'];
+      line.foreignPortOfLading = '42876'; // Hamburg — live-proven for landlocked CH (019 accepted)
+      line.parties = [
+        { type: 'M', identifier: 'CHGENWAT552GEN' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH 12.5%
+        { htsNumber: '9101118010', valueDollars: 1490200, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 0 },
+        { htsNumber: '9101118020', valueDollars: 601690, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 0 },
+        { htsNumber: '9101118030', valueDollars: 790840, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 0 },
+        { htsNumber: '9101118040', valueDollars: 500612, uomCode1: 'NO', quantity1Hundredths: 5960000, dutyCents: 0 },
+      ];
+    },
+    notes: 'Constituent duties pinned from the 9101.11.80 compound rate (USITC 2026-aug-06); suffix↔constituent mapping per CSMS #50019756 — confirm with rep. Origin CH assumed (package silent).',
+  }),
+
+  aeScenario('038', 'Morocco Free Trade Agreement', {
+    rates: {
+      '99030556': NT52_125,
+      '4203300000': { general: '2.7%', special: 'Free (A,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'MA';
+      line.countryOfExport = 'MA';
+      line.spiClaimCode = 'MA';
+      line.descriptions = ['LEATHER BELTS'];
+      line.foreignPortOfLading = '71401'; // Casablanca (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'MACASBEL713CAS' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030556', valueDollars: 0 }, // NT52 MA 12.5%
+        // CERT W1 (9/3): NO, not DOZ (live F442).
+        { htsNumber: '4203300000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 5000 },
+      ];
+    },
+  }),
+
+  aeScenario('039', 'Quantity and Unit of Measure Reporting on GRI (1) Sets', {
+    // 8206.00.00 (GRI 1 set heading): 'The rate of duty applicable to that
+    // article in the set subject to the highest rate of duty' — here the
+    // only listed component, slip joint pliers 8203.20.40 (12%, USITC
+    // 2026-aug-06). One line, set provision + component on separate
+    // 50-records. The title's point is the quantity/UOM pairing: the set
+    // provision reports the number of SETS (PCS, its USITC stat unit),
+    // the component its own unit (DOZ). Package gives no values —
+    // standing $10,000 rides the dutiable component; 600 one-pliers sets
+    // = 50 dozen pliers. Component duty engine-computed (12% × $10,000 =
+    // $1,200.00); set-provision line pinned $0.
+    rates: { '99038803': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '8203204000': '12%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['HAND TOOL SETS, PLIERS COMPONENT HIGHEST-RATE'];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'CNSHETOO654SHA' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // 301 leads, NT52 second (the accepted 028 order); both STACK with
+      // col 1 (NT52-alongside rule). HOLD TRANSMIT: metal hand tools share
+      // 032's unresolved NT16 bucket question — await Karl.
+      line.tariffs = [
+        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3, 25%
+        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
+        { htsNumber: '8206000000', valueDollars: 0, uomCode1: 'PCS', quantity1Hundredths: 60000, dutyCents: 0 },
+        { htsNumber: '8203204000', valueDollars: 10000, uomCode1: 'DOZ', quantity1Hundredths: 5000 },
+      ];
+    },
+    notes: 'Set duty at the highest-rate component (8203.20.40, 12%) — the only component the package lists. Value on the component line, set quantity in PCS — confirm value placement with rep.',
+  }),
+
+  aeScenario('040', 'U.S. Insular Possession', {
+    rates: { '7101223000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GU';
+      line.countryOfExport = 'GU';
+      // SPI Y (insular possessions, general note 3(a)(iv)) — statutory.
+      line.spiClaimCode = 'Y';
+      line.descriptions = ['CULTURED PEARLS, WORKED'];
+      line.foreignPortOfLading = '93501'; // Guam Island (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'GUHAGPEA842HAG' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        // CERT W1 (9/4): 'G', not 'GM' (live F442).
+        { htsNumber: '7101223000', valueDollars: 10000, uomCode1: 'G', quantity1Hundredths: 100000 },
+      ];
+    },
+  }),
+
+  aeScenario('041', 'Mail MOT', {
+    rates: { '99038803': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '9106100000': '36\u00a2 each + 5.6% + 2\u00a2/jewel' },
+    mutate: (p) => {
+      p.entrySummary.motCode = '50';
+      // Mail: no carrier/manifest data.
+      p.entrySummary.cargo = undefined;
+      p.entrySummary.manifests = undefined;
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['TIME REGISTERS'];
+      // Compound watch-style rate pinned by hand (the '\u00a2 each'/'\u00a2 per
+      // jewel' forms are outside the parser; no jewels on time registers):
+      // 36\u00a2\u00d7120 = $43.20 + 5.6%\u00d7$1,189 = $66.584 \u2192 $109.78 total.
+      // Mail MOT: no foreign port of lading (F429 is vessel-only).
+      line.tariffs = [
+        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3, 25% — stacks
+        // NT52 alongside another action → STACKS; 12.5% x $1,189 = 148.625
+        // pinned half-up per tariff (the 036 trace's rounding).
+        { htsNumber: '99030531', valueDollars: 0, dutyCents: 14863 }, // NT52 CN 12.5%
+        // CERT W1 (9/4): NO + JWL — the jewel count reports even at zero
+        // (live F443).
+        { htsNumber: '9106100000', valueDollars: 1189, uomCode1: 'NO', quantity1Hundredths: 12000, uomCode2: 'JWL', quantity2Hundredths: 0, dutyCents: 10978 },
+      ];
+    },
+    notes: 'MOT 50 + duty due triggers the 496 dutiable-mail fee automatically (engine). Rate pinned: 36\u00a2 each + 5.6% (no jewels).',
+  }),
+
+  aeScenario('042', 'Country of Export - US', {
+    // Export country US: Schedule K lists FOREIGN ports only — the foreign
+    // port of lading stays unset (flagged for the client rep).
+    rates: { '99030571': '12.5%', '6704190000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'KR';
+      line.countryOfExport = 'US'; // U.S. goods returned via export country US
+      line.descriptions = ['WIGS OF SYNTHETIC TEXTILE MATERIALS'];
+      line.parties = [
+        { type: 'M', identifier: 'KRSELWIG217SEL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030571', valueDollars: 0 }, // NT52 KR (origin) 12.5%
+        { htsNumber: '6704190000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100000 },
+      ];
+    },
+  }),
+
+  aeScenario('043', 'ADD/CVD & Quota', {
+    rates: {
+      // Modernized 9/4: the 9903.85 aluminum family is expired like the
+      // .80 steel range — NT16 treatment instead (023 pattern): .05.90
+      // excludes the EU NT52, .82.02 content bucket stacks on col 1.
+      '99030590': NO_ADDITIONAL,
+      '99038202': S232_CONTENT_50,
+      '7606123096': '3%',
+    },
+    mutate: (p, params) => {
+      p.entrySummary.entryTypeCode = '07';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'ES';
+      line.countryOfExport = 'ES';
+      line.descriptions = ['ALUMINUM ALLOY SHEET'];
+      line.foreignPortOfLading = '47094'; // Valencia (Schedule K)
+      // Live F499 9/4: type 07 requires the FOREIGN EXPORTER party.
+      line.parties = [
+        { type: 'M', identifier: 'ESMADALU365MAD' },
+        { type: 'E', identifier: 'ESMADALU365MAD' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030590', valueDollars: 0 }, // NT52-side 232 exclusion
+        { htsNumber: '99038202', valueDollars: 0 }, // metal content bucket, 50%, stacks
+        { htsNumber: '7606123096', valueDollars: 68707, uomCode1: 'KG', quantity1Hundredths: 2192600 },
+      ];
+      // Aluminum mill product: Type 07 smelt/cast declaration (ESF-111/112
+      // layout proven live on 035).
+      line.declarations = [{ typeCode: '07', information: 'Y  ESN    ES' }];
+      // F687 timeline: round 1 = no license → F687; Karl said none needed
+      // ("No steel licenses because of 232 duty") but round 2 without one
+      // → F687 again. The type-28 license was never live-tested — filing
+      // it now (aluminum import license, A-prefixed steel date pattern).
+      const d43 = params.applicabilityDate;
+      line.license = { typeCode: '28', number: `A23${d43.slice(4, 8)}${d43.slice(2, 4)}` };
+      // AD deposit rate comes from the AD case query at cert time (scenario
+      // 063); dry-run pins a zero deposit.
+      // Karl 9/4: deposit rate 3.8% (case not queryable in CERT's file).
+      // 3.8% × \$68,707 = \$2,610.87 (half-up).
+      line.adCvdCases = [
+        { caseNumber: 'A470820000', bondCashClaimCode: 'C', depositRateHundredths: 380, rateTypeQualifier: 'A', dutyCents: 261087 },
+      ];
+    },
+    notes: 'AD deposit rate arrives from the AD query (scenario 063) at cert; pinned 0 for the dry run.',
+  }),
+
+  aeScenario('044', 'Special Program Claim Code W', {
+    rates: { '0210992000': { general: '2.3%', special: 'Free (A,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' } },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'VC';
+      line.countryOfExport = 'VC';
+      // SPI W (CBERA beneficiary meat provision) is statutory — not printed
+      // in the Special column; preference pinned to Free.
+      line.spiClaimCode = 'W';
+      line.descriptions = ['DRIED MEAT PRODUCTS'];
+      line.foreignPortOfLading = '24871'; // Kingstown, St Vincent (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'VCKINMEA754KIN' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '0210992000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 1000500, dutyCents: 0 },
+      ];
+    },
+    notes: 'SPI W statutory, duty pinned to Free \u2014 confirm program letter treatment with client rep.',
+  }),
+
+  aeScenario('045', 'Currency Conversion', {
+    rates: { '99030539': '10%', '3103190000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'IT';
+      line.countryOfExport = 'IT';
+      line.descriptions = ['SUPERPHOSPHATE FERTILIZERS'];
+      line.foreignPortOfLading = '47527'; // Genoa (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'ITMILFER426MIL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // \u20ac5,000 at CBP's OWN certified rate from the daily %R broadcast
+      // (live 9/2: EUR 1159200 D \u2192 1.1592) = $5,796.00. Confirm the
+      // transmit-morning %R EUR line before sending.
+      line.tariffs = [
+        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (IT)
+        { htsNumber: '3103190000', valueDollars: 5796, uomCode1: 'T', quantity1Hundredths: 10000 },
+      ];
+    },
+    notes: 'Foreign-currency value: \u20ac5,000 \u00d7 CBP quarterly rate. Dry-run pinned at 1.08; substitute the certified rate at cert time.',
+  }),
+
+  aeScenario('046', 'Multiple Countries', {
+    rates: { '99030576': '10%', '99030571': '12.5%', '3103110000': 'Free' },
+    mutate: (p) => {
+      const ior = p.entrySummary.importerOfRecord.number;
+      const base = p.entrySummary.lines[0];
+      p.entrySummary.lines = [
+        {
+          ...base,
+          countryOfOrigin: 'TW',
+          countryOfExport: 'TW',
+          descriptions: ['SUPERPHOSPHATES 35%+ P2O5'],
+          foreignPortOfLading: '58309', // Kaohsiung (Schedule K)
+          parties: [{ type: 'M', identifier: 'TWTPEFER538TPE' }, { type: 'S', identifier: ior }],
+          tariffs: [
+            { htsNumber: '99030576', valueDollars: 0 }, // NT52 TW 10%
+            { htsNumber: '3103110000', valueDollars: 10000, uomCode1: 'T', quantity1Hundredths: 1000 },
+          ],
+        },
+        {
+          ...base,
+          countryOfOrigin: 'KR',
+          countryOfExport: 'KR',
+          descriptions: ['SUPERPHOSPHATES 35%+ P2O5'],
+          foreignPortOfLading: '58023', // Busan (Schedule K)
+          parties: [{ type: 'M', identifier: 'KRSELFER649SEL' }, { type: 'S', identifier: ior }],
+          tariffs: [
+            { htsNumber: '99030571', valueDollars: 0 }, // NT52 KR 12.5%
+            { htsNumber: '3103110000', valueDollars: 10000, uomCode1: 'T', quantity1Hundredths: 1000 },
+          ],
+        },
+      ];
+    },
+  }),
+
+  aeScenario('047', 'Warehouse Entry', {
+    rates: { '99038815': 'The duty provided in the applicable subheading + 7.5%', '99030531': NT52_125, '6601990000': '8.2%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '21';
+      // Live F173 9/4: warehouse entries report the bonded facility's
+      // FIRMS code (10-record location of goods). Package supplies none —
+      // well-formed test code; the TPL-cert precedent suggests unknown
+      // reference numbers downgrade to informationals.
+      p.entrySummary.cargo = { ...p.entrySummary.cargo!, locationOfGoodsCode: 'W303' };
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['UMBRELLAS'];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [
+        { htsNumber: '99038815', valueDollars: 0 }, // 301 List 4A, 7.5% — CN line (028 rule)
+        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
+        { htsNumber: '6601990000', valueDollars: 50000, uomCode1: 'DOZ', quantity1Hundredths: 120000 },
+      ];
+    },
+  }),
+
+  aeScenario('048', 'Watch Assemblies', {
+    // 9802.00.40 'Repairs or alterations made pursuant to a warranty':
+    // 'A duty upon the value of the repairs or alterations (see U.S. note
+    // 3 of this subchapter)' (USITC 2026-aug-06). The dutiable value is
+    // the $3,406 repair value, reported on the 9802.00.4040 50-record;
+    // the 9102.11.10 constituent values ($1,852/$2,619/$1,345/$204) ride
+    // duty-free, quantity 1,000 on ALL tariff numbers per the package.
+    // Article rate (9102.11.10): 44¢ each + 6% on the case + 14% on the
+    // strap, band or bracelet + 5.3% on the battery. Repairs touched only
+    // the movements, whose constituent piece is the specific 44¢ each:
+    //   44¢ × 1,000 watches = $440.00 (pinned).
+    // NT52 CH (origin) rides after the 9802 provision marker; it computes on
+    // the combined value of the other tariffs ($9,426) — whether NT52 should
+    // instead apply only to the repair value under 9802 needs rep
+    // confirmation (flagged).
+    rates: { '99030574': '12.5%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CH';
+      line.countryOfExport = 'GL';
+      line.descriptions = ['WRIST WATCHES REPAIRED IN GREENLAND, MOVEMENTS ONLY'];
+      line.foreignPortOfLading = '10125'; // Godthaab/Nuuk, Greenland (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'GLGOHWAT219GOH' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        // NT52-alone-replaces (the 037 precedent, same commodity family):
+        // ACE's calc = 12.5% x $9,426 combined value; the 44-cent repair
+        // duty and all constituents are '[replaced]'.
+        // CERT W1 (9/5): 9802.00.40.40 has ZERO reporting units — omit
+        // uom/quantity (the zero-units family; CERT's table beats the
+        // package's 'quantity on all HTS numbers').
+        { htsNumber: '9802004040', valueDollars: 3406, dutyCents: 0 },
+        // F624 with 12.5% x $9,426 (live 9/5): under 9802.00.40 the
+        // dutiable value is the REPAIRS ($3,406) — NT52 base follows it.
+        // 12.5% x $3,406 = $425.75.
+        // Karl's ESV trace 9/9: NT52 dcc=10 computes on the CONSTITUENT
+        // value only ($6,020 — the 9802 repair value is excluded from the
+        // base); the provision line itself is duty-free.
+        { htsNumber: '99030574', valueDollars: 0, dutyCents: 75250 }, // NT52 CH 12.5% x $6,020
+        { htsNumber: '9102111010', valueDollars: 1852, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
+        { htsNumber: '9102111020', valueDollars: 2619, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
+        { htsNumber: '9102111030', valueDollars: 1345, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
+        { htsNumber: '9102111040', valueDollars: 204, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 0 },
+      ];
+    },
+    notes: 'Repair-provision duty pinned: 44¢ each × 1,000 on the $3,406 repair value (movements constituent of 9102.11.10) — treatment of the specific piece under 9802 needs rep confirmation. Origin CH assumed (package silent); export country GL.',
+  }),
+
+  aeScenario('049', 'Ruling Details', {
+    rates: { '99030549': '12.5%', '8536490055': '2.7%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'JP';
+      line.countryOfExport = 'JP';
+      line.descriptions = ['ELECTROMECHANICAL RELAYS'];
+      line.foreignPortOfLading = '58886'; // Tokyo (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'JPMATELE288OSA' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.ruling = { typeCode: 'C', number: '832264' };
+      line.tariffs = [
+        { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
+        { htsNumber: '8536490055', valueDollars: 17100, uomCode1: 'NO', quantity1Hundredths: 900000, dutyCents: 0 }, // NT52-alone-replaces
+      ];
+    },
+    notes: 'PGA disclaimer FC0 rides the PG-record message set (workstream D \u2014 spec download pending); dry-run transmits the ruling core without the PG grouping.',
+  }),
+
+  appScenario('050', 'Entry Summary Query', 'EQ', (params) => {
+    // Package: EES criteria, from 30 days prior to today \u2014 derived from the
+    // applicability date so dry-run goldens stay stable.
+    // Window derived from the applicability date (30 days back) — the
+    // fixed Jul-Aug window would miss every entry we actually filed.
+    const d = params.applicabilityDate;
+    const to = new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(4, 6)) - 1, Number(d.slice(6, 8))));
+    const from = new Date(to.getTime() - 30 * 86400000);
+    const mmddyy = (x: Date) =>
+      `${String(x.getUTCMonth() + 1).padStart(2, '0')}${String(x.getUTCDate()).padStart(2, '0')}${String(x.getUTCFullYear()).slice(2)}`;
+    return buildEntrySummaryQuery({
+      returnDetail: true,
+      criteria: {
+        type: 'EES',
+        fromDateTime: `${mmddyy(from)}120000AM`,
+        toDateTime: `${mmddyy(to)}115959PM`,
+        entrySummaries: true,
+      },
+    });
+  }),
+
+  aeScenario('051', 'African Growth and Opportunity Act (AGOA)', {
+    rates: {
+      '99030569': NT52_125,
+      '4113903000': { general: '3.3%', special: 'Free (A+,AU,BH,CL,CO,D,E,IL, JO,KR,MA, OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'ZA';
+      line.countryOfExport = 'ZA';
+      line.spiClaimCode = 'D'; // AGOA
+      line.descriptions = ['LEATHER OF GOATS, WITHOUT HAIR'];
+      line.foreignPortOfLading = '79113'; // Durban (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'ZAJNBLEA318JNB' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030569', valueDollars: 0 }, // NT52 ZA 12.5%
+        { htsNumber: '4113903000', valueDollars: 10000, uomCode1: 'M2', quantity1Hundredths: 50000 },
+      ];
+    },
+  }),
+
+  aeScenario('052', 'B-Record Filer Authentication', {
+    rates: { '8507600030': '3.41%' },
+    // The package overrides ONLY the block-control fields; the enclosed
+    // 10–90 records stay a fully valid summary. The entry number therefore
+    // keeps our REAL filer code (params.filerCode → 10-record) — the
+    // reject ACE returns must come from B-record filer/port
+    // authentication, not from the entry data. The Y-record mirrors the
+    // B-record per the batch spec, so it carries 888/8888 too.
+    block: { port: '8888', filerCode: '888' },
+    mutate: () => {},
+    notes: 'CBP-side reject test: ACE must refuse the block on B-record authentication (filer 888, port 8888); the transmission itself goes out intact with valid 10–90 records.',
+  }),
+
+  aeScenario('053', 'B-Record Application Type/Filer Authentication', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    // Fully valid block: B-record carries our own filer code and
+    // application identifier AE (what buildBatch always emits) — the
+    // scenario verifies the positive half of B-record authentication.
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+    },
+    notes: 'Package instruction: contact the assigned client rep IMMEDIATELY PRIOR to transmitting this scenario. Standard envelope — B-record filer = our filer code, application identifier AE.',
+  }),
+
+  aeScenario('054', 'Korea Free Trade Agreement', {
+    rates: {
+      '99030571': '12.5%',
+      '4409106500': { general: '4.9%', special: 'Free (A+,AU,BH,CL,CO,D,E,IL,JO,KR,MA,OM,P,PA,PE,S,SG)' },
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'KR';
+      line.countryOfExport = 'KR';
+      line.spiClaimCode = 'KR';
+      line.descriptions = ['CONIFEROUS WOOD MOLDINGS'];
+      line.foreignPortOfLading = '58023'; // Busan (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'KRSELWOO471SEL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030571', valueDollars: 0 }, // NT52 KR 12.5%
+        // CERT W1 (9/8): 'M M3' — meters first, cubic meters second (live
+        // F442+F443). 40,000 m of moulding ≈ 40 m3.
+        { htsNumber: '4409106500', valueDollars: 10000, uomCode1: 'M', quantity1Hundredths: 4000000, uomCode2: 'M3', quantity2Hundredths: 4000 },
+      ];
+    },
+  }),
+
+  aeScenario('055', 'Haiti Earned Import Allowance Program', {
+    rates: { '98206225': 'Free', '6109901007': '32%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '02';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'HT';
+      line.countryOfExport = 'HT';
+      line.descriptions = ['KNIT T-SHIRTS, MAN-MADE FIBERS'];
+      line.foreignPortOfLading = '24585'; // Port-au-Prince (Schedule K) — live F429
+      line.parties = [
+        { type: 'M', identifier: 'HTPAPTEX593PAP' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // 9820.62.25 Haiti EIAP provision + apparel line; in-program = Free
+      // (pinned). 52-Record type 13 = Haiti Earned Import Allowance.
+      line.tariffs = [
+        // CERT W1 (9/8): 9820.62.25 has zero units (live F441 with 'X').
+        { htsNumber: '98206225', valueDollars: 0 },
+        // DOZ + KG (live F443); cotton fee 056 required (live F657, W5:
+        // \$0.00390509/kg × 12 kg = 4.686¢ → 5¢ half-up).
+        { htsNumber: '6109901007', valueDollars: 309, uomCode1: 'DOZ', quantity1Hundredths: 500, uomCode2: 'KG', quantity2Hundredths: 1200, dutyCents: 0 },
+      ];
+      line.fees = [{ classCode: '056', amountCents: 5 }];
+      line.license = { typeCode: '13', number: 'H623AD329' };
+      // Standard visa format = year-digit + ISO country + sequence (the
+      // 6CA123456 TPL-cert pattern) — bare '123456' drew F468 STANDARD
+      // VISA COUNTRY UNKNOWN.
+      line.visaNumber = '6HT123456';
+      line.textileCategoryCode = '638';
+    },
+    notes: 'EIAP certificate as 52-rec type 13; in-program preference pinned to Free.',
+  }),
+
+  aeScenario('056', 'Informal Entry \u2014 Commercial Sales Sample', {
+    rates: { '99030529': NT52_100, '98110060': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '11';
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, shipmentUsageTypeCode: 'X' };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CA';
+      line.countryOfExport = 'CA';
+      line.relatedPartyIndicator = undefined;
+      line.descriptions = ['SAMPLES FOR SOLICITING ORDERS'];
+      line.foreignPortOfLading = '12493'; // Vancouver, BC (Schedule K)
+      line.parties = [];
+      // 9811.00.60: sample of negligible value \u2014 $1. The 9811 provision is
+      // itself 98xx, so the NT52 number follows it.
+      // Live F613 9/8: the 9811 provision pairs with the underlying
+      // commodity's HTS (the 9802-constituent pattern). Package names no
+      // commodity — 3306.90 (Free, KG, CERT-verified) as the sample.
+      line.tariffs = [
+        { htsNumber: '98110060', valueDollars: 1 },
+        { htsNumber: '99030529', valueDollars: 0 }, // NT52 CA 10%
+        { htsNumber: '3306900000', valueDollars: 0, uomCode1: 'KG', quantity1Hundredths: 100, dutyCents: 0 },
+      ];
+    },
+  }),
+
+  aeScenario('057', 'Consolidated Release Details', {
+    rates: { '99030529': NT52_100, '8514908000': 'Free' },
+    mutate: (p, params) => {
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, consolidatedSummary: true };
+      p.entrySummary.releases = [
+        { filerCode: params.filerCode, entryNumber: '00100501' },
+        { filerCode: params.filerCode, entryNumber: '00100502' },
+        { filerCode: params.filerCode, entryNumber: '00100503' },
+      ];
+      const line = p.entrySummary.lines[0];
+      // Live F414 9/8: formal entries report the Canadian PROVINCE as
+      // origin (the XQ scheme) — informals like 056 are exempt.
+      line.countryOfOrigin = 'XO';
+      line.countryOfExport = 'CA';
+      line.descriptions = ['INDUSTRIAL FURNACE PARTS'];
+      line.foreignPortOfLading = '12493'; // Vancouver, BC (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'XOTORFUR815TOR' }, // XO = Ontario (CA MIDs carry the province X-code)
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030529', valueDollars: 0 }, // NT52 CA 10%
+        { htsNumber: '8514908000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 1000000 }, // CERT W1 (9/8): KG, not NO
+      ];
+    },
+  }),
+
+  aeScenario('058', 'Reporting the Commercial Description', {
+    rates: { '99030529': NT52_100, '3918101020': '5.3%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      // Live F414 9/8: formal entries report the Canadian PROVINCE as
+      // origin (the XQ scheme) — informals like 056 are exempt.
+      line.countryOfOrigin = 'XO';
+      line.countryOfExport = 'CA';
+      line.descriptions = ['VINYL FLOOR TILE - MARBLE SIMULATED, 12X12'];
+      line.foreignPortOfLading = '12493'; // Vancouver, BC (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'XOTORVIN926TOR' }, // XO = Ontario
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // Elimination (live 9/8): replace (\$1,000) and inapplicable (\$530)
+      // both F624'd — the remaining cell is the STACK: for Canadian
+      // province origins the NT52 stacks on column 1. \$1,530.00.
+      line.tariffs = [
+        { htsNumber: '99030529', valueDollars: 0 }, // NT52 CA 10% — stacks
+        { htsNumber: '3918101020', valueDollars: 10000, uomCode1: 'M2', quantity1Hundredths: 100000 },
+      ];
+    },
+  }),
+
+  aeScenario('059', 'Prototypes', {
+    rates: { '98178501': 'Free', '99030549': '12.5%', '8703330145': '2.5%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'JP';
+      line.countryOfExport = 'JP';
+      line.descriptions = ['AUTOMOBILE PROTOTYPE'];
+      line.foreignPortOfLading = '58886'; // Tokyo (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'JPTYOAUT137TYO' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // 9817.85.01 prototype provision governs \u2014 the ch.87 line rides at
+      // the provision's Free rate (pinned). NT52 JP computes 12.5% on the
+      // $500,000 prototype value ($62,500) \u2014 whether the 9817 prototype
+      // provision shields NT52 needs rep confirmation (flagged).
+      line.tariffs = [
+        { htsNumber: '98178501', valueDollars: 0 }, // zero-units family — no uom
+        { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
+        { htsNumber: '8703330145', valueDollars: 500000, uomCode1: 'NO', quantity1Hundredths: 100, dutyCents: 0 },
+      ];
+    },
+    notes: 'Prototype provision 9817.85.01: base line duty pinned Free.',
+  }),
+
+  aeScenario('060', 'Flag for Future Reconciliation', {
+    rates: { '99030581': NT52_100, '8414513000': '4.7%' },
+    mutate: (p) => {
+      // Karl 9/9: the params IOR has no recon bond in CERT — 060 files
+      // under 57-123456789 (live F162 answer).
+      p.entrySummary.importerOfRecord = { ...p.entrySummary.importerOfRecord, number: '57-123456789' };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'GB';
+      line.countryOfExport = 'GB';
+      line.descriptions = ['CEILING FANS'];
+      line.foreignPortOfLading = '41323'; // Felixstowe (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'GBLONFAN204LON' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030581', valueDollars: 0 }, // NT52 GB 10%
+        { htsNumber: '8414513000', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000 }, // Karl's trace 9/9: GB STACKS — \$1,000 NT52 + \$470 col1
+      ];
+      // Value reconciliation flag: conventional recon issue code 001
+      // (note aa) \u2014 requires the continuous bond the baseline carries.
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, reconciliationIssueCode: '001' };
+    },
+    notes: 'Value recon flagged via reconciliation issue code 001 \u2014 confirm code with client rep.',
+  }),
+
+  aeScenario('061', 'Cargo Release Certification', {
+    // Rebuilt 9/30 on Michael Barela's working example: the prior 061 entry
+    // (S7P-0000061-8) sits in CBP control status and cannot return to trade
+    // status, so this files a NEW entry number certified for cargo release.
+    // Its SX came back with SE10 Estimated Entry Value = 0 (errors 11022 and
+    // 11119); Michael's reference line derives a value of 15288.
+    rates: {
+      '99030531': NT52_125,
+      '9404409022': '12.8%',
+    },
+    mutate: (p) => {
+      // 0000610 (9/30) was accepted but its SX rejected; each retry needs a
+      // fresh number (Michael Barela 10/2).
+      p.entrySummary.entryNumber = '0000611';
+      p.entrySummary.cargoReleaseCertification = true;
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CN';
+      line.countryOfExport = 'CN';
+      line.descriptions = ['QUILTS AND COMFORTERS'];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'CNSHEBAT123SHA' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // Michael's reference 50-records, verbatim: NT52 CN 12.5% = $1,911.00
+      // and 12.8% = $1,956.86 on $15,288 (672 NO, 3,487 KG), both assessed.
+      line.tariffs = [
+        { htsNumber: '99030531', valueDollars: 0, dutyCents: 191100 },
+        { htsNumber: '9404409022', valueDollars: 15288, uomCode1: 'NO', quantity1Hundredths: 67200, uomCode2: 'KG', quantity2Hundredths: 348700, dutyCents: 195686 },
+      ];
+    },
+    postMap: (input, params) => {
+      // Release entities, all accepted on the 9/17 SX: SE13 contact, Seller
+      // (name route), Buyer (EIN route, qualifier EI), and the Manufacturer
+      // as a line-level SE50 entity.
+      const firm = {
+        name: 'SHENZHEN BATTERY CO',
+        addressComponents: [
+          { qualifier: '01', information: '123' },
+          { qualifier: '02', information: 'PUDONG AVE' },
+        ],
+        geography: { city: 'SHANGHAI', postalCode: '200001', countryCode: 'CN' },
+      };
+      input.certifyContact = { name: 'IMRAN SIDDIQUE', phone: '5715551234' };
+      input.cargoEntities = [
+        { code: 'SE', ...firm },
+        { code: 'BY', identifier: { qualifier: 'EI', value: params.importerOfRecordNumber } },
+      ];
+      input.lines![0].cargoEntities = [{ code: 'MF', ...firm }];
+    },
+    notes: 'New entry 0000611 certified for cargo release; numerics zero-filled per CBP (10/2).',
+  }),
+
+  appScenario('063', 'AD/CVD Case Information Query \u2014 HTS Number', 'AD', () =>
+    buildAdCvdCaseQuery({ type: 'criteria', companyCaseStatus: 'A', htsNumber: '7210703000' })
+  ),
+
+  appScenario('064', 'AD/CVD Case Information Query \u2014 Date Since Last Update', 'AD', (params) => {
+    // Two days prior to transmission, derived from the applicability date
+    // with real date arithmetic (the old day-minus-2 broke on the 1st/2nd
+    // of a month, e.g. Oct 1 gave day '-1').
+    const d = params.applicabilityDate;
+    const since = new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(4, 6)) - 1, Number(d.slice(6, 8)) - 2));
+    const mmddyy = `${String(since.getUTCMonth() + 1).padStart(2, '0')}${String(since.getUTCDate()).padStart(2, '0')}${String(since.getUTCFullYear()).slice(2)}`;
+    return buildAdCvdCaseQuery({
+      type: 'criteria',
+      companyCaseStatus: 'A',
+      dateSinceLastUpdate: mmddyy,
+    });
+  }),
+
+  aeScenario('065', 'Deferred Tax', {
+    rates: { '99030539': '10%', '2208202000': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, deferredTaxPaymentCode: '2' };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'FR';
+      line.countryOfExport = 'FR';
+      line.descriptions = ['GRAPE BRANDY, PIKE-VALUED'];
+      line.foreignPortOfLading = '42737'; // Le Havre (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'FRCOGBRA759COG' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // IRC distilled-spirits tax per CERT's W5 (9/10): class 016 at
+      // $3.5663227/PFL ($13.50/proof-gallon converted) × 324 PFL =
+      // $1,155.49, EFT deferral (code 2).
+      line.tariffs = [
+        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (FR)
+        { htsNumber: '2208202000', valueDollars: 5022, uomCode1: 'PFL', quantity1Hundredths: 32400 },
+      ];
+      line.irTax = { classCode: '016', amountCents: 115549 };
+    },
+    notes: 'IR tax on a DAILY statement (monthly would be barred by note y); EFT deferral code 2.',
+  }),
+
+  appScenario('066', 'Quota Query', 'QA', () =>
+    // Both 0202305085 (package) and 0202305091 (Christopher 9/17) return
+    // Q49: neither is active in CERT's quota module. Michael Barela 9/29:
+    // 0201101010 is present there.
+    buildQuotaQuery([{ typeCode: 'R', queryId: '0201101010', countryOfOrigin: 'NZ' }])
+  ),
+
+  // \u2500\u2500 Type-03 AD/CVD block (067\u2013073): deposit rates arrive from the AD
+  // query at cert time \u2014 dry-run pins zero deposits; the 88-record emits on
+  // case presence.
+  aeScenario('067', 'Related Cases', {
+    rates: { '99030539': '10%', '1902192020': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'IT';
+      line.countryOfExport = 'IT';
+      line.descriptions = ['DRIED PASTA'];
+      line.foreignPortOfLading = '47527'; // Genoa (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'ITROMPAS284ROM' },
+        { type: 'E', identifier: 'ITROMPAS284ROM' }, // live F499: type 03 needs the exporter
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (IT)
+        { htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
+      ];
+      // Live case file (9/10 AD query): A475818029 latest RF = 0.00%
+      // (2020 review), C475819011 = 2.04%; both CASH ONLY.
+      line.adCvdCases = [
+        { caseNumber: 'A475818029', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+        { caseNumber: 'C475819011', bondCashClaimCode: 'C', depositRateHundredths: 204, rateTypeQualifier: 'A', dutyCents: 20400 },
+      ];
+    },
+  }),
+
+  aeScenario('068', 'Case Status', {
+    rates: { '99030539': '10%', '1902192020': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      // Live 9/10: F547 — the case is French; origin follows it. The
+      // remaining F559 CASE REVOKED is the scenario's own evidence (the
+      // 057 'correct error' class); I548 HTS-not-on-case is informational.
+      line.countryOfOrigin = 'FR';
+      line.countryOfExport = 'FR';
+      line.descriptions = ['DRIED PASTA'];
+      line.foreignPortOfLading = '42737'; // Le Havre (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'FRPARMUS791PAR' },
+        { type: 'E', identifier: 'FRPARMUS791PAR' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (FR)
+        { htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
+      ];
+      line.adCvdCases = [
+        { caseNumber: 'A427109040', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+      ];
+    },
+    notes: 'Package gives only the case number; commodity/HTS reuse the 067 pasta line \u2014 confirm with rep.',
+  }),
+
+  aeScenario('069', 'HTS Number and Case Number', {
+    rates: { '99030539': '10%', '3912390000': '4.2%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      // Live 9/10: F547 — Finnish case; origin follows. F559 (revoked
+      // 2014) expected as evidence; I548 informational (package pairs an
+      // HTS outside the case's coverage on purpose).
+      line.countryOfOrigin = 'FI';
+      line.countryOfExport = 'FI';
+      line.descriptions = ['CELLULOSE ETHERS'];
+      line.foreignPortOfLading = '40500'; // Helsinki (Schedule K)
+      // Manufacturer and exporter = the company named on the case (CP KELCO
+      // OY, Finland). The Italian tomato-paste MID used before did not match
+      // the FI origin (found in the 10/2 wire review).
+      line.parties = [
+        { type: 'M', identifier: 'FICPKEL12AAN' },
+        { type: 'E', identifier: 'FICPKEL12AAN' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (FI)
+        // F624 with the stack (live 9/10) — trying the EU replace reading.
+        { htsNumber: '3912390000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 200000, dutyCents: 0 },
+      ];
+      line.adCvdCases = [
+        { caseNumber: 'A405803001', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+      ];
+    },
+  }),
+
+  aeScenario('070', 'Case with Ad Valorem Rate', {
+    rates: { '99038803': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '1902192020': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      line.descriptions = ['ALUMINUM EXTRUSION HARDWARE'];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'CNSHEBAT123SHA' },
+        { type: 'E', identifier: 'CNSHEBAT123SHA' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3 (live F771)
+        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
+        { htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
+      ];
+      // Rate qualifier S = specific (per package title/qualifier pairing).
+      line.adCvdCases = [
+        { caseNumber: 'A570967000', bondCashClaimCode: 'C', depositRateHundredths: 8601, rateTypeQualifier: 'S', quantityTenThousandths: 5000000, dutyCents: 4300500 }, // live RF 86.01 x 500 units
+      ];
+    },
+  }),
+
+  aeScenario('071', 'Case with Cash Deposit', {
+    rates: { '99030549': '12.5%', '1902192020': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      // Live 9/10: F547 — Japanese case; origin follows (I548 stays
+      // informational for the off-case commodity).
+      line.countryOfOrigin = 'JP';
+      line.countryOfExport = 'JP';
+      line.descriptions = ['PIPE FITTINGS'];
+      line.foreignPortOfLading = '58886'; // Tokyo (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'JPTYOSHO913TYO' },
+        { type: 'E', identifier: 'JPTYOSHO913TYO' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030549', valueDollars: 0 }, // NT52 JP 12.5%
+        { htsNumber: '1902192020', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000, dutyCents: 0 },
+      ];
+      // Live case file: 30.83% CASH ONLY.
+      line.adCvdCases = [
+        { caseNumber: 'A588602001', bondCashClaimCode: 'C', depositRateHundredths: 3083, rateTypeQualifier: 'A', dutyCents: 308300 },
+      ];
+    },
+  }),
+
+  aeScenario('072', 'Case with Differing Values', {
+    rates: { '99030539': '10%', '1902192020': 'Free' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'IT';
+      line.countryOfExport = 'IT';
+      line.descriptions = ['DRIED EGG PASTA'];
+      line.foreignPortOfLading = '47527'; // Genoa (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'ITROMPAS284ROM' },
+        { type: 'E', identifier: 'ITROMPAS284ROM' }, // live F499
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // CERT sweep 9/14: 1902.19.20.30 is NOT in the HTS file (suffixes
+      // jump 2020→2040) — Christopher's own sample wire files 2020.
+      line.tariffs = [
+        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (IT)
+        { htsNumber: '1902192020', valueDollars: 20000, uomCode1: 'KG', quantity1Hundredths: 32000 },
+      ];
+      // The AD case covers a $15,000 subset of the $20,000 line (53-record
+      // Value of Goods differs from the 50-record value).
+      // Live case file: A475818001 19.09%, C475819001 2.44% — on the
+      // $15,000 AD value subset.
+      line.adCvdCases = [
+        { caseNumber: 'A475818001', bondCashClaimCode: 'C', depositRateHundredths: 1909, rateTypeQualifier: 'A', valueOfGoodsDollars: 15000, dutyCents: 286350 },
+        { caseNumber: 'C475819001', bondCashClaimCode: 'C', depositRateHundredths: 244, rateTypeQualifier: 'A', valueOfGoodsDollars: 15000, dutyCents: 36600 },
+      ];
+    },
+  }),
+
+  aeScenario('073', 'Case and Deposit Rate', {
+    // Christopher's trace 9/14: all three STACK (the 028 rule held) — our
+    // one error was col 1: 2841.61.0000 is 5% in CERT, not Free.
+    rates: { '99038803': 'The duty provided in the applicable subheading + 25%', '99030531': NT52_125, '2841610000': '5%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '03';
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CN';
+      line.countryOfExport = 'CN';
+      line.descriptions = ['WOODEN BEDROOM FURNITURE'];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      // Live case file: covered HTS 2841610000 (potassium permanganate),
+      // 128.94% CASH ONLY.
+      line.descriptions = ['POTASSIUM PERMANGANATE'];
+      line.parties = [
+        { type: 'M', identifier: 'CNSHEBAT123SHA' },
+        { type: 'E', identifier: 'CNSHEBAT123SHA' }, // live F499
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99038803', valueDollars: 0 }, // 301 List 3, 25%
+        { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5% — stacks
+        { htsNumber: '2841610000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 500000 },
+      ];
+      line.adCvdCases = [
+        { caseNumber: 'A570001002', bondCashClaimCode: 'C', depositRateHundredths: 12894, rateTypeQualifier: 'A', dutyCents: 1289400 },
+      ];
+    },
+  }),
+
+  aeScenario('074', 'FTZ Withdrawal with Privilege Date', {
+    // Privileged-foreign status fixes rates as of 05/13/2020 — which
+    // PREDATES the NT52 regime entirely (the 011 era-lesson in reverse):
+    // the 2020-era CN adjustment is 301 List 2, stacked per that era.
+    rates: { '99038802': 'The duty provided in the applicable subheading + 25%', '8536410060': '2.7%' },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '06';
+      // Christopher 9/14: port-1303 CERT zone 074, subzone 004, site 0A1
+      // (9AN format NNN/XXX/XXX per the spec note).
+      p.entrySummary.foreignTradeZoneId = '0740040A1';
+      // Live F173 9/11: type 06 wants the FIRMS location too (the 047
+      // precedent — the invented code passed).
+      p.entrySummary.cargo = { ...p.entrySummary.cargo!, locationOfGoodsCode: 'W303' };
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CN';
+      line.countryOfExport = 'CN';
+      line.descriptions = ['ELECTRICAL RELAYS'];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'CNSHEREL491SHA' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // Privileged foreign status: rates fixed as of the privilege date.
+      line.ftz = { statusCode: 'P', privilegedFilingDate: '20200513', quantity: 5000 };
+      // Christopher 9/15: the graded item is applying the PRIVILEGED DATE
+      // per CATAIR — 2026-era numbers must not appear (the .05.31 F434
+      // cascaded every F642). 2020-era stack only, duties at 2020 rates.
+      line.tariffs = [
+        { htsNumber: '99038802', valueDollars: 0 }, // 301 List 2, 25% (2020 era)
+        { htsNumber: '8536410060', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 500000 },
+      ];
+    },
+    notes: 'FTZ id 124 is a dry-run placeholder \u2014 rep supplies the zone. Privilege date 05/13/2020 fixes the rate era.',
+  }),
+
+  // \u2500\u2500 PSC scenarios (075\u2013078): Replace of an accepted summary; statement
+  // fields are banned in a PSC (ESF-184) so the baseline payment is removed.
+  aeScenario('075', 'PSC with ES Header Change', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    action: 'R',
+    mutate: (p) => {
+      // PSC replaces an EXISTING accepted type-01 summary — scenario 053's
+      // battery entry (accepted 9/8), whose content this fixture mirrors.
+      p.entrySummary.entryNumber = '0000053';
+      const line = p.entrySummary.lines[0];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      p.entrySummary.payment = undefined;
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
+      p.entrySummary.psc = {
+        headerReasonCodes: ['H10', 'H12'],
+        explanationLines: ['CONSIGNEE AND STATE OF DESTINATION CORRECTED PER IMPORTER RECORDS.'],
+      };
+      p.entrySummary.usStateOfDestination = 'RI';
+    },
+    notes: 'Consignee number: client rep will supply (flows from CertParams).',
+  }),
+
+  aeScenario('076', 'PSC with ES Line Change', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    action: 'R',
+    mutate: (p) => {
+      // PSC target: scenario 013's accepted battery entry.
+      p.entrySummary.entryNumber = '0000013';
+      p.entrySummary.payment = undefined;
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
+      p.entrySummary.psc = {
+        headerReasonCodes: ['H99'],
+        explanationLines: ['LINE COUNTRY OF ORIGIN AND MANUFACTURER CORRECTED.'],
+      };
+      const line = p.entrySummary.lines[0];
+      line.pscReasonCodes = ['L07', 'L19'];
+      line.countryOfOrigin = 'CN';
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.parties = [
+        { type: 'M', identifier: 'CNCAWBAT7057SHE' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+    },
+  }),
+
+  aeScenario('077', 'PSC with Entry Type Change', {
+    rates: { '99030539': '10%', '1902192020': 'Free' },
+    action: 'R',
+    mutate: (p) => {
+      // PSC target: the third paid entry (Christopher 9/15).
+      p.entrySummary.entryNumber = '0000018';
+      p.entrySummary.payment = undefined;
+      p.entrySummary.entryTypeCode = '03';
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
+      p.entrySummary.psc = {
+        headerReasonCodes: ['H01'],
+        explanationLines: ['ENTRY TYPE CORRECTED TO 03: MERCHANDISE SUBJECT TO AD/CVD CASES.'],
+      };
+      const line = p.entrySummary.lines[0];
+      line.pscReasonCodes = ['L03', 'L04', 'L07', 'L29'];
+      line.countryOfOrigin = 'IT';
+      line.countryOfExport = 'IT';
+      line.descriptions = ['DRIED PASTA'];
+      line.foreignPortOfLading = '47527'; // Genoa (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'ITROMPAS284ROM' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030539', valueDollars: 0 }, // NT52 EU 10% (IT)
+        { htsNumber: '1902192020', valueDollars: 17367, uomCode1: 'KG', quantity1Hundredths: 436600 },
+      ];
+      line.adCvdCases = [
+        { caseNumber: 'A475818001', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+        { caseNumber: 'C475819000', bondCashClaimCode: 'C', depositRateHundredths: 0, rateTypeQualifier: 'A', dutyCents: 0 },
+      ];
+    },
+  }),
+
+  aeScenario('078', "PSC for Another Filer's ES", {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    action: 'R',
+    mutate: (p) => {
+      p.entrySummary.payment = undefined;
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, postSummaryCorrection: true };
+      p.entrySummary.psc = {
+        headerReasonCodes: ['H10'],
+        explanationLines: ['PSC FILED FOR ANOTHER FILERS SUMMARY; CONSIGNEE CORRECTED.'],
+      };
+      const line = p.entrySummary.lines[0];
+      line.pscReasonCodes = ['L07', 'L19'];
+      line.countryOfOrigin = 'CN';
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      line.parties = [
+        { type: 'M', identifier: 'CNCAWBAT7057SHE' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+    },
+    notes: 'Entry number / IOR / consignee: rep-supplied at cert (another filer\u2019s accepted summary \u2014 ownership transfers per note gg).',
+  }),
+
+  aeScenario('079', 'Temporary Import under Bond (TIB)', {
+    rates: {
+      '98130020': 'Free', // 'Free, under bond' \u2014 provision text pinned
+      '99030543': NT52_125, // NT52 HK \u2014 computes on the $81,408 line value; whether the TIB bond shields NT52 needs rep confirmation
+      '7113195091': 'Free', // TIB: no duty collected under the bond
+    },
+    mutate: (p) => {
+      p.entrySummary.entryTypeCode = '23';
+      // Live 9/11: F316 — the TIB certification indicator (10-rec pos 69).
+      p.entrySummary.indicators = { ...p.entrySummary.indicators, tibDeclaration: true };
+      p.entrySummary.motCode = '40';
+      // Live F167: air needs the unlading port (the 014 lesson — BWI).
+      p.entrySummary.cargo = { carrierCode: '*F', conveyanceName: 'FLIGHT 220', districtPortOfUnlading: '1305' };
+      p.entrySummary.manifests = [
+        { manifestedQuantity: 10, uomCode: 'CTNS', bills: [{ type: 'M', identifier: '87654321' }] },
+      ];
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'HK';
+      line.countryOfExport = 'HK';
+      line.descriptions = ['GOLD JEWELRY FOR EXHIBITION'];
+      line.parties = [
+        { type: 'M', identifier: 'HKHKGJEW368HKG' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // Air MOT: no foreign port of lading (F429 is vessel-only).
+      line.tariffs = [
+        { htsNumber: '98130020', valueDollars: 0 }, // zero-units provision (CERT W1)
+        // Live F624: TIB deposits NOTHING — the bond covers (duty zero).
+        { htsNumber: '99030543', valueDollars: 0, dutyCents: 0 }, // NT52 HK — bond-covered
+        // CERT sweep 9/11: 5090 expired — gold jewelry = 7113195091, PCS.
+        { htsNumber: '7113195091', valueDollars: 81408, uomCode1: 'PCS', quantity1Hundredths: 15000 },
+      ];
+    },
+  }),
+
+  appScenario('080', 'TIB Extension', 'TE', (params) =>
+    buildTibExtension({
+      action: 'extend',
+      districtPortOfEntrySummary: params.districtPortOfEntry,
+      filerCode: params.filerCode,
+      entryNumber: '0000079', // the scenario-079 TIB entry
+    })
+  , 'Extends the scenario-079 TIB summary (same entry sequence).'),
+
+  aeScenario('081', 'In-Bond', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    mutate: (p, params) => {
+      const line = p.entrySummary.lines[0];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      p.entrySummary.dates = { ...p.entrySummary.dates, inBond: `${params.currentYear}0816` };
+      // Paperless in-bond (VXXNNNNNNNN) \u21d2 the bill of lading is required.
+      p.entrySummary.manifests = [
+        {
+          manifestedQuantity: 287,
+          uomCode: 'CTN',
+          bills: [
+            { type: 'I', identifier: 'V1111124247' },
+            { type: 'M', issuerCode: 'MAEU', identifier: '123456789012' },
+          ],
+        },
+      ];
+      p.entrySummary.cargo = { ...p.entrySummary.cargo, districtPortOfUnlading: '3001' };
+    },
+  }),
+
+  aeScenario('082', 'PMS Statement Designation', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    mutate: (p, params) => {
+      const line = p.entrySummary.lines[0];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      // Package: print date ~10 days out, statement month = that date's
+      // month. Derived, not pinned \u2014 a pinned Sep 1 expired live 9/1 (F205).
+      const printDate = statementDateFrom(params.applicabilityDate);
+      p.entrySummary.payment = {
+        typeCode: '6',
+        preliminaryStatementPrintDate: printDate,
+        periodicStatementMonth: printDate.slice(4, 6),
+      };
+    },
+  }),
+
+  aeScenario('083', 'FDA Entry', {
+    rates: {
+      '99038815': 'The duty provided in the applicable subheading + 7.5%',
+      '99030590': NO_ADDITIONAL,
+      '99038210': '15%',
+      '8516710020': '3.7%',
+    },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'CN';
+      line.countryOfExport = 'CN';
+      line.descriptions = ['ELECTRIC COFFEE MAKERS'];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'TWNICSAN435TAI' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // 006-class metal appliance under NT16: .05.90 + .82.10 replaces
+      // col 1; CN adds its 301 (List 4A consumer appliances) which stacks.
+      line.tariffs = [
+        { htsNumber: '99038815', valueDollars: 0 }, // 301 List 4A, 7.5%
+        { htsNumber: '99030590', valueDollars: 0 }, // NT52-side 232 exclusion
+        { htsNumber: '99038210', valueDollars: 0, dutyCents: 11069295 }, // 15% x $737,953 (replace)
+        { htsNumber: '8516710020', valueDollars: 737953, uomCode1: 'NO', quantity1Hundredths: 5546800, dutyCents: 0 },
+      ];
+      // Live F773 9/14: coffee makers are NOT on the steel list — no
+      // melt/pour declaration (unlike 006's A/C units).
+    },
+    postMap: (input, params) => {
+      // FDA food-contact article set per SG ch.10 (FOO/CCW): OI + PG01 +
+      // PG02 'P' (FDP 52AOJ51) + PG06 country of production + PG10 name +
+      // PG19/20/21 role trios (MF/DEQ/FD1/DP) + PG26 quantities + PG30.
+      input.lines![0].pga = {
+        commercialDescription: 'ELECTRIC DRIP COFFEE MAKERS, HOUSEHOLD',
+        sets: [
+          {
+            kind: 'data',
+            agencyCode: 'FDA',
+            programCode: 'FOO',
+            processingCode: 'CCW',
+            intendedUseCode: '130.029',
+            product: { codes: [{ qualifier: 'FDP', number: '52AOJ51' }] },
+            sources: [{ typeCode: '39', countryCode: 'CN' }],
+            productName: 'COFFEE MAKER',
+            entities: [
+              {
+                // FDA actual manufacturer — live FPF6 9/14: a MID is not an
+                // accepted FDA entity id; FEI filed instead.
+                roleCode: 'MF',
+                identificationCode: '47', // numeric per Appendix PGA: 47 = FEI (live FP93 on the literal)
+                number: '3004567891',
+                name: 'NICSAN APPLIANCE WORKS',
+                address1: '435 INDUSTRIAL RD',
+                city: 'TAICHUNG',
+                country: 'TW',
+              },
+              {
+                roleCode: 'DEQ',
+                name: 'NICSAN APPLIANCE WORKS',
+                address1: '435 INDUSTRIAL RD',
+                city: 'TAICHUNG',
+                country: 'TW',
+              },
+              {
+                roleCode: 'FD1',
+                name: 'SIGMA TECHNOLOGY PARTNERS LLC',
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [
+                  // Live FPI9 9/14: the certifying individual's phone.
+                  { qualifier: 'FD1', name: 'IMRAN SIDDIQUE', emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM', telephone: '5715551234' },
+                ],
+              },
+              {
+                roleCode: 'DP',
+                name: 'SIGMA TECHNOLOGY PARTNERS LLC',
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+              },
+            ],
+            quantities: [
+              { qualifier: 1, quantityHundredths: 27734, uom: 'CS' },
+              { qualifier: 2, quantityHundredths: 20000, uom: 'PCS' },
+            ],
+            arrival: { status: 'A', dateMMDDCCYY: `0820${params.currentYear}`, timeHHMM: '0900' },
+          },
+        ],
+      };
+    },
+    notes: 'FDA FOO/CCW set per SG ch.10. Entity-id qualifier for the MID + FD1 address details: confirm with rep.',
+  }),
+
+  aeScenario('084', 'NAFTA/USMCA Net Cost', {
+    // NT52: XC = Canadian USMCA origin ⇒ the USMCA-qualifying subdivision
+    // (G) row 9903.05.93 at 0% (mirrors the US-goods 9903.05.86 treatment)
+    // — NEEDS LIVE VERIFICATION: the duty-bearing CA row 9903.05.29 (10%)
+    // would apply if CERT refuses the subdivision claim.
+    rates: { '99030593': 'The duty provided in the applicable subheading', '1004100000': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'XC';
+      line.countryOfExport = 'CA';
+      line.spiClaimCode = 'S';
+      line.naftaNetCostIndicator = 'Y';
+      line.descriptions = ['SEED OATS'];
+      line.foreignPortOfLading = '12493'; // Vancouver, BC (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'XMWINOAT173WIN' }, // XM = Manitoba (province X-code)
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // Live F771 9/14: XC IS in the adjustment family (058's XO line
+      // proved provinces work against Canadian rows) — the USMCA
+      // subdivision .05.93 returns at 0%.
+      line.tariffs = [
+        { htsNumber: '99030593', valueDollars: 0, dutyCents: 0 }, // USMCA-CA subdivision (G)
+        { htsNumber: '1004100000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 8500000 },
+      ];
+    },
+    notes: 'XC = Canadian USMCA origin convention; net-cost RVC indicator Y.',
+  }),
+
+  aeScenario('085', 'DOT Form Data (HS-7)', {
+    // Christopher's tables 9/15: this HTS pairs S301-FL-EU (.05.39 for
+    // col 1 < 10% — the .38/.39 split is a threshold pair) with a
+    // S232-ALSTCU-16 bucket (.82.10, col 1 < 15%). No .94 family.
+    rates: { '99030539': '10%', '99038210': '15%', '8703210130': '2.5%' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'DE';
+      line.countryOfExport = 'DE';
+      line.descriptions = ['SNOWMOBILE'];
+      line.foreignPortOfLading = '42876'; // Hamburg (Schedule K, Apr 2026 revision)
+      line.parties = [
+        { type: 'M', identifier: 'DEMUNSNO347MUN' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        { htsNumber: '99030539', valueDollars: 0 }, // S301-FL EU < 10%, stacks
+        { htsNumber: '99038210', valueDollars: 0, dutyCents: 150000 }, // S232, 15% replaces col 1
+        { htsNumber: '8703210130', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100, dutyCents: 0 },
+      ];
+      // Live F773 (round 2): aluminum not allowed — snowmobiles are
+      // steel-only, the 006 pattern.
+      line.declarations = [{ typeCode: '08', information: 'DE' }];
+    },
+    postMap: (input, params) => {
+      // NHTSA Box-8 set per the supplemental guide's own OFF-vehicle sample
+      // (p.65-66): NHT/OFF, PG02 P, PG07 make/model/VIN (AKG), PG10
+      // OFFTYP/OFF1 + V06 model year (the package's 'clarification code V'
+      // family), IM + CI entities, PG22 946 box 8 + 871 substantiating
+      // statement, both NH1-certified.
+      const signed = `0820${params.currentYear}`;
+      input.lines![0].pga = {
+        commercialDescription: 'SNOWMOBILE, NOT FOR ON-ROAD USE',
+        sets: [
+          {
+            kind: 'data',
+            agencyCode: 'NHT',
+            programCode: 'OFF',
+            product: { codes: [] }, // bare PG02 'P' (NHTSA Note 6: always P)
+            item: {
+              tradeName: 'ABC',
+              model: 'UTV-001',
+              numberQualifier: 'AKG',
+              number: 'TEST-VIN-NUMBER',
+            },
+            characteristics: [
+              { categoryTypeCode: 'OFFTYP', categoryCode: 'OFF1' },
+              { commodityQualifierCode: 'V06', characteristicQualifier: '2008' },
+            ],
+            entities: [
+              {
+                roleCode: 'IM',
+                name: params.importerName,
+                address1: '100 MARKET ST',
+                city: 'LOS ANGELES',
+                stateProvince: 'CA',
+                country: 'US',
+                zip: '90001',
+                contacts: [{ qualifier: 'IM', name: 'IMRAN SIDDIQUE', emailOrFax: 'ISIDDIQUE@SIGMATECHLLC.COM' }],
+              },
+              {
+                roleCode: 'CI',
+                name: 'IMRAN SIDDIQUE',
+                contacts: [{ qualifier: 'CI', name: 'IMRAN SIDDIQUE', telephone: '2135550100' }],
+              },
+            ],
+            conformance: [
+              {
+                importersSubstantiatingDocument: 'Y',
+                documentIdentifier: '946',
+                conformanceDeclaration: '8',
+                entityRoleCode: 'CI',
+                declarationCode: 'NH1',
+                declarationCertification: 'Y',
+                dateOfSignature: signed,
+              },
+              {
+                importersSubstantiatingDocument: 'Y',
+                documentIdentifier: '871',
+                entityRoleCode: 'CI',
+                declarationCode: 'NH1',
+                declarationCertification: 'Y',
+                dateOfSignature: signed,
+              },
+            ],
+          },
+        ],
+      };
+    },
+    notes: "Package's 'HS-7 Clarification Code V' maps to the PG10 V-qualifier family (V06 = model year CCYY), not a PG22 code — NHTSA guide Notes 16-19/38. Box 8 via PG22 946; 871 substantiating statement attached.",
+  }),
+
+  aeScenario('086', 'PGA Form Disclaimers', {
+    rates: { '99030543': NT52_125, '8527910500': 'Free' },
+    mutate: (p) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'HK';
+      line.countryOfExport = 'HK';
+      line.descriptions = ['RADIO BROADCAST RECEIVERS'];
+      line.foreignPortOfLading = '58201'; // Hong Kong (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'HKHKGRAD529HKG' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      line.tariffs = [
+        // (An earlier 079 edit string-matched this identical line and
+        // zeroed it — reverted: this is a regular type 01, the NT52
+        // computes normally.)
+        { htsNumber: '99030543', valueDollars: 0 }, // NT52 HK 12.5%
+        { htsNumber: '8527910500', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 50000 },
+      ];
+    },
+    postMap: (input) => {
+      // Legacy FC0 (FCC) / FD0 (FDA) disclaim records are replaced by the
+      // PG01 position-80 disclaimer (MS p.13/19): one OI + PG01-only set per
+      // disclaimed agency. FDA accepts only codes A or F; when disclaiming,
+      // FDA program/processing positions carry 'FDA' (SG p.171).
+      input.lines![0].pga = {
+        commercialDescription: 'RADIO BROADCAST RECEIVERS, HOUSEHOLD',
+        sets: [
+          // Christopher 9/15: the FCC reference in the package is
+          // obsolete (no FCC Supplemental Guide in ACE) — FDA-only, per
+          // his own accepted transmission of this entry.
+          { kind: 'disclaimer', agencyCode: 'FDA', programCode: 'FDA', processingCode: 'FDA', disclaimerCode: 'A' },
+        ],
+      };
+    },
+    notes: 'FCC program code RAD is an Appendix-PGA placeholder \u2014 confirm with rep; FDA disclaim per SG p.171.',
+  }),
+
+  aeScenario('087', 'Multiple Bills of Lading', {
+    rates: { '99039106': S301_REVIEW_BATT, '99030531': NT52_125, '99039406': 'The duty provided in the applicable subheading', '8507600030': '3.41%' },
+    mutate: (p, params) => {
+      const line = p.entrySummary.lines[0];
+      line.foreignPortOfLading = '57035'; // Shanghai (Schedule K)
+      line.tariffs = [{ htsNumber: '99039106', valueDollars: 0 }, { htsNumber: '99030531', valueDollars: 0 }, { htsNumber: '99039406', valueDollars: 0 }, ...line.tariffs]; // 301 review (batteries) + NT52 CN
+      p.entrySummary.dates = { ...p.entrySummary.dates, inBond: `${params.currentYear}0816` };
+      p.entrySummary.cargo = { ...p.entrySummary.cargo, districtPortOfUnlading: '3001' };
+      // Two manifest groupings share the movement/master/house; each carries
+      // its own sub-house bill and manifested quantity.
+      const shared = [
+        { type: 'I' as const, identifier: '111271845' },
+        { type: 'M' as const, issuerCode: 'MAEU', identifier: '9786543' },
+        { type: 'H' as const, issuerCode: 'DMAL', identifier: '15075' },
+      ];
+      p.entrySummary.manifests = [
+        { manifestedQuantity: 5, uomCode: 'CTNS', bills: [...shared, { type: 'S', identifier: 'H273' }] },
+        { manifestedQuantity: 10, uomCode: 'CTNS', bills: [...shared, { type: 'S', identifier: 'J878' }] },
+      ];
+    },
+  }),
+
+  aeScenario('088', 'Aluminum Licensing', {
+    rates: { '99030590': NO_ADDITIONAL, '99038202': S232_CONTENT_50, '7601103000': '2.6%' },
+    mutate: (p, params) => {
+      const line = p.entrySummary.lines[0];
+      line.countryOfOrigin = 'KR';
+      line.countryOfExport = 'KR';
+      line.descriptions = ['UNWROUGHT ALUMINUM, 99.8% PURE'];
+      line.foreignPortOfLading = '58023'; // Busan (Schedule K)
+      line.parties = [
+        { type: 'M', identifier: 'KRSELALU906SEL' },
+        { type: 'S', identifier: p.entrySummary.importerOfRecord.number },
+      ];
+      // The full 043 aluminum treatment: NT52 country row DROPPED, .05.90
+      // + .82.02 stacking on col 1, type-28 license, Type 07 smelt/cast.
+      line.tariffs = [
+        { htsNumber: '99030590', valueDollars: 0, dutyCents: 0 },
+        { htsNumber: '99038202', valueDollars: 0 }, // 50% stacks
+        { htsNumber: '7601103000', valueDollars: 10000, uomCode1: 'KG', quantity1Hundredths: 400000 },
+      ];
+      const d = params.applicabilityDate;
+      // Christopher 9/15: format-only validation, AALUM + mmdd keeps
+      // CERT licenses unique.
+      line.license = { typeCode: '28', number: `AALUM${d.slice(4, 8)}` };
+      line.declarations = [{ typeCode: '07', information: 'Y  KRN    KR' }];
+    },
+  }),
+
+  aeScenario('089', 'Watches \u2014 Components with Multiple Countries of Origin', {
+    rates: {
+      '9102114510': 'Free', '9102114520': 'Free', '9102114530': 'Free', '9102114540': 'Free',
+      '99038815': 'The duty provided in the applicable subheading + 7.5%',
+      '99030574': '12.5%', // NT52 CH lines
+      '99030531': NT52_125, // NT52 CN strap line — stacked with 301 9903.88.15; NEEDS LIVE VERIFICATION
+    },
+    mutate: (p) => {
+      const ior = p.entrySummary.importerOfRecord.number;
+      const base = p.entrySummary.lines[0];
+      // 9102.11.45 constituent rate: 40\u00a2 each + 8.5% case + 2.8% strap +
+      // 5.3% battery. Package gives no values/quantities \u2014 $10k per line
+      // (standing rule), 1,000 watches. Pinned per constituent (suffix
+      // mapping per CSMS #50019756 \u2014 CONFIRM WITH REP):
+      //   .4510 movements: 40\u00a2\u00d71,000       = $400.00
+      //   .4520 cases:     8.5%\u00d7$10,000     = $850.00
+      //   .4530 straps CN: 2.8%\u00d7$10,000     = $280.00 (+301 7.5% on 9903 line)
+      //   .4540 batteries: 5.3%\u00d7$10,000     = $530.00
+      const mk = (hts: string, dutyCents: number, coo: string, desc: string) => ({
+        ...base,
+        countryOfOrigin: coo,
+        countryOfExport: 'CH',
+        foreignPortOfLading: '42876', // Hamburg — live F429 9/15 (the 019/037 CH lesson)
+        descriptions: [desc],
+        parties: [
+          { type: 'M' as const, identifier: 'CHGENWAT552GEN' },
+          { type: 'S' as const, identifier: ior },
+        ],
+        // NT52 CH first (the CN strap line overrides its tariffs below).
+        tariffs: [
+          { htsNumber: '99030574', valueDollars: 0 }, // NT52 CH 12.5%
+          { htsNumber: hts, valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents },
+        ],
+      });
+      p.entrySummary.lines = [
+        // Live F624 9/15 on the CH lines only: NT52-alone-replaces (the
+        // 037 twin) — constituents zero, NT52 carries the duty.
+        mk('9102114510', 0, 'CH', 'WATCH MOVEMENTS'),
+        mk('9102114520', 0, 'CH', 'WATCH CASES'),
+        {
+          ...mk('9102114530', 28000, 'CN', 'WATCH STRAPS'),
+          // 301 + NT52 stacked ahead of the substantive (mirrors 001's
+          // accepted marker → adjustment → substantive order).
+          tariffs: [
+            { htsNumber: '99038815', valueDollars: 0 }, // zero-units ch99 — no uom
+            { htsNumber: '99030531', valueDollars: 0 }, // NT52 CN 12.5%
+            { htsNumber: '9102114530', valueDollars: 10000, uomCode1: 'NO', quantity1Hundredths: 100000, dutyCents: 28000 },
+          ],
+        },
+        mk('9102114540', 0, 'CH', 'WATCH BATTERIES'),
+      ];
+    },
+    notes: 'Constituent duties pinned from the 9102.11.45 compound rate; CN strap line carries 301 List-4A (9903.88.15 +7.5%). Confirm suffix\u2194constituent mapping with rep (CSMS #50019756).',
+  }),
+
+  // ── ISF certification (090): Add, then Replace, then Delete ────────────
+  // Not in the 89-scenario AE package: CBP rep Michael Barela (10/8) offered
+  // ISF certification as a three-step test on one filing. The step is chosen
+  // from the latest attached SN response, like 006: no accepted filing yet
+  // means Add; an accepted Add means Replace with CBP's ISF transaction
+  // number; an accepted Replace means Delete.
+  (() => {
+    const isfFor = (params: CertParams, action: 'A' | 'R' | 'D', transactionNumber?: string): IsfInput => {
+      const ior = params.importerOfRecordNumber;
+      if (action === 'D') {
+        return {
+          submissionType: '1',
+          shipmentTypeCode: '01',
+          action: 'D',
+          importer: { qualifier: 'EI', number: ior },
+          isfTransactionNumber: transactionNumber,
+          bills: [{ qualifier: 'BM', scac: 'MAEU', billNumber: '123456789012' }],
+          entities: [],
+        };
+      }
+      return {
+        submissionType: '1', // ISF-10
+        shipmentTypeCode: '01', // standard shipment
+        action,
+        // CT complete transaction on the Replace too: FR drew warning 141
+        // COMPLETE TRANSACTION REQUIRED live (10/9).
+        actionReasonCode: 'CT',
+        importer: { qualifier: 'EI', number: ior },
+        modeOfTransportationCode: '11',
+        scac: 'MAEU',
+        isfTransactionNumber: action === 'R' ? transactionNumber : undefined,
+        bond: { holder: ior, activityCode: '01', type: '8' },
+        bills: [{ qualifier: 'BM', scac: 'MAEU', billNumber: '123456789012' }],
+        references: [{ qualifier: 'CR', value: 'ISF090' }],
+        entities: [
+          { code: 'IM', identifier: { qualifier: 'EI', value: ior } },
+          { code: 'CN', identifier: { qualifier: 'EI', value: ior } },
+          {
+            code: 'SE',
+            name: 'SHENZHEN BATTERY CO',
+            addressComponents: [{ qualifier: '01', information: '123' }, { qualifier: '02', information: 'PUDONG AVE' }],
+            geography: { city: 'SHANGHAI', postalCode: '200001', countryCode: 'CN' },
+          },
+          { code: 'BY', identifier: { qualifier: 'EI', value: ior } },
+          {
+            // Ship-To cannot use an EIN (ISF-29..31): name and US address.
+            code: 'ST',
+            name: 'MYCARGOLENS TEST WAREHOUSE',
+            addressComponents: [{ qualifier: '01', information: '100' }, { qualifier: '02', information: 'MARKET ST' }],
+            geography: { city: 'LOS ANGELES', countrySubEntityCode: 'CA', postalCode: '90001', countryCode: 'US' },
+          },
+          {
+            code: 'LG',
+            name: 'SHANGHAI CFS',
+            addressComponents: [{ qualifier: '15', information: 'PORT ROAD 1' }],
+            geography: { city: 'SHANGHAI', countryCode: 'CN' },
+          },
+          {
+            code: 'CS',
+            name: 'SHANGHAI CONSOLIDATORS',
+            addressComponents: [{ qualifier: '15', information: 'HARBOUR WAY 2' }],
+            geography: { city: 'SHANGHAI', countryCode: 'CN' },
+          },
+        ],
+        manufacturers: [
+          {
+            name: 'SHENZHEN BATTERY CO',
+            addressComponents: [{ qualifier: '01', information: '123' }, { qualifier: '02', information: 'PUDONG AVE' }],
+            geography: { city: 'SHANGHAI', postalCode: '200001', countryCode: 'CN' },
+            // 6-digit headings: the ISF side rejected 8507600030 as 404 HTS
+            // CODE NOT ON FILE (10/9) although the AE table accepts it, so
+            // the filing avoids statistical suffixes (ISF allows 6 to 10
+            // digits). The Replace adds a line, giving CBP a real amendment.
+            tariffs: action === 'A'
+              ? [{ htsNumber: '850760', countryOfOrigin: 'CN' }]
+              : [{ htsNumber: '850760', countryOfOrigin: 'CN' }, { htsNumber: '850650', countryOfOrigin: 'CN' }],
+          },
+        ],
+      };
+    };
+
+    /**
+     * Next step from the whole response history. A text can hold several
+     * envelopes (SN verdicts and SA advisories share a scenario tag), so each
+     * envelope is parsed on its own and the last accepted filing wins; SA
+     * advisories and rejected retries carry no accepted filing and are skipped.
+     */
+    const nextStep = (history: string[]): { action: 'A' | 'R' | 'D'; transactionNumber?: string } => {
+      let last: { action?: string; transactionNumber?: string } | undefined;
+      for (const text of history) {
+        const envelopes: string[][] = [];
+        for (const line of text.split(/\r?\n/).filter((l) => l.length > 0)) {
+          if (line.startsWith('A') || envelopes.length === 0) envelopes.push([]);
+          envelopes[envelopes.length - 1].push(line);
+        }
+        for (const envelope of envelopes) {
+          let filings;
+          try {
+            filings = parseIsfResponseBatch(envelope).filings;
+          } catch {
+            continue; // not an ISF response envelope
+          }
+          for (const f of filings) {
+            if (!f.accepted || !f.isfTransactionNumber) continue;
+            last = { action: f.echoedRecords.find((r) => r.recordId === 'SF10')?.values.actionCode, transactionNumber: f.isfTransactionNumber };
+          }
+        }
+      }
+      if (last?.action === 'A') return { action: 'R', transactionNumber: last.transactionNumber };
+      if (last?.action === 'R') return { action: 'D', transactionNumber: last.transactionNumber };
+      return { action: 'A' }; // nothing accepted yet, or a completed Delete starts the cycle again
+    };
+
+    const scenario: Scenario = {
+      id: '090',
+      title: 'ISF: Add, Replace, Delete',
+      application: 'SF',
+      kind: 'transmit',
+      notes:
+        'ISF certification (CBP, 10/8): transmit three times. Each Generate reads every attached SN response (SA advisories ignored): Add first, then Replace with the CBP-assigned ISF transaction number, then Delete.',
+      run: async (params, ctx) => {
+        const step = nextStep(ctx?.allResponseTexts ?? (ctx?.priorResponseText ? [ctx.priorResponseText] : []));
+        return buildBatch({
+          sender: params.sender,
+          appId: 'SF',
+          blocks: [{
+            port: params.districtPortOfEntry,
+            filerCode: params.filerCode,
+            userData: scenarioTag('090'),
+            transactionLines: buildIsf(isfFor(params, step.action, step.transactionNumber)),
+          }],
+        });
+      },
+    };
+    return scenario;
+  })(),
+];
+
+export const SCENARIO_INDEX: Map<string, Scenario> = new Map(SCENARIOS.map((s) => [s.id, s]));
+export type { Scenario } from './aeBase.js';
+export { DRY_RUN_PARAMS, type CertParams } from './params.js';

@@ -15,12 +15,16 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
+/** Password resets get a short-lived link; onboarding links last a week. */
+export const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+
 export async function issuePasswordSetupToken(
   userId: string,
+  ttlMs: number = TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
 ): Promise<{ token: string; expiresAt: Date; expiresInDays: number }> {
   const token = randomBytes(32).toString('hex');
   const tokenHash = hashToken(token);
-  const expiresAt = new Date(Date.now() + TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + ttlMs);
 
   await prisma.$transaction([
     // Burn any outstanding tokens so only the newest link works.

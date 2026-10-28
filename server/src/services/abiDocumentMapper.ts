@@ -39,10 +39,34 @@ export function canonicaliseEntryNumber(s: string): string {
   return stripped;
 }
 
+/** True when any line carries data only the native engine can file:
+ *  Chapter 99 numbers, a trade program claim, or AD/CVD cases. */
+export function hasNativeOnlyData(body: ABIDocumentBody): boolean {
+  return body.manifest.some((m) =>
+    m.invoices.some((inv) =>
+      inv.items.some((it) => (it.additionalHtsNumbers?.length ?? 0) > 0 || !!it.spiClaimCode || (it.adCvdCases?.length ?? 0) > 0)
+    )
+  );
+}
+
 export function mapABIDocumentToCC(
   doc: { payload: Prisma.JsonValue }
 ): CCABICreateDocumentPayload {
-  const body: ABIDocumentBody = abiDocumentBodySchema.parse(doc.payload);
+  const parsed: ABIDocumentBody = abiDocumentBodySchema.parse(doc.payload);
+  if (hasNativeOnlyData(parsed)) {
+    throw new Error('The CustomsCity fallback cannot carry Chapter 99, trade program or AD/CVD claims.');
+  }
+  // CC's item schema has none of these fields: never forward them (audit MHT-06).
+  const body: ABIDocumentBody = {
+    ...parsed,
+    manifest: parsed.manifest.map((m) => ({
+      ...m,
+      invoices: m.invoices.map((inv) => ({
+        ...inv,
+        items: inv.items.map(({ additionalHtsNumbers: _ch99, adCvdCases: _adcvd, spiClaimCode: _spi, ...item }) => item),
+      })),
+    })),
+  };
 
   const normalised: ABIDocumentBody = {
     ...body,

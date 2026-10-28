@@ -124,7 +124,7 @@ function PickSourceButton({
         >
           <Sparkles className="h-4 w-4 text-amber-500" />
           <span className="font-medium">Pre-fill from a shipment</span>
-          <span className="text-[12px] text-muted-foreground/70 ml-auto">Optional</span>
+          <span className="text-[12px] text-muted-foreground ml-auto">Optional</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent

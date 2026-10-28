@@ -7,11 +7,11 @@
  * disabled (see routes/auth.ts), so this is the only way new client orgs are
  * created.
  *
- * Billing note: provisioned orgs get their tier's capabilities immediately. A
- * Stripe customer/subscription is NOT created here (the client has no card at
- * provisioning) — until one exists, per-shipment charges are recorded in
- * shipment_charges with status 'skipped' (see services/shipmentBilling.ts) for
- * manual/negotiated invoicing. Wire Stripe via the billing portal later.
+ * Billing note: provisioned orgs get their plan's capabilities immediately. A
+ * Stripe customer is NOT created here (the client has no card at provisioning);
+ * the owner adds one in Settings → Billing before a paid filing can be sent.
+ * Per-org prices (PUT /organizations/:id/pricing) live on the Subscription row,
+ * so a negotiated price survives deploys (planSync only writes plan defaults).
  */
 import { Router, Response } from 'express';
 import { z } from 'zod';
@@ -24,7 +24,10 @@ import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { issuePasswordSetupToken } from '../services/passwordSetup.js';
 import { sendAccountSetupEmail } from '../services/email.js';
 import { TIERS, tierById } from '../config/plans.js';
+import { checkPriceInput, resolvePricing } from '../services/pricing.js';
+import { statusAfterPlanChange } from '../services/billingAccount.js';
 import logger from '../config/logger.js';
+import { notifyLead } from '../services/leads.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -40,6 +43,7 @@ router.get('/plans', (_req: AuthRequest, res: Response): void => {
       perFilingCents: t.perFilingCents,
       capabilities: t.capabilities,
       isPublic: t.isPublic,
+      sellsEntries: t.capabilities.includes('ABI_ENTRY'),
     })),
   });
 });
@@ -50,6 +54,7 @@ router.get('/organizations', async (_req: AuthRequest, res: Response): Promise<v
     orderBy: { createdAt: 'desc' },
     include: {
       subscription: { include: { plan: true } },
+      cbpConfig: true,
       users: {
         where: { isActive: true },
         select: { id: true, email: true, firstName: true, lastName: true, role: true, emailVerified: true },
@@ -71,14 +76,101 @@ router.get('/organizations', async (_req: AuthRequest, res: Response): Promise<v
           ? { id: o.subscription.plan.id, name: o.subscription.plan.name }
           : null,
         subscriptionStatus: o.subscription?.status ?? null,
+        // The org's own prices (null = default) and what they resolve to.
+        pricing: o.subscription
+          ? {
+              isfCents: o.subscription.isfCents,
+              entryLinkedCents: o.subscription.entryLinkedCents,
+              entryOnlyCents: o.subscription.entryOnlyCents,
+              effective: resolvePricing(o.subscription.plan?.perFilingCents, o.subscription),
+            }
+          : null,
+        cardOnFile: !!o.subscription?.defaultPaymentMethodId,
         owner: owner
           ? { email: owner.email, firstName: owner.firstName, lastName: owner.lastName, emailVerified: owner.emailVerified }
           : null,
         userCount: o._count.users,
         filingCount: o._count.filings,
+        cbp: o.cbpConfig
+          ? {
+              gateway: o.cbpConfig.gateway,
+              filerCode: o.cbpConfig.filerCode,
+              isfFilerModeDefault: o.cbpConfig.isfFilerModeDefault,
+              serviceCenterApprovedAt: o.cbpConfig.serviceCenterApprovedAt,
+              serviceCenterApprovedBy: o.cbpConfig.serviceCenterApprovedBy,
+              notes: o.cbpConfig.notes,
+            }
+          : null,
       };
     }),
   });
+});
+
+// PUT /api/v1/admin/organizations/:id/cbp — set a client's CBP identity
+// (native go-live Phase 2). Platform admins only: the filer code and the
+// service-center approval are what make a client's filings legal to send.
+const cbpConfigSchema = z.object({
+  gateway: z.enum(['NATIVE', 'CC']).optional(),
+  filerCode: z
+    .string().trim().toUpperCase()
+    .regex(/^[A-Z0-9]{3}$/, 'Filer code must be 3 letters/digits')
+    .refine((v) => v !== 'S7P', 'S7P is Sigma\'s own filer code and cannot be assigned to a client')
+    .nullable().optional(),
+  isfFilerModeDefault: z.enum(['SIGMA', 'CLIENT']).optional(),
+  /** ISO date the client's CBP client rep approved our queue; null clears it. */
+  serviceCenterApprovedAt: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).nullable().optional(),
+  serviceCenterApprovedBy: z.string().trim().max(200).nullable().optional(),
+  notes: z.string().max(5000).nullable().optional(),
+}).strict();
+
+router.put('/organizations/:id/cbp', async (req: AuthRequest, res: Response): Promise<void> => {
+  const orgId = String(req.params.id);
+  const parsed = cbpConfigSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed', issues: parsed.error.issues });
+    return;
+  }
+  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { id: true } });
+  if (!org) {
+    res.status(404).json({ error: 'Organization not found' });
+    return;
+  }
+  const d = parsed.data;
+  if (d.filerCode) {
+    const taken = await prisma.orgCbpConfig.findFirst({ where: { filerCode: d.filerCode, orgId: { not: orgId } }, select: { orgId: true } });
+    if (taken) {
+      res.status(409).json({ error: `Filer code ${d.filerCode} is already assigned to another organization.` });
+      return;
+    }
+  }
+  const before = await prisma.orgCbpConfig.findUnique({ where: { orgId } });
+  const data = {
+    ...(d.gateway !== undefined && { gateway: d.gateway }),
+    ...(d.filerCode !== undefined && { filerCode: d.filerCode }),
+    ...(d.isfFilerModeDefault !== undefined && { isfFilerModeDefault: d.isfFilerModeDefault }),
+    ...(d.serviceCenterApprovedAt !== undefined && {
+      serviceCenterApprovedAt: d.serviceCenterApprovedAt ? new Date(d.serviceCenterApprovedAt) : null,
+    }),
+    ...(d.serviceCenterApprovedBy !== undefined && { serviceCenterApprovedBy: d.serviceCenterApprovedBy }),
+    ...(d.notes !== undefined && { notes: d.notes }),
+    updatedById: req.user!.id,
+  };
+  const config = await prisma.orgCbpConfig.upsert({
+    where: { orgId },
+    create: { orgId, ...data },
+    update: data,
+  });
+  writeAuditLog({
+    orgId,
+    userId: req.user!.id,
+    action: 'admin.org_cbp_config_set',
+    entityType: 'organization',
+    entityId: orgId,
+    oldValue: before ?? undefined,
+    newValue: config,
+    ...getRequestMeta(req),
+  });
+  res.json({ cbp: config });
 });
 
 const provisionSchema = z.object({
@@ -188,10 +280,13 @@ router.patch('/organizations/:id/plan', async (req: AuthRequest, res: Response):
   }
 
   const existing = await prisma.subscription.findUnique({ where: { orgId } });
+  // Keep a delinquency (billing audit G2): a plan change must not forgive an
+  // unpaid charge or re-open filing. The hourly sweep keeps retrying it.
+  const status = statusAfterPlanChange(existing);
   const sub = await prisma.subscription.upsert({
     where: { orgId },
-    update: { planId: tier.id, status: 'active' },
-    create: { orgId, planId: tier.id, status: 'active' },
+    update: { planId: tier.id, status },
+    create: { orgId, planId: tier.id, status },
   });
 
   writeAuditLog({
@@ -200,12 +295,58 @@ router.patch('/organizations/:id/plan', async (req: AuthRequest, res: Response):
     action: 'admin.org_plan_changed',
     entityType: 'subscription',
     entityId: sub.id,
-    oldValue: { planId: existing?.planId ?? null },
-    newValue: { planId: tier.id },
+    oldValue: { planId: existing?.planId ?? null, status: existing?.status ?? null },
+    newValue: { planId: tier.id, status },
     ...getRequestMeta(req),
   });
 
-  res.json({ orgId, plan: { id: tier.id, name: tier.name } });
+  res.json({ orgId, plan: { id: tier.id, name: tier.name }, status });
+});
+
+// PUT /api/v1/admin/organizations/:id/pricing — set a client's own prices
+// (cents; null = the default). Entries have no public price: an org can send
+// entries only once both entry prices are set. A new price applies to
+// shipments CBP accepts from now on; already-billed shipments keep theirs.
+const centsField = z.number().int().min(0).nullable();
+const pricingSchema = z.object({
+  isfCents: centsField,
+  entryLinkedCents: centsField,
+  entryOnlyCents: centsField,
+}).strict();
+
+router.put('/organizations/:id/pricing', async (req: AuthRequest, res: Response): Promise<void> => {
+  const orgId = String(req.params.id);
+  const parsed = pricingSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const problem = checkPriceInput(parsed.data);
+  if (problem) {
+    res.status(400).json({ error: problem });
+    return;
+  }
+  const existing = await prisma.subscription.findUnique({ where: { orgId }, include: { plan: true } });
+  if (!existing) {
+    res.status(404).json({ error: 'This organization has no plan yet. Assign a plan first.' });
+    return;
+  }
+  const updated = await prisma.subscription.update({
+    where: { orgId },
+    data: parsed.data,
+    include: { plan: true },
+  });
+  writeAuditLog({
+    orgId,
+    userId: req.user!.id,
+    action: 'admin.org_pricing_changed',
+    entityType: 'subscription',
+    entityId: existing.id,
+    oldValue: { isfCents: existing.isfCents, entryLinkedCents: existing.entryLinkedCents, entryOnlyCents: existing.entryOnlyCents },
+    newValue: parsed.data,
+    ...getRequestMeta(req),
+  });
+  res.json({ orgId, pricing: { ...parsed.data, effective: resolvePricing(updated.plan?.perFilingCents, updated) } });
 });
 
 // POST /api/v1/admin/organizations/:id/resend-setup — re-send the owner's link.
@@ -372,6 +513,46 @@ router.delete('/users/:id', async (req: AuthRequest, res: Response): Promise<voi
   });
   logger.info({ email: target.email, orgId: target.orgId }, '[Admin] User hard-deleted, email released');
   res.json({ success: true, releasedEmail: target.email });
+});
+
+// ─── Marketing leads (services/leads.ts) ────────────────────────────────
+// GET /api/v1/admin/leads?notification=failed&subject=demo&limit=50&before=<iso>
+// Newest first; page with `before` = the last row's createdAt.
+const leadListQuery = z.object({
+  notification: z.enum(['pending', 'sent', 'failed']).optional(),
+  subject: z.string().max(20).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  before: z.coerce.date().optional(),
+});
+
+router.get('/leads', async (req: AuthRequest, res: Response): Promise<void> => {
+  const q = leadListQuery.safeParse(req.query);
+  if (!q.success) {
+    res.status(400).json({ error: 'Invalid query', details: q.error.flatten() });
+    return;
+  }
+  const { notification, subject, limit, before } = q.data;
+  const where = {
+    ...(notification ? { notificationStatus: notification } : {}),
+    ...(subject ? { subject } : {}),
+    ...(before ? { createdAt: { lt: before } } : {}),
+  };
+  const [leads, failedCount] = await Promise.all([
+    prisma.lead.findMany({ where, orderBy: { createdAt: 'desc' }, take: limit }),
+    prisma.lead.count({ where: { notificationStatus: 'failed' } }),
+  ]);
+  res.json({ leads, failedCount });
+});
+
+// POST /api/v1/admin/leads/:id/notify — resend the team notification now.
+router.post('/leads/:id/notify', async (req: AuthRequest, res: Response): Promise<void> => {
+  const lead = await prisma.lead.findUnique({ where: { id: String(req.params.id) } }).catch(() => null);
+  if (!lead) {
+    res.status(404).json({ error: 'Lead not found' });
+    return;
+  }
+  const sent = await notifyLead(lead);
+  res.json({ success: sent });
 });
 
 export default router;

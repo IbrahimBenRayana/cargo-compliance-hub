@@ -1,4 +1,7 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { CbpTimeline } from '@/components/CbpTimeline';
+import { IsfRejectedChangesBanner } from '@/components/IsfRejectedChangesBanner';
+import { TransmitConfirmDialog } from '@/components/TransmitConfirmDialog';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFiling, useSubmitFiling, useAmendFiling, useCancelFiling, useValidateFiling, useCheckFilingStatus, useDuplicateFiling, useSaveFilingAsTemplate, useFilingDocuments, useUploadDocuments, useDownloadDocument, useDeleteDocument, useExportPdf, useConsolidationSiblings } from '@/hooks/useFilings';
 import { useAbiDocumentsList } from '@/hooks/useAbiDocument';
@@ -67,6 +70,7 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
   });
   const [currentStep, setCurrentStep] = useState<PipelineStep | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   // Upgrade modal: null = closed. `capability` set = 403 feature_not_in_plan;
   // undefined capability = 402 subscription_required (no active plan).
   const [upgradePrompt, setUpgradePrompt] = useState<{ capability?: Capability } | null>(null);
@@ -114,33 +118,44 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
       return;
     }
 
-    // Small delay so user sees the success
-    await new Promise(r => setTimeout(r, 600));
+    // Validated: confirm who files it and where before anything is sent.
+    setCurrentStep(null);
+    setIsRunning(false);
+    setConfirmOpen(true);
+  };
 
-    // Steps 2+3: Submit (backend does CC create + CC send in one call)
+  const transmit = async () => {
+    setConfirmOpen(false);
+    setIsRunning(true);
     setCurrentStep('send_cc');
     updateStep('send_cc', { status: 'running', message: 'Preparing CBP filing document...' });
 
     try {
       const result = await submitFiling.mutateAsync(filing.id);
 
-      // Filing document created
+      // Native: our engine transmitted it; CBP's answer arrives in the CBP activity card.
+      if (result.native) {
+        updateStep('send_cc', { status: 'success', message: 'Filing built and checked' });
+        updateStep('send_cbp', {
+          status: 'success',
+          message: result.native.outcome === 'UNKNOWN'
+            ? 'Sent; the outcome is not yet confirmed, waiting for CBP'
+            : `Sent to CBP under filer ${result.native.filerCode}. CBP usually answers within a few minutes.`,
+        });
+        toast.success('Sent to CBP');
+        onComplete();
+        setCurrentStep(null);
+        setIsRunning(false);
+        return;
+      }
+
+      // CustomsCity fallback: filing document created
       updateStep('send_cc', {
         status: 'success',
         message: `Document created — Ref: ${result.ccFilingId || 'assigned'}`,
       });
 
-      await new Promise(r => setTimeout(r, 400));
-
-      // Step 3: Send to CBP (already happened in backend but show result)
       setCurrentStep('send_cbp');
-      updateStep('send_cbp', {
-        status: 'running',
-        message: 'Transmitting to CBP...',
-      });
-
-      await new Promise(r => setTimeout(r, 500));
-
       updateStep('send_cbp', {
         status: 'success',
         message: result.sendResponse?.success
@@ -169,8 +184,15 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
         return;
       }
 
-      // Determine which step failed
-      if (body?.validationErrors) {
+      // Native refusals carry the missing fields or the reason in CBP-rule terms.
+      if (body?.code === 'ISF_DATA_INCOMPLETE' && Array.isArray(body.issues)) {
+        updateStep('send_cc', {
+          status: 'error',
+          message: 'Required ISF information is missing',
+          details: body.issues.map((i: { field: string; message: string }) => ({ field: i.field, message: i.message, severity: 'critical' })),
+        });
+        updateStep('send_cbp', { status: 'idle' });
+      } else if (body?.validationErrors) {
         // CC validation failed (document creation rejected)
         updateStep('send_cc', {
           status: 'error',
@@ -216,6 +238,14 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
   return (
     <>
     <PlanLimitModal open={upgradePrompt !== null} onClose={() => setUpgradePrompt(null)} capability={upgradePrompt?.capability} />
+    <TransmitConfirmDialog
+      open={confirmOpen}
+      onOpenChange={setConfirmOpen}
+      filing={filing}
+      actionLabel="Send this ISF to CBP"
+      onConfirm={transmit}
+      pending={submitFiling.isPending}
+    />
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
@@ -604,6 +634,7 @@ export default function ShipmentDetails() {
   const duplicateFiling = useDuplicateFiling();
   const saveAsTemplate = useSaveFilingAsTemplate();
   const { can } = useCapabilities();
+  const [resubmitConfirmOpen, setResubmitConfirmOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [templateName, setTemplateName] = useState('');
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
@@ -630,7 +661,7 @@ export default function ShipmentDetails() {
   const { data: docsData, isLoading: docsLoading } = useFilingDocuments(id);
   // Lifecycle widget data — fetched lazily; failure of either is fine
   // (the widget falls back to ISF-only state if abis/mqs don't load).
-  const { data: abiListData } = useAbiDocumentsList({ take: 100 });
+  const { data: abiListData } = useAbiDocumentsList({ take: 100 }, { enabled: can(CAPABILITIES.ABI_ENTRY) });
   const { data: mqListData } = useManifestQueries({ limit: 50 });
   const uploadDocs = useUploadDocuments();
   const downloadDoc = useDownloadDocument();
@@ -668,6 +699,7 @@ export default function ShipmentDetails() {
   const commodity = getFirstCommodity(filing);
 
   const handleResubmit = async () => {
+    setResubmitConfirmOpen(false);
     try {
       await submitFiling.mutateAsync(filing.id);
       toast.success('Filing resubmitted successfully!');
@@ -845,13 +877,13 @@ export default function ShipmentDetails() {
       </Dialog>
 
       {/* Header */}
-      <div className="flex items-center gap-3 opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
-        <Button variant="ghost" size="icon" className="rounded-xl" asChild>
-          <Link to="/shipments"><ArrowLeft className="h-4 w-4" /></Link>
+      <div className="flex flex-wrap items-start gap-3 opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
+        <Button variant="ghost" size="icon" className="rounded-xl shrink-0" asChild>
+          <Link to="/shipments" aria-label="Back to shipments"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black tracking-tight">{filing.houseBol || filing.masterBol || filing.id.slice(0, 8)}</h1>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="text-2xl font-black tracking-tight break-all">{filing.houseBol || filing.masterBol || filing.id.slice(0, 8)}</h1>
             <StatusBadge status={filing.status as ShipmentStatus} />
             {filing.ccFilingId && (
               <Badge variant="outline" className="text-[10px] font-mono">Ref: {filing.ccFilingId.slice(0, 12)}</Badge>
@@ -864,7 +896,8 @@ export default function ShipmentDetails() {
             )}
           </p>
         </div>
-        <div className="flex gap-2">
+        {/* Own row on phones; wraps instead of pushing the page sideways. */}
+        <div className="flex flex-wrap gap-2 basis-full sm:basis-auto">
           {/* AI pre-flight review — surfaces UFLPA/PGA risks + rule-based issues
               + AI suggestions before submit. Available for any in-flight filing. */}
           {aiStatusQuery.data?.enabled
@@ -883,7 +916,7 @@ export default function ShipmentDetails() {
             </Button>
           )}
           {filing.status === 'rejected' && (
-            <Button onClick={handleResubmit} disabled={submitFiling.isPending} className="gap-1.5">
+            <Button onClick={() => setResubmitConfirmOpen(true)} disabled={submitFiling.isPending} className="gap-1.5">
               {submitFiling.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
               Resubmit
             </Button>
@@ -941,7 +974,7 @@ export default function ShipmentDetails() {
           {/* More Actions Dropdown — Duplicate, Save Template, Cancel */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="shrink-0">
+              <Button variant="outline" size="icon" className="shrink-0" aria-label="More actions">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -1078,6 +1111,9 @@ export default function ShipmentDetails() {
         />
       </div>
 
+      {/* CBP rejected the last changes: what's shown is not what CBP has (BUG-015) */}
+      {filing.lastTransmissionId && <IsfRejectedChangesBanner filingId={filing.id} />}
+
       {/* Submission Pipeline — only for draft filings */}
       {filing.status === 'draft' && (
         <div className="opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
@@ -1086,11 +1122,27 @@ export default function ShipmentDetails() {
       )}
 
       {/* CBP Status Checker — for submitted filings awaiting CBP response */}
-      {filing.status === 'submitted' && (
+      {filing.status === 'submitted' && !filing.lastTransmissionId && (
         <div className="opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
           <CBPStatusChecker filing={filing} onStatusUpdate={() => refetch()} />
         </div>
       )}
+
+      {/* Native CBP activity: what was sent and CBP's answer, live while pending */}
+      {filing.lastTransmissionId && (
+        <div className="opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
+          <CbpTimeline filingId={filing.id} />
+        </div>
+      )}
+
+      <TransmitConfirmDialog
+        open={resubmitConfirmOpen}
+        onOpenChange={setResubmitConfirmOpen}
+        filing={filing}
+        actionLabel="Resubmit this ISF to CBP"
+        onConfirm={handleResubmit}
+        pending={submitFiling.isPending}
+      />
 
       {/* Timeline */}
       <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
@@ -1151,7 +1203,7 @@ export default function ShipmentDetails() {
               <Button variant="outline" size="sm" className="gap-1.5" asChild>
                 <Link to={`/shipments/${filing.id}/edit`}><Pencil className="h-3.5 w-3.5" /> Edit & Fix</Link>
               </Button>
-              <Button size="sm" className="gap-1.5" onClick={handleResubmit} disabled={submitFiling.isPending}>
+              <Button size="sm" className="gap-1.5" onClick={() => setResubmitConfirmOpen(true)} disabled={submitFiling.isPending}>
                 {submitFiling.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
                 Resubmit
               </Button>
@@ -1221,7 +1273,7 @@ export default function ShipmentDetails() {
               <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
                 <div>
                   <p className="text-sm font-medium">{c.description || 'No description'}</p>
-                  <p className="text-xs text-muted-foreground">HTS: {c.htsCode} \u00b7 Origin: {c.countryOfOrigin}</p>
+                  <p className="text-xs text-muted-foreground">HTS: {c.htsCode} · Origin: {c.countryOfOrigin}</p>
                 </div>
                 {c.quantity && <span className="text-sm text-muted-foreground tabular-nums">Qty: {c.quantity}</span>}
               </div>
@@ -1243,7 +1295,7 @@ export default function ShipmentDetails() {
             {filing.containers.map((c: any, i: number) => (
               <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
                 <p className="text-sm font-medium font-mono">{c.number}</p>
-                <p className="text-xs text-muted-foreground">{c.type} {c.sealNumber ? `\u00b7 Seal: ${c.sealNumber}` : ''}</p>
+                <p className="text-xs text-muted-foreground">{c.type} {c.sealNumber ? `· Seal: ${c.sealNumber}` : ''}</p>
               </div>
             ))}
           </CardContent>
@@ -1370,7 +1422,7 @@ export default function ShipmentDetails() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1 transition-opacity can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:focus-within:opacity-100">
                       <Button
                         variant="ghost" size="icon" className="h-8 w-8"
                         title="Download"

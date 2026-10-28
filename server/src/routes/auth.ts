@@ -10,8 +10,8 @@ import { env } from '../config/env.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
-import { sendWelcomeEmail, sendVerificationCodeEmail } from '../services/email.js';
-import { peekPasswordSetupToken, consumePasswordSetupToken } from '../services/passwordSetup.js';
+import { sendWelcomeEmail, sendVerificationCodeEmail, sendPasswordResetEmail } from '../services/email.js';
+import { peekPasswordSetupToken, consumePasswordSetupToken, issuePasswordSetupToken, RESET_TOKEN_TTL_MS } from '../services/passwordSetup.js';
 import { notify } from '../services/notifications.js';
 import {
   requestVerificationCode,
@@ -372,7 +372,9 @@ router.post('/login', authLimiter, async (req: Request, res: Response): Promise<
       include: { organization: true },
     });
 
-    if (!user) {
+    // A removed member is deactivated, not deleted: answer as for an unknown
+    // email, so they get no session and the removal isn't revealed.
+    if (!user || !user.isActive) {
       res.status(401).json({ error: 'Invalid email or password' });
       return;
     }
@@ -779,7 +781,9 @@ router.post('/set-password', authLimiter, async (req: Request, res: Response): P
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
   await prisma.user.update({
     where: { id: userId },
-    data: { passwordHash, emailVerified: true },
+    // Clearing the refresh token signs out every existing session, so a reset
+    // locks out whoever may have had the old password.
+    data: { passwordHash, emailVerified: true, refreshToken: null },
   });
 
   writeAuditLog({
@@ -791,6 +795,32 @@ router.post('/set-password', authLimiter, async (req: Request, res: Response): P
   });
 
   res.json({ success: true });
+});
+
+// POST /api/v1/auth/forgot-password — { email } → email a 1-hour reset link
+// (the set-password flow above). Always answers the same way so the endpoint
+// can't be used to learn which emails have accounts.
+router.post('/forgot-password', authLimiter, async (req: Request, res: Response): Promise<void> => {
+  const parsed = z.object({ email: emailField }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'A valid email address is required' });
+    return;
+  }
+  const user = await prisma.user.findUnique({
+    where: { email: parsed.data.email },
+    select: { id: true, email: true, firstName: true, isActive: true, orgId: true },
+  });
+  if (user?.isActive) {
+    const { token } = await issuePasswordSetupToken(user.id, RESET_TOKEN_TTL_MS);
+    sendPasswordResetEmail({ to: user.email, firstName: user.firstName, resetToken: token })
+      .catch((err) => logger.error({ err, userId: user.id }, '[Auth] Failed to send password reset email'));
+    writeAuditLog({
+      orgId: user.orgId, userId: user.id,
+      action: 'user.password_reset_requested', entityType: 'user', entityId: user.id,
+      ...getRequestMeta(req),
+    });
+  }
+  res.json({ success: true, message: 'If an account exists for that email, a reset link is on its way.' });
 });
 
 type ConfirmReason = 'invalid' | 'expired' | 'locked' | 'no_active_token' | undefined;

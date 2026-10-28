@@ -133,19 +133,22 @@ export function parseRejectionReason(raw: string | null | undefined): ParsedReje
     if (parsed && Array.isArray(parsed.errors) && parsed.errors.length > 0) {
       const errors: ParsedError[] = parsed.errors
         .map((e: any): ParsedError => {
+          // Old gateway rows carry {field, message}; native CBP rows carry
+          // CBP's own {code, narrative, blocking} (BUG-027).
           const message =
             cleanLegacyArtifacts(e.message) ??
             cleanLegacyArtifacts(e.originalMessage) ??
+            cleanLegacyArtifacts(e.narrative) ??
             'CBP flagged an issue with this field.';
           const fieldLabel =
             cleanLegacyArtifacts(e.fieldLabel) ??
             cleanLegacyArtifacts(e.field) ??
-            'CBP validation';
+            (e.code ? `CBP code ${e.code}` : 'CBP validation');
           const fix = cleanLegacyArtifacts(e.fix);
           const severity: ParsedError['severity'] =
             e.severity === 'critical' || e.severity === 'warning' || e.severity === 'info'
               ? e.severity
-              : 'warning';
+              : e.blocking === true ? 'critical' : e.blocking === false ? 'info' : 'warning';
           return { field: e.field, fieldLabel, message, fix, severity };
         });
       const summary = cleanLegacyArtifacts(parsed.summary);

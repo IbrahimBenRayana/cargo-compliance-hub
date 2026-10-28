@@ -89,6 +89,7 @@ export async function verifyEmailConnection(): Promise<boolean> {
 interface SendMailOptions {
   to: string | string[];
   cc?: string | string[];
+  replyTo?: string;
   subject: string;
   html: string;
   text?: string;
@@ -112,6 +113,7 @@ async function sendMail(options: SendMailOptions): Promise<boolean> {
       from: `"${env.EMAIL_FROM_NAME}" <${env.EMAIL_FROM}>`,
       to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
       ...(options.cc ? { cc: Array.isArray(options.cc) ? options.cc.join(', ') : options.cc } : {}),
+      ...(options.replyTo ? { replyTo: options.replyTo } : {}),
       subject: options.subject,
       html: options.html,
       text: options.text ?? stripHtml(options.html),
@@ -343,6 +345,32 @@ export async function sendAccountSetupEmail(params: {
     subject: `Set up your ${params.organizationName} account — MyCargoLens`,
     html: wrapTemplate(body),
   });
+}
+
+/**
+ * Password reset link (reuses the set-password page and token).
+ */
+export async function sendPasswordResetEmail(params: {
+  to: string;
+  firstName?: string | null;
+  resetToken: string;
+}): Promise<boolean> {
+  const resetUrl = `${env.FRONTEND_URL}/set-password?token=${params.resetToken}`;
+  const greeting = params.firstName ? `Hi ${params.firstName},` : 'Hello,';
+  const body = `
+    <h2 style="margin:0 0 16px; font-size:20px; color:#14213D;">Reset your password</h2>
+    <p style="margin:0 0 8px; font-size:15px; line-height:1.6; color:#475569;">${greeting}</p>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">
+      We received a request to reset your MyCargoLens password. Choose a new one below.
+      If you didn't ask for this, you can ignore this email; your password stays the same.
+    </p>
+    ${buttonHtml('Choose a new password', resetUrl)}
+    <p style="margin:0; font-size:13px; color:#94a3b8;">
+      This link expires in 1 hour and works once. If the button doesn't work, paste this link in your browser:<br/>
+      <a href="${resetUrl}" style="color:#1E2D4D; word-break:break-all;">${resetUrl}</a>
+    </p>
+  `;
+  return sendMail({ to: params.to, subject: 'Reset your MyCargoLens password', html: wrapTemplate(body) });
 }
 
 /**

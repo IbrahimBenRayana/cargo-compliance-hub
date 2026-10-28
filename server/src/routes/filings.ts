@@ -1,4 +1,10 @@
 import { Router, Response } from 'express';
+import { withGuidance } from '../services/cbp/conditions.js';
+import { isOverdue } from '../services/cbp/unanswered.js';
+import { loadOrgCbpConfig } from '../services/cbp/filerIdentity.js';
+import { transmitIsfNative } from '../services/cbp/nativeIsf.js';
+import { canStartIsfAction } from '../services/cbp/isfLifecycle.js';
+import { isfFilingDeadline } from '../services/isfDeadline.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
@@ -149,11 +155,7 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
       return;
     }
 
-    let filingDeadline: Date | null = null;
-    if (shared.estimatedDeparture) {
-      filingDeadline = new Date(shared.estimatedDeparture);
-      filingDeadline.setHours(filingDeadline.getHours() - 24);
-    }
+    const filingDeadline: Date | null = shared.estimatedDeparture ? isfFilingDeadline(shared.estimatedDeparture, shared.estimatedLading) : null;
 
     const consolidationId = randomUUID();
 
@@ -204,9 +206,13 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
               placeOfDelivery: shared.placeOfDelivery,
               estimatedDeparture: shared.estimatedDeparture ? new Date(shared.estimatedDeparture) : undefined,
               estimatedArrival: shared.estimatedArrival ? new Date(shared.estimatedArrival) : undefined,
+              estimatedLading: shared.estimatedLading ? new Date(shared.estimatedLading) : undefined,
               filingDeadline: filingDeadline ?? undefined,
               bondType: shared.bondType,
               bondSuretyCode: shared.bondSuretyCode,
+              bondReferenceNumber: shared.bondReferenceNumber,
+              houseBillScac: shared.houseBillScac || undefined,
+              isfFilerMode: shared.isfFilerMode ?? undefined,
               isf5Data: shared.isf5Data ?? undefined,
               // ── Cargo (commodities per-HBL via PR 2 + containers optional) ──
               commodities: filingCommodities,
@@ -281,6 +287,9 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     where.OR = [
       { importerName: { contains: search, mode: 'insensitive' } },
       { masterBol: { contains: search, mode: 'insensitive' } },
+      // House bill = the shipment's heading; ISF ID = CBP's transaction number (BUG-028).
+      { houseBol: { contains: search, mode: 'insensitive' } },
+      { cbpTransactionId: { contains: search, mode: 'insensitive' } },
       { vesselName: { contains: search, mode: 'insensitive' } },
       { consigneeName: { contains: search, mode: 'insensitive' } },
     ];
@@ -353,11 +362,11 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const data = createFilingSchema.partial().parse(req.body);
 
-    // Recalculate deadline if departure changed
+    // Recalculate deadline if departure or lading changed
     let filingDeadline = existing.filingDeadline;
-    if (data.estimatedDeparture) {
-      filingDeadline = new Date(data.estimatedDeparture);
-      filingDeadline.setHours(filingDeadline.getHours() - 24);
+    if (data.estimatedDeparture || data.estimatedLading) {
+      const etd = data.estimatedDeparture ?? existing.estimatedDeparture;
+      if (etd) filingDeadline = isfFilingDeadline(etd, data.estimatedLading ?? existing.estimatedLading);
     }
 
     // Atomic org-scoped write (updateMany accepts the orgId in its where; the
@@ -368,6 +377,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
         ...data,
         estimatedDeparture: data.estimatedDeparture ? new Date(data.estimatedDeparture) : undefined,
         estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
+        estimatedLading: data.estimatedLading ? new Date(data.estimatedLading) : undefined,
         filingDeadline: filingDeadline ?? undefined,
       },
     });
@@ -416,6 +426,37 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolle
   res.status(outcome.httpStatus).json(outcome.body);
 });
 
+// ─── GET /api/v1/filings/:id/cbp — native CBP activity for this filing ──
+// Every transmission (what was sent, when, its outcome) with CBP's decoded
+// responses (verdict, conditions in CBP's words). Drives the live timeline.
+router.get('/:id/cbp', async (req: AuthRequest, res: Response): Promise<void> => {
+  const filing = await prisma.filing.findFirst({
+    where: { id: paramId(req), orgId: req.user!.orgId },
+    select: { id: true, status: true, cbpState: true, pendingAction: true, isfFilerCode: true, cbpTransactionId: true },
+  });
+  if (!filing) {
+    res.status(404).json({ error: 'Filing not found' });
+    return;
+  }
+  const transmissions = await prisma.cbpTransmission.findMany({
+    where: { entityType: 'filing', entityId: filing.id, orgId: req.user!.orgId },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true, environment: true, action: true, filerCode: true, status: true,
+      sentAt: true, respondedAt: true, createdAt: true, lastError: true, isfTransactionNumber: true,
+      inbound: { orderBy: { receivedAt: 'asc' }, select: { id: true, application: true, receivedAt: true, parsed: true } },
+    },
+  });
+  res.json({
+    filing,
+    transmissions: transmissions.map((t) => ({
+      ...t,
+      overdue: isOverdue(t),
+      inbound: t.inbound.map((m) => ({ ...m, parsed: m.parsed && withGuidance(m.parsed as any) })),
+    })),
+  });
+});
+
 // ─── POST /api/v1/filings/:id/amend — Submit amendment ─────
 router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   const filing = await prisma.filing.findFirst({
@@ -424,6 +465,38 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
 
   if (!filing) {
     res.status(404).json({ error: 'Filing not found' });
+    return;
+  }
+
+  // Native gateway: an amendment is a CBP REPLACE of the ISF on file. The
+  // filing's data is updated, then sent; CBP's verdict settles the status
+  // (a rejected replace leaves the previously accepted version on file).
+  if (((await loadOrgCbpConfig(req.user!.orgId))?.gateway ?? 'NATIVE') === 'NATIVE') {
+    const parsedUpdates = createFilingSchema.partial().safeParse(req.body);
+    if (!parsedUpdates.success) {
+      res.status(400).json({ error: 'Validation failed', details: parsedUpdates.error.flatten() });
+      return;
+    }
+    const allowed = canStartIsfAction(filing, 'REPLACE');
+    if (!allowed.ok) {
+      res.status(409).json({ error: allowed.reason, code: 'ISF_ACTION_NOT_ALLOWED' });
+      return;
+    }
+    const u = parsedUpdates.data;
+    if (Object.keys(u).length > 0) {
+      await prisma.filing.update({
+        where: { id: filing.id },
+        data: {
+          ...u,
+          estimatedDeparture: u.estimatedDeparture ? new Date(u.estimatedDeparture) : undefined,
+          estimatedArrival: u.estimatedArrival ? new Date(u.estimatedArrival) : undefined,
+          estimatedLading: u.estimatedLading ? new Date(u.estimatedLading) : undefined,
+          filingDeadline: u.estimatedDeparture ? isfFilingDeadline(u.estimatedDeparture, u.estimatedLading ?? filing.estimatedLading) : undefined,
+        } as never,
+      });
+    }
+    const out = await transmitIsfNative({ filingId: filing.id, orgId: req.user!.orgId, userId: req.user!.id, action: 'REPLACE' });
+    res.status(out.httpStatus).json(out.body);
     return;
   }
 
@@ -448,8 +521,7 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
     // Recalculate deadline if departure changed
     let filingDeadline = filing.filingDeadline;
     if (updates.estimatedDeparture) {
-      filingDeadline = new Date(updates.estimatedDeparture);
-      filingDeadline.setHours(filingDeadline.getHours() - 24);
+      filingDeadline = isfFilingDeadline(updates.estimatedDeparture, updates.estimatedLading ?? filing.estimatedLading);
     }
 
     // Update the filing locally first
@@ -459,6 +531,7 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
         ...updates,
         estimatedDeparture: updates.estimatedDeparture ? new Date(updates.estimatedDeparture) : undefined,
         estimatedArrival: updates.estimatedArrival ? new Date(updates.estimatedArrival) : undefined,
+        estimatedLading: updates.estimatedLading ? new Date(updates.estimatedLading) : undefined,
         filingDeadline: filingDeadline ?? undefined,
         status: 'amended',
         amendedAt: new Date(),
@@ -568,6 +641,15 @@ router.post('/:id/cancel', filingMutationLimiter, requireVerifiedEmail, requireM
 
   if (!filing) {
     res.status(404).json({ error: 'Filing not found' });
+    return;
+  }
+
+  // Native gateway: an ISF that CBP holds is removed with a CBP DELETE; it
+  // only becomes 'cancelled' once CBP accepts the delete. A draft that never
+  // reached CBP is simply discarded below.
+  if (filing.cbpState === 'ON_FILE' && ((await loadOrgCbpConfig(req.user!.orgId))?.gateway ?? 'NATIVE') === 'NATIVE') {
+    const out = await transmitIsfNative({ filingId: filing.id, orgId: req.user!.orgId, userId: req.user!.id, action: 'DELETE' });
+    res.status(out.httpStatus).json(out.body);
     return;
   }
 
@@ -749,6 +831,16 @@ router.post('/:id/check-status', ccApiLimiter, async (req: AuthRequest, res: Res
 
   if (!filing) {
     res.status(404).json({ error: 'Filing not found' });
+    return;
+  }
+
+  // Native filings are settled by CBP's own responses (inbound dispatcher).
+  if (filing.lastTransmissionId) {
+    res.json({
+      statusChanged: false,
+      status: filing.status,
+      message: 'CBP responses for this filing arrive automatically; no manual check is needed.',
+    });
     return;
   }
 
@@ -981,6 +1073,7 @@ router.post('/check-all-statuses', ccApiLimiter, async (req: AuthRequest, res: R
     where: {
       orgId: req.user!.orgId,
       status: 'submitted',
+      lastTransmissionId: null, // native filings settle from CBP responses, not CC polling
     },
     orderBy: { submittedAt: 'asc' },
     take: 20, // Limit to avoid overwhelming CC API
@@ -1121,6 +1214,9 @@ router.post('/:id/duplicate', filingMutationLimiter, async (req: AuthRequest, re
       placeOfDelivery: filing.placeOfDelivery,
       bondType: filing.bondType,
       bondSuretyCode: filing.bondSuretyCode,
+              bondReferenceNumber: filing.bondReferenceNumber,
+              houseBillScac: filing.houseBillScac || undefined,
+              isfFilerMode: filing.isfFilerMode ?? undefined,
       isf5Data: filing.isf5Data ?? undefined,
       commodities: filing.commodities as any ?? [],
       containers: [], // Different per shipment
@@ -1182,6 +1278,9 @@ router.post('/:id/save-template', filingMutationLimiter, async (req: AuthRequest
     placeOfDelivery: filing.placeOfDelivery,
     bondType: filing.bondType,
     bondSuretyCode: filing.bondSuretyCode,
+              bondReferenceNumber: filing.bondReferenceNumber,
+              houseBillScac: filing.houseBillScac || undefined,
+              isfFilerMode: filing.isfFilerMode ?? undefined,
     isf5Data: filing.isf5Data,
     commodities: filing.commodities,
   };
@@ -1238,67 +1337,29 @@ router.post('/bulk-submit', filingMutationLimiter, ccApiLimiter, requireVerified
       newStatus?: string;
     }> = [];
 
+    // Each filing goes through the same service as the single Submit button
+    // (validation, billing gate, create + transmit, history, notifications),
+    // so bulk can never mark a filing submitted without transmitting it.
+    const meta = getRequestMeta(req);
     for (const filing of filings) {
+      const bol = filing.houseBol || filing.masterBol || filing.id.slice(0, 8);
       try {
-        // Validate first
-        const validation = validateFiling(filing);
-        if (!validation.valid) {
-          results.push({
-            filingId: filing.id,
-            bol: filing.houseBol || filing.masterBol || filing.id.slice(0, 8),
-            success: false,
-            error: `${validation.criticalCount} critical errors`,
-          });
-          continue;
-        }
+        const outcome = await submitFilingToCBP({ filingId: filing.id, orgId: req.user!.orgId, userId: req.user!.id, requestMeta: meta });
+        const body = outcome.body as { filing?: { status?: string }; error?: string } | undefined;
+        const status = body?.filing?.status;
+        const ok = outcome.httpStatus < 300 && status === 'submitted';
+        results.push(ok
+          ? { filingId: filing.id, bol, success: true, newStatus: 'submitted' }
+          : { filingId: filing.id, bol, success: false, error: body?.error ?? (status ? `CBP gateway returned ${status}` : `HTTP ${outcome.httpStatus}`), newStatus: status });
+        // A missing card stops the batch: every remaining filing would fail the same way.
+        if (outcome.httpStatus === 402) break;
 
-        // Map and submit to CC API
-        const payload = mapFilingToCCPayload(filing);
-        const ccResult = await abiGateway.createDocument(payload);
-
-        // Update filing status
-        const ccFilingId = ccResult?.data?._id || ccResult?.data?.id || null;
-        await prisma.filing.update({
-          where: { id: filing.id },
-          data: {
-            status: 'submitted',
-            ccFilingId: ccFilingId ? String(ccFilingId) : undefined,
-            submittedAt: new Date(),
-          },
-        });
-
-        // Create status history
-        await prisma.filingStatusHistory.create({
-          data: {
-            filingId: filing.id,
-            status: 'submitted',
-            message: 'Bulk submission to CBP',
-            ccResponse: ccResult?.data || null,
-            changedById: req.user!.id,
-          },
-        });
-        await recordScoreSnapshot(filing.id, 'submitted');
-
-        await notifyFilingSubmitted(req.user!.orgId, req.user!.id, filing.id, filing.houseBol || filing.masterBol || '');
-
-        results.push({
-          filingId: filing.id,
-          bol: filing.houseBol || filing.masterBol || filing.id.slice(0, 8),
-          success: true,
-          newStatus: 'submitted',
-        });
-
-        // Rate limit: wait 500ms between CC API calls
+        // Rate limit: wait 500ms between gateway calls
         if (filings.indexOf(filing) < filings.length - 1) {
           await new Promise(r => setTimeout(r, 500));
         }
       } catch (err: any) {
-        results.push({
-          filingId: filing.id,
-          bol: filing.houseBol || filing.masterBol || filing.id.slice(0, 8),
-          success: false,
-          error: err.message,
-        });
+        results.push({ filingId: filing.id, bol, success: false, error: err.message });
       }
     }
 

@@ -7,10 +7,11 @@ import {
   AbiDocumentListParams,
 } from '../api/client';
 
-export function useAbiDocumentsList(params?: AbiDocumentListParams) {
+export function useAbiDocumentsList(params?: AbiDocumentListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['abi-documents', 'list', params],
     queryFn: () => abiDocumentsApi.list(params),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -42,6 +43,9 @@ export function useCreateAbiDocument() {
 export function useUpdateAbiDocument() {
   const queryClient = useQueryClient();
   return useMutation({
+    // Offline, run (and fail) at once rather than pause: a paused save left
+    // the wizard on "Saving..." forever with no "Not saved, retry".
+    networkMode: 'always',
     mutationFn: ({
       id,
       payload,
@@ -100,6 +104,26 @@ export function useDeleteAbiDocument() {
   });
 }
 
+/**
+ * Transmit-time duty & fee estimate for a draft.
+ *
+ * Keyed UNDER the document key on purpose: the autosave mutation's
+ * `invalidateQueries({ queryKey: ['abi-documents', id] })` prefix-matches
+ * this key, so every saved edit automatically re-prices the estimate —
+ * no manual wiring between the wizard steps and this hook.
+ */
+export function useDutyEstimate(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['abi-documents', id, 'estimate-duty'],
+    queryFn: () => abiDocumentsApi.estimateDuty(id!),
+    enabled: Boolean(id) && enabled,
+    // The estimate must always reflect the latest save, never a 30s-old
+    // snapshot (the app-wide default staleTime).
+    staleTime: 0,
+    select: (res) => res.data,
+  });
+}
+
 export function usePollAbiDocument() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -130,22 +154,45 @@ export function useAbiDocumentAutosave(id: string | undefined, debounceMs = 800)
     idRef.current = id;
   }, [id]);
 
-  const flush = () => {
+  // Saves run one at a time, in order, so an older patch can never land
+  // after a newer one; callers can await the last one (audit FPR-01).
+  const chainRef = useRef<Promise<void>>(Promise.resolve());
+
+  /**
+   * Save whatever is pending now. Resolves once it (and every save before
+   * it) is on the server; rejects if it failed, in which case the patch is
+   * kept and retried on the next save or flush.
+   */
+  const flush = (): Promise<void> => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
     const nextId = idRef.current;
     const payload = pendingRef.current;
-    if (!nextId || Object.keys(payload).length === 0) return;
-    pendingRef.current = {};
-    update.mutate({ id: nextId, payload });
+    if (nextId && Object.keys(payload).length > 0) {
+      pendingRef.current = {};
+      chainRef.current = chainRef.current
+        .catch(() => undefined)
+        .then(() => update.mutateAsync({ id: nextId, payload }))
+        .then(() => undefined)
+        .catch((err) => {
+          // Keep the unsaved patch under anything typed since.
+          pendingRef.current = { ...payload, ...pendingRef.current };
+          throw err;
+        });
+    }
+    return chainRef.current;
   };
 
   const save = (patch: ABIDocumentDraft) => {
     pendingRef.current = { ...pendingRef.current, ...patch };
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(flush, debounceMs);
+    timerRef.current = setTimeout(() => {
+      // A failed background save surfaces through `error`; the patch stays
+      // pending for the next attempt.
+      flush().catch(() => undefined);
+    }, debounceMs);
   };
 
   // Flush any pending patch on unmount so we do not drop the last edit.

@@ -1,0 +1,5 @@
+ALA  MCLPASSWD           TE                                                     
+B  2704ZZZTE                                               SCENARIO 080         
+XA2704ZZZ 000007971                                                             
+Y  2704ZZZTE                                                                    
+ZLA  MCL                                                                        

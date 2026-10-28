@@ -66,3 +66,35 @@ RUN_CC_SUBMIT=1 npx playwright test --config tests/e2e/playwright.e2e.config.ts 
 `recon.mjs`, `net-audit.mjs`, `session-persist.mjs`, `repro-bounce.mjs`,
 `login-debug.mjs` are standalone `node` scripts used to map the app and
 reproduce issues. Run e.g. `node tests/e2e/recon.mjs`.
+
+## Running against staging (testing week)
+
+The base URL and account come from the environment (`specs/env.ts`); nothing
+secret is committed. Accounts with MFA need their authenticator secret.
+
+```sh
+E2E_BASE_URL=https://staging.mycargolens.com \
+E2E_EMAIL=<qa account> E2E_PASSWORD=<password> E2E_TOTP_SECRET=<base32 secret> \
+./node_modules/.bin/playwright test --config tests/e2e/playwright.e2e.config.ts
+```
+
+Screen sweep (every route at 1440 / 768 / 390 px, light and dark, with
+overflow, console-error, failed-request and axe checks):
+
+```sh
+E2E_SWEEP=1 E2E_SWEEP_LABEL=full-owner E2E_BASE_URL=... E2E_EMAIL=... E2E_PASSWORD=... E2E_TOTP_SECRET=... \
+./node_modules/.bin/playwright test --config tests/e2e/playwright.e2e.config.ts specs/sweep.spec.ts
+```
+
+Screenshots and `report.json` land in `tests/e2e/sweep-output/<label>/` (git-ignored).
+Specs that need local DB access (`mfa.spec.ts`) or send real email/CBP traffic stay opt-in.
+
+Account-dependent specs read these (defaults suit the local demo account):
+
+| Variable | Meaning |
+|---|---|
+| `E2E_TIER` | Plan of the run's account: `isf` (default) runs the capability-gate specs; set `full` to skip them. |
+| `E2E_PLATFORM_ADMIN=1` | The account is a platform admin; on a remote URL the `/admin` spec is skipped without it. |
+| `E2E_EMAIL_2` / `E2E_PASSWORD_2` / `E2E_TOTP_SECRET_2` | A second account in another org, for `session.spec.ts` (tabs and sign-out). |
+
+On a remote URL the demo-hint check and `mfa.spec.ts` (needs local DB access) are skipped.

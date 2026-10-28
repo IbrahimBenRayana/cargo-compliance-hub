@@ -6,6 +6,9 @@
  * (callers pass userId + audit meta, and submit returns a {httpStatus, body}
  * outcome the caller maps to its response).
  */
+import { loadOrgCbpConfig } from './cbp/filerIdentity.js';
+import { transmitIsfNative } from './cbp/nativeIsf.js';
+import { isfFilingDeadline } from './isfDeadline.js';
 import type { Filing } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { abiGateway } from './abi/gateway.js';
@@ -36,12 +39,8 @@ export async function createFilingForOrg(params: {
 }): Promise<Filing> {
   const { data, orgId, userId, meta = {} } = params;
 
-  // Calculate filing deadline (24h before departure)
-  let filingDeadline: Date | null = null;
-  if (data.estimatedDeparture) {
-    filingDeadline = new Date(data.estimatedDeparture);
-    filingDeadline.setHours(filingDeadline.getHours() - 24);
-  }
+  // ISF deadline: 24h before lading, estimated from departure (services/isfDeadline).
+  const filingDeadline: Date | null = data.estimatedDeparture ? isfFilingDeadline(data.estimatedDeparture, data.estimatedLading) : null;
 
   const filing = await prisma.filing.create({
     data: {
@@ -69,9 +68,13 @@ export async function createFilingForOrg(params: {
       placeOfDelivery: data.placeOfDelivery,
       estimatedDeparture: data.estimatedDeparture ? new Date(data.estimatedDeparture) : undefined,
       estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
+      estimatedLading: data.estimatedLading ? new Date(data.estimatedLading) : undefined,
       filingDeadline: filingDeadline ?? undefined,
       bondType: data.bondType,
       bondSuretyCode: data.bondSuretyCode,
+      bondReferenceNumber: data.bondReferenceNumber,
+      houseBillScac: data.houseBillScac || undefined,
+      isfFilerMode: data.isfFilerMode ?? undefined,
       isf5Data: data.isf5Data ?? undefined,
       commodities: data.commodities,
       containers: data.containers,
@@ -138,6 +141,21 @@ export async function submitFilingToCBP(params: {
           ? { error: 'Choose a plan to submit filings.', code: 'subscription_required', upgradeUrl: '/settings?tab=billing' }
           : { error: 'Add a payment method to submit filings.', code: 'card_required', upgradeUrl: '/settings?tab=billing' },
     };
+  }
+
+  // Native gateway (the default): our own certified engine. CustomsCity
+  // remains only as a per-org fallback (OrgCbpConfig.gateway = 'CC').
+  const cbpConfig = await loadOrgCbpConfig(orgId);
+  if ((cbpConfig?.gateway ?? 'NATIVE') === 'NATIVE') {
+    const native = await transmitIsfNative({ filingId: filing.id, orgId, userId, action: 'ADD' });
+    if (native.httpStatus >= 300) return native;
+    const updated = await prisma.filing.findUnique({ where: { id: filing.id } });
+    writeAuditLog({
+      orgId, userId, action: 'filing.submitted', entityType: 'filing', entityId: filing.id,
+      newValue: { gateway: 'NATIVE', ...native.body },
+      ...requestMeta,
+    });
+    return { httpStatus: 200, body: { filing: updated, native: native.body } };
   }
 
   try {

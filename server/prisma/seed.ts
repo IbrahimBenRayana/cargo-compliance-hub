@@ -210,15 +210,11 @@ async function main() {
 
   // ─── Plans (per-filing tiers) ──────────────────────────
   // Derived from the single source of truth in server/src/config/plans.ts so
-  // the seed can never drift from the billing logic. Stripe Price ids come from
-  // env (populated by `npm run stripe:bootstrap`); they stay null in dev until
-  // bootstrapped, which is fine — checkout self-disables without them.
+  // the seed can never drift from the billing logic.
   const plans = TIERS.map((t) => ({
     id: t.id,
     name: t.name,
     description: t.description,
-    stripePriceId: t.stripePriceId(),
-    stripeProductId: null as string | null,
     perFilingCents: t.perFilingCents,
     capabilities: t.capabilities,
     features: t.features,

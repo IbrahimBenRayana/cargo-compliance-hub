@@ -1,6 +1,8 @@
 import * as React from "react";
 
-const MOBILE_BREAKPOINT = 768;
+// Below 1280px (phones and every iPad, portrait or landscape) the sidebar is
+// a slide-out drawer opened from the header button; it docks on laptops and up.
+const MOBILE_BREAKPOINT = 1280;
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined);

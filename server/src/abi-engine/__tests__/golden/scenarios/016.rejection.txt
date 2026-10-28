@@ -1,0 +1,1 @@
+F ScenarioValidation.entryTypeCode: unknown entry type '86' (AE Table 2)

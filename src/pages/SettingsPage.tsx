@@ -7,17 +7,20 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  useProfile, useUpdateProfile, useChangePassword,
-  useOrganization, useUpdateOrganization, useAuditLog, useTestCCConnection,
+  useProfile, useUpdateProfile,
+  useOrganization, useUpdateOrganization, useAuditLog,
 } from '@/hooks/useFilings';
 import {
   User, Building2, Shield, Key, Activity, CheckCircle2, XCircle,
-  Loader2, Clock, Users, FileText, Save, Eye, EyeOff, ChevronRight,
+  Loader2, Clock, Users, FileText, Save, ChevronRight,
   Mail, CalendarDays, BadgeCheck, Plus, Trash2, Copy, ShieldCheck, Bell, CreditCard,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
+import { EntryNumberBlocksCard } from '@/components/settings/EntryNumberBlocksCard';
+import { CbpIdentityCard } from '@/components/settings/CbpIdentityCard';
 import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
+import { ChangePasswordCard } from '@/components/settings/ChangePasswordCard';
 import { BillingSettings } from '@/components/billing/BillingSettings';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -28,7 +31,7 @@ const tabs: { id: SettingsTab; label: string; desc: string; icon: React.ElementT
   { id: 'profile',       label: 'Profile',           desc: 'Personal info & security',  icon: User },
   { id: 'organization',  label: 'Organization',      desc: 'Company & IOR details',     icon: Building2 },
   { id: 'billing',       label: 'Billing',           desc: 'Plan, card & charges',      icon: CreditCard },
-  { id: 'api',           label: 'API & Integrations',desc: 'Filing gateway connection', icon: Key },
+  { id: 'api',           label: 'CBP identity',      desc: 'Filer code & service center', icon: Key },
   { id: 'notifications', label: 'Notifications',     desc: 'Per-event delivery channels', icon: Bell },
   { id: 'activity',      label: 'Audit Log',         desc: 'Recent activity',           icon: Activity },
 ];
@@ -38,9 +41,7 @@ export default function SettingsPage() {
   const { data: org, isLoading: orgLoading } = useOrganization();
   const { data: auditData, isLoading: auditLoading } = useAuditLog({ limit: 30 });
   const updateProfile = useUpdateProfile();
-  const changePassword = useChangePassword();
   const updateOrganization = useUpdateOrganization();
-  const testConnection = useTestCCConnection();
 
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
@@ -53,21 +54,13 @@ export default function SettingsPage() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
 
-  // Password form
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPasswords, setShowPasswords] = useState(false);
-
   // Org form
   const [orgName, setOrgName] = useState('');
   const [iorNumber, setIorNumber] = useState('');
   const [einNumber, setEinNumber] = useState('');
+  const [orgPhone, setOrgPhone] = useState('');
 
   // Connection test
-  const [connectionResult, setConnectionResult] = useState<{
-    connected: boolean; environment: string; baseUrl: string;
-  } | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -82,57 +75,33 @@ export default function SettingsPage() {
       setOrgName(org.name || '');
       setIorNumber(org.iorNumber || '');
       setEinNumber(org.einNumber || '');
+      setOrgPhone(org.phone || '');
     }
   }, [org]);
 
   const handleSaveProfile = async () => {
     try {
-      await updateProfile.mutateAsync({ firstName, lastName, email });
+      await updateProfile.mutateAsync({ firstName, lastName });
       toast.success('Profile updated');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update profile');
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      toast.error('New passwords do not match');
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
-      return;
-    }
-    try {
-      await changePassword.mutateAsync({ currentPassword, newPassword });
-      toast.success('Password changed');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to change password');
+      toast.error(err.body?.error || err.message || 'Failed to update profile');
     }
   };
 
   const handleSaveOrg = async () => {
     try {
-      await updateOrganization.mutateAsync({ name: orgName, iorNumber, einNumber });
+      const digits = orgPhone.replace(/\D/g, '');
+      if (digits && digits.length < 10) {
+        toast.error('Enter a 10-digit phone number, area code included');
+        return;
+      }
+      await updateOrganization.mutateAsync({ name: orgName, iorNumber, einNumber, phone: orgPhone.trim() });
       toast.success('Organization saved');
     } catch (err: any) {
       toast.error(err.message || 'Failed to update organization');
     }
   };
 
-  const handleTestConnection = async () => {
-    try {
-      const result = await testConnection.mutateAsync();
-      setConnectionResult(result);
-      if (result.connected) toast.success('CBP Filing Gateway connected');
-      else toast.error('CBP Filing Gateway connection failed');
-    } catch (err: any) {
-      toast.error('Connection test failed: ' + (err.message || 'Unknown error'));
-    }
-  };
 
   const initials = ((profile?.firstName?.[0] || '') + (profile?.lastName?.[0] || '')).toUpperCase() || 'U';
 
@@ -263,7 +232,9 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="settings-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email Address</Label>
-                    <Input id="settings-email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@company.com" />
+                    {/* Email changes aren't supported here yet (server refuses them). */}
+                    <Input id="settings-email" value={email} readOnly aria-describedby="settings-email-hint" type="email" className="bg-muted/40" />
+                    <p id="settings-email-hint" className="text-xs text-muted-foreground">To change your email, contact support.</p>
                   </div>
                   <div className="flex items-center justify-between pt-2">
                     <p className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -278,76 +249,7 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="border-b">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-amber-600" />
-                    Password & Security
-                  </CardTitle>
-                  <CardDescription>Use a strong password to protect your account</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6 space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="settings-current-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="settings-current-password"
-                        type={showPasswords ? 'text' : 'password'}
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="Enter current password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPasswords((p) => !p)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                        aria-label={showPasswords ? 'Hide password' : 'Show password'}
-                      >
-                        {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid gap-5 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="settings-new-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">New Password</Label>
-                      <Input
-                        id="settings-new-password"
-                        type={showPasswords ? 'text' : 'password'}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Min 8 characters"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="settings-confirm-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Confirm Password</Label>
-                      <Input
-                        id="settings-confirm-password"
-                        type={showPasswords ? 'text' : 'password'}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Re-enter new password"
-                      />
-                    </div>
-                  </div>
-                  {newPassword && confirmPassword && newPassword !== confirmPassword && (
-                    <p className="text-xs text-destructive">Passwords do not match</p>
-                  )}
-                  <div className="flex justify-end pt-2">
-                    <Button
-                      onClick={handleChangePassword}
-                      disabled={changePassword.isPending || !currentPassword || !newPassword || newPassword !== confirmPassword}
-                      className="cursor-pointer"
-                    >
-                      {changePassword.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Shield className="h-4 w-4 mr-2" />
-                      )}
-                      Update Password
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <ChangePasswordCard email={email} />
 
               <TwoFactorSettings />
             </>
@@ -381,6 +283,12 @@ export default function SettingsPage() {
                       <p className="text-[11px] text-muted-foreground">Employer Identification Number</p>
                     </div>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-org-phone" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</Label>
+                    <Input id="settings-org-phone" type="tel" autoComplete="tel" value={orgPhone} onChange={(e) => setOrgPhone(e.target.value)}
+                      placeholder="(310) 555-0100" aria-describedby="settings-org-phone-hint" className="sm:max-w-xs" />
+                    <p id="settings-org-phone-hint" className="text-[11px] text-muted-foreground">10 digits. CBP needs a contact phone to release cargo on your entries.</p>
+                  </div>
                   <div className="flex justify-end pt-2">
                     <Button onClick={handleSaveOrg} disabled={updateOrganization.isPending} className="cursor-pointer">
                       {updateOrganization.isPending ? (
@@ -393,6 +301,10 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              <EntryNumberBlocksCard
+                canEdit={profile?.role === 'owner' || profile?.role === 'admin'}
+              />
 
               {org && (
                 <Card>
@@ -431,88 +343,7 @@ export default function SettingsPage() {
           {activeTab === 'billing' && <BillingSettings />}
 
           {activeTab === 'api' && (
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Key className="h-4 w-4 text-amber-600" />
-                  CBP Filing Gateway
-                </CardTitle>
-                <CardDescription>Test and manage your filing gateway integration</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-5">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Button onClick={handleTestConnection} disabled={testConnection.isPending} variant="outline" className="cursor-pointer">
-                    {testConnection.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Activity className="h-4 w-4 mr-2" />
-                    )}
-                    Test Connection
-                  </Button>
-
-                  {connectionResult && (
-                    <div className="flex items-center gap-2">
-                      {connectionResult.connected ? (
-                        <>
-                          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                          <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Connected</span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="h-5 w-5 text-red-500" />
-                          <span className="text-sm font-semibold text-red-600 dark:text-red-400">Failed</span>
-                        </>
-                      )}
-                      <Badge variant="secondary" className="text-xs ml-1">
-                        {connectionResult.environment}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-
-                {connectionResult && (
-                  <div className="rounded-xl border bg-muted/30 p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">Status</p>
-                      <div
-                        className={cn(
-                          'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold',
-                          connectionResult.connected
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                        )}
-                      >
-                        <span className={cn('h-1.5 w-1.5 rounded-full', connectionResult.connected ? 'bg-emerald-500' : 'bg-red-500')} />
-                        {connectionResult.connected ? 'Online' : 'Offline'}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">Environment</p>
-                      <p className="font-semibold capitalize">{connectionResult.environment}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">API Base URL</p>
-                      <p className="font-mono text-xs truncate">{connectionResult.baseUrl}</p>
-                    </div>
-                  </div>
-                )}
-
-                <Separator />
-
-                <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40 p-4 flex gap-3">
-                  <Key className="h-4 w-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-                    <p className="font-semibold mb-1">API Credentials Managed Server-Side</p>
-                    <p className="text-amber-700 dark:text-amber-400/90">
-                      Filing gateway credentials are configured via environment variables on the server
-                      (<code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded font-mono">CC_API_EMAIL</code>,
-                      {' '}<code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded font-mono">CC_API_PASSWORD</code>).
-                      Contact your administrator to update them.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <CbpIdentityCard canEdit={profile?.role === 'owner' || profile?.role === 'admin'} />
           )}
 
           {/* ── NOTIFICATIONS ── */}

@@ -24,6 +24,7 @@ import { useManifestQueries } from '@/hooks/useManifestQuery';
 import { Filing } from '@/types/shipment';
 import { useCurrentUser } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useBilling';
+import { acceptanceRate } from '@/lib/acceptanceRate';
 import { CAPABILITIES } from '@/lib/planMeta';
 import { CelebrationModal } from '@/components/CelebrationModal';
 import { Button } from '@/components/ui/button';
@@ -292,14 +293,14 @@ function ShipmentCard({ tile, delay }: { tile: ShipmentTile; delay: number }) {
             )}
           </div>
         </div>
-        <p className={cn(TYPE.meta, 'truncate text-muted-foreground/80')}>
+        <p className={cn(TYPE.meta, 'truncate text-muted-foreground')}>
           {tile.subRef}
         </p>
         <div className="mt-2.5 flex items-center justify-between gap-2 text-[11px]">
           <span className={cn('font-medium truncate', SEVERITY_LABEL_TINT[tile.severity])}>
             {tile.statusLabel}
           </span>
-          <span className="text-muted-foreground/70 tabular-nums shrink-0">
+          <span className="text-muted-foreground tabular-nums shrink-0">
             {relativeTime(tile.ageRef)}
           </span>
         </div>
@@ -322,7 +323,7 @@ interface ColumnDef {
 const COLUMNS: ColumnDef[] = [
   { stage: 'isf',      index: '01', title: 'ISF Filed',         subtitle: 'Drafting or with CBP',          emptyTitle: 'No ISF filings in flight',  emptyHint: 'New ISF filings will appear here.' },
   { stage: 'manifest', index: '02', title: 'Manifest Verified', subtitle: 'ISF accepted — file the Entry', emptyTitle: 'Nothing waiting on entry',  emptyHint: 'Once an ISF clears, it lands here.' },
-  { stage: 'entry',    index: '03', title: 'Entry Filed',       subtitle: '7501 + 3461 with CBP',          emptyTitle: 'No entries in flight',      emptyHint: 'Transmitted entries appear here.' },
+  { stage: 'entry',    index: '03', title: 'Entry Filed',       subtitle: 'Drafting or with CBP',          emptyTitle: 'No entries in flight',      emptyHint: 'Entries you draft or send appear here.' },
   { stage: 'cleared',  index: '04', title: 'Cleared',           subtitle: 'Accepted by CBP',               emptyTitle: 'No cleared shipments yet',  emptyHint: 'Once CBP accepts an entry, it lands here.' },
 ];
 
@@ -553,7 +554,8 @@ function KpiCard({
   label, value, format = 'number', sub, tone, delay, pulse, series, delta,
 }: {
   label: string;
-  value: number;
+  /** null = nothing to measure yet; shown as a dash. */
+  value: number | null;
   format?: 'number' | 'percent';
   sub: string;
   tone: KpiTone;
@@ -562,8 +564,8 @@ function KpiCard({
   series?: number[];
   delta?: KpiDelta;
 }) {
-  const animated = useCountUp(value, 1000);
-  const display = format === 'percent' ? `${animated}%` : animated.toLocaleString();
+  const animated = useCountUp(value ?? 0, 1000);
+  const display = value === null ? '—' : format === 'percent' ? `${animated}%` : animated.toLocaleString();
   const tint = KPI_TINT[tone];
   return (
     <div
@@ -679,10 +681,12 @@ export default function Dashboard() {
   const { data: filingsData, isLoading: filingsLoading } = useFilings({
     sortBy: 'updatedAt', sortOrder: 'desc', limit: 200,
   });
-  const { data: abiData, isLoading: abiLoading } = useAbiDocumentsList({ take: 100 });
+
   const { data: mqData, isLoading: mqLoading } = useManifestQueries({ limit: 30 });
   const { data: profile } = useCurrentUser();
   const { can } = useCapabilities();
+  // Entry plans only: on an ISF plan the list is a 403 on every load.
+  const { data: abiData, isLoading: abiLoading } = useAbiDocumentsList({ take: 100 }, { enabled: can(CAPABILITIES.ABI_ENTRY) });
 
   const [searchParams, setSearchParams] = useSearchParams();
   const welcomePlanId = searchParams.get('welcome');
@@ -717,12 +721,7 @@ export default function Dashboard() {
     return abiDocs.filter(d => d.status === 'ACCEPTED' && new Date(d.updatedAt).getTime() >= monthStart).length;
   }, [abiDocs]);
 
-  const acceptanceRate = useMemo(() => {
-    const accepted = filings.filter(f => f.status === 'accepted').length;
-    const rejected = filings.filter(f => f.status === 'rejected').length;
-    const resolved = accepted + rejected;
-    return resolved === 0 ? 100 : Math.round((accepted / resolved) * 100);
-  }, [filings]);
+  const acceptance = useMemo(() => acceptanceRate(filings), [filings]);
 
   const inFlightStages =
     [byStage.isf.length > 0, byStage.manifest.length > 0, byStage.entry.length > 0]
@@ -921,7 +920,7 @@ export default function Dashboard() {
 
         {/* ─── KPIs ────────────────────────────────────────────────────── */}
         <section
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
           style={{ animationDelay: '40ms', animationFillMode: 'forwards' }}
         >
           <KpiCard
@@ -954,9 +953,9 @@ export default function Dashboard() {
           />
           <KpiCard
             label="Acceptance Rate"
-            value={acceptanceRate}
+            value={acceptance}
             format="percent"
-            sub="ISFs accepted vs resolved"
+            sub={acceptance === null ? 'No ISFs accepted or rejected yet' : 'ISFs accepted vs resolved'}
             tone="violet"
             delay={270}
           />

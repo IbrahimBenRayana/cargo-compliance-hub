@@ -61,6 +61,348 @@ export * as aeHeaderRecordDefs from './ae/headerRecordDefs.js';
 export * as aeLineRecordDefs from './ae/lineRecordDefs.js';
 export * as aeResponseDefs from './ae/responseDefs.js';
 
+// ── Importer Security Filing (SF/SN + SA advisory) ─────────
+export { buildIsf } from './isf/builder.js';
+export type {
+  IsfInput,
+  IsfImporter,
+  IsfBond,
+  IsfShipmentInfo,
+  IsfBill,
+  IsfReference,
+  IsfContainer,
+  IsfEntity,
+  IsfEntityBase,
+  IsfEntityGeography,
+  IsfAddressComponent,
+  IsfManufacturer,
+  IsfTariff,
+  IsfSubmissionType,
+  IsfShipmentType,
+  IsfActionCode,
+  IsfActionReasonCode,
+  IsfEntityCode,
+  IsfEntityIdentifierQualifier,
+} from './isf/builder.js';
+export { mapFilingToIsfInput } from './isf/fromFiling.js';
+export type { PlatformIsfFiling, MapFilingToIsfOptions } from './isf/fromFiling.js';
+export {
+  parseIsfResponse,
+  parseIsfResponseBatch,
+  parseIsfStatusAdvisory,
+  parseIsfStatusAdvisoryBatch,
+} from './isf/responseParser.js';
+export type {
+  IsfResponse,
+  IsfResponseBatch,
+  IsfEchoedRecord,
+  IsfRecordError,
+  IsfDisposition,
+  IsfStatusAdvisory,
+  IsfStatusAdvisoryBatch,
+  IsfBillStatus,
+} from './isf/responseParser.js';
+export {
+  SUBMISSION_TYPES,
+  SHIPMENT_TYPES,
+  ACTION_REASON_CODES,
+  IMPORTER_NUMBER_QUALIFIERS,
+  ENTITY_CODES,
+  ENTITY_SECONDARY_NAME_CODES,
+  ENTITY_IDENTIFIER_QUALIFIERS,
+  ADDRESS_COMPONENT_QUALIFIERS,
+  REFERENCE_IDENTIFIER_QUALIFIERS,
+  BOND_ACTIVITY_CODES,
+  BOND_TYPES,
+  SF90_MESSAGE_TYPES,
+  SA_DISPOSITION_CODES,
+} from './isf/recordDefs.js';
+export * as isfRecordDefs from './isf/recordDefs.js';
+
+// ── In-Bond (QP/QT + WP/WT events + NS notifications) ──────
+export { buildInbond, buildInbondEvent } from './inbond/builder.js';
+export type {
+  InbondInput,
+  InbondAddInput,
+  InbondDeleteBillInput,
+  InbondDeleteInput,
+  InbondEventInput,
+  InbondEntryType,
+  InbondEventAction,
+  InbondWeightUnit,
+  InbondConveyance,
+  InbondParty,
+  InbondCommodity,
+  InbondCargoLine,
+  InbondCargoGroup,
+  InbondHazmat,
+  InbondHazmatContinuation,
+  InbondContainer,
+  InbondBillDetails,
+  InbondBill,
+  InbondReference,
+} from './inbond/builder.js';
+export {
+  computeInbondCheckDigit,
+  formatInbondNumber,
+  isAcceptableInbondNumber,
+} from './inbond/checkDigit.js';
+export {
+  parseInbondResponse,
+  parseInbondResponseBatch,
+  parseInbondEventResponse,
+  parseInbondEventResponseBatch,
+  parseInbondStatus,
+  parseInbondStatusBatch,
+  parseInbondStructureRejects,
+} from './inbond/responseParser.js';
+export type {
+  InbondMessage,
+  InbondStructureReject,
+  InbondEchoedRecord,
+  InbondBillResult,
+  InbondResponse,
+  InbondResponseBatch,
+  InbondEventResponse,
+  InbondEventResponseBatch,
+  InbondStatusConveyanceHeader,
+  InbondStatusInbondHeader,
+  InbondStatusContainer,
+  InbondStatusNotification,
+  InbondStatusBatch,
+} from './inbond/responseParser.js';
+export {
+  IN_BOND_ENTRY_TYPES,
+  QP10_ACTION_CODES,
+  QP30_ACTION_CODES,
+  WP_ACTION_CODES,
+  QP33_REFERENCE_QUALIFIERS,
+  WEIGHT_UNITS,
+  VOLUME_UNITS,
+  NARRATIVE_MESSAGE_TYPES,
+  HAZMAT_QUALIFIERS,
+  INLAND_LADING_CODES,
+} from './inbond/recordDefs.js';
+export * as inbondRecordDefs from './inbond/recordDefs.js';
+
+// ── ACE Cargo Release (SE/SX + SO status notifications) ────
+export { buildCargoRelease } from './cargoRelease/builder.js';
+export type {
+  CargoReleaseInput,
+  CargoReleaseAddReplaceInput,
+  CargoReleaseUpdateInput,
+  CargoReleaseCancelInput,
+  SeEntryType,
+  SeBillType,
+  SeReferenceQualifier,
+  SeCancellationReasonCode,
+  SeEntityCode,
+  SeContact,
+  SeBill,
+  SeConveyance,
+  SeBillGrouping,
+  SeReference,
+  SeGbiIdentifier,
+  SeAddressComponent,
+  SeEntityGeography,
+  SeEntity,
+  SeTariff,
+  SeFtzStatus,
+  SeLine,
+  SeAdditionalHeader,
+  UnifiedIsfInput,
+  UnifiedIsfEntity,
+} from './cargoRelease/builder.js';
+export {
+  parseCargoReleaseResponse,
+  parseCargoReleaseResponseBatch,
+  parseCargoReleaseStatus,
+  parseCargoReleaseStatusBatch,
+} from './cargoRelease/responseParser.js';
+export type {
+  CargoReleaseResponse,
+  CargoReleaseResponseBatch,
+  SeEchoedRecord,
+  SeRecordError,
+  SeDisposition,
+  CargoReleaseStatusNotification,
+  CargoReleaseStatusBatch,
+  SoReference,
+  SoLine,
+  SoBill,
+  SoInBondLeg,
+  SoBillMatch,
+  SoBillGroupingStatus,
+  SoReleaseDisposition,
+  SoPgaStatus,
+  SoPgaDetail,
+} from './cargoRelease/responseParser.js';
+export {
+  SE_ACTION_CODES,
+  SE_ENTRY_TYPES,
+  SE_IMPORTER_OF_RECORD_TYPES,
+  SE_MOT_CODES,
+  SPLIT_SHIPMENT_RELEASE_CODES,
+  CANCELLATION_REASON_CODES,
+  BILL_TYPE_INDICATORS,
+  SE20_REFERENCE_QUALIFIERS,
+  SE_ENTITY_CODES,
+  SE_ENTITY_IDENTIFIER_QUALIFIERS,
+  GBI_IDENTIFIER_QUALIFIERS,
+  SE_ADDRESS_COMPONENT_QUALIFIERS,
+  FTZ_ZONE_STATUS_CODES,
+  UNIFIED_ISF_SHIPMENT_TYPES,
+  UNIFIED_SF20_REFERENCE_QUALIFIERS,
+  SE90_MESSAGE_TYPES,
+  SO20_REFERENCE_QUALIFIERS,
+  SO20_RSN_REASON_CODES,
+  SO50_DISPOSITION_CODES,
+  SO60_DISPOSITION_CODES,
+  RELEASE_ORIGIN_CODES,
+  PGA_ENTRY_HOLD_TYPES,
+} from './cargoRelease/recordDefs.js';
+export * as cargoReleaseRecordDefs from './cargoRelease/recordDefs.js';
+
+// ── Census Warning Override (CW/CO) + Query (CJ/CL) ────────
+export { buildCensusOverride } from './apps/census/cwBuilder.js';
+export type { CwCensusOverrideInput, CwEntryOverrides, CwLineOverrides, CwOverride } from './apps/census/cwBuilder.js';
+export { parseCwResponse, parseCwResponseBatch } from './apps/census/cwResponseParser.js';
+export type { CwOverrideDisposition, CwResponseBatch } from './apps/census/cwResponseParser.js';
+export { buildCensusWarningQuery } from './apps/census/cjBuilder.js';
+export type { CjCensusWarningQueryInput, CjQuery } from './apps/census/cjBuilder.js';
+export { parseCjResponse, parseCjResponseBatch } from './apps/census/cjResponseParser.js';
+export type { CjWarningRow, CjResponseBatch } from './apps/census/cjResponseParser.js';
+export * as cwRecordDefs from './apps/census/cwRecordDefs.js';
+export * as cjRecordDefs from './apps/census/cjRecordDefs.js';
+
+// ── Companion apps: TIB extend/close (TE/TX) + expiration notice (TS) ──
+export { buildTibExtension } from './apps/tib/builder.js';
+export type { TibExtendCloseInput, TibAction } from './apps/tib/builder.js';
+export {
+  parseTibResponse,
+  parseTibResponseBatch,
+  parseTibExpirationNotices,
+  parseTibExpirationNoticeBatch,
+  TIB_CONDITION_CODES,
+} from './apps/tib/responseParser.js';
+export type {
+  TibResponse,
+  TibCondition,
+  TibDisposition,
+  TibResponseBatch,
+  TibExpirationNotice,
+  TibExpirationNoticeBatch,
+} from './apps/tib/responseParser.js';
+export * as tibRecordDefs from './apps/tib/recordDefs.js';
+
+// ── Add Manufacturer ($I/$R) — ACE-authoritative MID derivation ──
+export { buildAddManufacturers } from './apps/addManufacturer/builder.js';
+export type { AmfRequest, AddManufacturerRequest, UpdatePostalCodeRequest } from './apps/addManufacturer/builder.js';
+export { parseAmfResponse, parseAmfResponseBatch } from './apps/addManufacturer/responseParser.js';
+export type { AmfResult } from './apps/addManufacturer/responseParser.js';
+export * as amfRecordDefs from './apps/addManufacturer/recordDefs.js';
+
+// ── Companion query applications (workstream E) ────────────
+export { buildAdCvdCaseQuery } from './apps/adcvd/builder.js';
+export type {
+  AdCvdCaseQueryInput,
+  AdCvdCaseNumberQueryInput,
+  AdCvdCriteriaQueryInput,
+} from './apps/adcvd/builder.js';
+export { parseAdCvdResponse, parseAdCvdResponseBatch } from './apps/adcvd/responseParser.js';
+export type {
+  AdCvdQueryResponse,
+  AdCvdCaseResult,
+  AdCvdNamedParty,
+  AdCvdContact,
+  AdCvdDepositRate,
+  AdCvdCaseEvent,
+  AdCvdBondCashDetail,
+  AdCvdTariffDetail,
+  AdCvdSuspensionDetail,
+  AdCvdFailedQuery,
+  AdCvdResponseBatch,
+} from './apps/adcvd/responseParser.js';
+export * as adCvdRecordDefs from './apps/adcvd/recordDefs.js';
+export { buildQuotaQuery } from './apps/quota/builder.js';
+export type { QuotaQueryRequest } from './apps/quota/builder.js';
+export { parseQuotaResponse, parseQuotaResponseBatch } from './apps/quota/responseParser.js';
+export type {
+  QuotaQueryResponse,
+  QuotaStatusResult,
+  QuotaQueryError,
+  QuotaResponseBatch,
+} from './apps/quota/responseParser.js';
+export * as quotaRecordDefs from './apps/quota/recordDefs.js';
+
+// ── Harmonized Tariff Schedule Query (HA/HY) ───────────────
+export { buildHtsQuery } from './apps/htsQuery/builder.js';
+export type { HtsQueryRequest } from './apps/htsQuery/builder.js';
+export { parseHtsQueryResponse, parseHtsQueryResponseBatch } from './apps/htsQuery/responseParser.js';
+export type {
+  HtsQueryResponse,
+  HtsQueryResponseBatch,
+  HtsQueryResult,
+  HtsTariffResult,
+  HtsSpecialRate,
+  HtsValueEdit,
+  HtsDateRestriction,
+  HtsQuantityEdit,
+} from './apps/htsQuery/responseParser.js';
+export * as htsQueryRecordDefs from './apps/htsQuery/recordDefs.js';
+
+// ── Entry Summary Query (EQ/ER) ────────────────────────────
+export { buildEntrySummaryQuery } from './apps/esQuery/builder.js';
+export type { EsQueryInput, EsQueryEntry, EsQueryCriteria } from './apps/esQuery/builder.js';
+export { parseEsQueryResponse, parseEsQueryResponseBatch } from './apps/esQuery/responseParser.js';
+export type {
+  EsQueryResponse,
+  EsQueryResponseBatch,
+  EsQuerySummary,
+  EsQueryStatus,
+  EsQueryLiquidation,
+  EsQueryEstimates,
+  EsQueryBond,
+  EsQueryProtest,
+  EsQueryBill,
+  EsQueryCollection,
+  EsQueryClassAmount,
+  EsQueryCondition,
+} from './apps/esQuery/responseParser.js';
+export * as esQueryRecordDefs from './apps/esQuery/recordDefs.js';
+
+// ── Entry Summary Status Notification (UC, inbound only) ───
+export { parseUcNotification, parseUcNotificationBatch } from './apps/uc/parser.js';
+export type {
+  UcNotification,
+  UcNotificationBatch,
+  UcCbpAction,
+  UcQuotaLine,
+  UcPgaGroup,
+  UcPgaReview,
+} from './apps/uc/parser.js';
+export * as ucRecordDefs from './apps/uc/recordDefs.js';
+
+// ── PGA Message Set (workstream D) ─────────────────────────
+export { buildPgaLine } from './pga/builder.js';
+export type {
+  PgaLineInput,
+  PgaSet,
+  PgaDataSet,
+  PgaDisclaimerSet,
+  PgaDisclaimerCode,
+  PgaProductCode,
+  PgaEntity,
+  PgaContact,
+  PgaSourceCountry,
+  PgaItemIdentity,
+  PgaQuantity,
+  PgaArrival,
+  PgaConformance,
+} from './pga/builder.js';
+export { DISCLAIMER_CODES } from './pga/recordDefs.js';
+export * as pgaRecordDefs from './pga/recordDefs.js';
+
 // ── Payload schema v2 (decision D2) ────────────────────────
 export {
   zAbiPayloadV2,

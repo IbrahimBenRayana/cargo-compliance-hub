@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SPI_CLAIM_CODES } from '../abi-engine/refdata/spiCodes.js';
 
 // ─── Primitive helpers ──────────────────────────────────────────────────
 
@@ -6,6 +7,9 @@ const YYYYMMDD = z.string().regex(/^\d{8}$/, 'Date must be YYYYMMDD');
 const TwoDigit = z.string().regex(/^\d{2}$/);
 const CountryCode = z.string().regex(/^[A-Z]{2}$/, 'ISO-3166 alpha-2');
 const USState = z.string().regex(/^[A-Z]{2}$/);
+// Schedule D district/port: 4 digits, never the '0000' unknown placeholder
+// (the AE 10/20-records take exactly 4; audit UFF-03).
+const ScheduleDPort = z.string().regex(/^(?!0000)\d{4}$/, 'Use the 4-digit CBP Schedule D port code');
 
 // ─── ABI document sub-schemas ───────────────────────────────────────────
 
@@ -16,7 +20,7 @@ const abiDatesSchema = z.object({
 });
 
 const abiLocationSchema = z.object({
-  portOfEntry: z.string().min(1).max(4), // CC: must NOT be longer than 4 chars
+  portOfEntry: ScheduleDPort,
   destinationStateUS: USState,
 });
 
@@ -43,13 +47,19 @@ const abiBondSchema = z.object({
   type: z.enum(['8', '9']), // CC: only "8" continuous or "9" single-transaction
   // CBP-issued 3-character surety company code (e.g. "050", "211"). Distinct
   // from `taxId` which is the bond *holder*'s tax ID.
-  suretyCode: z.string().min(1).max(10),
+  suretyCode: z.string().regex(/^[A-Z0-9]{3}$/, 'Surety codes are 3 characters'),
   taxId: z.string().min(1).max(50),
+  /** Single transaction bond (type 9) amount in whole dollars (ESF-158). */
+  stbAmount: z.number().int().positive().max(9_999_999_999).optional(),
 });
 
+// Payment type (CATAIR ESF-31): 1 individual; 2/3/5 daily statement;
+// 6/7/8 periodic monthly statement. Which statement fields apply depends on
+// the type (usage note y), enforced in abiDocumentBodySchema below.
 const abiPaymentSchema = z.object({
-  typeCode: z.number().int(),
-  preliminaryStatementDate: YYYYMMDD,
+  typeCode: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(5), z.literal(6), z.literal(7), z.literal(8)]),
+  preliminaryStatementDate: YYYYMMDD.optional(),
+  periodicStatementMonth: z.string().regex(/^(0[1-9]|1[0-2])$/, 'Statement month must be 01-12').optional(),
 });
 
 const abiConsigneeSchema = z.object({
@@ -85,7 +95,8 @@ const abiCarrierSchema = z.object({
 });
 
 const abiPortsSchema = z.object({
-  portOfUnlading: z.string().min(1).max(10),
+  portOfUnlading: ScheduleDPort,
+  foreignPortOfLading: z.string().regex(/^\d{5}$/, 'Use the 5-digit Schedule K foreign port code').optional(),
 });
 
 const abiPartySchema = z.object({
@@ -103,9 +114,38 @@ const abiPartySchema = z.object({
   pointOfContact: z.string().optional(),
 });
 
+const abiAdCvdCaseSchema = z
+  .object({
+    caseNumber: z.string().regex(/^[AC]-?\d{3}-?\d{3}-?\d{3}$/i, "Case number looks like A-570-967-000 (A antidumping, C countervailing)"),
+    bondOrCash: z.enum(['B', 'C']),
+    rateType: z.enum(['A', 'S']),
+    rate: z.number().nonnegative().max(99999),
+    quantity: z.number().positive().optional(),
+  })
+  .refine((c) => c.rateType === 'A' || c.quantity !== undefined, {
+    path: ['quantity'],
+    message: 'A specific (per-unit) rate needs the quantity',
+  });
+
 const abiItemSchema = z.object({
   sku: z.string().min(1).max(100),
   htsNumber: z.string().regex(/^\d{10}$/, 'HTS must be 10 digits'),
+  /**
+   * Chapter 99 numbers (Section 301, 232, NT52 and other programs) claimed
+   * alongside the base classification above, 8 digits each. The migrator
+   * puts them in CBP's program order, ahead of the base; value and
+   * quantity stay on the base (abi-engine/payload/ch99.ts). Capped at 31 so
+   * a line stays within the engine's 32-tariff maximum.
+   */
+  additionalHtsNumbers: z
+    .array(z.string().regex(/^99\d{6}$/, 'Chapter 99 numbers are 8 digits starting with 99'))
+    .max(31)
+    .refine((list) => new Set(list).size === list.length, 'Each Chapter 99 number can be claimed once per line')
+    .optional(),
+  /** Trade agreement / special program claim (AE Table 8), e.g. 'S' for USMCA. */
+  spiClaimCode: z.enum(SPI_CLAIM_CODES).optional(),
+  /** AD/CVD cases (entry type 03, usage note ff); a line carries at most two. */
+  adCvdCases: z.array(abiAdCvdCaseSchema).min(1).max(2).optional(),
   description: z.string().min(1).max(500),
   origin: z.object({ country: CountryCode }),
   values: z.object({
@@ -139,9 +179,16 @@ const abiInvoiceSchema = z.object({
   purchaseOrder: z.string().min(1).max(100),
   invoiceNumber: z.string().min(1).max(100),
   exportDate: YYYYMMDD,
-  // Phase 1: only "N" accepted. Y (related-party transactions) opens up
-  // additional CBP fields we haven't modelled — defer to phase 2.
-  relatedParties: z.literal('N').default('N'),
+  // 19 CFR 152.102(g): 'Y' when buyer and seller are related. Intercompany
+  // imports are a very large share of US import value, so 'N'-only excluded
+  // most mid-market importers outright.
+  //
+  // The indicator is declarative — it flags the transaction for CBP's
+  // valuation review and does NOT require extra fields on the entry summary
+  // (the native engine writes it to AE 40-record column 56 and nothing else
+  // changes). Transaction value must still be arm's-length-defensible, which
+  // is the filer's determination to make, not ours to block.
+  relatedParties: z.enum(['Y', 'N']).default('N'),
   countryOfExport: CountryCode,
   currency: z.string().length(3),
   exchangeRate: z.number().positive().max(8), // CC max 8 (see item.values)
@@ -160,10 +207,12 @@ const abiManifestSchema = z.object({
 // ─── Full ABI document body (the `body[0]` object in the CC payload) ────
 
 // Base schema (a plain ZodObject so it stays `.deepPartial()`-able).
-const abiDocumentBodyBaseSchema = z.object({
+/** Every field present and well-formed, without the transmit-time
+ *  cross-field rules: enough to price an entry (dutyEstimate). */
+export const abiDocumentBodyBaseSchema = z.object({
   // 01 = consumption (formal), 11 = informal, 86 = de minimis (Section 321,
   // sub-$800 — cargo-release only, no formal entry summary).
-  entryType: z.enum(['01', '11', '86']),
+  entryType: z.enum(['01', '03', '11', '86']),
   modeOfTransport: TwoDigit,
   // Filer-assigned entry number. CBP / CustomsCity do NOT assign this —
   // the broker draws it from their pre-issued block (e.g. "S4G12580927" or
@@ -184,18 +233,57 @@ const abiDocumentBodyBaseSchema = z.object({
   manifest: z.array(abiManifestSchema).min(1),
 });
 
-// Validated schema used at transmit time — adds the cross-field refine
-// that `.deepPartial()` can't survive. CC: Preliminary Statement Date
-// cannot be earlier than the Entry Date.
-export const abiDocumentBodySchema = abiDocumentBodyBaseSchema.refine(
-  (b) => !b.dates?.entryDate || !b.payment?.preliminaryStatementDate
-    ? true
-    : b.payment.preliminaryStatementDate >= b.dates.entryDate,
-  {
-    path: ['payment', 'preliminaryStatementDate'],
-    message: 'Preliminary Statement Date must be on or after the Entry Date',
-  },
-);
+// Validated schema used at transmit time — adds the cross-field rules
+// that `.deepPartial()` can't survive (audit FNA-02, usage note y):
+// statement fields follow the payment type, and the statement date cannot
+// be earlier than the entry date.
+/**
+ * Entry rules beyond field shapes (payment statements, bond amount, AD/CVD vs
+ * type 03, vessel lading port). Shared by the schema below and the native
+ * send/preflight, which builds from a draft and must refuse the same things.
+ * Tolerates partial drafts: a missing section is not reported here.
+ */
+export function entryRuleIssues(b: any): Array<{ path: (string | number)[]; message: string }> {
+  const out: Array<{ path: (string | number)[]; message: string }> = [];
+  const at = (path: (string | number)[], message: string) => out.push({ path, message });
+  const p = b?.payment;
+  if (p?.typeCode !== undefined) {
+    const { typeCode, preliminaryStatementDate, periodicStatementMonth } = p;
+    if (typeCode === 1) {
+      if (preliminaryStatementDate) at(['payment', 'preliminaryStatementDate'], 'Individual payment (type 1) has no statement date');
+      if (periodicStatementMonth) at(['payment', 'periodicStatementMonth'], 'Individual payment (type 1) has no statement month');
+    } else {
+      if (!preliminaryStatementDate) {
+        at(['payment', 'preliminaryStatementDate'], 'Statement payment needs a preliminary statement date');
+      } else if (b.dates?.entryDate && preliminaryStatementDate < b.dates.entryDate) {
+        at(['payment', 'preliminaryStatementDate'], 'Preliminary Statement Date must be on or after the Entry Date');
+      }
+      const monthly = typeCode === 6 || typeCode === 7 || typeCode === 8;
+      if (monthly && !periodicStatementMonth) at(['payment', 'periodicStatementMonth'], 'Periodic monthly statement needs the statement month');
+      if (!monthly && periodicStatementMonth) at(['payment', 'periodicStatementMonth'], 'Only periodic monthly statements (types 6-8) have a statement month');
+    }
+  }
+  if (b?.bond?.type === '9' && !b.bond.stbAmount) at(['bond', 'stbAmount'], 'A single transaction bond needs its amount');
+  if (b?.bond?.type === '8' && b.bond.stbAmount) at(['bond', 'stbAmount'], 'A continuous bond has no transaction amount');
+  const manifests: any[] = Array.isArray(b?.manifest) ? b.manifest : [];
+  const items = manifests.flatMap((m) => (m?.invoices ?? []).flatMap((inv: any) => inv?.items ?? []));
+  const withCases = items.some((it: any) => (it?.adCvdCases?.length ?? 0) > 0);
+  if (b?.entryType === '03' && !withCases) at(['entryType'], 'Entry type 03 needs at least one AD/CVD case on a line');
+  if (b?.entryType && b.entryType !== '03' && withCases) at(['entryType'], 'Lines with AD/CVD cases are filed as entry type 03');
+  if (b?.modeOfTransport === '10' || b?.modeOfTransport === '11') {
+    manifests.forEach((m, i) => {
+      const foreignExport = (m?.invoices ?? []).some((inv: any) => inv?.countryOfExport && inv.countryOfExport !== 'US');
+      if (foreignExport && !m?.ports?.foreignPortOfLading) {
+        at(['manifest', i, 'ports', 'foreignPortOfLading'], 'Vessel entries need the foreign port of lading (ACE F429)');
+      }
+    });
+  }
+  return out;
+}
+
+export const abiDocumentBodySchema = abiDocumentBodyBaseSchema.superRefine((b, ctx) => {
+  for (const issue of entryRuleIssues(b)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: issue.path, message: issue.message });
+});
 
 export type ABIDocumentBody = z.infer<typeof abiDocumentBodySchema>;
 

@@ -96,7 +96,7 @@ export default function CompliancePage() {
 
       {/* Tabs */}
       <Tabs value={active} onValueChange={(v) => setTab(v as TabId)} className="space-y-4">
-        <TabsList className="bg-transparent p-0 h-auto border-b border-slate-200 dark:border-slate-800 w-full justify-start rounded-none gap-1">
+        <TabsList className="bg-transparent p-0 h-auto border-b border-slate-200 dark:border-slate-800 w-full justify-start rounded-none gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&>*]:shrink-0">
           {TABS.map((t) => {
             const isOverview = t.id === 'overview';
             return (

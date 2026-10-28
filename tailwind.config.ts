@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
 export default {
   darkMode: ["class"],
@@ -160,5 +161,10 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // `can-hover:` applies only on devices with a real hover pointer (mouse /
+    // trackpad). Hover-revealed UI must stay visible on touch screens.
+    plugin(({ addVariant }) => { addVariant("can-hover", "@media (hover: hover) and (pointer: fine)"); }),
+  ],
 } satisfies Config;

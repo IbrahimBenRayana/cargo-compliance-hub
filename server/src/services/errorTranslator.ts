@@ -574,12 +574,15 @@ export function parseRejectionReason(raw: string | null | undefined): ParsedReje
   try {
     const parsed = JSON.parse(raw);
     if (parsed && Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+      // Old gateway rows carry {field, message}; native CBP rows carry
+      // CBP's own {code, narrative, blocking} (BUG-027).
       const errors = parsed.errors.map((e: any) => ({
         field:      e.field,
-        fieldLabel: cleanLegacy(e.fieldLabel) ?? cleanLegacy(e.field) ?? 'CBP validation',
-        message:    cleanLegacy(e.message) ?? cleanLegacy(e.originalMessage) ?? 'CBP flagged an issue with this field.',
+        fieldLabel: cleanLegacy(e.fieldLabel) ?? cleanLegacy(e.field) ?? (e.code ? `CBP code ${e.code}` : 'CBP validation'),
+        message:    cleanLegacy(e.message) ?? cleanLegacy(e.originalMessage) ?? cleanLegacy(e.narrative) ?? 'CBP flagged an issue with this field.',
         fix:        cleanLegacy(e.fix),
-        severity:   (e.severity === 'critical' || e.severity === 'warning' || e.severity === 'info' ? e.severity : 'warning') as 'critical' | 'warning' | 'info',
+        severity:   (e.severity === 'critical' || e.severity === 'warning' || e.severity === 'info' ? e.severity
+          : e.blocking === true ? 'critical' : e.blocking === false ? 'info' : 'warning') as 'critical' | 'warning' | 'info',
       }));
       return { errors, summary: cleanLegacy(parsed.summary) };
     }

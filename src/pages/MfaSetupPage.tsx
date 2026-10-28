@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck, LogOut } from 'lucide-react';
@@ -17,6 +17,10 @@ export default function MfaSetupPage() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const logout = useLogout();
+  // Set once enrollment is under way on this page. From then on, only
+  // "Finish setup" leaves: turning MFA on refreshes the user, and leaving on
+  // that refresh would hide the recovery codes before they're saved.
+  const [enrolling, setEnrolling] = useState(false);
 
   // Self-heal against stale client state: this page can be reached with an
   // out-of-date mfaSetupRequired (e.g. enrollment completed in another tab or
@@ -25,13 +29,13 @@ export default function MfaSetupPage() {
     queryClient.invalidateQueries({ queryKey: ['currentUser'] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // … and the moment the fresh user says enrollment is NOT required, leave.
-  // (Also fires after a successful enrollment below, which is harmless.)
+  // … and the moment the fresh user says enrollment is NOT required, leave
+  // (unless that is because the user just enrolled here).
   useEffect(() => {
-    if (user && user.mfaSetupRequired !== true) {
+    if (!enrolling && user && user.mfaSetupRequired !== true) {
       navigate('/', { replace: true });
     }
-  }, [user, navigate]);
+  }, [enrolling, user, navigate]);
 
   const handleComplete = async () => {
     // Refresh the cached user so mfaSetupRequired flips false and the route
@@ -74,7 +78,7 @@ export default function MfaSetupPage() {
 
           {/* Enrollment stepper */}
           <div className="px-7 py-7">
-            <MfaEnrollment onComplete={handleComplete} />
+            <MfaEnrollment onComplete={handleComplete} onEnrollmentStart={() => setEnrolling(true)} />
           </div>
         </div>
 
