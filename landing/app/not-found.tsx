@@ -16,7 +16,7 @@ const CARDS = [
   { title: "The product", body: "ISF and entry filing, the inbox and pre-filing checks.", href: ROUTES.platform.href, linkLabel: "See the platform" },
   {
     title: "Pricing",
-    body: "$45, $180 or $280 per shipment, charged when CBP accepts. Volume pricing on request.",
+    body: "ISF is $45, charged when CBP accepts. Customs entry and volume pricing: talk to us.",
     href: ROUTES.pricing.href,
     linkLabel: "See pricing",
   },

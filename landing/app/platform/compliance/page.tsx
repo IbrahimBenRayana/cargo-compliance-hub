@@ -197,7 +197,7 @@ export default function CompliancePage() {
                 tells you which trade programs include the origin country. Whether the goods meet the rules of origin
                 stays your call.
               </p>
-              <p className="text-[13.5px]">The duty calculator is on the Complete plan.</p>
+              <p className="text-[13.5px]">The duty calculator is available with customs entry; ask us in the demo.</p>
             </>
           }
           actions={<InlineLink href={ROUTES.customsEntry.href}>File the entry with these numbers</InlineLink>}

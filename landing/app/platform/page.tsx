@@ -157,7 +157,7 @@ export default function PlatformPage() {
             {
               module: "compliance",
               title: "Tracked until it's closed",
-              body: "Each ISF carries its deadline clock, and each accepted entry carries its 314-day liquidation window. The post-summary correction deadline is marked at day 300 after entry, CBP's regular PSC window. On the Complete plan, containers show vessel ETAs and last free day.",
+              body: "Each ISF carries its deadline clock, and each accepted entry carries its 314-day liquidation window. The post-summary correction deadline is marked at day 300 after entry, CBP's regular PSC window. Container tracking with vessel ETAs and last free day is available with customs entry; ask us in the demo.",
               media: <Screenshot screen="app-liquidation-clocks" aspect="16/10" sizes="(min-width: 1024px) 260px, 100vw" />,
             },
           ]}
@@ -191,9 +191,9 @@ export default function PlatformPage() {
             </p>
           }
           bullets={[
-            "A linked ISF and entry is one shipment, billed once.",
+            "A linked ISF and entry sit on one shipment record.",
             "Four roles (Owner, Admin, Operator, Viewer) and MFA on every account.",
-            "Duty calculator with rates, MPF/HMF and a total from HTS reference data (Complete plan).",
+            "Duty calculator with rates, MPF/HMF and a total from HTS reference data, on request.",
           ]}
           actions={<TextLinks links={[{ label: "Roles, MFA and the audit trail", href: ROUTES.security.href }]} />}
           media={<StackedShots main="app-isf-consolidation" inset="app-isf-timeline" />}
@@ -239,8 +239,8 @@ export default function PlatformPage() {
         <div className="grid items-center gap-8 lg:grid-cols-[1.4fr_1fr] lg:gap-16">
           <div className="min-w-0">
             <SectionHeading
-              title="Priced per shipment, charged when CBP accepts"
-              intro="Importers pick a plan: $45 for ISF, $180 for ISF + Entry or $280 for Complete, per shipment, with no monthly fee. NVOCCs, forwarders and brokers filing at volume get volume pricing on request."
+              title="ISF is $45, charged when CBP accepts"
+              intro="Importers pay $45 per accepted ISF, with no monthly fee. For customs entry, talk to us. NVOCCs, forwarders and brokers filing at volume get volume pricing on request."
             />
           </div>
           <div className="min-w-0 space-y-6">
@@ -261,7 +261,7 @@ export default function PlatformPage() {
         title="Watch one shipment go from ISF to entry in 20 minutes."
         sub="We'll run a sample ISF and entry in a demo account on shipments like yours, then tell you what it would cost."
         src="platform-close"
-        micro="Pay per shipment, only when CBP accepts."
+        micro="ISF is $45, charged only when CBP accepts."
         links={[PRICING_LINK]}
       />
     </>

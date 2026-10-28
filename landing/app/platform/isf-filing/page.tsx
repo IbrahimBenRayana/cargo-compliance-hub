@@ -60,7 +60,7 @@ const FAQ = [
   },
   {
     q: "What does an ISF cost?",
-    a: "Importers filing their own: $45 per shipment, charged only when CBP accepts. NVOCCs, forwarders and brokers filing at volume get volume pricing on request. See pricing or volume pricing.",
+    a: "Importers filing their own: $45 per accepted ISF, charged only when CBP accepts. NVOCCs, forwarders and brokers filing at volume get volume pricing on request. See pricing or volume pricing.",
   },
   {
     q: "Are you a customs broker?",
@@ -245,7 +245,7 @@ export default function IsfFilingPage() {
           body={
             <p>
               When the ISF is accepted, start the entry summary (7501) or cargo release (3461) from it. The parties and
-              bond carry over. For importers on the ISF + Entry plan, a linked ISF and entry is billed once.
+              bond carry over, and the ISF and entry stay linked on one shipment.
             </p>
           }
           actions={<TextLinks links={[{ label: "Customs entry, prefilled from the ISF", href: ROUTES.customsEntry.href }]} />}

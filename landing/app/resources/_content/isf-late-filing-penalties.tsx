@@ -263,7 +263,7 @@ function Body() {
         It won&apos;t make a late shipper send data sooner, and it doesn&apos;t replace your broker&apos;s judgment on a
         petition. It makes sure nobody on your team is surprised by a cutoff. For NVOCCs and forwarders,{" "}
         <Link href={`${ROUTES.pricing.href}#volume`}>volume pricing is on request</Link>, and we&apos;re taking a small
-        number of design partners.
+        number of paid pilots.
       </p>
       <p>
         <strong>
