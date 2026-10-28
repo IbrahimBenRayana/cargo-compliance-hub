@@ -18,6 +18,8 @@ import {
 import { Loader2, ArrowLeft, ShieldCheck, KeyRound, Mail, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { AuthBrandPanel } from '@/components/AuthBrandPanel';
+import { waitForAuthScene } from '@/components/auth3d/success';
+import type { GateState } from '@/components/auth3d/state';
 import { LogoMark } from '@/components/LogoMark';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -51,6 +53,10 @@ export default function LoginPage() {
 
   const inChallenge = mfaToken !== null;
 
+  // ── 3D gate scene: cleared on success, one rose flash per failed attempt ──
+  const [cleared, setCleared] = useState(false);
+  const [failures, setFailures] = useState(0);
+
   const resetToPassword = useCallback(() => {
     setMfaToken(null);
     setMethods([]);
@@ -79,8 +85,11 @@ export default function LoginPage() {
         return;
       }
       toast.success('Welcome back!');
+      setCleared(true);
+      await waitForAuthScene();
       navigate(redirectTo);
     } catch (err: any) {
+      setFailures((n) => n + 1);
       toast.error(err.body?.error || 'Login failed');
     }
   };
@@ -93,8 +102,11 @@ export default function LoginPage() {
       try {
         await verify.mutateAsync({ mfaToken, method, code: value });
         toast.success('Welcome back!');
+        setCleared(true);
+        await waitForAuthScene();
         navigate(redirectTo);
       } catch (err: any) {
+        setFailures((n) => n + 1);
         const body = err?.body ?? {};
         if (err?.status === 401 && body.code === 'mfa_token_invalid') {
           toast.error('Session expired, sign in again.');
@@ -203,14 +215,23 @@ export default function LoginPage() {
     </div>
   );
 
+  const gate: GateState = {
+    kind: 'gate',
+    email,
+    hasPassword: password.length > 0,
+    phase: cleared ? 'success' : login.isPending ? 'checking' : inChallenge ? 'mfa' : 'idle',
+    codeLength: mode === 'recovery' ? 0 : code.length,
+    errorCount: failures,
+  };
+
   return (
     <MotionConfig reducedMotion="user">
       {/* Full-viewport split layout */}
       <div className="flex min-h-screen">
 
         {/* ── Left: dark brand panel (desktop only) ── */}
-        <div className="w-1/2 flex-shrink-0">
-          <AuthBrandPanel variant="login" />
+        <div className="hidden lg:block lg:w-1/2 flex-shrink-0">
+          <AuthBrandPanel scene={gate} caption="Sign in to your customs inbox." />
         </div>
 
         {/* ── Right: form panel ── */}
