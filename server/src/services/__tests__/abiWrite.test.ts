@@ -69,7 +69,7 @@ beforeEach(() => {
   mapper.extractDenormFromPayload.mockReturnValue({ mbolNumber: 'MBOL1', entryNumber: 'ENT1', entryType: '01', modeOfTransport: '40' });
   abiGateway.createABIDocument.mockResolvedValue({ status: 201, data: { _id: 'cc1' }, latencyMs: 1 });
   abiGateway.sendABIDocument.mockResolvedValue({ status: 200, data: {}, latencyMs: 1 });
-  entitlements.getOrgEntitlements.mockResolvedValue({ canFile: true, hasActiveTier: true, capabilities: ['ABI_ENTRY'], planId: 'entry', delinquent: false });
+  entitlements.getOrgEntitlements.mockResolvedValue({ canFile: true, hasActiveTier: true, capabilities: ['ABI_ENTRY'], planId: 'entry', delinquent: false, entryPricingSet: true });
 });
 
 describe('sendAbiDocumentToCBP', () => {
@@ -139,6 +139,14 @@ describe('sendAbiDocumentToCBP', () => {
     entitlements.getOrgEntitlements.mockResolvedValue({ canFile: false, hasActiveTier: true, capabilities: ['ABI_ENTRY'], planId: 'entry', delinquent: false });
     const out = await sendAbiDocumentToCBP(ARGS);
     expect(out.httpStatus).toBe(402);
+    expect(abiGateway.sendABIDocument).not.toHaveBeenCalled();
+  });
+
+  it('402 when entry pricing has not been set for the org (entries have no public price)', async () => {
+    entitlements.getOrgEntitlements.mockResolvedValue({ canFile: true, hasActiveTier: true, capabilities: ['ABI_ENTRY'], planId: 'entry', delinquent: false, entryPricingSet: false });
+    const out = await sendAbiDocumentToCBP(ARGS);
+    expect(out.httpStatus).toBe(402);
+    expect(out.body).toMatchObject({ code: 'entry_pricing_required' });
     expect(abiGateway.sendABIDocument).not.toHaveBeenCalled();
   });
 

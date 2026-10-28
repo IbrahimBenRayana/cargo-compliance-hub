@@ -7,11 +7,11 @@
  * disabled (see routes/auth.ts), so this is the only way new client orgs are
  * created.
  *
- * Billing note: provisioned orgs get their tier's capabilities immediately. A
- * Stripe customer/subscription is NOT created here (the client has no card at
- * provisioning) — until one exists, per-shipment charges are recorded in
- * shipment_charges with status 'skipped' (see services/shipmentBilling.ts) for
- * manual/negotiated invoicing. Wire Stripe via the billing portal later.
+ * Billing note: provisioned orgs get their plan's capabilities immediately. A
+ * Stripe customer is NOT created here (the client has no card at provisioning);
+ * the owner adds one in Settings → Billing before a paid filing can be sent.
+ * Per-org prices (PUT /organizations/:id/pricing) live on the Subscription row,
+ * so a negotiated price survives deploys (planSync only writes plan defaults).
  */
 import { Router, Response } from 'express';
 import { z } from 'zod';
@@ -24,6 +24,8 @@ import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { issuePasswordSetupToken } from '../services/passwordSetup.js';
 import { sendAccountSetupEmail } from '../services/email.js';
 import { TIERS, tierById } from '../config/plans.js';
+import { checkPriceInput, resolvePricing } from '../services/pricing.js';
+import { statusAfterPlanChange } from '../services/billingAccount.js';
 import logger from '../config/logger.js';
 import { notifyLead } from '../services/leads.js';
 
@@ -41,6 +43,7 @@ router.get('/plans', (_req: AuthRequest, res: Response): void => {
       perFilingCents: t.perFilingCents,
       capabilities: t.capabilities,
       isPublic: t.isPublic,
+      sellsEntries: t.capabilities.includes('ABI_ENTRY'),
     })),
   });
 });
@@ -73,6 +76,16 @@ router.get('/organizations', async (_req: AuthRequest, res: Response): Promise<v
           ? { id: o.subscription.plan.id, name: o.subscription.plan.name }
           : null,
         subscriptionStatus: o.subscription?.status ?? null,
+        // The org's own prices (null = default) and what they resolve to.
+        pricing: o.subscription
+          ? {
+              isfCents: o.subscription.isfCents,
+              entryLinkedCents: o.subscription.entryLinkedCents,
+              entryOnlyCents: o.subscription.entryOnlyCents,
+              effective: resolvePricing(o.subscription.plan?.perFilingCents, o.subscription),
+            }
+          : null,
+        cardOnFile: !!o.subscription?.defaultPaymentMethodId,
         owner: owner
           ? { email: owner.email, firstName: owner.firstName, lastName: owner.lastName, emailVerified: owner.emailVerified }
           : null,
@@ -267,10 +280,13 @@ router.patch('/organizations/:id/plan', async (req: AuthRequest, res: Response):
   }
 
   const existing = await prisma.subscription.findUnique({ where: { orgId } });
+  // Keep a delinquency (billing audit G2): a plan change must not forgive an
+  // unpaid charge or re-open filing. The hourly sweep keeps retrying it.
+  const status = statusAfterPlanChange(existing);
   const sub = await prisma.subscription.upsert({
     where: { orgId },
-    update: { planId: tier.id, status: 'active' },
-    create: { orgId, planId: tier.id, status: 'active' },
+    update: { planId: tier.id, status },
+    create: { orgId, planId: tier.id, status },
   });
 
   writeAuditLog({
@@ -279,12 +295,58 @@ router.patch('/organizations/:id/plan', async (req: AuthRequest, res: Response):
     action: 'admin.org_plan_changed',
     entityType: 'subscription',
     entityId: sub.id,
-    oldValue: { planId: existing?.planId ?? null },
-    newValue: { planId: tier.id },
+    oldValue: { planId: existing?.planId ?? null, status: existing?.status ?? null },
+    newValue: { planId: tier.id, status },
     ...getRequestMeta(req),
   });
 
-  res.json({ orgId, plan: { id: tier.id, name: tier.name } });
+  res.json({ orgId, plan: { id: tier.id, name: tier.name }, status });
+});
+
+// PUT /api/v1/admin/organizations/:id/pricing — set a client's own prices
+// (cents; null = the default). Entries have no public price: an org can send
+// entries only once both entry prices are set. A new price applies to
+// shipments CBP accepts from now on; already-billed shipments keep theirs.
+const centsField = z.number().int().min(0).nullable();
+const pricingSchema = z.object({
+  isfCents: centsField,
+  entryLinkedCents: centsField,
+  entryOnlyCents: centsField,
+}).strict();
+
+router.put('/organizations/:id/pricing', async (req: AuthRequest, res: Response): Promise<void> => {
+  const orgId = String(req.params.id);
+  const parsed = pricingSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const problem = checkPriceInput(parsed.data);
+  if (problem) {
+    res.status(400).json({ error: problem });
+    return;
+  }
+  const existing = await prisma.subscription.findUnique({ where: { orgId }, include: { plan: true } });
+  if (!existing) {
+    res.status(404).json({ error: 'This organization has no plan yet. Assign a plan first.' });
+    return;
+  }
+  const updated = await prisma.subscription.update({
+    where: { orgId },
+    data: parsed.data,
+    include: { plan: true },
+  });
+  writeAuditLog({
+    orgId,
+    userId: req.user!.id,
+    action: 'admin.org_pricing_changed',
+    entityType: 'subscription',
+    entityId: existing.id,
+    oldValue: { isfCents: existing.isfCents, entryLinkedCents: existing.entryLinkedCents, entryOnlyCents: existing.entryOnlyCents },
+    newValue: parsed.data,
+    ...getRequestMeta(req),
+  });
+  res.json({ orgId, pricing: { ...parsed.data, effective: resolvePricing(updated.plan?.perFilingCents, updated) } });
 });
 
 // POST /api/v1/admin/organizations/:id/resend-setup — re-send the owner's link.
