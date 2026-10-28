@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useSubscription, useSelectTier } from '@/hooks/useBilling';
 import { CardCapture } from '@/components/billing/CardCapture';
-import { PLAN_META, PUBLIC_TIERS } from '@/lib/planMeta';
+import { PLAN_META, PUBLIC_TIERS, TALK_TO_US_URL } from '@/lib/planMeta';
+import { pricingLines } from '@/lib/pricing';
 import { cn } from '@/lib/utils';
 
 /**
@@ -73,8 +74,8 @@ export function OnboardingPaymentStep({ onDone }: { onDone: () => void }) {
     return (
       <div>
         <p className="text-sm text-muted-foreground mb-4">
-          {meta?.name} · {meta?.priceLabel} {meta?.priceFooter}. No charge now — you're billed per shipment, only when
-          CBP accepts it.
+          {meta?.name} · {(billing?.plan?.id === chosen && billing?.pricing ? pricingLines(billing.pricing) : [`${meta?.priceLabel} ${meta?.priceFooter}`]).join(' · ')}.
+          {' '}No charge now — you're billed per filing, only when CBP accepts it.
         </p>
         <CardCapture
           submitLabel="Save card"
@@ -102,10 +103,11 @@ export function OnboardingPaymentStep({ onDone }: { onDone: () => void }) {
   return (
     <div>
       <p className="text-sm text-muted-foreground mb-5">
-        Pick a plan to set your per-shipment rate. Add a card now to be ready to file, or skip and add it the first time
-        you submit — browsing and drafting are always free.
+        Pick a plan to start filing. Add a card now to be ready to file, or skip and add it the first time you submit —
+        browsing and drafting are always free. Filing entries, or ISFs for your customers?{' '}
+        <a href={TALK_TO_US_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-foreground">Talk to us</a>.
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {PUBLIC_TIERS.map((tier) => (
           <button
             key={tier.id}

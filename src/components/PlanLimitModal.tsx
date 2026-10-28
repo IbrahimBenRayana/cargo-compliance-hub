@@ -14,6 +14,7 @@ import {
   type Capability,
   CAPABILITY_LABEL,
   PUBLIC_TIERS,
+  TALK_TO_US_URL,
   minTierForCapability,
 } from '@/lib/planMeta';
 
@@ -63,9 +64,9 @@ export function PlanLimitModal({ open, onClose, capability }: PlanLimitModalProp
     : 'Choose a plan to submit filings';
   const description = featureLabel
     ? unlockingTier
-      ? `${featureLabel} isn't part of your current plan. Upgrade to ${unlockingTier.name} to start using it — billed per shipment, no monthly fee.`
-      : `${featureLabel} isn't part of your current plan.`
-    : 'You need an active plan to submit filings. Pick the tier that matches your work — pay per shipment filed, no monthly fee.';
+      ? `${featureLabel} isn't part of your current plan. Upgrade to ${unlockingTier.name} to start using it — billed per accepted filing, no monthly fee.`
+      : `${featureLabel} isn't part of your current plan. Our team sets it up per account, priced for your volume.`
+    : 'You need an active plan to submit filings. Pay per accepted ISF, no monthly fee.';
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -159,14 +160,20 @@ export function PlanLimitModal({ open, onClose, capability }: PlanLimitModalProp
 
         {/* Actions */}
         <div className="px-6 pb-6 pt-1 flex flex-col gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="w-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-            onClick={() => go()}
-          >
-            Compare all plans
-          </Button>
+          {capability && !unlockingTier ? (
+            <Button size="sm" className="w-full" asChild>
+              <a href={TALK_TO_US_URL} target="_blank" rel="noreferrer" onClick={onClose}>Talk to us</a>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="w-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+              onClick={() => go()}
+            >
+              Compare plans
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -5,12 +5,12 @@
  * once and drifted when TIERS changed (e.g. the IN_BOND capability landed
  * in code but not in existing rows, hiding the feature for everyone).
  *
- * This sync upserts the descriptive fields on every boot, idempotently.
- * Stripe identifiers are deliberately untouched — those are bootstrapped
- * against the live Stripe account through the billing flow.
+ * This sync upserts the descriptive fields on every boot, idempotently, and
+ * deactivates retired plans. It writes only the plan DEFAULTS: an org's own
+ * negotiated prices live on its Subscription row and are never touched here.
  */
 import { prisma } from '../config/database.js';
-import { TIERS } from '../config/plans.js';
+import { TIERS, RETIRED_TIER_IDS } from '../config/plans.js';
 import logger from '../config/logger.js';
 
 export async function syncPlansFromTiers(): Promise<void> {
@@ -31,5 +31,10 @@ export async function syncPlansFromTiers(): Promise<void> {
       create: { id: tier.id, ...data },
     });
   }
+  // Retired plans keep their row (old charges reference it) but can't be used.
+  await prisma.plan.updateMany({
+    where: { id: { in: [...RETIRED_TIER_IDS] } },
+    data: { isActive: false, isPublic: false },
+  });
   logger.info({ tiers: TIERS.map((t) => t.id) }, '[PlanSync] plans table synced from TIERS');
 }

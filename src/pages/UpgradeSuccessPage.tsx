@@ -168,7 +168,7 @@ export default function UpgradeSuccessPage() {
                   Welcome to {planName}!
                 </h1>
                 <p className="text-muted-foreground mb-4 text-sm">
-                  {rateLabel} per shipment filed · no monthly fee
+                  {rateLabel} per accepted ISF · no monthly fee
                 </p>
 
                 {capabilities.length > 0 && (
