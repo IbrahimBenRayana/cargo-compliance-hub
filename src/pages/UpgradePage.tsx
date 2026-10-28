@@ -5,6 +5,7 @@ import { Check, Lock, ShieldCheck, Receipt, Loader2, ArrowRight, Star, CreditCar
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useSubscription, useSelectTier } from '@/hooks/useBilling';
+import { useAuthStore } from '@/hooks/useAuth';
 import { CardCapture } from '@/components/billing/CardCapture';
 import { PLAN_META, KNOWN_PLAN_IDS, PUBLIC_TIERS } from '@/lib/planMeta';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,9 @@ export default function UpgradePage() {
 
   const { data: billing, isLoading: subLoading } = useSubscription();
   const selectTier = useSelectTier();
+  // Changing the plan is an owner/admin action (the server refuses others).
+  const role = useAuthStore((s) => s.user?.role);
+  const canManage = role === 'owner' || role === 'admin';
 
   const [step, setStep] = React.useState<'pick' | 'card' | 'done'>('pick');
   const [chosen, setChosen] = React.useState<string>(KNOWN_PLAN_IDS.includes(presetPlan) ? presetPlan : '');
@@ -100,6 +104,11 @@ export default function UpgradePage() {
         No subscription, no monthly fee. Your tier sets your flat per-shipment rate and unlocks its features. You're
         charged per shipment, only when CBP accepts it{hasCard ? ' — your saved card carries over.' : '.'}
       </p>
+      {!canManage && (
+        <p className="text-sm font-medium text-foreground mb-8 -mt-4">
+          Only owners and admins can change the plan. Ask one of them to switch.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {PUBLIC_TIERS.map((tier) => {
@@ -136,7 +145,7 @@ export default function UpgradePage() {
                 className={cn('w-full font-semibold', tier.featured ? 'bg-gold text-yellow-950 hover:bg-gold/90' : '')}
                 variant={tier.featured ? 'default' : 'outline'}
                 onClick={() => choose(tier.id)}
-                disabled={busy || isCurrent}
+                disabled={busy || isCurrent || !canManage}
               >
                 {busy ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
