@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authApi } from '@/api/client';
 import { AuthBrandPanel } from '@/components/AuthBrandPanel';
+import { emailDomain, passwordStrength, type BerthState } from '@/components/auth3d/state';
 import { LogoMark } from '@/components/LogoMark';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -32,6 +33,7 @@ export function SetPasswordPage() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [failures, setFailures] = useState(0);
 
   // Validate the setup token on mount.
   useEffect(() => {
@@ -86,11 +88,28 @@ export function SetPasswordPage() {
         setStatus('invalid');
         toast.error('This link is invalid or has expired');
       } else {
+        setFailures((n) => n + 1);
         toast.error(err?.body?.error || 'Could not set your password');
       }
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // 3D berth scene: the account is already provisioned, so the container
+  // carries the email's domain and the crew card the email itself.
+  const fieldsDone = [password.length >= 8, confirm.length > 0 && confirm === password];
+  const berth: BerthState = {
+    kind: 'berth',
+    org: emailDomain(email ?? ''),
+    name: email ?? '',
+    role: 'Your account',
+    doneLabel: 'Password set',
+    filled: fieldsDone.filter(Boolean).length,
+    total: fieldsDone.length,
+    strength: passwordStrength(password),
+    phase: status === 'done' ? 'success' : submitting ? 'checking' : 'idle',
+    errorCount: failures,
   };
 
   return (
@@ -99,8 +118,8 @@ export function SetPasswordPage() {
       <div className="flex min-h-screen">
 
         {/* ── Left: dark brand panel (desktop only) ── */}
-        <div className="w-1/2 flex-shrink-0">
-          <AuthBrandPanel variant="register" />
+        <div className="hidden lg:block lg:w-1/2 flex-shrink-0">
+          <AuthBrandPanel scene={berth} caption="Choose a password for your account." />
         </div>
 
         {/* ── Right: form panel ── */}

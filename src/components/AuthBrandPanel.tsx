@@ -1,138 +1,65 @@
-import { motion, MotionConfig } from 'framer-motion';
-import { Shield, Lock } from 'lucide-react';
-import { LoginScene } from './illustrations/login-scene';
-import { RegisterJourneyScene } from './illustrations/register-journey';
+import { KeyRound, Lock, UserCheck } from 'lucide-react';
 import { LogoMark } from '@/components/LogoMark';
-
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-// Floating geometric squares — always-dark panel so white/gold borders are visible
-const SQUARES = [
-  { size: 20, top: '10%', left: '6%', duration: 18, gold: false, rotate: 8 },
-  { size: 40, top: '22%', left: '72%', duration: 23, gold: false, rotate: -12 },
-  { size: 48, top: '60%', left: '10%', duration: 20, gold: true, rotate: 15 },
-  { size: 28, top: '75%', left: '68%', duration: 16, gold: false, rotate: -8 },
-  { size: 16, top: '45%', left: '85%', duration: 25, gold: true, rotate: 20 },
-];
+import { AuthScene } from '@/components/auth3d/AuthScene';
+import type { AuthSceneState } from '@/components/auth3d/state';
 
 export interface AuthBrandPanelProps {
-  variant?: 'login' | 'register';
+  /** live form state the 3D scene reacts to (gate = sign in, berth = sign up) */
+  scene: AuthSceneState;
+  /** one calm line under the scene */
+  caption: string;
 }
 
-export function AuthBrandPanel({ variant = 'login' }: AuthBrandPanelProps) {
+// Only statements that are true today: no certifications we don't hold and no
+// claim of a live direct CBP connection.
+const FACTS = [
+  { icon: KeyRound, label: 'Multi-factor sign-in' },
+  { icon: Lock, label: 'Encrypted in transit (TLS)' },
+  { icon: UserCheck, label: 'Invite-only workspaces' },
+];
+
+/**
+ * Always-dark brand panel on the auth pages (desktop only). The interactive
+ * 3D scene fills it; wordmark on top, a caption and the facts row below.
+ */
+export function AuthBrandPanel({ scene, caption }: AuthBrandPanelProps) {
   return (
-    <MotionConfig reducedMotion="user">
-      {/* Always-dark navy panel regardless of theme */}
+    <div
+      className="relative hidden h-screen overflow-hidden lg:flex lg:flex-col lg:justify-between"
+      style={{ background: 'hsl(222, 47%, 8%)' }}
+    >
+      {/* soft gold glow the diorama floats on */}
       <div
-        className="hidden lg:flex relative flex-col justify-between h-screen overflow-hidden"
-        style={{ background: 'hsl(222, 47%, 8%)' }}
         aria-hidden="true"
-      >
-        {/* ── Ambient gradient orbs ── */}
-        {/* Gold orb — top-right */}
-        <div
-          className="pointer-events-none absolute"
-          style={{
-            top: '-60px',
-            right: '-60px',
-            width: 400,
-            height: 400,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, hsl(43 96% 56% / 0.12) 0%, transparent 70%)',
-            filter: 'blur(80px)',
-          }}
-        />
-        {/* Navy-blue orb — bottom-left */}
-        <div
-          className="pointer-events-none absolute"
-          style={{
-            bottom: '-80px',
-            left: '-80px',
-            width: 500,
-            height: 500,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, hsl(222 60% 30% / 0.15) 0%, transparent 70%)',
-            filter: 'blur(80px)',
-          }}
-        />
+        className="pointer-events-none absolute inset-x-[8%] top-[18%] bottom-[22%] blur-[10px]"
+        style={{ background: 'radial-gradient(closest-side, hsl(43 96% 56% / .12), hsl(222 60% 30% / .18) 55%, transparent 80%)' }}
+      />
 
-        {/* ── Dot grid ── */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
-            maskImage:
-              'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)',
-            WebkitMaskImage:
-              'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)',
-          }}
-        />
+      <AuthScene state={scene} />
 
-        {/* ── Floating line-art squares ── */}
-        {SQUARES.map((sq, i) => (
-          <motion.div
-            key={i}
-            className="pointer-events-none absolute rounded-sm"
-            style={{
-              width: sq.size,
-              height: sq.size,
-              top: sq.top,
-              left: sq.left,
-              border: sq.gold
-                ? '1px solid hsl(43 96% 56% / 0.15)'
-                : '1px solid rgba(255,255,255,0.08)',
-            }}
-            animate={{
-              y: [0, 18, 0, -18, 0],
-              x: [0, 10, 0, -10, 0],
-              rotate: [0, sq.rotate, 0, -sq.rotate, 0],
-            }}
-            transition={{
-              duration: sq.duration,
-              repeat: Infinity,
-              ease: 'easeInOut',
-            }}
-          />
-        ))}
+      {/* fade the scene into the panel at the top and bottom so the text reads */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{ background: 'linear-gradient(to bottom, hsl(222 47% 8%) 0%, transparent 16%, transparent 72%, hsl(222 47% 8%) 100%)' }}
+      />
 
-        {/* ── Wordmark — top left ── */}
-        <div className="absolute top-8 left-8 flex items-center gap-2.5 z-10">
-          {/* Brand mark — Focus Frame, reversed tint for contrast on dark panel */}
-          <LogoMark size={30} className="text-[hsl(222_30%_64%)]" />
-          <span
-            className="text-base font-semibold tracking-tight"
-            style={{ color: 'rgba(255,255,255,0.92)' }}
-          >
-            MyCargoLens
-          </span>
-        </div>
-
-        {/* ── Scene illustration — center ── */}
-        <motion.div
-          className="relative z-10 flex-1 flex flex-col justify-center px-8"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.2, ease: EASE }}
-        >
-          <div className="w-full max-w-sm mx-auto h-auto">
-            {variant === 'login' ? <LoginScene /> : <RegisterJourneyScene />}
-          </div>
-        </motion.div>
-
-        {/* ── Trust badges — bottom left ── */}
-        <div className="absolute bottom-8 left-8 flex items-center gap-6 z-10">
-          <span className="flex items-center gap-1.5 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            <Lock size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
-            256-bit TLS
-          </span>
-          <span className="flex items-center gap-1.5 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            <Shield size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
-            Multi-factor sign-in
-          </span>
-        </div>
+      <div className="relative z-10 flex items-center gap-2.5 p-8" aria-hidden="true">
+        <LogoMark size={30} className="text-[hsl(222_30%_64%)]" />
+        <span className="text-base font-semibold tracking-tight text-white/90">MyCargoLens</span>
       </div>
-    </MotionConfig>
+
+      <div className="relative z-10 space-y-4 p-8">
+        <p className="max-w-sm text-lg font-medium leading-snug tracking-tight text-white/85">{caption}</p>
+        <ul className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          {FACTS.map(({ icon: Icon, label }) => (
+            <li key={label} className="flex items-center gap-1.5 text-xs text-white/45">
+              <Icon size={14} className="text-white/35" aria-hidden="true" />
+              {label}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }

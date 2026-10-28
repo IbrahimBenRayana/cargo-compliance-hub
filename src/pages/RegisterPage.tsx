@@ -11,6 +11,8 @@ import { useQuery } from '@tanstack/react-query';
 import { authApi } from '@/api/client';
 import { toast } from 'sonner';
 import { AuthBrandPanel } from '@/components/AuthBrandPanel';
+import { waitForAuthScene } from '@/components/auth3d/success';
+import { emailDomain, passwordStrength, type BerthState } from '@/components/auth3d/state';
 import { LogoMark } from '@/components/LogoMark';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -53,6 +55,10 @@ export default function RegisterPage() {
     if (invitation?.email) setForm((prev) => ({ ...prev, email: invitation.email }));
   }, [invitation?.email]);
 
+  // ── 3D berth scene: loaded aboard on success, rose pulse per failure ──
+  const [aboard, setAboard] = useState(false);
+  const [failures, setFailures] = useState(0);
+
   const passwordsMismatch =
     form.confirmPassword.length > 0 && form.password !== form.confirmPassword;
 
@@ -85,8 +91,11 @@ export default function RegisterPage() {
       }
       await register.mutateAsync(payload);
       toast.success(inviteToken ? 'Welcome to the team!' : 'Account created! Welcome to MyCargoLens.');
+      setAboard(true);
+      await waitForAuthScene();
       navigate(redirectTo);
     } catch (err: any) {
+      setFailures((n) => n + 1);
       if (err?.body?.code === 'signup_disabled') {
         setSignupDisabled(true);
         return;
@@ -95,14 +104,33 @@ export default function RegisterPage() {
     }
   };
 
+  const fieldsDone = [
+    form.firstName.trim().length > 0,
+    form.lastName.trim().length > 0,
+    form.password.length >= 8,
+    form.confirmPassword.length > 0 && form.confirmPassword === form.password,
+  ];
+  const role = invitation?.role ?? '';
+  const berth: BerthState = {
+    kind: 'berth',
+    org: invitation?.organizationName || form.companyName.trim() || emailDomain(form.email),
+    name: `${form.firstName} ${form.lastName}`.trim(),
+    role: role ? role.charAt(0).toUpperCase() + role.slice(1).toLowerCase() : '',
+    filled: fieldsDone.filter(Boolean).length,
+    total: fieldsDone.length,
+    strength: passwordStrength(form.password),
+    phase: aboard ? 'success' : register.isPending ? 'checking' : 'idle',
+    errorCount: failures,
+  };
+
   return (
     <MotionConfig reducedMotion="user">
       {/* Full-viewport split layout */}
       <div className="flex min-h-screen">
 
         {/* ── Left: dark brand panel (desktop only) ── */}
-        <div className="w-1/2 flex-shrink-0">
-          <AuthBrandPanel variant="register" />
+        <div className="hidden lg:block lg:w-1/2 flex-shrink-0">
+          <AuthBrandPanel scene={berth} caption="Your workspace is ready. Set up your seat." />
         </div>
 
         {/* ── Right: form panel ── */}
