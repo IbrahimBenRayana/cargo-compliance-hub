@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useSubscription, useCreatePortalSession } from '@/hooks/useBilling';
+import { useAuthStore } from '@/hooks/useAuth';
 import { CardCapture } from '@/components/billing/CardCapture';
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -14,6 +15,10 @@ export function BillingSettings() {
   const { data, isLoading } = useSubscription();
   const portal = useCreatePortalSession();
   const [editingCard, setEditingCard] = React.useState(false);
+  // Plan, card and the Stripe portal are owner/admin actions (the server
+  // refuses everyone else); operators see the details but not the controls.
+  const role = useAuthStore((s) => s.user?.role);
+  const canManage = role === 'owner' || role === 'admin';
 
   function openPortal() {
     portal.mutate(undefined, {
@@ -40,9 +45,13 @@ export function BillingSettings() {
           <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div className="text-sm">
             <p className="font-semibold text-destructive">A recent charge failed</p>
-            <p className="text-muted-foreground">Update your card below to settle it and keep filing. We retry automatically once a working card is on file.</p>
+            <p className="text-muted-foreground">{canManage ? 'Update your card below to settle it and keep filing.' : 'Ask an owner or admin to update the card to settle it and keep filing.'} We retry automatically once a working card is on file.</p>
           </div>
         </div>
+      )}
+
+      {!canManage && (
+        <p className="text-sm text-muted-foreground">Only owners and admins can change billing.</p>
       )}
 
       {/* Plan */}
@@ -60,14 +69,16 @@ export function BillingSettings() {
                   {plan.perFilingCents > 0 ? `${money(plan.perFilingCents)} per shipment filed` : 'Custom pricing'}
                 </div>
               </div>
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/upgrade">Change plan</Link>
-              </Button>
+              {canManage && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/upgrade">Change plan</Link>
+                </Button>
+              )}
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground">No plan selected yet.</p>
-              <Button size="sm" asChild><Link to="/upgrade">Choose a plan</Link></Button>
+              {canManage && <Button size="sm" asChild><Link to="/upgrade">Choose a plan</Link></Button>}
             </div>
           )}
         </CardContent>
@@ -101,19 +112,23 @@ export function BillingSettings() {
                   )}
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setEditingCard(true)} disabled={!plan}>
-                <Pencil className="h-3.5 w-3.5 mr-1.5" /> Update
-              </Button>
+              {canManage && (
+                <Button variant="outline" size="sm" onClick={() => setEditingCard(true)} disabled={!plan}>
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" /> Update
+                </Button>
+              )}
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground">No card on file. Add one to start filing.</p>
-              <Button size="sm" onClick={() => setEditingCard(true)} disabled={!plan}>
-                <CreditCard className="h-3.5 w-3.5 mr-1.5" /> Add card
-              </Button>
+              {canManage && (
+                <Button size="sm" onClick={() => setEditingCard(true)} disabled={!plan}>
+                  <CreditCard className="h-3.5 w-3.5 mr-1.5" /> Add card
+                </Button>
+              )}
             </div>
           )}
-          {!plan && !editingCard && (
+          {canManage && !plan && !editingCard && (
             <p className="text-xs text-muted-foreground">Choose a plan first, then add a card.</p>
           )}
         </CardContent>
@@ -133,11 +148,15 @@ export function BillingSettings() {
             <span className="text-muted-foreground">Total charged</span>
             <span className="font-medium tabular-nums">{money(data?.usage.amountCents ?? 0)}</span>
           </div>
-          <Separator />
-          <Button variant="ghost" size="sm" onClick={openPortal} disabled={portal.isPending || !card} className="px-0">
-            {portal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ExternalLink className="h-4 w-4 mr-2" />}
-            Manage cards &amp; receipts in Stripe
-          </Button>
+          {canManage && (
+            <>
+              <Separator />
+              <Button variant="ghost" size="sm" onClick={openPortal} disabled={portal.isPending || !card} className="px-0">
+                {portal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ExternalLink className="h-4 w-4 mr-2" />}
+                Manage cards &amp; receipts in Stripe
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
