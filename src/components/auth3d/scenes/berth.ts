@@ -147,7 +147,7 @@ export function berthScene(get: () => BerthState): SceneDef {
 
         // "Workspace ready · {org}" rises over the ship (built on first success)
         if (ok >= 0) {
-          const label = org ? `Workspace ready · ${org}` : 'Workspace ready';
+          const label = s.doneLabel ?? (org ? `Workspace ready · ${org}` : 'Workspace ready');
           if (label !== readyFor) {
             if (ready) W.scene.remove(ready);
             ready = W.pill(label, { h: 0.42, dot: C.emerald }); W.add(ready); readyFor = label;

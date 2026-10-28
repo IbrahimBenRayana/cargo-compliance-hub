@@ -104,6 +104,7 @@ export function SetPasswordPage() {
     org: emailDomain(email ?? ''),
     name: email ?? '',
     role: 'Your account',
+    doneLabel: 'Password set',
     filled: fieldsDone.filter(Boolean).length,
     total: fieldsDone.length,
     strength: passwordStrength(password),
@@ -118,7 +119,7 @@ export function SetPasswordPage() {
 
         {/* ── Left: dark brand panel (desktop only) ── */}
         <div className="hidden lg:block lg:w-1/2 flex-shrink-0">
-          <AuthBrandPanel scene={berth} caption="Your workspace is ready. Set your password to come aboard." />
+          <AuthBrandPanel scene={berth} caption="Choose a password for your account." />
         </div>
 
         {/* ── Right: form panel ── */}

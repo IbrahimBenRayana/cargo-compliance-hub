@@ -107,6 +107,7 @@ export function gateScene(get: () => GateState): SceneDef {
         error: ['Not cleared · check your details', C.rose],
       };
       const pills: Record<string, THREE.Mesh> = {};
+      let noteText = '';
       for (const [k, [text, dot]] of Object.entries(STATUS)) {
         const p = W.pill(text, { h: 0.38, dot }); p.position.set(GATE_X, 3.75, LANE_Z); W.add(p);
         (p.material as THREE.MeshBasicMaterial).opacity = k === 'idle' ? 1 : 0; pills[k] = p;
@@ -182,8 +183,13 @@ export function gateScene(get: () => GateState): SceneDef {
           m.emissive.set(ok >= 0 ? C.emerald : C.gold); m.emissiveIntensity = dotK[i] * 0.9;
         });
 
-        // status label
-        const now_k = err > 0.05 ? 'error' : ok >= 0 ? 'success' : s.phase === 'error' ? 'idle' : s.phase;
+        // status label (a page note, e.g. "Link sent", replaces it)
+        if (s.note && s.note !== noteText) {
+          if (pills.note) W.scene.remove(pills.note);
+          const p = W.pill(s.note, { h: 0.38, dot: C.gold }); p.position.set(GATE_X, 3.75, LANE_Z); W.add(p);
+          (p.material as THREE.MeshBasicMaterial).opacity = 0; pills.note = p; noteText = s.note;
+        }
+        const now_k = err > 0.05 ? 'error' : ok >= 0 ? 'success' : s.note ? 'note' : s.phase === 'error' ? 'idle' : s.phase;
         for (const k of Object.keys(pills)) {
           pillK[k] = damp(pillK[k] ?? 0, k === now_k ? 1 : 0, 9, dt);
           (pills[k].material as THREE.MeshBasicMaterial).opacity = pillK[k];

@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authApi } from '@/api/client';
 import { AuthBrandPanel } from '@/components/AuthBrandPanel';
+import type { GateState } from '@/components/auth3d/state';
 import { LogoMark } from '@/components/LogoMark';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -36,11 +37,22 @@ export function ForgotPasswordPage() {
     }
   };
 
+  // the sign-in gate scene, reading the email; once sent, the gate says so
+  const gate: GateState = {
+    kind: 'gate',
+    email,
+    hasPassword: false,
+    phase: submitting ? 'checking' : 'idle',
+    codeLength: 0,
+    errorCount: 0,
+    note: sent ? 'Link sent · check your email' : undefined,
+  };
+
   return (
     <MotionConfig reducedMotion="user">
       <div className="flex min-h-screen">
-        <div className="w-1/2 flex-shrink-0">
-          <AuthBrandPanel variant="login" />
+        <div className="hidden lg:block lg:w-1/2 flex-shrink-0">
+          <AuthBrandPanel scene={gate} caption="Reset your password and get back to your inbox." />
         </div>
         <div className="flex-1 lg:w-1/2 bg-background flex items-center justify-center px-6 py-12 min-h-screen">
           <div className="w-full max-w-sm mx-auto">

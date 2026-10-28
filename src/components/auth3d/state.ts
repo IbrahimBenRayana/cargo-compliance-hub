@@ -15,6 +15,8 @@ export interface GateState {
   codeLength: number;
   /** bump on every failed attempt so repeated errors re-trigger the flash */
   errorCount: number;
+  /** replaces the status label over the gate, e.g. "Link sent · check your email" */
+  note?: string;
 }
 
 /** Invite sign-up and set-password: "Your berth is ready". */
@@ -33,6 +35,8 @@ export interface BerthState {
   strength: number;
   phase: AuthPhase;
   errorCount: number;
+  /** what rises over the ship on success (default "Workspace ready · {org}") */
+  doneLabel?: string;
 }
 
 export type AuthSceneState = GateState | BerthState;
