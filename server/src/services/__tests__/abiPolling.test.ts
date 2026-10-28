@@ -72,12 +72,12 @@ describe('pollSentAbiDocuments', () => {
     expect(webhooks.emitWebhook).toHaveBeenCalledWith('o1', 'entry.accepted', expect.anything());
   });
 
-  it('anchors billing on the linked ISF filing when present', async () => {
+  it('bills a linked entry on its own anchor (billing prices the ISF link itself)', async () => {
     prisma.abiDocument.findUnique.mockResolvedValue({ filingId: 'f9' });
 
     await pollSentAbiDocuments();
 
-    expect(billing.billShipment).toHaveBeenCalledWith({ filingId: 'f9' }, 'o1');
+    expect(billing.billShipment).toHaveBeenCalledWith({ abiDocumentId: 'd1' }, 'o1');
   });
 
   it('leaves the document at SENT and does not bill when CBP has not responded', async () => {

@@ -27,7 +27,7 @@ import {
 } from './notifications.js';
 import { drainEmailDeliveries } from './notificationDeliveryWorker.js';
 import { recordScoreSnapshot, triggerForStatus } from './compliance/scoreSnapshot.js';
-import { billShipmentForFiling, retryFailedCharges } from './shipmentBilling.js';
+import { billShipmentForFiling, sweepUnsettledCharges } from './shipmentBilling.js';
 import { syncFromFederalRegister } from './compliance/addCvdSync.js';
 import { invalidateAddCvdCache } from './compliance/addCvd.js';
 import { CRON, ABI_SENDING_TIMEOUT_MS } from '../config/schedules.js';
@@ -484,19 +484,12 @@ let cbpNoAnswerTask: ScheduledTask | null = null;
 let chargeRetryTask: ScheduledTask | null = null;
 let leadNotifyRetryTask: ScheduledTask | null = null;
 
-/** Retry per-shipment charges that failed, for every delinquent org. */
-async function retryDelinquentCharges(): Promise<void> {
-  const delinquent = await prisma.subscription.findMany({
-    where: { status: 'delinquent' },
-    select: { orgId: true },
-  });
-  let settled = 0;
-  for (const s of delinquent) {
-    const r = await retryFailedCharges(s.orgId);
-    settled += r.settled;
-  }
-  if (delinquent.length > 0) {
-    logger.info({ orgs: delinquent.length, settled }, '[Jobs:ChargeRetry] Done');
+/** Retry every unsettled per-shipment charge (failed, 3DS, or stuck after a
+ *  Stripe error), for any org — not only delinquent ones (billing audit G1/G2). */
+async function retryUnsettledCharges(): Promise<void> {
+  const r = await sweepUnsettledCharges();
+  if (r.orgs > 0 || r.stuck > 0) {
+    logger.info(r, '[Jobs:ChargeRetry] Done');
   }
 }
 
@@ -595,7 +588,7 @@ export function startBackgroundJobs(): void {
   }
 
   chargeRetryTask = cron.schedule(CRON.CHARGE_RETRY, () => {
-    withAdvisoryLock('jobs:charge-retry', tracked('charge-retry', retryDelinquentCharges))
+    withAdvisoryLock('jobs:charge-retry', tracked('charge-retry', retryUnsettledCharges))
       .catch(err => logger.error({ err }, '[Jobs:ChargeRetry] Unhandled'));
   }, cronOpts);
   logger.info('[Jobs] Failed-charge retry scheduled — hourly at :15 (UTC)');

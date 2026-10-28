@@ -67,6 +67,7 @@ export async function applyEntryVerdict(opts: { docId: string; transmissionId: s
     abiDocumentId: doc.id, entryNumber: doc.entryNumber, entryType: doc.entryType, mbolNumber: doc.mbolNumber,
   });
   if (accepted) {
-    await billShipment(doc.filingId ? { filingId: doc.filingId } : { abiDocumentId: doc.id }, doc.orgId);
+    // Priced by what was filed: shipmentBilling reads the entry's ISF link itself.
+    await billShipment({ abiDocumentId: doc.id }, doc.orgId);
   }
 }
