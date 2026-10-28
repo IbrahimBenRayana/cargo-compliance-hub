@@ -1,8 +1,8 @@
-// ─── Per-Filing Pricing: Tiers & Capabilities (app mirror) ──────────────────
+// ─── Plans & Capabilities (app mirror) ──────────────────────────────────────
 // Mirrors server/src/config/plans.ts. The server is the source of truth for
-// rates + capabilities; this file is the display/UX layer (labels, blurbs,
-// feature bullets) plus the capability constants the UI gates on. Keep the ids,
-// rates, and capability lists in sync with the server.
+// prices + capabilities (and an org's own prices come from /billing/subscription);
+// this file is the display/UX layer (labels, blurbs, feature bullets) plus the
+// capability constants the UI gates on. Keep ids and capabilities in sync.
 
 // Capabilities — must match the server's CAPABILITIES keys exactly.
 export const CAPABILITIES = {
@@ -10,19 +10,19 @@ export const CAPABILITIES = {
   ABI_ENTRY: 'ABI_ENTRY',
   CONTAINER_TRACKING: 'CONTAINER_TRACKING',
   HTS_CLASSIFICATION: 'HTS_CLASSIFICATION',
-  // Native in-bond (7512) movements — premium tiers only.
+  // Native in-bond (7512) movements — plans set up by our team.
   IN_BOND: 'IN_BOND',
 } as const;
 
 export type Capability = (typeof CAPABILITIES)[keyof typeof CAPABILITIES];
 
 export interface PlanMeta {
-  /** Tier id — matches the server plan row id. */
+  /** Plan id — matches the server plan row id. */
   id: string;
   name: string;
   /** Short positioning line. */
   blurb: string;
-  /** Per-shipment rate in cents. */
+  /** Default price of one accepted ISF, in cents. */
   perFilingCents: number;
   /** Human price label, e.g. "$45". */
   priceLabel: string;
@@ -31,12 +31,24 @@ export interface PlanMeta {
   capabilities: Capability[];
   /** Marketing bullets for the upgrade / pricing cards. */
   features: string[];
+  /** Self-selectable in the app (false = set up by MyCargoLens). */
+  isPublic: boolean;
   /** Featured (visually highlighted) tier. */
   featured?: boolean;
 }
 
 const dollars = (cents: number) => `$${Math.round(cents / 100)}`;
 
+const ALL_CAPABILITIES: Capability[] = [
+  CAPABILITIES.ISF_FILING,
+  CAPABILITIES.ABI_ENTRY,
+  CAPABILITIES.CONTAINER_TRACKING,
+  CAPABILITIES.HTS_CLASSIFICATION,
+  CAPABILITIES.IN_BOND,
+];
+
+// Pricing v2: ISF is the only self-serve price ($45 per accepted ISF). Entries
+// have no public price; MyCargoLens sets them per account on "ISF + Entry".
 export const PLAN_META: Record<string, PlanMeta> = {
   isf: {
     id: 'isf',
@@ -44,12 +56,14 @@ export const PLAN_META: Record<string, PlanMeta> = {
     blurb: 'Security filings, pay as you go.',
     perFilingCents: 4500,
     priceLabel: dollars(4500),
-    priceFooter: 'per shipment filed',
-    capabilities: [CAPABILITIES.ISF_FILING],
+    priceFooter: 'per accepted ISF',
+    capabilities: [CAPABILITIES.ISF_FILING, CAPABILITIES.HTS_CLASSIFICATION],
+    isPublic: true,
     features: [
       'ISF-10 (10+2) & ISF-5 filing',
       'Templates & bulk duplicate',
       'Manifest (MBOL) query',
+      'HTS suggestions',
       'Filing deadline tracking',
       'Email support',
     ],
@@ -57,48 +71,40 @@ export const PLAN_META: Record<string, PlanMeta> = {
   entry: {
     id: 'entry',
     name: 'ISF + Entry',
-    blurb: 'Add ABI Entry Summary to your filings.',
-    perFilingCents: 18000,
-    priceLabel: dollars(18000),
-    priceFooter: 'per shipment filed',
-    capabilities: [CAPABILITIES.ISF_FILING, CAPABILITIES.ABI_ENTRY],
-    featured: true,
+    blurb: 'ISF plus customs entries, priced for your account.',
+    perFilingCents: 4500,
+    priceLabel: 'Custom',
+    priceFooter: 'set up with our team',
+    capabilities: ALL_CAPABILITIES,
+    isPublic: false,
     features: [
       'Everything in ISF Filing',
       'ABI Entry Summary (7501)',
       'ABI Cargo Release (3461)',
-      'Linked ISF + Entry billed once per shipment',
+      'Container tracking',
       'Email + chat support',
     ],
   },
-  full: {
-    id: 'full',
-    name: 'Complete',
-    blurb: 'The full customs suite.',
-    perFilingCents: 28000,
-    priceLabel: dollars(28000),
-    priceFooter: 'per shipment filed',
-    capabilities: [
-      CAPABILITIES.ISF_FILING,
-      CAPABILITIES.ABI_ENTRY,
-      CAPABILITIES.CONTAINER_TRACKING,
-      CAPABILITIES.HTS_CLASSIFICATION,
-      CAPABILITIES.IN_BOND,
-    ],
-    features: [
-      'Everything in ISF + Entry',
-      'Container tracking (Terminal 49)',
-      'HTS classification & Duty Calculator',
-      'In-Bond (7512) movements',
-      'Priority support',
-    ],
+  enterprise: {
+    id: 'enterprise',
+    name: 'Enterprise',
+    blurb: 'Contract pricing, invoiced.',
+    perFilingCents: 0,
+    priceLabel: 'Custom',
+    priceFooter: 'per contract',
+    capabilities: ALL_CAPABILITIES,
+    isPublic: false,
+    features: ['Everything in ISF + Entry', 'Dedicated support', 'Custom integrations'],
   },
 };
 
 export const KNOWN_PLAN_IDS = Object.keys(PLAN_META);
 
-/** Public tiers in display order (excludes enterprise/custom). */
-export const PUBLIC_TIERS: PlanMeta[] = [PLAN_META.isf, PLAN_META.entry, PLAN_META.full];
+/** Self-serve plans in display order. */
+export const PUBLIC_TIERS: PlanMeta[] = Object.values(PLAN_META).filter((p) => p.isPublic);
+
+/** Where to talk to us about entries, volume or contract pricing. */
+export const TALK_TO_US_URL = 'https://mycargolens.com/book-a-demo';
 
 /** Human label for a capability — used in locked-feature nudges. */
 export const CAPABILITY_LABEL: Record<Capability, string> = {
@@ -109,8 +115,8 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   IN_BOND: 'In-Bond Movements',
 };
 
-/** The cheapest public tier that includes a given capability (for "upgrade to
- *  unlock" prompts). */
+/** The self-serve plan that includes a capability, if any. Undefined means the
+ *  capability is set up by our team (entries, tracking, in-bond): talk to us. */
 export function minTierForCapability(cap: Capability): PlanMeta | undefined {
   return PUBLIC_TIERS.find((t) => t.capabilities.includes(cap));
 }

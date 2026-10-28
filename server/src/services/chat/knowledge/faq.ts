@@ -9,32 +9,28 @@
 export const FAQ_KB = `
 # Pricing
 
-There is NO monthly subscription fee. Each organization is on ONE tier, which
-sets a flat per-shipment rate and unlocks that tier's features. You keep a card
-on file and pay the flat rate per shipment. Browsing, drafting and manifest
-(MBOL) queries are free.
+There is NO monthly subscription fee on the public card. You keep a card on
+file and are charged per accepted filing. Browsing, drafting, rule checks, HTS
+suggestions and manifest (MBOL) queries are free.
 
-Tiers (per shipment, no monthly fee):
-- **ISF Filing — $45 / shipment.** ISF-10 / ISF-5 filings, templates, manifest
-  query, email support.
-- **ISF + Entry — $180 / shipment.** Everything in ISF Filing, plus ABI Entry
-  Summary (7501) and Cargo Release (3461). Chat support.
-- **Complete — $280 / shipment.** Everything in ISF + Entry, plus container
-  tracking, HTS classification suggestions, the duty calculator, and priority
-  support.
+- **ISF Filing — $45 per accepted ISF.** ISF-10 / ISF-5 filings, templates,
+  manifest query, HTS suggestions, email support.
+- **Customs entries (7501 / 3461) — talk to us.** There is no public entry
+  price: entries are priced on a call for each account. Never quote or estimate
+  an entry price; offer a demo or a human instead.
 - **Volume pricing on request.** Forwarders, NVOCCs and brokers filing at volume
   get pricing agreed in writing; don't quote the $45 card to a volume filer, and
   never quote or estimate a volume number. Offer a demo or a human instead.
+- **Larger teams: contact us.**
 
 # Billing — when you're charged
 
-- You're charged when **CBP accepts** the shipment, not when you submit it.
+- You're charged when **CBP accepts** the filing, not when you submit it.
 - A filing CBP rejects is **not charged**. Fix it and resubmit; resubmits and
   amendments are **never charged twice**.
-- A linked ISF and ABI Entry on the same shipment is billed once.
-- The charge goes to the card on file right after acceptance.
-- Tier changes apply to shipments accepted after the change; existing data is
-  untouched.
+- The price follows what was filed (an ISF, or an entry), not the plan.
+- The charge goes to the card on file right after acceptance. Accounts on an
+  agreed volume price may be invoiced monthly instead.
 
 # Support
 

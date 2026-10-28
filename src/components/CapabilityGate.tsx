@@ -6,6 +6,7 @@ import { useCapabilities } from '@/hooks/useBilling';
 import {
   type Capability,
   CAPABILITY_LABEL,
+  TALK_TO_US_URL,
   minTierForCapability,
 } from '@/lib/planMeta';
 
@@ -20,7 +21,8 @@ interface CapabilityGateProps {
  * neutral spinner — never flash the locked panel before we know the truth.
  *
  * When locked, renders an "Upgrade to unlock" panel IN PLACE (the URL is kept
- * — we never redirect) naming the cheapest tier that unlocks the feature.
+ * — we never redirect) naming the self-serve plan that unlocks the feature, or,
+ * for features our team sets up per account (entries etc.), a "talk to us".
  *
  * This is cosmetic only; the server enforces the real boundary (402/403).
  */
@@ -59,7 +61,7 @@ function UpgradePanel({ capability }: { capability: Capability }) {
               {featureLabel}
             </div>
             <CardTitle className="text-[20px] leading-tight font-semibold">
-              Upgrade to unlock {featureLabel}
+              {tier ? `Upgrade to unlock ${featureLabel}` : `${featureLabel} isn't on your plan yet`}
             </CardTitle>
             <CardDescription className="text-[13.5px] leading-relaxed">
               {tier ? (
@@ -70,7 +72,7 @@ function UpgradePanel({ capability }: { capability: Capability }) {
                   start using it.
                 </>
               ) : (
-                <>This feature requires a plan that includes {featureLabel}.</>
+                <>{featureLabel} is set up for your account by our team, with pricing that fits your volume. Talk to us to add it.</>
               )}
             </CardDescription>
           </div>
@@ -89,10 +91,17 @@ function UpgradePanel({ capability }: { capability: Capability }) {
           )}
 
           <Button asChild size="lg" className="w-full font-semibold">
-            <Link to={tier ? `/upgrade?plan=${tier.id}` : '/upgrade'}>
-              {tier ? `Upgrade to ${tier.name}` : 'View plans'}
-              <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
+            {tier ? (
+              <Link to={`/upgrade?plan=${tier.id}`}>
+                Upgrade to {tier.name}
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            ) : (
+              <a href={TALK_TO_US_URL} target="_blank" rel="noreferrer">
+                Talk to us
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </a>
+            )}
           </Button>
         </CardContent>
       </Card>

@@ -188,6 +188,14 @@ export async function sendAbiDocumentToCBP(params: {
         : { error: 'Add a payment method to submit entries.', code: 'card_required', upgradeUrl: '/settings?tab=billing' },
     };
   }
+  // Entries have no public price (pricing v2): each org's entry prices are set
+  // by MyCargoLens. Until they are, an accepted entry would go unbilled.
+  if (!ent.entryPricingSet) {
+    return {
+      httpStatus: 402,
+      body: { error: 'Entry pricing has not been set up for your account yet. Contact us to start filing entries.', code: 'entry_pricing_required' },
+    };
+  }
 
   const denorm = extractDenormFromPayload(doc.payload);
   if (!denorm.mbolNumber) {

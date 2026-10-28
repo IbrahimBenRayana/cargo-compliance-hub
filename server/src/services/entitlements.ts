@@ -7,17 +7,23 @@
  * Selecting a tier grants its capabilities (so the user can see + explore the
  * features). Actually FILING — which charges the card on CBP acceptance —
  * additionally requires a usable card on file and no unpaid (delinquent)
- * charge, UNLESS the tier is $0 (enterprise/custom), which needs no card.
+ * charge, UNLESS nothing the org files costs money ($0 prices), which needs no
+ * card. Prices come from services/pricing.ts (per org, by what was filed).
  */
 import { prisma } from '../config/database.js';
 import type { Capability } from '../config/plans.js';
+import { resolvePricing, requiresPaymentMethod, entryPricingSet, type OrgPricing } from './pricing.js';
 
 export interface OrgEntitlements {
   /** Selected tier id, or null when no tier is chosen. */
   planId: string | null;
   capabilities: Capability[];
-  /** Per-shipment rate (cents) of the selected tier; 0 when none / enterprise. */
+  /** Price (cents) of one accepted ISF for this org; 0 when no plan. */
   perFilingCents: number;
+  /** The org's prices by what was filed (ISF, linked entry, entry-only). */
+  pricing: OrgPricing;
+  /** Entries have no public price: an org can send entries only once priced. */
+  entryPricingSet: boolean;
   stripeCustomerId: string | null;
   defaultPaymentMethodId: string | null;
   status: string | null;
@@ -39,14 +45,16 @@ export async function getOrgEntitlements(orgId: string): Promise<OrgEntitlements
   // treated the same as the new 'card_on_file'/'incomplete'/'delinquent'.
   const selected = !!sub && sub.status !== 'canceled' && !!sub.plan;
   const plan = selected ? sub!.plan : null;
-  const perFilingCents = plan?.perFilingCents ?? 0;
+  const pricing = resolvePricing(plan?.perFilingCents, selected ? sub : null);
   const cardOnFile = !!sub?.defaultPaymentMethodId;
   const delinquent = sub?.status === 'delinquent';
-  const canFile = selected && (perFilingCents === 0 || (cardOnFile && !delinquent));
+  const canFile = selected && (!requiresPaymentMethod(pricing) || (cardOnFile && !delinquent));
   return {
     planId: plan?.id ?? null,
     capabilities: (plan?.capabilities ?? []) as Capability[],
-    perFilingCents,
+    perFilingCents: pricing.isfCents,
+    pricing,
+    entryPricingSet: entryPricingSet(pricing),
     stripeCustomerId: sub?.stripeCustomerId ?? null,
     defaultPaymentMethodId: sub?.defaultPaymentMethodId ?? null,
     status: sub?.status ?? null,
