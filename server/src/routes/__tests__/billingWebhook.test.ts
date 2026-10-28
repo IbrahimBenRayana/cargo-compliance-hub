@@ -11,6 +11,7 @@ const { prisma, notifications } = vi.hoisted(() => ({
     stripeWebhookEvent: { update: vi.fn() },
     shipmentCharge: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     subscription: { updateMany: vi.fn(), findFirst: vi.fn() },
+    billingInvoice: { updateMany: vi.fn() },
   },
   notifications: { notify: vi.fn(() => Promise.resolve()) },
 }));
@@ -69,5 +70,18 @@ describe('payment_intent.succeeded', () => {
     prisma.shipmentCharge.findUnique.mockResolvedValue({ id: 'c1', status: 'refunded' });
     await handleStripeEvent(event('payment_intent.succeeded', { id: 'pi_1', metadata: { chargeId: 'c1' } }));
     expect(prisma.shipmentCharge.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('monthly invoices', () => {
+  it('mirrors a paid invoice', async () => {
+    await handleStripeEvent(event('invoice.paid', { id: 'in_1', status: 'paid', metadata: { orgId: 'o1' } }));
+    expect(prisma.billingInvoice.updateMany).toHaveBeenCalledWith({ where: { stripeInvoiceId: 'in_1' }, data: { status: 'paid' } });
+  });
+
+  it('a failed ACH debit is mirrored and owners/admins are told', async () => {
+    await handleStripeEvent(event('invoice.payment_failed', { id: 'in_2', status: 'open', metadata: { orgId: 'o1' } }));
+    expect(prisma.billingInvoice.updateMany).toHaveBeenCalledWith({ where: { stripeInvoiceId: 'in_2' }, data: { status: 'open' } });
+    expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ audience: { orgId: 'o1', roles: ['ADMIN', 'OWNER'] } }));
   });
 });

@@ -46,19 +46,29 @@ export async function createStripeCustomer(opts: {
   return customer.id;
 }
 
+export type PaymentMethodKind = 'card' | 'us_bank_account';
+
 /**
- * Start a SetupIntent so the browser (Stripe Elements) can save a card to the
- * customer WITHOUT charging it. Returns the client secret for the frontend.
+ * Start a SetupIntent so the browser (Stripe Elements) can save a payment
+ * method to the customer WITHOUT charging it. Returns the client secret.
+ * `us_bank_account` (ACH Direct Debit, for invoiced accounts) verifies the
+ * account with Stripe Financial Connections (instant) or micro-deposits, and
+ * Stripe's Payment Element collects the debit mandate.
  */
-export async function createSetupIntent(customerId: string): Promise<{
+export async function createSetupIntent(customerId: string, method: PaymentMethodKind = 'card'): Promise<{
   clientSecret: string;
   setupIntentId: string;
 }> {
   const stripe = getStripe();
   const intent = await stripe.setupIntents.create({
     customer: customerId,
-    payment_method_types: ['card'],
+    payment_method_types: [method],
     usage: 'off_session', // we will charge later without the customer present
+    ...(method === 'us_bank_account' && {
+      payment_method_options: {
+        us_bank_account: { verification_method: 'automatic', financial_connections: { permissions: ['payment_method'] } },
+      },
+    }),
   });
   return { clientSecret: intent.client_secret ?? '', setupIntentId: intent.id };
 }
@@ -71,17 +81,28 @@ export type CardSummary = {
   expYear: number | null;
 };
 
-/** Pull the card brand/last4/exp for display + set it as the customer default. */
-export async function setDefaultCard(
-  customerId: string,
-  paymentMethodId: string,
-): Promise<CardSummary> {
+export type SavedPaymentMethod =
+  | ({ type: 'card' } & CardSummary)
+  | { type: 'us_bank_account'; paymentMethodId: string; bankName: string | null; last4: string | null };
+
+/** Set a saved payment method as the customer default and summarise it for
+ *  display (card brand/last4/exp, or bank name/last4). */
+export async function setDefaultPaymentMethod(customerId: string, paymentMethodId: string): Promise<SavedPaymentMethod> {
   const stripe = getStripe();
   await stripe.customers.update(customerId, {
     invoice_settings: { default_payment_method: paymentMethodId },
   });
   const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+  if (pm.type === 'us_bank_account') {
+    return {
+      type: 'us_bank_account',
+      paymentMethodId,
+      bankName: pm.us_bank_account?.bank_name?.slice(0, 100) ?? null,
+      last4: pm.us_bank_account?.last4 ?? null,
+    };
+  }
   return {
+    type: 'card',
     paymentMethodId,
     brand: pm.card?.brand ?? null,
     last4: pm.card?.last4 ?? null,
