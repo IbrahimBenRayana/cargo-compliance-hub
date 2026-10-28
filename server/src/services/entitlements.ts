@@ -24,6 +24,10 @@ export interface OrgEntitlements {
   pricing: OrgPricing;
   /** Entries have no public price: an org can send entries only once priced. */
   entryPricingSet: boolean;
+  /** "card" = charged per filing; "invoiced" = accrued for a monthly invoice. */
+  billingMode: 'card' | 'invoiced';
+  /** A manual submit hold set by MyCargoLens (e.g. an overdue invoice). */
+  billingHold: boolean;
   stripeCustomerId: string | null;
   defaultPaymentMethodId: string | null;
   status: string | null;
@@ -48,13 +52,20 @@ export async function getOrgEntitlements(orgId: string): Promise<OrgEntitlements
   const pricing = resolvePricing(plan?.perFilingCents, selected ? sub : null);
   const cardOnFile = !!sub?.defaultPaymentMethodId;
   const delinquent = sub?.status === 'delinquent';
-  const canFile = selected && (!requiresPaymentMethod(pricing) || (cardOnFile && !delinquent));
+  const billingMode = sub?.billingMode === 'invoiced' ? 'invoiced' : 'card';
+  const billingHold = !!sub?.billingHold;
+  // Invoiced orgs need no card: usage is billed monthly (ACH). Card orgs need a
+  // working card once anything they file costs money.
+  const canFile = selected && !billingHold
+    && (billingMode === 'invoiced' || !requiresPaymentMethod(pricing) || (cardOnFile && !delinquent));
   return {
     planId: plan?.id ?? null,
     capabilities: (plan?.capabilities ?? []) as Capability[],
     perFilingCents: pricing.isfCents,
     pricing,
     entryPricingSet: entryPricingSet(pricing),
+    billingMode,
+    billingHold,
     stripeCustomerId: sub?.stripeCustomerId ?? null,
     defaultPaymentMethodId: sub?.defaultPaymentMethodId ?? null,
     status: sub?.status ?? null,
