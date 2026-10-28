@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useSubscription, useSelectTier } from '@/hooks/useBilling';
 import { useAuthStore } from '@/hooks/useAuth';
 import { CardCapture } from '@/components/billing/CardCapture';
-import { PLAN_META, KNOWN_PLAN_IDS, PUBLIC_TIERS } from '@/lib/planMeta';
+import { PLAN_META, KNOWN_PLAN_IDS, PUBLIC_TIERS, TALK_TO_US_URL } from '@/lib/planMeta';
 import { cn } from '@/lib/utils';
 
 /**
@@ -32,6 +32,8 @@ export default function UpgradePage() {
 
   const hasCard = !!billing?.card;
   const chosenMeta = chosen ? PLAN_META[chosen] : null;
+  // An org on a plan we set up (ISF + Entry, Enterprise) can't switch itself.
+  const managedPlan = !subLoading && !!billing?.plan && billing.plan.isPublic === false;
 
   async function choose(tierId: string) {
     try {
@@ -59,7 +61,7 @@ export default function UpgradePage() {
           <h1 className="text-2xl font-bold text-foreground mb-1">Add a payment method</h1>
           <p className="text-sm text-muted-foreground">
             {chosenMeta.name} · {chosenMeta.priceLabel} {chosenMeta.priceFooter}. No charge now — you're billed per
-            shipment, only when CBP accepts it.
+            filing, only when CBP accepts it.
           </p>
         </div>
         <CardCapture
@@ -101,16 +103,21 @@ export default function UpgradePage() {
     <Shell label="Choose your tier" wide>
       <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">Pick a plan to start filing</h1>
       <p className="text-muted-foreground text-sm mb-8 max-w-xl">
-        No subscription, no monthly fee. Your tier sets your flat per-shipment rate and unlocks its features. You're
-        charged per shipment, only when CBP accepts it{hasCard ? ' — your saved card carries over.' : '.'}
+        No subscription, no monthly fee. You're charged per filing, only when CBP accepts it
+        {hasCard ? ' — your saved card carries over.' : '.'}
       </p>
+      {managedPlan && (
+        <p className="text-sm font-medium text-foreground mb-8 -mt-4">
+          You're on {billing?.plan?.name}, set up for your account by our team. Talk to us to change it.
+        </p>
+      )}
       {!canManage && (
         <p className="text-sm font-medium text-foreground mb-8 -mt-4">
           Only owners and admins can change the plan. Ask one of them to switch.
         </p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {PUBLIC_TIERS.map((tier) => {
           const isCurrent = !subLoading && billing?.plan?.id === tier.id;
           const busy = selectTier.isPending;
@@ -145,7 +152,7 @@ export default function UpgradePage() {
                 className={cn('w-full font-semibold', tier.featured ? 'bg-gold text-yellow-950 hover:bg-gold/90' : '')}
                 variant={tier.featured ? 'default' : 'outline'}
                 onClick={() => choose(tier.id)}
-                disabled={busy || isCurrent || !canManage}
+                disabled={busy || isCurrent || !canManage || managedPlan}
               >
                 {busy ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -159,12 +166,35 @@ export default function UpgradePage() {
             </div>
           );
         })}
+        <div className="relative flex flex-col rounded-2xl border border-border/60 bg-muted/30 p-6">
+          <h2 className="text-lg font-semibold text-foreground">Entries &amp; volume</h2>
+          <p className="text-xs text-muted-foreground mb-4 min-h-[2rem]">
+            Customs entries, or filing ISFs for your customers.
+          </p>
+          <div className="mb-4">
+            <span className="text-4xl font-bold text-foreground">Talk to us</span>
+            <p className="text-xs text-muted-foreground mt-1">priced for your account</p>
+          </div>
+          <ul className="space-y-2 mb-6 flex-1">
+            {['ABI Entry Summary (7501) & Cargo Release (3461)', 'Volume pricing for NVOCCs and forwarders', 'Monthly invoice by ACH'].map((feature) => (
+              <li key={feature} className="flex items-start gap-2">
+                <Check className="h-3.5 w-3.5 text-gold shrink-0 mt-0.5" strokeWidth={2.5} />
+                <span className="text-xs text-foreground/85 leading-relaxed">{feature}</span>
+              </li>
+            ))}
+          </ul>
+          <Button variant="outline" className="w-full font-semibold" asChild>
+            <a href={TALK_TO_US_URL} target="_blank" rel="noreferrer">
+              <ArrowRight className="h-4 w-4 mr-2" /> Talk to us
+            </a>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-4 mt-8 pt-6 border-t border-border/60">
         <Badge icon={Lock}>TLS encrypted</Badge>
         <Badge icon={ShieldCheck}>Powered by Stripe</Badge>
-        <Badge icon={Receipt}>No subscription · billed per shipment</Badge>
+        <Badge icon={Receipt}>No subscription · billed per accepted filing</Badge>
       </div>
     </Shell>
   );

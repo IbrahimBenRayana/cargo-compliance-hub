@@ -5,6 +5,7 @@
 import type { HtsClassifyResult } from '@/types/htsClassify';
 import type { AuthSession, LoginResult, MfaMethod, User } from '@/types/auth';
 import type { Filing } from '@/types/shipment';
+import type { OrgPricing } from '@/lib/pricing';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -971,6 +972,7 @@ export const exportApi = {
 };
 
 // ─── Billing API (card-on-file, immediate per-shipment charge) ─────────────
+export type { OrgPricing };
 export type BillingCard = { brand: string | null; last4: string | null; expMonth: number | null; expYear: number | null };
 
 export const billingApi = {
@@ -980,11 +982,16 @@ export const billingApi = {
         id: string;
         name: string;
         description: string | null;
+        /** This org's price of one accepted ISF (cents). */
         perFilingCents: number;
+        /** Self-serve plan (false = set up by MyCargoLens). */
+        isPublic: boolean;
         capabilities: string[];
         features: string[];
       } | null;
       capabilities: string[];
+      /** This org's prices by what was filed; entry prices null = entries not offered. */
+      pricing: OrgPricing | null;
       /** May submit/file: a card is on file (or a $0 tier) and no unpaid charge. */
       canFile: boolean;
       status: string | null;
@@ -1086,6 +1093,9 @@ export interface AdminOrganization {
   createdAt: string;
   plan: { id: string; name: string } | null;
   subscriptionStatus: string | null;
+  /** The org's own prices (cents; null = default) and what they resolve to. */
+  pricing: (AdminPriceOverrides & { effective: OrgPricing }) | null;
+  cardOnFile: boolean;
   owner: { email: string; firstName: string | null; lastName: string | null; emailVerified: boolean } | null;
   userCount: number;
   filingCount: number;
@@ -1112,6 +1122,12 @@ export interface OrgCbpIdentity {
   environment: 'NONE' | 'CERT' | 'PROD';
 }
 
+export interface AdminPriceOverrides {
+  isfCents: number | null;
+  entryLinkedCents: number | null;
+  entryOnlyCents: number | null;
+}
+
 export interface AdminPlan {
   id: string;
   name: string;
@@ -1119,6 +1135,7 @@ export interface AdminPlan {
   perFilingCents: number;
   capabilities: string[];
   isPublic: boolean;
+  sellsEntries: boolean;
 }
 
 export const adminApi = {
@@ -1157,6 +1174,13 @@ export const adminApi = {
     return apiFetch<{ orgId: string; plan: { id: string; name: string } }>(
       `/api/v1/admin/organizations/${orgId}/plan`,
       { method: 'PATCH', body: JSON.stringify({ planId }) },
+    );
+  },
+
+  setPricing(orgId: string, body: AdminPriceOverrides) {
+    return apiFetch<{ orgId: string; pricing: AdminPriceOverrides & { effective: OrgPricing } }>(
+      `/api/v1/admin/organizations/${orgId}/pricing`,
+      { method: 'PUT', body: JSON.stringify(body) },
     );
   },
 

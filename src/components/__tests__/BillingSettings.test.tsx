@@ -16,7 +16,8 @@ vi.mock('@/hooks/useBilling', () => ({
   useSubscription: () => ({
     isLoading: false,
     data: {
-      plan: { name: 'Full', perFilingCents: 4900 },
+      plan: { name: 'ISF Filing', perFilingCents: 4500, isPublic: true },
+      pricing: { isfCents: 4500, entryLinkedCents: 10500, entryOnlyCents: 12500 },
       card: { brand: 'visa', last4: '4242', expMonth: 12, expYear: 2030 },
       usage: { filingsBilled: 0, amountCents: 0 },
       delinquent: false,
@@ -37,6 +38,13 @@ describe('BillingSettings', () => {
     expect(screen.getByText('Change plan')).toBeInTheDocument();
     expect(screen.getByText('Update')).toBeInTheDocument();
     expect(screen.getByText(/Manage cards/)).toBeInTheDocument();
+  });
+
+  it("shows the org's own prices by what is filed", () => {
+    renderIt();
+    expect(screen.getByText('$45 per accepted ISF')).toBeInTheDocument();
+    expect(screen.getByText('+$105 for an entry on the same shipment as an ISF')).toBeInTheDocument();
+    expect(screen.getByText('$125 per entry without an ISF')).toBeInTheDocument();
   });
 
   it('shows an operator the plan and card but no billing actions', () => {
