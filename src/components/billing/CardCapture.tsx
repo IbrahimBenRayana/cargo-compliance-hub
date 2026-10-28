@@ -13,6 +13,9 @@ import { Loader2, Lock } from 'lucide-react';
  * backend (works for staging-test / prod-live with the same bundle), creates a
  * SetupIntent (saves the card WITHOUT charging), confirms it client-side, then
  * persists it as the org's default payment method. Calls `onSaved` on success.
+ * `method="us_bank_account"` captures a US bank account instead (ACH Direct
+ * Debit for invoiced accounts): Stripe verifies it with Financial Connections
+ * or micro-deposits and the Payment Element collects the debit mandate.
  */
 
 // Memoize the Stripe.js promise per publishable key (loadStripe must run once).
@@ -22,7 +25,9 @@ function getStripePromise(pk: string): Promise<Stripe | null> {
   return stripeCache.get(pk)!;
 }
 
-function CardForm({ onSaved, submitLabel }: { onSaved?: () => void; submitLabel: string }) {
+type Method = 'card' | 'us_bank_account';
+
+function CardForm({ onSaved, submitLabel, method }: { onSaved?: () => void; submitLabel: string; method: Method }) {
   const stripe = useStripe();
   const elements = useElements();
   const saveCard = useSaveCard();
@@ -45,7 +50,11 @@ function CardForm({ onSaved, submitLabel }: { onSaved?: () => void; submitLabel:
         toast.error('Card setup did not complete. Please try again.');
         return;
       }
-      await saveCard.mutateAsync({ setupIntentId: setupIntent.id });
+      const saved = await saveCard.mutateAsync({ setupIntentId: setupIntent.id });
+      if (saved.pending) {
+        // Micro-deposit verification: saved later, from Stripe's webhook.
+        toast.info(saved.message ?? 'Check your email from Stripe to confirm the account.');
+      }
       // The caller announces success (each page words it differently).
       onSaved?.();
     } catch (err) {
@@ -64,13 +73,15 @@ function CardForm({ onSaved, submitLabel }: { onSaved?: () => void; submitLabel:
         {submitLabel}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
-        Your card is stored securely by Stripe. No charge now — you're only billed per shipment, when CBP accepts it.
+        {method === 'us_bank_account'
+          ? 'Your bank account is stored securely by Stripe. Nothing is debited now; your monthly invoice is debited when it is issued.'
+          : "Your card is stored securely by Stripe. No charge now — you're only billed per shipment, when CBP accepts it."}
       </p>
     </form>
   );
 }
 
-export function CardCapture({ onSaved, submitLabel = 'Save card' }: { onSaved?: () => void; submitLabel?: string }) {
+export function CardCapture({ onSaved, submitLabel = 'Save card', method = 'card' }: { onSaved?: () => void; submitLabel?: string; method?: Method }) {
   const config = useQuery({ queryKey: ['billing', 'config'], queryFn: () => billingApi.config() });
   const setupIntent = useCreateSetupIntent();
   const [clientSecret, setClientSecret] = React.useState<string | null>(null);
@@ -81,7 +92,7 @@ export function CardCapture({ onSaved, submitLabel = 'Save card' }: { onSaved?: 
     if (started.current) return;
     started.current = true;
     setupIntent
-      .mutateAsync()
+      .mutateAsync(method)
       .then((r) => setClientSecret(r.clientSecret))
       .catch(() => {
         /* surfaced below */
@@ -92,7 +103,7 @@ export function CardCapture({ onSaved, submitLabel = 'Save card' }: { onSaved?: 
   if (config.isLoading || setupIntent.isPending || !clientSecret) {
     return (
       <div className="flex items-center justify-center py-10 text-muted-foreground">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing secure card form…
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing secure {method === 'us_bank_account' ? 'bank account' : 'card'} form…
       </div>
     );
   }
@@ -109,7 +120,7 @@ export function CardCapture({ onSaved, submitLabel = 'Save card' }: { onSaved?: 
       stripe={getStripePromise(config.data.publishableKey)}
       options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: '#0b1f3a' } } }}
     >
-      <CardForm onSaved={onSaved} submitLabel={submitLabel} />
+      <CardForm onSaved={onSaved} submitLabel={submitLabel} method={method} />
     </Elements>
   );
 }

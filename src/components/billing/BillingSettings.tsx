@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { useSubscription, useCreatePortalSession } from '@/hooks/useBilling';
 import { useAuthStore } from '@/hooks/useAuth';
 import { CardCapture } from '@/components/billing/CardCapture';
+import { InvoicedBilling } from '@/components/billing/InvoicedBilling';
 import { money, pricingLines } from '@/lib/pricing';
 
 export function BillingSettings() {
@@ -33,6 +34,9 @@ export function BillingSettings() {
       </div>
     );
   }
+
+  // Invoiced accounts (pilots, contracts) pay a monthly invoice by ACH.
+  if (data?.billingMode === 'invoiced') return <InvoicedBilling data={data} canManage={canManage} />;
 
   const plan = data?.plan ?? null;
   const card = data?.card ?? null;

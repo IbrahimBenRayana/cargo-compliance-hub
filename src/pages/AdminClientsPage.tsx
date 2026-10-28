@@ -23,10 +23,11 @@ import {
 import {
   Building2, UserPlus, Loader2, MoreHorizontal, CheckCircle2, Clock,
   Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck, Radio, Landmark,
-  Activity, DollarSign,
+  Activity, DollarSign, FileText,
 } from 'lucide-react';
 import { CbpSetupDialog } from '@/components/admin/CbpSetupDialog';
 import { PricingDialog } from '@/components/admin/PricingDialog';
+import { UsageInvoicesDialog } from '@/components/admin/UsageInvoicesDialog';
 import { adminApi } from '@/api/client';
 import type { AdminOrganization, AdminUserLookup } from '@/api/client';
 import { PLAN_META } from '@/lib/planMeta';
@@ -55,7 +56,10 @@ function planPrice(p: { perFilingCents: number; sellsEntries: boolean }) {
 function pricingSummary(org: AdminOrganization) {
   const e = org.pricing?.effective;
   if (!e) return null;
-  const isf = `ISF ${money(e.isfCents)}`;
+  const b = org.billing;
+  const isf = b?.mode === 'invoiced'
+    ? `Invoiced ${money(b.monthlyMinimumCents ?? 0)}/mo incl. ${b.includedIsfs ?? 0} · then ${money(e.isfCents)}/ISF`
+    : `ISF ${money(e.isfCents)}`;
   if (e.entryLinkedCents == null || e.entryOnlyCents == null) return isf;
   return `${isf} · entry +${money(e.entryLinkedCents)} / ${money(e.entryOnlyCents)}`;
 }
@@ -295,6 +299,7 @@ export function AdminClientsPage() {
   const [planDialogOrg, setPlanDialogOrg] = useState<AdminOrganization | null>(null);
   const [cbpDialogOrg, setCbpDialogOrg] = useState<AdminOrganization | null>(null);
   const [pricingDialogOrg, setPricingDialogOrg] = useState<AdminOrganization | null>(null);
+  const [usageDialogOrg, setUsageDialogOrg] = useState<AdminOrganization | null>(null);
   const [selectedPlan, setSelectedPlan] = useState('');
 
   const openPlanDialog = (org: AdminOrganization) => {
@@ -577,7 +582,11 @@ export function AdminClientsPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setPricingDialogOrg(org)} disabled={!org.plan}>
                             <DollarSign className="h-3.5 w-3.5 mr-2" />
-                            Pricing…
+                            Pricing &amp; billing…
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setUsageDialogOrg(org)} disabled={!org.plan}>
+                            <FileText className="h-3.5 w-3.5 mr-2" />
+                            Usage &amp; invoices…
                           </DropdownMenuItem>
                           {org.owner && (
                             <DropdownMenuItem
@@ -603,6 +612,7 @@ export function AdminClientsPage() {
 
       <CbpSetupDialog org={cbpDialogOrg} onClose={() => setCbpDialogOrg(null)} />
       <PricingDialog org={pricingDialogOrg} onClose={() => setPricingDialogOrg(null)} />
+      <UsageInvoicesDialog org={usageDialogOrg} onClose={() => setUsageDialogOrg(null)} />
 
       {/* Change plan dialog */}
       <Dialog open={!!planDialogOrg} onOpenChange={(open) => !open && setPlanDialogOrg(null)}>
