@@ -974,6 +974,16 @@ export const exportApi = {
 // ─── Billing API (card-on-file, immediate per-shipment charge) ─────────────
 export type { OrgPricing };
 export type BillingCard = { brand: string | null; last4: string | null; expMonth: number | null; expYear: number | null };
+export type BillingBankAccount = { bankName: string | null; last4: string | null };
+
+/** One line of a monthly invoice (or of the month-to-date estimate). */
+export interface InvoiceLine {
+  code: 'minimum' | 'isf_overage' | 'entry_linked' | 'entry';
+  description: string;
+  quantity: number;
+  unitCents: number | null;
+  amountCents: number;
+}
 
 export const billingApi = {
   subscription() {
@@ -998,6 +1008,17 @@ export const billingApi = {
       delinquent: boolean;
       /** Saved card summary, or null when none on file. */
       card: BillingCard | null;
+      /** "card" = charged per filing; "invoiced" = monthly invoice by ACH. */
+      billingMode: 'card' | 'invoiced';
+      /** New submissions are on hold (e.g. an overdue invoice). */
+      billingHold: boolean;
+      /** Invoiced accounts only: terms, ACH account and this month so far. */
+      invoicing: {
+        monthlyMinimumCents: number;
+        includedIsfs: number;
+        bankAccount: BillingBankAccount | null;
+        monthToDate: { isfs: number; shipments: number; estimatedCents: number; lines: InvoiceLine[] };
+      } | null;
       // This calendar month's charged shipments + running total.
       usage: {
         periodStart: string | null;
@@ -1022,13 +1043,21 @@ export const billingApi = {
   },
 
   /** Start saving a card — returns a SetupIntent client secret for Elements. */
-  createSetupIntent() {
-    return apiFetch<{ clientSecret: string }>('/api/v1/billing/setup-intent', { method: 'POST' });
+  /** `us_bank_account` = ACH Direct Debit for invoiced accounts. */
+  createSetupIntent(method: 'card' | 'us_bank_account' = 'card') {
+    return apiFetch<{ clientSecret: string }>('/api/v1/billing/setup-intent', { method: 'POST', body: JSON.stringify({ method }) });
   },
 
   /** Confirm the saved card after Elements confirms the SetupIntent. */
   saveCard(body: { setupIntentId: string }) {
-    return apiFetch<{ card: BillingCard; canFile: boolean }>('/api/v1/billing/card', {
+    return apiFetch<{
+      card: BillingCard | null;
+      bankAccount: BillingBankAccount | null;
+      canFile?: boolean;
+      /** A bank account awaiting micro-deposit verification. */
+      pending?: boolean;
+      message?: string;
+    }>('/api/v1/billing/card', {
       method: 'POST',
       body: JSON.stringify(body),
     });
@@ -1095,6 +1124,7 @@ export interface AdminOrganization {
   subscriptionStatus: string | null;
   /** The org's own prices (cents; null = default) and what they resolve to. */
   pricing: (AdminPriceOverrides & { effective: OrgPricing }) | null;
+  billing: AdminBillingTerms & { bankAccount: BillingBankAccount | null } | null;
   cardOnFile: boolean;
   owner: { email: string; firstName: string | null; lastName: string | null; emailVerified: boolean } | null;
   userCount: number;
@@ -1126,6 +1156,37 @@ export interface AdminPriceOverrides {
   isfCents: number | null;
   entryLinkedCents: number | null;
   entryOnlyCents: number | null;
+}
+
+export interface AdminBillingTerms {
+  mode: 'card' | 'invoiced';
+  monthlyMinimumCents: number | null;
+  includedIsfs: number | null;
+  /** YYYY-MM-DD; nothing before it is invoiced. */
+  billingStartsOn: string | null;
+  billingHold: boolean;
+}
+
+export interface AdminInvoice {
+  id: string;
+  period: string;
+  kind: 'usage' | 'prepay';
+  status: string;
+  totalCents: number;
+  lines: InvoiceLine[];
+  lastError: string | null;
+  dashboardUrl: string | null;
+  createdAt: string;
+}
+
+export interface AdminUsagePreview {
+  billingMode: 'card' | 'invoiced';
+  period: { start: string; end: string };
+  closed: boolean;
+  lines: InvoiceLine[];
+  totalCents: number;
+  isfCount: number;
+  accruedShipments: number;
 }
 
 export interface AdminPlan {
@@ -1177,10 +1238,35 @@ export const adminApi = {
     );
   },
 
-  setPricing(orgId: string, body: AdminPriceOverrides) {
-    return apiFetch<{ orgId: string; pricing: AdminPriceOverrides & { effective: OrgPricing } }>(
+  setPricing(orgId: string, body: AdminPriceOverrides & Partial<{
+    billingMode: 'card' | 'invoiced';
+    monthlyMinimumCents: number | null;
+    includedIsfs: number | null;
+    billingStartsOn: string | null;
+    billingHold: boolean;
+  }>) {
+    return apiFetch<{ orgId: string; pricing: AdminPriceOverrides & { effective: OrgPricing }; billing: AdminBillingTerms }>(
       `/api/v1/admin/organizations/${orgId}/pricing`,
       { method: 'PUT', body: JSON.stringify(body) },
+    );
+  },
+
+  usage(orgId: string, period: string) {
+    return apiFetch<AdminUsagePreview>(`/api/v1/admin/organizations/${orgId}/usage?period=${encodeURIComponent(period)}`);
+  },
+
+  usageCsv(orgId: string, period: string) {
+    return apiDownload(`/api/v1/admin/organizations/${orgId}/usage?period=${encodeURIComponent(period)}&format=csv`);
+  },
+
+  invoices(orgId: string) {
+    return apiFetch<{ invoices: AdminInvoice[] }>(`/api/v1/admin/organizations/${orgId}/invoices`);
+  },
+
+  createInvoice(orgId: string, body: { period: string; kind: 'usage' | 'prepay' }) {
+    return apiFetch<{ invoice: { id: string; stripeInvoiceId: string; totalCents: number; dashboardUrl: string } }>(
+      `/api/v1/admin/organizations/${orgId}/invoices`,
+      { method: 'POST', body: JSON.stringify(body) },
     );
   },
 

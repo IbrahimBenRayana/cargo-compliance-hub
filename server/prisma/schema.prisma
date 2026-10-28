@@ -34,6 +34,7 @@ model Organization {
   invitations       OrgInvitation[]
   subscription      Subscription?
   shipmentCharges   ShipmentCharge[]
+  billingInvoices   BillingInvoice[]
   manifestQueries   ManifestQuery[]
   abiDocuments      AbiDocument[]
   trackedShipments  TrackedShipment[]
@@ -730,6 +731,23 @@ model Subscription {
   isfCents               Int?      @map("isf_cents")
   entryLinkedCents       Int?      @map("entry_linked_cents")
   entryOnlyCents         Int?      @map("entry_only_cents")
+  // Billing mode (pricing plan v2 §7.1):
+  //   "card"     — each accepted shipment charged to the card at once (public card)
+  //   "invoiced" — no per-filing charge; accepted shipments accrue and a monthly
+  //                Stripe invoice (ACH Direct Debit) bills them (pilots, contracts).
+  //                isfCents is then the rate per ISF above includedIsfs.
+  billingMode            String    @default("card") @map("billing_mode") @db.VarChar(20)
+  // Invoiced terms: a monthly minimum that covers the first includedIsfs
+  // accepted ISFs; nothing is invoiced for usage before billingStartsOn.
+  monthlyMinimumCents    Int?      @map("monthly_minimum_cents")
+  includedIsfs           Int?      @map("included_isfs")
+  billingStartsOn        DateTime? @map("billing_starts_on") @db.Date
+  // Manual submit hold (e.g. an overdue invoice): blocks new submissions.
+  billingHold            Boolean   @default(false) @map("billing_hold")
+  // Saved US bank account (ACH Direct Debit) for invoiced orgs.
+  achPaymentMethodId     String?   @map("ach_payment_method_id")
+  achBankName            String?   @map("ach_bank_name") @db.VarChar(100)
+  achLast4               String?   @map("ach_last4") @db.VarChar(4)
   currentPeriodStart     DateTime? @map("current_period_start") @db.Timestamptz()
   currentPeriodEnd       DateTime? @map("current_period_end") @db.Timestamptz()
   cancelAtPeriodEnd      Boolean   @default(false) @map("cancel_at_period_end")
@@ -772,13 +790,16 @@ model ShipmentCharge {
   //   unknown after a Stripe outage — retried with the SAME idempotency key)
   //   → paid | failed (declined / card gone; retried with a new key once the
   //   card changes, and hourly for 30 days) | requires_action (3DS) |
-  //   refunded | skipped (no charge: $0 price, or Stripe not configured).
+  //   refunded | skipped (no charge: $0 price, or Stripe not configured) |
+  //   accrued (invoiced mode: waiting for the monthly invoice) | invoiced.
   //   "pending" is legacy (pre-v2 rows; migrated to processing).
   status                String   @default("processing") @db.VarChar(20)
   // Charge attempts made; the Stripe idempotency key derives from (id, attempt).
   attemptCount          Int      @default(0) @map("attempt_count")
   lastAttemptAt         DateTime? @map("last_attempt_at") @db.Timestamptz()
   lastError             String?  @map("last_error") @db.VarChar(500)
+  // Invoiced mode: "accrued" rows are put on a monthly invoice → "invoiced".
+  invoiceId             String?  @map("invoice_id") @db.Uuid
   billedAt              DateTime @default(now()) @map("billed_at") @db.Timestamptz()
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
@@ -787,6 +808,7 @@ model ShipmentCharge {
   filing       Filing?      @relation(fields: [filingId], references: [id], onDelete: Cascade)
   abiDocument  AbiDocument? @relation(fields: [abiDocumentId], references: [id], onDelete: Cascade)
   plan         Plan         @relation(fields: [planId], references: [id])
+  invoice      BillingInvoice? @relation(fields: [invoiceId], references: [id])
 
   @@index([orgId, billedAt])
   @@index([status])
@@ -794,6 +816,33 @@ model ShipmentCharge {
   //   (linked_filing_id) WHERE kind = 'entry_linked' (raw SQL in the migration;
   //   Prisma can't express partial indexes).
   @@map("shipment_charges")
+}
+
+// BillingInvoice: one monthly Stripe invoice for an invoiced org (pricing plan
+// v2 §8.2). kind "usage" bills a closed UTC month in arrears (minimum + ISFs
+// above the included count + entries); kind "prepay" bills a month's minimum in
+// advance (a pilot's first month), so that month's usage invoice skips it.
+// Unique per (org, month, kind): a month can't be invoiced twice.
+model BillingInvoice {
+  id              String   @id @default(uuid()) @db.Uuid
+  orgId           String   @map("org_id") @db.Uuid
+  periodStart     DateTime @map("period_start") @db.Date // first day of the UTC month
+  kind            String   @db.VarChar(20) // "usage" | "prepay"
+  // creating → draft (in Stripe, for review) → open → paid | uncollectible | void; error = retry
+  status          String   @default("creating") @db.VarChar(20)
+  stripeInvoiceId String?  @unique @map("stripe_invoice_id")
+  totalCents      Int      @default(0) @map("total_cents")
+  lines           Json     @default("[]") // rated lines as sent to Stripe
+  lastError       String?  @map("last_error") @db.VarChar(500)
+  createdById     String?  @map("created_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  charges      ShipmentCharge[]
+
+  @@unique([orgId, periodStart, kind])
+  @@map("billing_invoices")
 }
 
 // ─── Manifest Queries ─────────────────────────────────────

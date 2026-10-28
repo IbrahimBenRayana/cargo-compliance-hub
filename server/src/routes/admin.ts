@@ -26,6 +26,8 @@ import { sendAccountSetupEmail } from '../services/email.js';
 import { TIERS, tierById } from '../config/plans.js';
 import { checkPriceInput, resolvePricing } from '../services/pricing.js';
 import { statusAfterPlanChange } from '../services/billingAccount.js';
+import { PILOT_DEFAULTS, parsePeriod } from '../services/invoiceRating.js';
+import { previewMonth, createMonthlyInvoice, usageCsv, stripeDashboardUrl } from '../services/invoicing.js';
 import logger from '../config/logger.js';
 import { notifyLead } from '../services/leads.js';
 
@@ -83,6 +85,18 @@ router.get('/organizations', async (_req: AuthRequest, res: Response): Promise<v
               entryLinkedCents: o.subscription.entryLinkedCents,
               entryOnlyCents: o.subscription.entryOnlyCents,
               effective: resolvePricing(o.subscription.plan?.perFilingCents, o.subscription),
+            }
+          : null,
+        billing: o.subscription
+          ? {
+              mode: o.subscription.billingMode,
+              monthlyMinimumCents: o.subscription.monthlyMinimumCents,
+              includedIsfs: o.subscription.includedIsfs,
+              billingStartsOn: o.subscription.billingStartsOn?.toISOString().slice(0, 10) ?? null,
+              billingHold: o.subscription.billingHold,
+              bankAccount: o.subscription.achLast4
+                ? { bankName: o.subscription.achBankName, last4: o.subscription.achLast4 }
+                : null,
             }
           : null,
         cardOnFile: !!o.subscription?.defaultPaymentMethodId,
@@ -304,14 +318,24 @@ router.patch('/organizations/:id/plan', async (req: AuthRequest, res: Response):
 });
 
 // PUT /api/v1/admin/organizations/:id/pricing — set a client's own prices
-// (cents; null = the default). Entries have no public price: an org can send
-// entries only once both entry prices are set. A new price applies to
-// shipments CBP accepts from now on; already-billed shipments keep theirs.
+// (cents; null = the default) and, optionally, how it pays. Entries have no
+// public price: an org can send entries only once both entry prices are set.
+// A new price applies to shipments CBP accepts from now on; already-billed
+// shipments keep theirs.
+//   billingMode "invoiced" (pilots, contracts): no per-filing card charge;
+//   accepted shipments accrue for a monthly Stripe invoice paid by ACH. When an
+//   org is switched to invoiced, any term left null gets the founder-approved
+//   pilot default: $250/month minimum including 50 ISFs, then $5 per ISF.
 const centsField = z.number().int().min(0).nullable();
 const pricingSchema = z.object({
   isfCents: centsField,
   entryLinkedCents: centsField,
   entryOnlyCents: centsField,
+  billingMode: z.enum(['card', 'invoiced']).optional(),
+  monthlyMinimumCents: centsField.optional(),
+  includedIsfs: z.number().int().min(0).max(1_000_000).nullable().optional(),
+  billingStartsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  billingHold: z.boolean().optional(),
 }).strict();
 
 router.put('/organizations/:id/pricing', async (req: AuthRequest, res: Response): Promise<void> => {
@@ -331,9 +355,21 @@ router.put('/organizations/:id/pricing', async (req: AuthRequest, res: Response)
     res.status(404).json({ error: 'This organization has no plan yet. Assign a plan first.' });
     return;
   }
+  const { billingStartsOn, ...rest } = parsed.data;
+  const data: Record<string, unknown> = {
+    ...rest,
+    ...(billingStartsOn !== undefined && { billingStartsOn: billingStartsOn ? new Date(`${billingStartsOn}T00:00:00Z`) : null }),
+  };
+  const mode = parsed.data.billingMode ?? existing.billingMode;
+  if (mode === 'invoiced') {
+    // Pilot defaults for anything the admin didn't set (pricing plan v2 §5.1).
+    data.isfCents ??= PILOT_DEFAULTS.isfCents;
+    if ((parsed.data.monthlyMinimumCents ?? existing.monthlyMinimumCents) == null) data.monthlyMinimumCents = PILOT_DEFAULTS.monthlyMinimumCents;
+    if ((parsed.data.includedIsfs ?? existing.includedIsfs) == null) data.includedIsfs = PILOT_DEFAULTS.includedIsfs;
+  }
   const updated = await prisma.subscription.update({
     where: { orgId },
-    data: parsed.data,
+    data,
     include: { plan: true },
   });
   writeAuditLog({
@@ -342,11 +378,104 @@ router.put('/organizations/:id/pricing', async (req: AuthRequest, res: Response)
     action: 'admin.org_pricing_changed',
     entityType: 'subscription',
     entityId: existing.id,
-    oldValue: { isfCents: existing.isfCents, entryLinkedCents: existing.entryLinkedCents, entryOnlyCents: existing.entryOnlyCents },
-    newValue: parsed.data,
+    oldValue: {
+      isfCents: existing.isfCents, entryLinkedCents: existing.entryLinkedCents, entryOnlyCents: existing.entryOnlyCents,
+      billingMode: existing.billingMode, monthlyMinimumCents: existing.monthlyMinimumCents, includedIsfs: existing.includedIsfs,
+      billingStartsOn: existing.billingStartsOn, billingHold: existing.billingHold,
+    },
+    newValue: data,
     ...getRequestMeta(req),
   });
-  res.json({ orgId, pricing: { ...parsed.data, effective: resolvePricing(updated.plan?.perFilingCents, updated) } });
+  res.json({
+    orgId,
+    pricing: {
+      isfCents: updated.isfCents, entryLinkedCents: updated.entryLinkedCents, entryOnlyCents: updated.entryOnlyCents,
+      effective: resolvePricing(updated.plan?.perFilingCents, updated),
+    },
+    billing: {
+      mode: updated.billingMode, monthlyMinimumCents: updated.monthlyMinimumCents, includedIsfs: updated.includedIsfs,
+      billingStartsOn: updated.billingStartsOn?.toISOString().slice(0, 10) ?? null, billingHold: updated.billingHold,
+    },
+  });
+});
+
+// GET /api/v1/admin/organizations/:id/usage?period=YYYY-MM[&format=csv]
+// The month's accepted shipments (UTC). JSON = what the usage invoice would
+// bill now; CSV = every row, for the statement or rating by hand.
+router.get('/organizations/:id/usage', async (req: AuthRequest, res: Response): Promise<void> => {
+  const orgId = String(req.params.id);
+  const periodStart = parsePeriod(String(req.query.period ?? ''));
+  if (!periodStart) {
+    res.status(400).json({ error: 'period must be YYYY-MM' });
+    return;
+  }
+  if (req.query.format === 'csv') {
+    const csv = await usageCsv(orgId, periodStart);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="usage-${orgId.slice(0, 8)}-${String(req.query.period)}.csv"`);
+    res.send(csv);
+    return;
+  }
+  const preview = await previewMonth(orgId, periodStart);
+  if (!preview) {
+    res.status(404).json({ error: 'This organization has no plan.' });
+    return;
+  }
+  const { rows, ...rest } = preview;
+  res.json({ ...rest, accruedShipments: rows.length });
+});
+
+// GET /api/v1/admin/organizations/:id/invoices — the org's monthly invoices.
+router.get('/organizations/:id/invoices', async (req: AuthRequest, res: Response): Promise<void> => {
+  const invoices = await prisma.billingInvoice.findMany({
+    where: { orgId: String(req.params.id) },
+    orderBy: [{ periodStart: 'desc' }, { kind: 'asc' }],
+  });
+  res.json({
+    invoices: invoices.map((i) => ({
+      id: i.id,
+      period: i.periodStart.toISOString().slice(0, 7),
+      kind: i.kind,
+      status: i.status,
+      totalCents: i.totalCents,
+      lines: i.lines,
+      lastError: i.lastError,
+      dashboardUrl: i.stripeInvoiceId ? stripeDashboardUrl(i.stripeInvoiceId) : null,
+      createdAt: i.createdAt,
+    })),
+  });
+});
+
+// POST /api/v1/admin/organizations/:id/invoices { period: 'YYYY-MM', kind }
+// Draft a monthly Stripe invoice (finalize it in the Stripe dashboard).
+const invoiceSchema = z.object({
+  period: z.string().regex(/^\d{4}-\d{2}$/),
+  kind: z.enum(['usage', 'prepay']).default('usage'),
+}).strict();
+
+router.post('/organizations/:id/invoices', async (req: AuthRequest, res: Response): Promise<void> => {
+  const orgId = String(req.params.id);
+  const parsed = invoiceSchema.safeParse(req.body);
+  const periodStart = parsed.success ? parsePeriod(parsed.data.period) : null;
+  if (!parsed.success || !periodStart) {
+    res.status(400).json({ error: 'period must be YYYY-MM' });
+    return;
+  }
+  const outcome = await createMonthlyInvoice({ orgId, periodStart, kind: parsed.data.kind, createdById: req.user!.id });
+  if (!outcome.ok) {
+    res.status(outcome.httpStatus).json({ error: outcome.error });
+    return;
+  }
+  writeAuditLog({
+    orgId,
+    userId: req.user!.id,
+    action: 'admin.invoice_drafted',
+    entityType: 'billing_invoice',
+    entityId: outcome.invoice.id,
+    newValue: { period: parsed.data.period, kind: parsed.data.kind, totalCents: outcome.invoice.totalCents },
+    ...getRequestMeta(req),
+  });
+  res.status(201).json({ invoice: outcome.invoice });
 });
 
 // POST /api/v1/admin/organizations/:id/resend-setup — re-send the owner's link.
