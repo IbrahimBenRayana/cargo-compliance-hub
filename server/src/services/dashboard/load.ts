@@ -8,6 +8,7 @@ import { getOrgEntitlements } from '../entitlements.js';
 import { computeBlockers, computeSetup } from './blockers.js';
 import type { FilingRow, EntryRow, Loaded } from './build.js';
 import { buildSummary } from './build.js';
+import { computeMetrics, type MetricRows } from './metrics.js';
 import type { DashboardResponse } from './types.js';
 
 const DAY = 86_400_000;
@@ -115,6 +116,44 @@ async function loadMonth(orgId: string, abi: boolean, now: Date) {
   return { isfAccepted, isfRejected, entriesAccepted };
 }
 
+/** Dates only, for the last 60 days: enough for two 30-day windows. */
+async function loadMetricRows(orgId: string, abi: boolean, now: Date): Promise<MetricRows> {
+  const since = new Date(now.getTime() - 60 * DAY);
+  const [filings, entries, history] = await Promise.all([
+    prisma.filing.findMany({
+      where: {
+        orgId,
+        OR: [
+          { submittedAt: { gte: since } },
+          { acceptedAt: { gte: since } },
+          { rejectedAt: { gte: since } },
+          { estimatedArrival: { gte: now } },
+        ],
+      },
+      select: {
+        id: true, status: true, submittedAt: true, acceptedAt: true, rejectedAt: true,
+        estimatedDeparture: true, estimatedLading: true, estimatedArrival: true, rejectionReason: true,
+      },
+    }),
+    abi
+      ? prisma.abiDocument.findMany({
+          where: { orgId, status: 'ACCEPTED', updatedAt: { gte: since } },
+          select: { respondedAt: true, updatedAt: true },
+        })
+      : [],
+    prisma.filingStatusHistory.findMany({
+      where: { status: 'rejected', filing: { orgId }, createdAt: { gte: since } },
+      select: { filingId: true },
+      distinct: ['filingId'],
+    }),
+  ]);
+  return {
+    filings,
+    entries: entries.map((e) => ({ at: e.respondedAt ?? e.updatedAt })),
+    everRejected: new Set(history.map((h) => h.filingId)),
+  };
+}
+
 export interface Viewer { orgId: string; role: string; now: Date }
 
 export const canManage = (role: string) => role === 'owner' || role === 'admin';
@@ -131,8 +170,9 @@ export async function capabilitiesOf(orgId: string) {
 export async function loadDashboard({ orgId, role, now }: Viewer): Promise<DashboardResponse> {
   const { ent, abi, tracking } = await capabilitiesOf(orgId);
   const canFix = canManage(role);
-  const [data, recent, month, cfg, anyFiling, anyEntry] = await Promise.all([
+  const [data, metricRows, recent, month, cfg, anyFiling, anyEntry] = await Promise.all([
     loadLive(orgId, { abi, tracking, now }),
+    loadMetricRows(orgId, abi, now),
     loadRecent(orgId, abi),
     canFix ? loadMonth(orgId, abi, now) : null,
     prisma.orgCbpConfig.findUnique({ where: { orgId }, select: { filerCode: true, isfFilerModeDefault: true, serviceCenterApprovedAt: true } }),
@@ -140,8 +180,10 @@ export async function loadDashboard({ orgId, role, now }: Viewer): Promise<Dashb
     abi ? prisma.abiDocument.findFirst({ where: { orgId }, select: { id: true } }) : null,
   ]);
   const isEmpty = !anyFiling && !anyEntry;
+  const summary = buildSummary(data, { abi, canAct: role !== 'viewer', now });
   return {
-    ...buildSummary(data, { abi, canAct: role !== 'viewer', now }),
+    ...summary,
+    metrics: computeMetrics(metricRows, { abi, overdue: summary.attention.overdue, now }),
     isEmpty, recent, month,
     blockers: computeBlockers(ent, cfg, { canFix, abi }),
     setup: isEmpty ? computeSetup(ent, { canFix }) : null,

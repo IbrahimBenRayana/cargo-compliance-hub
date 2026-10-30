@@ -18,7 +18,7 @@ vi.mock('../../config/database.js', () => {
   });
   return { prisma: {
     filing: model('filing'), abiDocument: model('abiDocument'), cbpTransmission: model('cbpTransmission'),
-    trackedShipment: model('trackedShipment'), orgCbpConfig: model('orgCbpConfig'),
+    trackedShipment: model('trackedShipment'), orgCbpConfig: model('orgCbpConfig'), filingStatusHistory: model('filingStatusHistory'),
   } };
 });
 
@@ -48,7 +48,10 @@ describe('GET /dashboard data access', () => {
     rows.filing = [{ id: 'f1', status: 'submitted', pendingAction: 'ADD', lastTransmissionId: 't1', updatedAt: new Date(), filingType: 'ISF-10' }];
     await loadDashboard({ orgId: ORG, role: 'owner', now: new Date() });
     expect(calls.length).toBeGreaterThan(5);
-    for (const c of calls) expect(c.args.where?.orgId, `${c.model}.${c.method}`).toBe(ORG);
+    for (const c of calls) {
+      const scoped = c.args.where?.orgId ?? (c.args.where?.filing as { orgId?: string } | undefined)?.orgId;
+      expect(scoped, `${c.model}.${c.method}`).toBe(ORG);
+    }
   });
 
   it('reads no entries or holds for an ISF-only plan', async () => {

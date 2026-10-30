@@ -14,6 +14,7 @@ const HOUR = 3_600_000;
 const HORIZON_BUCKETS = 12;
 const HORIZON_BUCKET_HOURS = 6;
 const AWAITING_SHOWN = 5;
+const WORKLOAD_SHOWN = 5;
 const LANES: Lane[] = ['now', 'soon', 'later'];
 
 export interface FilingRow extends FilingFacts {
@@ -272,7 +273,7 @@ function awaitingState(tx: TransmissionFacts | undefined, now: Date): AwaitingIt
 }
 
 export function buildSummary(data: Loaded, opts: { abi: boolean; canAct: boolean; now: Date }):
-  Omit<DashboardResponse, 'isEmpty' | 'recent' | 'month' | 'blockers' | 'setup'> {
+  Omit<DashboardResponse, 'isEmpty' | 'recent' | 'month' | 'blockers' | 'setup' | 'metrics'> {
   const { abi, now } = opts;
   const shipments = assemble(data, opts);
   const rows = shipments.flatMap((s) => (s.row ? [s.row] : [])).sort(compareRows);
@@ -324,6 +325,13 @@ export function buildSummary(data: Loaded, opts: { abi: boolean; canAct: boolean
     }
     return [];
   });
+  const byImporter = new Map<string, number>();
+  for (const r of rows) if (r.importer) byImporter.set(r.importer, (byImporter.get(r.importer) ?? 0) + 1);
+  const workload = [...byImporter.entries()]
+    .sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))
+    .slice(0, WORKLOAD_SHOWN)
+    .map(([name, n]) => ({ name, count: n }));
+
   const STUCK = new Set(['NO_RESPONSE', 'UNKNOWN', 'CONDITIONAL']);
   const byUrgency = [...awaitingAll].sort((a, b) =>
     Number(STUCK.has(b.state)) - Number(STUCK.has(a.state)) || (a.sentAt ?? '').localeCompare(b.sentAt ?? ''));
@@ -334,7 +342,7 @@ export function buildSummary(data: Loaded, opts: { abi: boolean; canAct: boolean
       now: inLane('now').length, soon: inLane('soon').length, later: inLane('later').length,
       overdue: count('overdue'), nextCutoffAt,
     },
-    flow, filters, lanes,
+    flow, filters, lanes, workload,
     horizon: buckets.some(Boolean) ? { startsAt: now.toISOString(), bucketHours: HORIZON_BUCKET_HOURS, buckets } : null,
     awaiting: { count: awaitingAll.length, noResponse: awaitingAll.filter((a) => STUCK.has(a.state)).length, items: byUrgency.slice(0, AWAITING_SHOWN) },
   };
