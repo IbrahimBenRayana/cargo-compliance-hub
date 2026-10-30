@@ -6,13 +6,15 @@
  * words, history, notification + webhook, and billing. Exactly once: the
  * update claims the filing only while that transaction is still pending, so
  * a duplicate, late or stale response changes nothing and fires nothing.
- * Only the first accepted ADD bills the shipment.
+ * Only the first accepted ADD bills the shipment. A replace's edits reach the
+ * filing only here, on acceptance; rejected ones move to rejectedChanges.
  */
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database.js';
-import { notifyFilingAccepted, notifyFilingRejected } from '../notifications.js';
+import { notifyFilingAccepted, notifyFilingChangeRejected, notifyFilingRejected } from '../notifications.js';
 import { billShipmentForFiling } from '../shipmentBilling.js';
 import { recordScoreSnapshot, triggerForStatus } from '../compliance/scoreSnapshot.js';
-import { isfStateOnVerdict } from './isfLifecycle.js';
+import { isfEditsToRow, isfStateOnVerdict, type IsfEdits } from './isfLifecycle.js';
 import type { ResponseSummary } from './responses.js';
 
 export async function applyIsfVerdict(opts: {
@@ -38,6 +40,11 @@ export async function applyIsfVerdict(opts: {
         errors: summary.conditions.map((c) => ({ code: c.code, narrative: c.narrative, explanation: c.explanation, blocking: c.blocking })),
       });
 
+  const edits = filing.pendingChanges as IsfEdits | null | undefined;
+  const settledEdits = !edits ? {} : accepted
+    ? { ...isfEditsToRow(edits, filing), pendingChanges: Prisma.DbNull, rejectedChanges: Prisma.DbNull }
+    : { pendingChanges: Prisma.DbNull, rejectedChanges: edits as Prisma.InputJsonValue };
+
   const committed = await prisma.$transaction(async (tx) => {
     const claimed = await tx.filing.updateMany({
       where: { id: filing.id, pendingAction: action, lastTransmissionId: opts.transmissionId },
@@ -49,11 +56,11 @@ export async function applyIsfVerdict(opts: {
           cbpTransactionId: summary.keys.isfTransactionNumber ?? filing.cbpTransactionId,
           isfFilerCode: opts.filerCode,
           acceptedAt: now,
-          rejectedAt: null,
-          rejectionReason: null,
         }),
+        ...(accepted && { rejectedAt: null, rejectionReason: null }),
         ...(!accepted && { rejectedAt: now, rejectionReason }),
         ...(action === 'REPLACE' && accepted && { amendedAt: now }),
+        ...settledEdits,
         ...(action === 'DELETE' && accepted && { cancelledAt: now }),
       },
     });
@@ -79,6 +86,10 @@ export async function applyIsfVerdict(opts: {
     await notifyFilingAccepted(filing.orgId, filing.id, bol);
     if (action === 'ADD') await billShipmentForFiling(filing.id, filing.orgId);
   } else {
-    await notifyFilingRejected(filing.orgId, filing.id, bol, summary.conditions.map((c) => c.narrative).join('; ') || summary.narrative);
+    const reason = summary.conditions.map((c) => c.narrative).join('; ') || summary.narrative;
+    // A rejected replace or delete leaves the filing accepted, so it never
+    // shows up as a rejection; the notification has to carry it.
+    if (action === 'ADD') await notifyFilingRejected(filing.orgId, filing.id, bol, reason);
+    else await notifyFilingChangeRejected(filing.orgId, filing.id, bol, action as 'REPLACE' | 'DELETE', reason);
   }
 }

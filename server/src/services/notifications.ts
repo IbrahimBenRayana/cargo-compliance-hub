@@ -435,6 +435,28 @@ export async function notifyFilingRejected(orgId: string, filingId: string, bolN
   emitWebhook(orgId, 'filing.rejected', { filingId, bolNumber: ref, reason: reason ?? null });
 }
 
+/**
+ * CBP refused an amendment or delete of an ISF it already holds. Same kind as
+ * any rejection (so the same preferences apply), but the filing stays accepted
+ * and has no rejection item in the action queue, so this links to the filing.
+ */
+export async function notifyFilingChangeRejected(orgId: string, filingId: string, bolNumber: string, action: 'REPLACE' | 'DELETE', reason?: string): Promise<void> {
+  const ref = bolNumber || filingId.slice(0, 8);
+  const change = action === 'REPLACE' ? 'amendment' : 'delete';
+  await notify({
+    kind:     'filing_rejected',
+    audience: { orgId, roles: ['OPERATOR', 'ADMIN', 'OWNER'] },
+    title:    `ISF ${action === 'REPLACE' ? 'Amendment' : 'Delete'} Rejected by CBP`,
+    message:  action === 'REPLACE'
+      ? `CBP rejected the amendment to ISF filing ${ref}. The earlier version stays on file at CBP, so your changes are not in effect.${reason ? ` Reason: ${reason}` : ''}`
+      : `CBP rejected the delete of ISF filing ${ref}. The ISF stays on file at CBP.${reason ? ` Reason: ${reason}` : ''}`,
+    linkUrl:  filingLink(filingId),
+    metadata: { bolNumber: ref, reason: reason ?? null, rejectedChange: change },
+    filingId,
+  });
+  emitWebhook(orgId, 'filing.rejected', { filingId, bolNumber: ref, reason: reason ?? null, action, onFile: true });
+}
+
 export async function notifyFilingAmended(orgId: string, userId: string, filingId: string, bolNumber: string): Promise<void> {
   const ref = bolNumber || filingId.slice(0, 8);
   await notify({
