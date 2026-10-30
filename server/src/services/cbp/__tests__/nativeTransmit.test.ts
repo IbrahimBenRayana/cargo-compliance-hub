@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const { prisma } = vi.hoisted(() => ({
-  prisma: { cbpTransmission: { create: vi.fn(), update: vi.fn() } },
+  prisma: { cbpTransmission: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn() } },
 }));
 vi.mock('../../../config/database.js', () => ({ prisma }));
 
@@ -24,6 +24,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   prisma.cbpTransmission.create.mockImplementation(async ({ data }: any) => ({ id: data.id, ...data }));
   prisma.cbpTransmission.update.mockImplementation(async ({ data }: any) => data);
+  prisma.cbpTransmission.updateMany.mockResolvedValue({ count: 1 });
 });
 
 describe('correlationTag', () => {
@@ -44,10 +45,33 @@ describe('transmitNative', () => {
     const created = prisma.cbpTransmission.create.mock.calls[0][0].data;
     expect(created.wireText).toContain(created.userDataTag);
     expect(created.status).toBe('QUEUED');
-    expect(prisma.cbpTransmission.update).toHaveBeenLastCalledWith(expect.objectContaining({
+    expect(prisma.cbpTransmission.updateMany).toHaveBeenLastCalledWith({
+      where: { id: created.id, status: 'QUEUED' },
       data: expect.objectContaining({ status: 'SENT', mqMessageId: 'm1' }),
-    }));
+    });
     expect(out.status).toBe('SENT');
+  });
+
+  it('uses the id the caller claimed the filing with', async () => {
+    const transport = { send: vi.fn(async () => ({ messageId: 'm1' })) };
+    const out = await transmitNative({ ...base, id: '0f8fad5b-d9cb-469f-a165-70867728950e', transport });
+    expect(out.id).toBe('0f8fad5b-d9cb-469f-a165-70867728950e');
+    expect(prisma.cbpTransmission.create.mock.calls[0][0].data.id).toBe('0f8fad5b-d9cb-469f-a165-70867728950e');
+  });
+
+  it('keeps an answer that landed during the send, and still records the MsgId', async () => {
+    prisma.cbpTransmission.updateMany.mockResolvedValue({ count: 0 });
+    const transport = { send: vi.fn(async () => ({ messageId: 'm1' })) };
+    await transmitNative({ ...base, transport });
+    expect(prisma.cbpTransmission.update.mock.calls[0][0].data).toEqual({ mqMessageId: 'm1', sentAt: expect.any(Date) });
+  });
+
+  it('keeps an answer that landed before an unknown outcome', async () => {
+    prisma.cbpTransmission.updateMany.mockResolvedValue({ count: 0 });
+    const transport = { send: vi.fn(async () => { throw new Error('MQRC 2009 connection broken'); }) };
+    await transmitNative({ ...base, transport });
+    expect(prisma.cbpTransmission.updateMany.mock.calls[0][0].where.status).toBe('QUEUED');
+    expect(prisma.cbpTransmission.update).not.toHaveBeenCalled();
   });
 
   it('marks a guard refusal FAILED: nothing left, so a retry is safe', async () => {

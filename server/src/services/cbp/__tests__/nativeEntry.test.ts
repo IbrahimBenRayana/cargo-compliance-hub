@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const { prisma, filer, engine, transmit, cfg } = vi.hoisted(() => ({
   prisma: {
     abiDocument: { findFirst: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
+    cbpInboundMessage: { findMany: vi.fn(async () => []) },
     user: { findUnique: vi.fn() },
     organization: { findUnique: vi.fn() },
     htsRateLine: {},
