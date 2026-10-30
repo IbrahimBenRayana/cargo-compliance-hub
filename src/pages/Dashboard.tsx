@@ -7,10 +7,10 @@
  *
  * Each stage carries its own gradient identity (a journey from cool →
  * warm → formal → success):
- *   ISF Filed         → blue   (cool, beginning)
- *   Manifest Verified → amber  (warm, action)
- *   Entry Filed       → violet (formal, serious)
- *   Cleared           → emerald (success, complete)
+ *   ISF             → blue   (cool, beginning)
+ *   Ready for entry → amber  (warm, action)
+ *   Entry           → violet (formal, serious)
+ *   Accepted        → emerald (success, complete)
  *
  * Color lives in structure (column rails, stage chips, count gradients,
  * hover glows), never in tile bodies — keeps the dashboard rich without
@@ -156,14 +156,14 @@ function buildShipments(args: {
     let to: string;
 
     if (abi?.status === 'ACCEPTED') {
-      stage = 'cleared'; severity = 'success'; statusLabel = 'Cleared by CBP';
+      stage = 'cleared'; severity = 'success'; statusLabel = 'Entry accepted';
       ageRef = abi.updatedAt; to = `/abi-documents/${abi.id}`;
     } else if (abi) {
       stage = 'entry';
       severity = abi.status === 'REJECTED' ? 'critical' : abi.status === 'DRAFT' ? 'warn' : 'neutral';
       statusLabel = abi.status === 'DRAFT' ? 'Entry · Draft'
                   : abi.status === 'SENDING' ? 'Entry · Transmitting'
-                  : abi.status === 'SENT' ? 'Entry · Awaiting CBP'
+                  : abi.status === 'SENT' ? 'Entry · Sent'
                   : abi.status === 'REJECTED' ? 'Entry · Rejected'
                   : `Entry · ${abi.status}`;
       ageRef = abi.updatedAt; to = `/abi-documents/${abi.id}`;
@@ -175,7 +175,7 @@ function buildShipments(args: {
       severity = f.status === 'rejected' ? 'critical' : f.status === 'draft' ? 'warn' : 'neutral';
       statusLabel = f.status === 'draft' ? 'ISF · Draft'
                   : f.status === 'rejected' ? 'ISF · Rejected'
-                  : f.status === 'submitted' || f.status === 'pending_cbp' ? 'ISF · At CBP'
+                  : f.status === 'submitted' || f.status === 'pending_cbp' ? 'ISF · Sent'
                   : f.status === 'on_hold' ? 'ISF · On hold'
                   : `ISF · ${f.status}`;
       ageRef = f.updatedAt;
@@ -193,13 +193,13 @@ function buildShipments(args: {
     let severity: Severity = 'neutral';
     let statusLabel: string;
     if (d.status === 'ACCEPTED') {
-      stage = 'cleared'; severity = 'success'; statusLabel = 'Cleared by CBP';
+      stage = 'cleared'; severity = 'success'; statusLabel = 'Entry accepted';
     } else {
       stage = 'entry';
       severity = d.status === 'REJECTED' ? 'critical' : d.status === 'DRAFT' ? 'warn' : 'neutral';
       statusLabel = d.status === 'DRAFT' ? 'Entry · Draft'
                   : d.status === 'SENDING' ? 'Entry · Transmitting'
-                  : d.status === 'SENT' ? 'Entry · Awaiting CBP'
+                  : d.status === 'SENT' ? 'Entry · Sent'
                   : d.status === 'REJECTED' ? 'Entry · Rejected'
                   : `Entry · ${d.status}`;
     }
@@ -321,10 +321,10 @@ interface ColumnDef {
 }
 
 const COLUMNS: ColumnDef[] = [
-  { stage: 'isf',      index: '01', title: 'ISF Filed',         subtitle: 'Drafting or with CBP',          emptyTitle: 'No ISF filings in flight',  emptyHint: 'New ISF filings will appear here.' },
-  { stage: 'manifest', index: '02', title: 'Manifest Verified', subtitle: 'ISF accepted — file the Entry', emptyTitle: 'Nothing waiting on entry',  emptyHint: 'Once an ISF clears, it lands here.' },
-  { stage: 'entry',    index: '03', title: 'Entry Filed',       subtitle: 'Drafting or with CBP',          emptyTitle: 'No entries in flight',      emptyHint: 'Entries you draft or send appear here.' },
-  { stage: 'cleared',  index: '04', title: 'Cleared',           subtitle: 'Accepted by CBP',               emptyTitle: 'No cleared shipments yet',  emptyHint: 'Once CBP accepts an entry, it lands here.' },
+  { stage: 'isf',      index: '01', title: 'ISF',               subtitle: 'Drafts and sent ISFs',          emptyTitle: 'No ISF filings in flight',  emptyHint: 'New ISF filings will appear here.' },
+  { stage: 'manifest', index: '02', title: 'Ready for entry',   subtitle: 'ISF accepted — file the Entry', emptyTitle: 'Nothing waiting on entry',  emptyHint: 'Once an ISF clears, it lands here.' },
+  { stage: 'entry',    index: '03', title: 'Entry',             subtitle: 'Drafts and sent entries',       emptyTitle: 'No entries in flight',      emptyHint: 'Entries you draft or send appear here.' },
+  { stage: 'cleared',  index: '04', title: 'Accepted',          subtitle: 'Entry accepted by CBP',         emptyTitle: 'No accepted entries yet',  emptyHint: 'Once CBP accepts an entry, it lands here.' },
 ];
 
 const COLUMN_TILE_LIMIT = 5;
@@ -679,7 +679,7 @@ function shapeDelta(
 
 export default function Dashboard() {
   const { data: filingsData, isLoading: filingsLoading } = useFilings({
-    sortBy: 'updatedAt', sortOrder: 'desc', limit: 200,
+    sortBy: 'updatedAt', sortOrder: 'desc', limit: 100,
   });
 
   const { data: mqData, isLoading: mqLoading } = useManifestQueries({ limit: 30 });
@@ -837,7 +837,7 @@ export default function Dashboard() {
           {/* Hero row: count + inline stage legend (right-aligned, vertically centered) */}
           {inFlightCount === 0 ? (
             <h1 className="text-[44px] leading-[1.05] font-semibold tracking-[-0.025em] text-foreground">
-              Nothing in flight yet.
+              Nothing open yet.
               <span className="ml-3 text-[28px] font-medium text-muted-foreground/60 tracking-[-0.015em]">
                 Time to file.
               </span>
@@ -847,7 +847,7 @@ export default function Dashboard() {
               <h1 className="text-[44px] leading-[1.05] font-semibold tracking-[-0.025em] text-foreground flex items-baseline gap-3 min-w-0">
                 <span className="tabular-nums inline-block min-w-[1ch]">{animatedInFlight}</span>
                 <span className="text-[26px] font-medium text-muted-foreground tracking-[-0.015em]">
-                  {inFlightCount === 1 ? 'shipment in flight' : 'shipments in flight'}
+                  {inFlightCount === 1 ? 'open shipment' : 'open shipments'}
                 </span>
               </h1>
               {/* Stage legend — 4 small dots + counts. Stage identity at a glance,
@@ -885,12 +885,12 @@ export default function Dashboard() {
                 {clearedCount > 0 && (
                   <span className="text-muted-foreground/60">
                     <span className="mx-1.5 text-muted-foreground/30">·</span>
-                    <span className="tabular-nums text-foreground/85 font-medium">{clearedCount}</span> recently cleared
+                    <span className="tabular-nums text-foreground/85 font-medium">{clearedCount}</span> recently accepted
                   </span>
                 )}
               </span>
             ) : inFlightCount > 0 ? (
-              <>Everything is on track.{clearedCount > 0 && <> <span className="tabular-nums text-foreground/85 font-medium">{clearedCount}</span> {clearedCount === 1 ? 'shipment' : 'shipments'} recently cleared.</>}</>
+              <>Everything is on track.{clearedCount > 0 && <> <span className="tabular-nums text-foreground/85 font-medium">{clearedCount}</span> {clearedCount === 1 ? 'shipment' : 'shipments'} recently accepted.</>}</>
             ) : (
               <>Run a manifest query to look up CBP data, or start a new ISF filing.</>
             )}
@@ -926,7 +926,7 @@ export default function Dashboard() {
           <KpiCard
             label="Active"
             value={inFlightCount}
-            sub={inFlightStages === 0 ? 'no shipments in flight' : `across ${inFlightStages} ${inFlightStages === 1 ? 'stage' : 'stages'}`}
+            sub={inFlightStages === 0 ? 'no open shipments' : `across ${inFlightStages} ${inFlightStages === 1 ? 'stage' : 'stages'}`}
             tone="primary"
             delay={120}
             series={kpiSeries.active.series}
@@ -943,7 +943,7 @@ export default function Dashboard() {
             delta={kpiSeries.attention.delta}
           />
           <KpiCard
-            label="Cleared This Month"
+            label="Accepted This Month"
             value={clearedThisMonth}
             sub="entries accepted by CBP"
             tone="emerald"
