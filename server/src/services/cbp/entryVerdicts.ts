@@ -2,10 +2,14 @@
  * Apply CBP's entry responses (native go-live 4.2; audit D5).
  *
  * AX settles the entry summary (only for the transmission still pending);
- * SX settles the certified cargo release. The entry's status is derived
- * from both (entryLifecycle). Notification, webhook and billing fire only
- * on the transition into ACCEPTED or REJECTED, and billing is idempotent at
- * the database, so duplicate or late responses change nothing twice.
+ * SX settles the certified cargo release, and only counts for a summary CBP
+ * accepted. CBP answers the two separately and in no promised order, so an SX
+ * for a summary still in flight waits on its stored inbound row until the AX:
+ * accepted, it applies then; rejected, it is never applied. An SX for any
+ * other summary is logged and ignored. The entry's status is derived from
+ * both (entryLifecycle). Notification, webhook and billing fire only on the
+ * transition into ACCEPTED or REJECTED, and billing is idempotent at the
+ * database, so duplicate or late responses change nothing twice.
  *
  * A rejected replace or delete is the exception: the entry keeps its status
  * because the accepted summary stays on file, but people still hear that CBP
@@ -26,18 +30,61 @@ import { extractDenormFromPayload } from '../abiDocumentMapper.js';
 import { entryStateOnReleaseVerdict, entryStateOnSummaryVerdict } from './entryLifecycle.js';
 import type { ResponseSummary } from './responses.js';
 
-interface AcceptedEntryVersion { payload: Prisma.InputJsonValue; releaseRequested: boolean }
+interface AcceptedEntryVersion { payload: Prisma.InputJsonValue; releaseRequested: boolean; transmissionId?: string }
+type VerdictOpts = { docId: string; transmissionId: string; summary: ResponseSummary };
 
-export async function applyEntryVerdict(opts: { docId: string; transmissionId: string; summary: ResponseSummary }): Promise<void> {
+/** Whether the summary CBP holds for this entry is the one this transmission sent. */
+function holdsSummary(
+  doc: { cbpState: string; pendingAction: string | null; lastTransmissionId: string | null; acceptedVersion: unknown },
+  transmissionId: string,
+): boolean {
+  if (doc.cbpState !== 'ON_FILE') return false;
+  const held = (doc.acceptedVersion as AcceptedEntryVersion | null)?.transmissionId;
+  // Accepted before versions recorded their transmission: the latest settled one.
+  return held ? held === transmissionId : doc.lastTransmissionId === transmissionId && !doc.pendingAction;
+}
+
+export async function applyEntryVerdict(opts: VerdictOpts): Promise<void> {
+  const summaryAccepted = await settleVerdict(opts);
+  // CBP may have answered the release first; it counts now the summary does.
+  if (summaryAccepted) await applyStoredRelease(opts.docId, opts.transmissionId);
+}
+
+/** Apply CBP's latest stored release verdict for this transmission, if there is one. */
+export async function applyStoredRelease(docId: string, transmissionId: string): Promise<void> {
+  const stored = await prisma.cbpInboundMessage.findMany({
+    where: { transmissionId, application: 'SX' },
+    orderBy: { receivedAt: 'desc' },
+    select: { parsed: true },
+  });
+  const latest = stored.map((m) => m.parsed as unknown as ResponseSummary | null).find((s) => s?.verdict === 'ACCEPTED' || s?.verdict === 'REJECTED');
+  if (latest) await settleVerdict({ docId, transmissionId, summary: latest });
+}
+
+/** Returns true when this call put a newly accepted summary on file. */
+async function settleVerdict(opts: VerdictOpts, retry = true): Promise<boolean> {
   const { summary } = opts;
-  if (summary.verdict !== 'ACCEPTED' && summary.verdict !== 'REJECTED') return;
+  if (summary.verdict !== 'ACCEPTED' && summary.verdict !== 'REJECTED') return false;
   const isRelease = summary.application === 'SX';
-  if (!isRelease && summary.application !== 'AX') return;
+  if (!isRelease && summary.application !== 'AX') return false;
 
   const doc = await prisma.abiDocument.findUnique({ where: { id: opts.docId } });
-  if (!doc || doc.lastTransmissionId !== opts.transmissionId) return;
-  // The summary verdict only counts while that transaction is pending.
-  if (!isRelease && !doc.pendingAction) return;
+  if (!doc) return false;
+  const reason = summary.verdict === 'REJECTED'
+    ? JSON.stringify({ summary: summary.narrative ?? 'Rejected by CBP', errors: summary.conditions })
+    : null;
+
+  if (isRelease) {
+    if (doc.pendingAction && doc.lastTransmissionId === opts.transmissionId) return false;
+    if (!holdsSummary(doc, opts.transmissionId)) {
+      logger.warn({ docId: doc.id, transmissionId: opts.transmissionId, verdict: summary.verdict }, '[CBP] Cargo release response for a summary CBP does not hold; ignored');
+      return false;
+    }
+    if (doc.cargoReleaseStatus === summary.verdict && (!reason || doc.lastError === reason)) return false;
+  } else if (doc.lastTransmissionId !== opts.transmissionId || !doc.pendingAction) {
+    // The summary verdict only counts while that transaction is pending.
+    return false;
+  }
 
   const rejectedReplace = !isRelease && summary.verdict === 'REJECTED' && doc.pendingAction === 'REPLACE';
   const fallback = rejectedReplace ? (doc.acceptedVersion as unknown as AcceptedEntryVersion | null) : null;
@@ -48,21 +95,14 @@ export async function applyEntryVerdict(opts: { docId: string; transmissionId: s
 
   const settling = fallback ? { ...doc, releaseRequested: fallback.releaseRequested } : doc;
   const next = isRelease ? entryStateOnReleaseVerdict(doc, summary.verdict) : entryStateOnSummaryVerdict(settling, summary.verdict);
-  const reason = summary.verdict === 'REJECTED'
-    ? JSON.stringify({ summary: summary.narrative ?? 'Rejected by CBP', errors: summary.conditions })
-    : null;
 
   const claimed = await prisma.abiDocument.updateMany({
-    where: isRelease
-      ? { id: doc.id, lastTransmissionId: opts.transmissionId, cargoReleaseStatus: doc.cargoReleaseStatus }
-      : { id: doc.id, lastTransmissionId: opts.transmissionId, pendingAction: doc.pendingAction },
+    where: { id: doc.id, lastTransmissionId: doc.lastTransmissionId, pendingAction: doc.pendingAction, ...(isRelease && { cargoReleaseStatus: doc.cargoReleaseStatus }) },
     data: {
       status: next.status,
-      cbpState: next.cbpState,
-      pendingAction: next.pendingAction,
-      entrySummaryStatus: next.entrySummaryStatus,
       cargoReleaseStatus: next.cargoReleaseStatus,
       respondedAt: new Date(),
+      ...(!isRelease && { cbpState: next.cbpState, pendingAction: next.pendingAction, entrySummaryStatus: next.entrySummaryStatus }),
       ...(reason && { lastError: reason }),
       ...(fallback && {
         payload: fallback.payload,
@@ -72,18 +112,21 @@ export async function applyEntryVerdict(opts: { docId: string; transmissionId: s
         ...(!isDeepStrictEqual(doc.payload, fallback.payload) && { rejectedPayload: doc.payload as Prisma.InputJsonValue }),
       }),
       ...(acceptedSummary && {
-        acceptedVersion: { payload: doc.payload, releaseRequested: doc.releaseRequested } as Prisma.InputJsonValue,
+        acceptedVersion: { payload: doc.payload, releaseRequested: doc.releaseRequested, transmissionId: opts.transmissionId } as Prisma.InputJsonValue,
         rejectedPayload: Prisma.DbNull,
       }),
     },
   });
-  if (claimed.count === 0) return;
+  if (claimed.count === 0) {
+    // A release is not spent by losing the race: the row moved, so judge it again.
+    return isRelease && retry ? settleVerdict(opts, false) : false;
+  }
 
   const becameTerminal = next.status !== doc.status && (next.status === 'ACCEPTED' || next.status === 'REJECTED');
   const refusedChange = !isRelease && summary.verdict === 'REJECTED' && doc.pendingAction !== 'ADD'
     ? (doc.pendingAction === 'REPLACE' ? 'Replace' : 'Delete')
     : null;
-  if (!becameTerminal && !refusedChange) return;
+  if (!becameTerminal && !refusedChange) return acceptedSummary;
 
   const ref = doc.entryNumber || doc.mbolNumber || doc.id.slice(0, 8);
   const accepted = next.status === 'ACCEPTED' && !refusedChange;
@@ -110,4 +153,5 @@ export async function applyEntryVerdict(opts: { docId: string; transmissionId: s
     // Priced by what was filed: shipmentBilling reads the entry's ISF link itself.
     await billShipment({ abiDocumentId: doc.id }, doc.orgId);
   }
+  return acceptedSummary;
 }

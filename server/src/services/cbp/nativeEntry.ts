@@ -10,9 +10,12 @@
  *      certification add the SE13 contact and the SE/BY cargo entities CBP
  *      requires (live SX 11035/11037/11208 on 061), all from real data
  *   4. the engine's CATAIR validator must pass; issues -> 422 with fields
- *   5. atomic claim, then transmitNative (row first; FAILED rolls back,
- *      UNKNOWN stays awaiting CBP); CBP's AX/SX settle it (entryVerdicts)
+ *   5. atomic claim that carries the new transmission id, so only a response
+ *      to this send can settle it, then transmitNative (row first; FAILED
+ *      rolls back to the previous transmission, UNKNOWN stays awaiting CBP);
+ *      CBP's AX/SX settle it (entryVerdicts)
  */
+import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { entryRuleIssues } from '../../schemas/abiDocument.js';
 import { prisma } from '../../config/database.js';
@@ -28,6 +31,7 @@ import { RecordCodecError } from '../../abi-engine/records/codec.js';
 import type { AbiDocumentBody, AbiParty } from '../abi/types.js';
 import { writeAuditLog } from '../auditLog.js';
 import { canStartEntryAction, entryStateOnStart, type EntryAction } from './entryLifecycle.js';
+import { applyStoredRelease } from './entryVerdicts.js';
 import { checkEntryFiler, loadOrgCbpConfig } from './filerIdentity.js';
 import { transmitNative } from './nativeTransmit.js';
 import { convertInvoiceValuesToUsd, CurrencyConversionError, type CurrencyConversion } from './currency.js';
@@ -242,6 +246,7 @@ export async function transmitEntryNative(opts: {
 
   const sender = requireCbpSender();
   const started = entryStateOnStart(doc, opts.action);
+  const transmissionId = randomUUID();
   const claimed = await prisma.abiDocument.updateMany({
     // payload: an edit landing after the build must not go out unsent, or the
     // row would record as CBP's version something CBP never received.
@@ -252,6 +257,7 @@ export async function transmitEntryNative(opts: {
       entrySummaryStatus: started.entrySummaryStatus,
       cargoReleaseStatus: started.cargoReleaseStatus,
       ...(opts.action !== 'DELETE' && { releaseRequested }),
+      lastTransmissionId: transmissionId,
       lastError: null,
     },
   });
@@ -260,6 +266,7 @@ export async function transmitEntryNative(opts: {
   }
 
   const result = await transmitNative({
+    id: transmissionId,
     transport: cbpTransport,
     orgId: opts.orgId,
     environment: cbpTrafficConfig.transport === 'mock' ? 'MOCK' : cbpTrafficConfig.environment === 'PROD' ? 'PROD' : 'CERT',
@@ -282,17 +289,25 @@ export async function transmitEntryNative(opts: {
         entrySummaryStatus: doc.entrySummaryStatus,
         cargoReleaseStatus: doc.cargoReleaseStatus,
         releaseRequested: doc.releaseRequested,
-        lastTransmissionId: result.id,
+        // CBP never saw this one; its responses still belong to the previous.
+        lastTransmissionId: doc.lastTransmissionId,
         lastError: result.lastError ?? 'Not sent',
       },
     });
+    // The rollback wrote back what was read before the claim; a release that
+    // landed for the summary CBP holds during the send still counts.
+    if (doc.lastTransmissionId) await applyStoredRelease(doc.id, doc.lastTransmissionId);
     return { httpStatus: 502, body: { error: 'The entry could not be sent to CBP. Nothing was transmitted; you can try again.', detail: result.lastError } };
   }
 
-  await prisma.abiDocument.update({
-    where: { id: doc.id },
-    data: { lastTransmissionId: result.id, sentAt: new Date(), lastError: result.status === 'UNKNOWN' ? result.lastError : null },
-  });
+  await prisma.abiDocument.update({ where: { id: doc.id }, data: { sentAt: new Date() } });
+  if (result.status === 'UNKNOWN') {
+    // CBP may already have answered; its reason outranks our send error.
+    await prisma.abiDocument.updateMany({
+      where: { id: doc.id, lastTransmissionId: transmissionId, pendingAction: started.pendingAction },
+      data: { lastError: result.lastError },
+    });
+  }
   writeAuditLog({
     orgId: opts.orgId, userId: opts.userId,
     action: `entry.native_${opts.action.toLowerCase()}`, entityType: 'abi_document', entityId: doc.id,

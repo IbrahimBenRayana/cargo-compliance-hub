@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const { prisma, n, w, b, log } = vi.hoisted(() => ({
-  prisma: { abiDocument: { findUnique: vi.fn(), updateMany: vi.fn() } },
+  prisma: { abiDocument: { findUnique: vi.fn(), updateMany: vi.fn() }, cbpInboundMessage: { findMany: vi.fn() } },
   n: { notify: vi.fn() }, w: { emitWebhook: vi.fn() }, b: { billShipment: vi.fn() },
   log: { warn: vi.fn() },
 }));
@@ -22,6 +22,7 @@ const sx = (verdict: 'ACCEPTED' | 'REJECTED') => ({ application: 'SX', verdict, 
 beforeEach(() => {
   vi.clearAllMocks();
   prisma.abiDocument.updateMany.mockResolvedValue({ count: 1 });
+  prisma.cbpInboundMessage.findMany.mockResolvedValue([]);
 });
 
 describe('applyEntryVerdict', () => {
@@ -120,7 +121,7 @@ describe('applyEntryVerdict', () => {
       prisma.abiDocument.findUnique.mockResolvedValue({ ...IN_FLIGHT, rejectedPayload: { iorName: 'OLDER ATTEMPT' } });
       await applyEntryVerdict({ docId: 'd1', transmissionId: 't1', summary: ax('ACCEPTED') as never });
       const data = prisma.abiDocument.updateMany.mock.calls[0][0].data;
-      expect(data.acceptedVersion).toEqual({ payload: EDITED_PAYLOAD, releaseRequested: true });
+      expect(data.acceptedVersion).toEqual({ payload: EDITED_PAYLOAD, releaseRequested: true, transmissionId: 't1' });
       expect(data.rejectedPayload).toBe(Prisma.DbNull);
       expect(data).not.toHaveProperty('payload');
     });
@@ -128,7 +129,7 @@ describe('applyEntryVerdict', () => {
     it('an accepted add is the first version to fall back to', async () => {
       prisma.abiDocument.findUnique.mockResolvedValue({ ...SENT, payload: ACCEPTED_PAYLOAD });
       await applyEntryVerdict({ docId: 'd1', transmissionId: 't1', summary: ax('ACCEPTED') as never });
-      expect(prisma.abiDocument.updateMany.mock.calls[0][0].data.acceptedVersion).toEqual({ payload: ACCEPTED_PAYLOAD, releaseRequested: true });
+      expect(prisma.abiDocument.updateMany.mock.calls[0][0].data.acceptedVersion).toEqual({ payload: ACCEPTED_PAYLOAD, releaseRequested: true, transmissionId: 't1' });
     });
 
     it('a rejected add stores no accepted version', async () => {
