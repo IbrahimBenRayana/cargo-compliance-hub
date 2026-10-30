@@ -348,7 +348,7 @@ export interface CbpResponseSummary {
 }
 
 export interface FilingCbpActivity {
-  filing: { id: string; status: string; cbpState: string; pendingAction: string | null; isfFilerCode: string | null; cbpTransactionId: string | null };
+  filing: { id: string; status: string; cbpState: string; pendingAction: string | null; isfFilerCode: string | null; cbpTransactionId: string | null; rejectedChanges?: Record<string, unknown> | null };
   transmissions: Array<{
     id: string;
     environment: string;
@@ -2180,6 +2180,8 @@ export interface AbiDocument {
   /** Set once the entry went through the native engine. */
   lastTransmissionId?: string | null;
   releaseRequested?: boolean;
+  /** The payload of the last replace CBP rejected, kept to fix and resend. */
+  rejectedPayload?: Record<string, unknown> | null;
 
   entryType: string;
   modeOfTransport: string;
@@ -2307,6 +2309,11 @@ export const abiDocumentsApi = {
   /** Every transmission to CBP for this entry and CBP's answers. */
   cbpActivity(id: string) {
     return apiFetch<EntryCbpActivity>(`/api/v1/abi-documents/${id}/cbp`);
+  },
+
+  /** Put the edits from a rejected replace back on the entry, to fix and resend. */
+  reopenRejected(id: string) {
+    return apiFetch<{ message: string }>(`/api/v1/abi-documents/${id}/reopen-rejected`, { method: 'POST' });
   },
 
   /** Replace or delete the entry summary CBP holds (native entries). */

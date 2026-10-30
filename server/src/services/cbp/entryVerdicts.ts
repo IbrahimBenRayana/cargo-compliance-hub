@@ -10,13 +10,23 @@
  * A rejected replace or delete is the exception: the entry keeps its status
  * because the accepted summary stays on file, but people still hear that CBP
  * refused the change, in those words, and never that the entry was accepted.
+ *
+ * The entry's payload can hold unsent edits, so each accepted summary is kept
+ * as acceptedVersion. A rejected replace falls back to it and keeps the edits
+ * in rejectedPayload to fix and resend.
  */
+import { isDeepStrictEqual } from 'node:util';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database.js';
+import logger from '../../config/logger.js';
 import { notify } from '../notifications.js';
 import { emitWebhook } from '../webhooks.js';
 import { billShipment } from '../shipmentBilling.js';
+import { extractDenormFromPayload } from '../abiDocumentMapper.js';
 import { entryStateOnReleaseVerdict, entryStateOnSummaryVerdict } from './entryLifecycle.js';
 import type { ResponseSummary } from './responses.js';
+
+interface AcceptedEntryVersion { payload: Prisma.InputJsonValue; releaseRequested: boolean }
 
 export async function applyEntryVerdict(opts: { docId: string; transmissionId: string; summary: ResponseSummary }): Promise<void> {
   const { summary } = opts;
@@ -29,7 +39,15 @@ export async function applyEntryVerdict(opts: { docId: string; transmissionId: s
   // The summary verdict only counts while that transaction is pending.
   if (!isRelease && !doc.pendingAction) return;
 
-  const next = isRelease ? entryStateOnReleaseVerdict(doc, summary.verdict) : entryStateOnSummaryVerdict(doc, summary.verdict);
+  const rejectedReplace = !isRelease && summary.verdict === 'REJECTED' && doc.pendingAction === 'REPLACE';
+  const fallback = rejectedReplace ? (doc.acceptedVersion as unknown as AcceptedEntryVersion | null) : null;
+  if (rejectedReplace && !fallback) {
+    logger.warn({ docId: doc.id }, '[CBP] Rejected replace of an entry with no accepted version on record; its data was left as sent');
+  }
+  const acceptedSummary = !isRelease && summary.verdict === 'ACCEPTED' && doc.pendingAction !== 'DELETE';
+
+  const settling = fallback ? { ...doc, releaseRequested: fallback.releaseRequested } : doc;
+  const next = isRelease ? entryStateOnReleaseVerdict(doc, summary.verdict) : entryStateOnSummaryVerdict(settling, summary.verdict);
   const reason = summary.verdict === 'REJECTED'
     ? JSON.stringify({ summary: summary.narrative ?? 'Rejected by CBP', errors: summary.conditions })
     : null;
@@ -46,6 +64,17 @@ export async function applyEntryVerdict(opts: { docId: string; transmissionId: s
       cargoReleaseStatus: next.cargoReleaseStatus,
       respondedAt: new Date(),
       ...(reason && { lastError: reason }),
+      ...(fallback && {
+        payload: fallback.payload,
+        ...extractDenormFromPayload(fallback.payload),
+        releaseRequested: fallback.releaseRequested,
+        // Resending what CBP holds carries no edits; keep the ones already saved.
+        ...(!isDeepStrictEqual(doc.payload, fallback.payload) && { rejectedPayload: doc.payload as Prisma.InputJsonValue }),
+      }),
+      ...(acceptedSummary && {
+        acceptedVersion: { payload: doc.payload, releaseRequested: doc.releaseRequested } as Prisma.InputJsonValue,
+        rejectedPayload: Prisma.DbNull,
+      }),
     },
   });
   if (claimed.count === 0) return;

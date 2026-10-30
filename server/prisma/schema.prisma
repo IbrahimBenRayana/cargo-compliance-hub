@@ -307,6 +307,10 @@ model Filing {
   isfFilerCode       String? @map("isf_filer_code") @db.VarChar(3)
   /** The latest native transmission for this filing (cbp_transmissions). */
   lastTransmissionId String? @map("last_transmission_id") @db.Uuid
+  /** Edits sent in the REPLACE in flight; they reach the filing's columns only when CBP accepts. */
+  pendingChanges     Json?   @map("pending_changes")
+  /** Edits from the last REPLACE CBP rejected, kept to fix and resend. */
+  rejectedChanges    Json?   @map("rejected_changes")
   /** SCAC of the house-bill issuer (NVOCC); the carrier SCAC stays in scacCode (audit ENG-07). */
   houseBillScac      String? @map("house_bill_scac") @db.VarChar(4)
   /** Estimated lading at the foreign port; the ISF deadline is 24h before it (19 CFR 149.2(b)). */
@@ -911,6 +915,10 @@ model AbiDocument {
   lastTransmissionId String? @map("last_transmission_id") @db.Uuid
   /** True when this entry asked CBP to certify the summary for cargo release. */
   releaseRequested   Boolean @default(false) @map("release_requested")
+  /** What CBP last accepted, { payload, releaseRequested }: payload can hold unsent edits, so a rejected replace falls back to this. */
+  acceptedVersion    Json?   @map("accepted_version")
+  /** The payload of the last rejected replace, kept to fix and resend. */
+  rejectedPayload    Json?   @map("rejected_payload")
 
   // Parties denorm
   iorNumber     String? @map("ior_number") @db.VarChar(100)

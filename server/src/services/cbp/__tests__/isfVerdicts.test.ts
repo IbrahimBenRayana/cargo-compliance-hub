@@ -20,6 +20,7 @@ vi.mock('../../notifications.js', () => notify);
 vi.mock('../../shipmentBilling.js', () => billing);
 vi.mock('../../compliance/scoreSnapshot.js', () => score);
 
+import { Prisma } from '@prisma/client';
 import { applyIsfVerdict } from '../isfVerdicts.js';
 
 const FILING = {
@@ -66,6 +67,55 @@ describe('applyIsfVerdict', () => {
     expect(notify.notifyFilingChangeRejected).toHaveBeenCalledWith('o1', 'f1', 'HB1', action, 'DUPLICATE ISF TRANSACTION');
     expect(notify.notifyFilingRejected).not.toHaveBeenCalled();
     expect(billing.billShipmentForFiling).not.toHaveBeenCalled();
+  });
+
+  describe('a replace with edits', () => {
+    const EDITS = { vesselName: 'NEW VESSEL', estimatedLading: '2026-11-09T06:00:00.000Z' };
+    const IN_FLIGHT = {
+      ...FILING, status: 'amended', cbpState: 'ON_FILE', pendingAction: 'REPLACE', cbpTransactionId: 'S7P-12345678901', isfFilerCode: 'S7P',
+      vesselName: 'OLD VESSEL', estimatedDeparture: null, estimatedLading: null, pendingChanges: EDITS,
+    };
+
+    it('leaves the row as CBP holds it when CBP rejects, and keeps the edits to fix and resend', async () => {
+      prisma.filing.findUnique.mockResolvedValue(IN_FLIGHT);
+      await applyIsfVerdict({ filingId: 'f1', transmissionId: 't1', filerCode: 'S7P', summary: rejected as never });
+      const data = prisma.filing.updateMany.mock.calls[0][0].data;
+      expect(data).not.toHaveProperty('vesselName');
+      expect(data).not.toHaveProperty('filingDeadline');
+      expect(data.rejectedChanges).toEqual(EDITS);
+      expect(data.pendingChanges).toBe(Prisma.DbNull);
+    });
+
+    it('a rejected replace without edits keeps the edits from an earlier rejection', async () => {
+      prisma.filing.findUnique.mockResolvedValue({ ...IN_FLIGHT, pendingChanges: null, rejectedChanges: EDITS });
+      await applyIsfVerdict({ filingId: 'f1', transmissionId: 't1', filerCode: 'S7P', summary: rejected as never });
+      expect(prisma.filing.updateMany.mock.calls[0][0].data).not.toHaveProperty('rejectedChanges');
+    });
+
+    it('an accepted replace without edits changes no data and keeps earlier rejected edits', async () => {
+      prisma.filing.findUnique.mockResolvedValue({ ...IN_FLIGHT, pendingChanges: null, rejectedChanges: EDITS });
+      await applyIsfVerdict({ filingId: 'f1', transmissionId: 't1', filerCode: 'S7P', summary: accepted as never });
+      const data = prisma.filing.updateMany.mock.calls[0][0].data;
+      expect(data).not.toHaveProperty('vesselName');
+      expect(data).not.toHaveProperty('rejectedChanges');
+    });
+
+    it('writes the edits onto the row only once CBP accepts', async () => {
+      prisma.filing.findUnique.mockResolvedValue(IN_FLIGHT);
+      await applyIsfVerdict({ filingId: 'f1', transmissionId: 't1', filerCode: 'S7P', summary: accepted as never });
+      const data = prisma.filing.updateMany.mock.calls[0][0].data;
+      expect(data.vesselName).toBe('NEW VESSEL');
+      expect(data.estimatedLading).toEqual(new Date(EDITS.estimatedLading));
+      expect(data.filingDeadline).toEqual(new Date('2026-11-08T06:00:00.000Z'));
+      expect(data.pendingChanges).toBe(Prisma.DbNull);
+      expect(data.rejectedChanges).toBe(Prisma.DbNull);
+    });
+
+    it('an accepted replace clears the rejection left by an earlier attempt', async () => {
+      prisma.filing.findUnique.mockResolvedValue({ ...IN_FLIGHT, rejectedAt: new Date(), rejectionReason: '{"summary":"ISF REJECTED"}' });
+      await applyIsfVerdict({ filingId: 'f1', transmissionId: 't1', filerCode: 'S7P', summary: accepted as never });
+      expect(prisma.filing.updateMany.mock.calls[0][0].data).toMatchObject({ rejectedAt: null, rejectionReason: null });
+    });
   });
 
   it('does nothing twice: a duplicate response finds the claim already taken', async () => {
