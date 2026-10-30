@@ -40,6 +40,7 @@ export function BillingSettings() {
 
   const plan = data?.plan ?? null;
   const card = data?.card ?? null;
+  const amountCharged = data?.usage.amountCents ?? null;
 
   return (
     <div className="space-y-6">
@@ -122,6 +123,8 @@ export function BillingSettings() {
                 </Button>
               )}
             </div>
+          ) : data?.cardOnFile ? (
+            <p className="text-sm text-muted-foreground">A card is on file. Owners and admins can see its details.</p>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground">No card on file. Add one to start filing.</p>
@@ -148,10 +151,12 @@ export function BillingSettings() {
             <span className="text-muted-foreground">Shipments charged</span>
             <span className="font-medium tabular-nums">{data?.usage.filingsBilled ?? 0}</span>
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Total charged</span>
-            <span className="font-medium tabular-nums">{money(data?.usage.amountCents ?? 0)}</span>
-          </div>
+          {(canManage || amountCharged != null) && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Total charged</span>
+              <span className="font-medium tabular-nums">{money(amountCharged ?? 0)}</span>
+            </div>
+          )}
           {canManage && (
             <>
               <Separator />

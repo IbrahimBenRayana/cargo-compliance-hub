@@ -5,10 +5,13 @@
  *   cbpState      NOT_ON_FILE | ON_FILE | DELETED   what CBP has
  *   pendingAction ADD | REPLACE | DELETE | null      the transaction in flight
  *   status        the user-facing label derived from both
- * A rejected replace or delete leaves the previously accepted ISF on file.
+ * A rejected replace or delete leaves the previously accepted ISF on file,
+ * so a replace's edits wait in pendingChanges until CBP accepts them.
  * A delete is a CBP transaction; it is only "cancelled" once CBP accepts it.
  * One action at a time: nothing starts while another is pending.
  */
+import { isfFilingDeadline } from '../isfDeadline.js';
+
 export type IsfCbpState = 'NOT_ON_FILE' | 'ON_FILE' | 'DELETED';
 export type IsfAction = 'ADD' | 'REPLACE' | 'DELETE';
 
@@ -16,6 +19,37 @@ export interface IsfLifecycleState {
   status: string;
   cbpState: string;
   pendingAction: string | null;
+}
+
+/** Validated fields from an amendment, as the API received them (and pendingChanges stores them). */
+export type IsfEdits = Record<string, unknown>;
+type IsfDates = { estimatedDeparture: Date | null; estimatedLading: Date | null };
+
+const ISF_DATES = ['estimatedDeparture', 'estimatedArrival', 'estimatedLading'];
+
+/**
+ * Dates that could not be stored. These must be refused before sending:
+ * edits are only written after CBP accepts, and a write that fails then would
+ * leave the filing pending for good.
+ */
+export function invalidIsfDates(edits: IsfEdits): string[] {
+  return ISF_DATES.filter((key) => edits[key] && Number.isNaN(Date.parse(edits[key] as string)));
+}
+
+/** An amendment's edits as filing columns: dates parsed, the deadline moved with them. */
+export function isfEditsToRow(edits: IsfEdits, filing: IsfDates): Record<string, unknown> {
+  const row: Record<string, unknown> = { ...edits };
+  for (const key of ISF_DATES) {
+    if (edits[key]) row[key] = new Date(edits[key] as string);
+    else delete row[key];
+  }
+  if (row.isf5Data === null) delete row.isf5Data;
+  const deadline = isfFilingDeadline(
+    (edits.estimatedDeparture as string | undefined) || filing.estimatedDeparture,
+    (edits.estimatedLading as string | undefined) || filing.estimatedLading,
+  );
+  if (deadline) row.filingDeadline = deadline;
+  return row;
 }
 
 export function canStartIsfAction(s: IsfLifecycleState, action: IsfAction): { ok: true } | { ok: false; reason: string } {

@@ -378,8 +378,12 @@ router.post('/card', requireRole('owner', 'admin'), requireVerifiedEmail, requir
 });
 
 // GET /api/v1/billing/subscription → { plan, capabilities, card, canFile, usage }
+// Every role reads this: the capability gate depends on it. Card, price and
+// invoice detail is for owners and admins; operators and viewers get what the
+// gates need (plan, capabilities, whether a card is on file, filing holds).
 router.get('/subscription', async (req: AuthRequest, res: Response): Promise<void> => {
   const orgId = req.user!.orgId;
+  const seesDetail = req.user!.role === 'owner' || req.user!.role === 'admin';
   const sub = await prisma.subscription.findUnique({ where: { orgId }, include: { plan: true } });
   const ent = await getOrgEntitlements(orgId);
   const plan = ent.hasActiveTier ? sub?.plan ?? null : null;
@@ -394,7 +398,7 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
     _sum: { amountCents: true },
   });
   // Invoiced accounts: this month so far, rated as the monthly invoice will be.
-  const invoiced = ent.billingMode === 'invoiced' && sub ? await previewMonth(orgId, periodStart) : null;
+  const invoiced = seesDetail && ent.billingMode === 'invoiced' && sub ? await previewMonth(orgId, periodStart) : null;
 
   res.json({
     plan: plan
@@ -402,7 +406,7 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
           id: plan.id,
           name: plan.name,
           description: plan.description,
-          perFilingCents: ent.perFilingCents,
+          perFilingCents: seesDetail ? ent.perFilingCents : null,
           isPublic: plan.isPublic,
           capabilities: plan.capabilities,
           features: plan.features,
@@ -410,11 +414,12 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
       : null,
     capabilities: ent.capabilities,
     // This org's prices by what was filed (cents; entry prices null = not offered).
-    pricing: ent.hasActiveTier ? ent.pricing : null,
+    pricing: seesDetail && ent.hasActiveTier ? ent.pricing : null,
     canFile: ent.canFile,
     status: ent.status,
     delinquent: ent.delinquent,
-    card: ent.cardOnFile
+    cardOnFile: ent.cardOnFile,
+    card: seesDetail && ent.cardOnFile
       ? { brand: sub?.cardBrand, last4: sub?.cardLast4, expMonth: sub?.cardExpMonth, expYear: sub?.cardExpYear }
       : null,
     billingMode: ent.billingMode,
@@ -432,7 +437,7 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
       periodStart,
       periodEnd,
       filingsBilled: agg._count._all,
-      amountCents: agg._sum.amountCents ?? 0,
+      amountCents: seesDetail ? agg._sum.amountCents ?? 0 : null,
     },
   });
 });

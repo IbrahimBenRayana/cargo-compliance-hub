@@ -20,4 +20,14 @@ describe('isfFilingDeadline with an estimated lading date', () => {
   it('falls back to the conservative ETD estimate without a lading date', () => {
     expect(isfFilingDeadline('2026-11-10T12:00:00Z', null).toISOString()).toBe('2026-11-08T12:00:00.000Z');
   });
+
+  it('needs only the lading date: no ETD is no reason to lose the deadline', () => {
+    expect(isfFilingDeadline(null, '2026-11-09T06:00:00Z')?.toISOString()).toBe('2026-11-08T06:00:00.000Z');
+    expect(isfFilingDeadline(undefined, '2026-11-09T06:00:00Z')?.toISOString()).toBe('2026-11-08T06:00:00.000Z');
+  });
+
+  it('has no deadline with neither date', () => {
+    expect(isfFilingDeadline(null, null)).toBeNull();
+    expect(isfFilingDeadline(undefined)).toBeNull();
+  });
 });

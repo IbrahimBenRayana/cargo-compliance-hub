@@ -9,6 +9,7 @@
  */
 import { transmitEntryNative } from './cbp/nativeEntry.js';
 import { checkEntryFiler, loadOrgCbpConfig } from './cbp/filerIdentity.js';
+import { Prisma } from '@prisma/client';
 import type { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { abiGateway } from './abi/gateway.js';
@@ -119,6 +120,24 @@ export function isEntryEditable(doc: EntryEditState): boolean {
   if (doc.status === 'DRAFT') return true;
   if (doc.lastTransmissionId === null) return false;
   return isNativeResendable(doc) || doc.cbpState === 'ON_FILE';
+}
+
+/**
+ * Put the edits from a rejected replace back on the entry as unsent changes,
+ * to fix and send again. They replace any edits made since the rejection.
+ */
+export async function reopenRejectedReplace(opts: { docId: string; orgId: string }): Promise<{ httpStatus: number; body: Record<string, unknown> }> {
+  const doc = await prisma.abiDocument.findFirst({ where: { id: opts.docId, orgId: opts.orgId } });
+  if (!doc) return { httpStatus: 404, body: { error: 'ABI document not found' } };
+
+  const nothingToReopen = { httpStatus: 409, body: { error: 'There are no rejected changes to reopen on this entry.', code: 'NO_REJECTED_CHANGES' } };
+  if (!doc.rejectedPayload || doc.pendingAction || doc.cbpState !== 'ON_FILE') return nothingToReopen;
+
+  const reopened = await prisma.abiDocument.updateMany({
+    where: { id: doc.id, orgId: opts.orgId, pendingAction: null, cbpState: 'ON_FILE' },
+    data: { payload: doc.rejectedPayload as Prisma.InputJsonValue, ...extractDenormFromPayload(doc.rejectedPayload), rejectedPayload: Prisma.DbNull },
+  });
+  return reopened.count > 0 ? { httpStatus: 200, body: { message: 'Rejected changes reopened' } } : nothingToReopen;
 }
 
 // ─── Send (transmit) an ABI Entry to CBP ───────────────────
