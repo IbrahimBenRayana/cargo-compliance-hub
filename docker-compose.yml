@@ -59,6 +59,8 @@ services:
       EMAIL_PASS: ${EMAIL_PASS:-}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@mycargolens.com}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-MyCargoLens}
+      # Which dashboard people see: off | staff | all (spec: dashboard-redesign).
+      DASHBOARD_V2: ${DASHBOARD_V2:-off}
       # Marketing leads: sales-lead notification recipients (comma-separated)
       # and the prospect confirmation email (off until the founder approves copy).
       LEADS_NOTIFY_TO: ${LEADS_NOTIFY_TO:-ibrahim.rayana@mycargolens.com}

@@ -462,8 +462,7 @@ All new files live in `src/components/dashboard/`. `Dashboard.tsx` becomes a thi
 | `src/index.css` | Adds the semantic tokens |
 | `src/api/client.ts` | Adds `dashboardApi` and its types |
 | `src/pages/ShipmentsList.tsx`, `src/pages/ABIDocumentsListPage.tsx` | Read `?stage=` from the URL so strip links land on a filtered list. Shipments adds the missing statuses |
-| `server/src/routes/filings.ts` | List accepts `stage`, sharing the where-builder in `dashboard/stages.ts`. Deadlines compute from a lading date with no ETD |
-| `server/src/services/isfDeadline.ts` | Accepts a lading date alone |
+| `server/src/routes/filings.ts` | List accepts `stage` |
 | `server/src/config/env.ts`, `docker-compose*.yml`, `routes/auth.ts` | `DASHBOARD_V2` setting, added to the compose `environment:` list and returned by `/auth/me` |
 | `server/src/routes/billing.ts` | `/subscription` trims card, prices and invoice lines for operators and viewers |
 | `src/components/AppSidebar.tsx` | Nav label only, if you approve the rename (question 1) |
@@ -482,7 +481,7 @@ page, but its four labels change to match section 5.3 so the product speaks one 
 
 ```
 GET /api/v1/dashboard
-GET /api/v1/dashboard/actions?lane=&kind=&mine=&importer=&group=&cursor=&limit=
+GET /api/v1/dashboard/actions?lane=&filter=&mine=&importer=&group=&cursor=&limit=
 ```
 
 The first returns everything one page load needs in a single round trip. The second handles
@@ -571,7 +570,7 @@ export interface SetupStep { key: string; label: string; done: boolean; href: st
 ```
 
 `GET /dashboard/actions` returns `{ items: ActionItem[]; nextCursor: string | null; total: number }`.
-Query rules: `lane` and `kind` are enums, `mine` is boolean, `importer` is a string of at most 255
+Query rules: `lane` and `filter` are enums, `mine` is boolean, `importer` is a string of at most 255
 characters (the column's limit), `group` is a uuid, `limit` is 1 to 50 (default 25), and `cursor` is opaque and
 base64-encoded. Anything else returns 400.
 
@@ -644,16 +643,14 @@ Regulatory basis, checked against the text of the rule where available:
 
 ### 9.4 Queries
 
-All counting happens in Postgres. No row JSON is read to build counts or the ranked order.
+The server reads scalar columns of live shipments and classifies them in `rules.ts`. No row JSON is
+read. This replaces the SQL `UNION` first proposed here, because rules in both SQL and TypeScript
+would drift, and a deadline rule must have one source.
 
-1. **Candidates.** One parameterised `$queryRaw` with a `UNION ALL` per source (filings, entries,
-   tracking), joined to each entity's latest transmission, returning only `id, kind, lane, due_at, occurred_at,
-   consolidation_id`. It applies capability filters in SQL, sorts, and limits per lane.
-2. **Counts.** `count(*) FILTER (...)` over the same candidate set, so counts and rows cannot
-   disagree.
-3. **Hydrate.** A `select` of only the needed columns for the rows on screen.
-4. **Flow.** One grouped query over live filings and their entries, bounded by the windows in 5.3,
-   so historic rows cost nothing.
+1. **Filings and entries.** Columns for live rows only, bounded by the windows in 5.3.
+2. **Transmissions.** Only for rows with an action in flight, by `lastTransmissionId`.
+3. **Classify.** `assemble` makes one pass, and counts, stages and rows all come from it, so they
+   cannot disagree. Sorting and paging happen on that result, with keyset cursors.
 
 Standalone entries (no `filingId`) count as shipments, and filings with two entries use the most
 urgent entry rather than only the latest.
@@ -675,9 +672,8 @@ model Filing {
 Additive only. No new tables and no new columns. Prod has little data today, so plain `CREATE
 INDEX` is fine; if that changes before release, use one `CONCURRENTLY` migration per index.
 
-One data migration: recompute `filingDeadline` for open filings, so rows written before the
-lading-date rule match it. This changes when live deadline alerts fire, so it runs on staging first
-and saves each row's old value to a file before writing.
+No data migration. The cutoff is computed from the dates at read time, so old `filingDeadline` values
+cannot mislead this page, and live alert timing does not change.
 
 ### 9.6 Measured, on a scratch database
 
@@ -697,6 +693,19 @@ copy before Phase 2 closes.
 So the index earns its place for counts, and it does nothing for the stage query at the largest
 size. That query needs the design in 9.4: scope to live filings and the windows in 5.3.
 The numbers above are for the unscoped worst case.
+
+Measured again on the built endpoint, on a real Postgres with the real migrations, synthetic data
+in which open rows never age out, so the live set is larger than a real org's:
+
+| Org size | Live rows | p50 | Budget |
+|---|---|---|---|
+| 12,000 filings | about 2,000 | **70 ms** | 150 ms, met |
+| 1,000 filings | about 170 | 22 ms | met |
+| 120,000 filings | about 35,000 | **1,200 ms** | 400 ms, **not met** |
+
+The miss is mostly loading the live rows. No org is near this size, so nothing is added for it now.
+`dashboard.load` logs duration and open count per request. **Revisit if any org passes 30,000 filings
+or the log shows more than 400 ms.**
 
 ### 9.7 Caching
 
@@ -797,7 +806,7 @@ the rail never takes 50 tabs.
 | Metric | Budget | How it is checked |
 |---|---|---|
 | `GET /dashboard` p95, 12,000-filing org | ≤ 150 ms | Logged, staging copy |
-| `GET /dashboard` p95, 120,000-filing org | ≤ 400 ms | Same |
+| `GET /dashboard` p95, 120,000-filing org | ≤ 400 ms. **Not met: 1,200 ms, see 9.6** | Same |
 | Response size | ≤ 40 KB raw | Playwright |
 | Page chunk | ≤ 30 KB gzip, no Recharts, no Framer Motion | Build output |
 | LCP | ≤ 2.0 s, 4G, cached shell | Lighthouse on staging |
@@ -840,7 +849,7 @@ go out with the next regular release. Nothing else reaches prod until Phase 9.
 | Phase | Ships | Scope | Tests | Est. |
 |---|---|---|---|---|
 | **0. Honest labels** | Current page only: true labels, drafts split out, today's baseline measured. No flag | XS, 2 files | Unit | 0.5 d |
-| **1. Rules and data** | `DASHBOARD_V2` setting, indexes, deadline fix and backfill, `rules.ts`, `stages.ts`, both endpoints. No UI change | L, split into three PRs | Unit for every rule and status; org isolation; plan gating; query timing | 4.5 d |
+| **1. Rules and data** | `DASHBOARD_V2` setting, indexes, `rules.ts`, both endpoints. No UI change | L, split into three PRs | Unit for every rule and status; org isolation; plan gating; query timing | 4.5 d |
 | **2. Queue** | Flagged v2 page for staff: headline, chips, queue, deadline pills at all widths, `?welcome=` | M | Component; Playwright core path | 2.5 d |
 | **3. Strip and rail** | Flow strip, Awaiting, Recent, horizon, `?stage=` on both lists | M | Component; 744 and 390 layouts | 2.5 d |
 | **4. Every user** | Blockers, setup card, viewer, operator, owner, platform admin, ISF-only, invoiced pilot, billing response trimmed | M | Playwright matrix per role and plan | 2 d |
@@ -898,7 +907,6 @@ The app has no flag system, and this needs only a small one.
 | Everyone | Set `DASHBOARD_V2=off`, then `docker compose up -d server`. No rebuild. This recreates the container, so the API and web app blink, and open tabs switch within 5 minutes or on reload | Target under 2 minutes, not yet measured. Rehearse on staging in Phase 9 |
 | API | Additive; the old page never calls it | Nothing to do |
 | Indexes | Harmless to leave; `DROP INDEX` if ever needed | Minutes |
-| Deadline backfill | Restore from the saved file, or leave it, since the new values are correct | Minutes |
 
 ### 12.6 Monitoring
 
