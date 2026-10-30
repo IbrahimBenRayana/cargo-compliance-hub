@@ -1011,38 +1011,51 @@ Each has a recommendation, so a one-word answer is enough.
 
 ## 16. Revision after the first build
 
-The first build followed sections 3, 5 and 10 closely and looked like an ordinary list. Ibrahim's
-direction: merge practicality and beauty, with KPIs and metrics that are highly useful to customers.
-This reverses three earlier calls.
+Ibrahim reviewed two builds. The plain queue was too simple. The bento build with a navy hero, rings,
+four KPI tiles and entrance animation looked AI-generated, and the $5,000 exposure figure did not
+belong as a KPI. The current build is a flat, table-led page in the Stripe and Mercury family.
+
+**This section wins over earlier sections.**
 
 | Earlier call | Now |
 |---|---|
 | Metrics leave the page (5.2, question 4) | Metrics stay, from real filing data |
-| Motion is minimal, charts never animate (10) | One choreographed opening per session, then figures glide on update |
-| No figure is shown twice (13) | Every figure has one source, and repeats are fine when they help |
+| Motion only where needed (10) | Kept: no entrance animation. Motion is interaction only: tab underline, chart morph between measures, hover crosshair |
+| Focus Frame, Cutoff horizon as hero, clear-state logo (1) | Removed. They read as decoration |
+| No figure shown twice (13) | Every figure has one source, and a repeat is fine when it helps |
 
-**Layout, top to bottom:** blocker band; navy command panel with the Now count in the Focus Frame and
-the 72-hour cutoff chart; Filing health ring; four KPI tiles; proportional stage bar; filter chips and
-queue beside a rail of Awaiting response, ISF outcomes, Busiest importers, Top rejection reasons and
-Recent.
+**Page, top to bottom:** Today header with date and actions; blocker banner; one summary strip of six
+figures; Action items table with Issue, Shipment, Importer, Due and action columns, grouped Now, Soon,
+Later; beside it ISF cutoffs, Awaiting response and Shipments by stage; Filing activity chart with
+measure tabs and a previous-period line; beside it Top rejection reasons and Open items by importer.
 
-**Measures, all over 30 days against the 30 before, all from recorded dates (`dashboard/metrics.ts`):**
+**Rules that keep it from looking generated:** flat surfaces with hairlines, no shadows, no gradients,
+no rings, no equal KPI tiles, no trend arrows, no pastel pills on rows, no uppercase eyebrows, no
+count-ups, one hue for charts, plain words for change ("up 5 pts"), straight lines for daily counts.
 
-| Measure | Definition |
-|---|---|
-| Sent before cutoff | ISFs sent on or before their computed cutoff, of those with a cutoff |
-| Accepted first time | Accepted ISFs with no rejection in their history, of all accepted |
-| ISFs sent | Count, with a daily trend |
-| ISF outcomes | Accepted and rejected per day |
-| Arriving, next 7 days | Live shipments by estimated arrival |
-| Busiest importers | Open queue items per importer, top 5 |
-| Top rejection reasons | Translated reasons, top 3. Internal names become "Other reason" |
-| Late ISF exposure | Overdue ISFs times up to $5,000, shown as an upper figure, never a charge |
+**KPIs, and why each earns its place:**
 
-A rate with nothing behind it is shown as no data, never as 100%.
+| Figure | Decision it supports | Source |
+|---|---|---|
+| Needs attention | What to do now | Queue rules |
+| Next ISF cutoff | How long there is | Open ISFs |
+| Sent before cutoff | Are we filing on time | 30 days, against the 30 before |
+| Accepted first time | Is our data good | 30 days, against the 30 before |
+| Arriving without entry | Which entries to start | Stage rules, 7 days. Plain Arriving on ISF-only plans |
+| On hold | What is stuck, and what risks storage charges | Filing holds, terminal holds, last free day within 3 days |
+| Filing activity | How volume is trending | Daily counts, with the previous period |
+| Billed this month, or included ISFs used | What it costs | Billing, owners and admins only |
+| Top rejection reasons | What to fix upstream | 30 days |
+| Open items by importer | Who needs help. Hidden with one importer | Queue |
 
-**Measured** on a real Postgres with the real migrations, synthetic data: 12,000 filings p50 76 ms,
-35 KB. The 120,000-filing case in 9.6 has not been remeasured with the metrics added.
+**Not available yet, because the data is not stored:** duty and fees paid, continuous bond usage, and
+days to cargo release. All three would be valuable and need new fields first.
+
+**Removed:** Late ISF exposure as a KPI. A one-line note under the table says a late ISF can draw
+liquidated damages of up to $5,000, shown only while an ISF is overdue or due within 24 hours.
+
+**Measured** on a real Postgres with the real migrations, synthetic data: 12,000 filings p50 73 ms,
+34 KB. The 120,000-filing case in 9.6 has not been remeasured.
 
 ## Sources
 

@@ -3,6 +3,10 @@ import type { ActionItem, DashboardResponse } from '@/types/dashboard';
 export const NOW = Date.parse('2026-10-30T12:00:00Z');
 const HOUR = 3_600_000;
 
+function count(total: number, prior: number) {
+  return { total, prior, series: new Array(30).fill(4), priorSeries: new Array(30).fill(3) };
+}
+
 export function action(over: Partial<ActionItem> = {}): ActionItem {
   return {
     id: 'isf:1', kind: 'isf_due', lane: 'now', title: 'ISF due', ref: 'HLCU4471902', party: 'Acme Imports', meta: 'ETD Nov 2',
@@ -16,7 +20,7 @@ export function dashboard(over: Partial<DashboardResponse> = {}): DashboardRespo
     action({ id: 'isf:0', kind: 'isf_overdue', title: 'ISF cutoff passed', ref: 'COSU6287340', due: { at: new Date(NOW - 3 * HOUR).toISOString(), basis: 'LADING' } }),
     action(),
     action({ id: 'isf:2', kind: 'isf_rejected', title: 'Rejected: invalid manufacturer ID', ref: 'MAEU2241890', party: 'Northwind Trading', due: { at: new Date(NOW + 19 * HOUR).toISOString(), basis: 'ETD_ESTIMATE' }, primary: { label: 'Fix ISF', href: '/shipments/2', enabled: true, disabledReason: null } }),
-    action({ id: 'isf:3', kind: 'isf_change_rejected', title: 'CBP rejected your change. The earlier version is on file.', ref: 'ONEY7719032', due: null, primary: { label: 'Review change', href: '/shipments/3', enabled: true, disabledReason: null } }),
+    action({ id: 'isf:3', kind: 'isf_change_rejected', title: 'Change rejected. Earlier version on file.', ref: 'ONEY7719032', due: null, primary: { label: 'Review change', href: '/shipments/3', enabled: true, disabledReason: null } }),
   ];
   const soon = [
     action({ id: 'isf:4', lane: 'soon', ref: 'ONEY3380165', due: { at: new Date(NOW + 51 * HOUR).toISOString(), basis: 'ETD_ESTIMATE' } }),
@@ -37,17 +41,18 @@ export function dashboard(over: Partial<DashboardResponse> = {}): DashboardRespo
       { lane: 'soon', total: soon.length, items: soon, nextCursor: null },
       { lane: 'later', total: later.length, items: later, nextCursor: null },
     ],
-    awaiting: { count: 0, noResponse: 0, items: [] }, recent: [], month: null, blockers: [], setup: null, workload: [],
+    awaiting: { count: 0, noResponse: 0, items: [] }, blockers: [], setup: null, workload: [],
+    arrivingWithoutEntry: 6, holds: { total: 2, lastFreeDaySoon: 1 },
     metrics: {
       windowDays: 30,
       sentOnTime: { rate: 96, sample: 118, prior: 91 },
       firstPass: { rate: 88, sample: 104, prior: 83 },
-      isfSent: { total: 127, prior: 109, series: new Array(30).fill(4) },
-      outcomes: { accepted: new Array(30).fill(3), rejected: new Array(30).fill(0), acceptedTotal: 112, rejectedTotal: 7 },
-      entriesAccepted: { total: 63, prior: 58, series: new Array(30).fill(2) },
+      isfSent: count(127, 109),
+      isfAccepted: count(112, 100),
+      isfRejected: count(7, 9),
+      entriesAccepted: count(63, 58),
       arrivals: [3, 1, 4, 6, 2, 0, 5],
       rejectionReasons: [],
-      exposureUsd: 5000,
     },
     ...over,
   };
