@@ -888,7 +888,7 @@ model AbiDocument {
 
   // Entry identifiers
   entryType       String  @map("entry_type") @db.VarChar(2) // 01 | 11
-  modeOfTransport String  @map("mode_of_transport") @db.VarChar(2) // 40 = vessel, 41 = air
+  modeOfTransport String  @map("mode_of_transport") @db.VarChar(2) // CBP MOT: 11 = vessel containerized, 40 = air, 41 = air containerized
   entryNumber     String? @unique @map("entry_number") @db.VarChar(50)
   ccDocumentId    String? @map("cc_document_id") @db.VarChar(100)
 
