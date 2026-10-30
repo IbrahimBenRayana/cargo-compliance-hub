@@ -53,7 +53,7 @@ export function InvoicedBilling({ data, canManage }: { data: Subscription; canMa
         </CardHeader>
         <CardContent>
           <div className="text-lg font-semibold">{data.plan?.name}</div>
-          <ul className="text-sm text-muted-foreground">
+          {canManage && <ul className="text-sm text-muted-foreground">
             {inv && inv.monthlyMinimumCents > 0 && (
               <li>{money(inv.monthlyMinimumCents)} a month, including {inv.includedIsfs} accepted ISFs</li>
             )}
@@ -67,10 +67,11 @@ export function InvoicedBilling({ data, canManage }: { data: Subscription; canMa
                 <li>{money(entryOnly)} per entry without an ISF</li>
               </>
             )}
-          </ul>
+          </ul>}
         </CardContent>
       </Card>
 
+      {canManage && <>
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2"><Landmark className="h-4 w-4" /> Bank account (ACH)</CardTitle>
@@ -134,14 +135,13 @@ export function InvoicedBilling({ data, canManage }: { data: Subscription; canMa
             <span className="font-medium">Estimated total</span>
             <span className="font-semibold tabular-nums">{money(inv?.monthToDate.estimatedCents ?? 0)}</span>
           </div>
-          {canManage && (
-            <Button variant="ghost" size="sm" onClick={openPortal} disabled={portal.isPending} className="px-0">
-              {portal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ExternalLink className="h-4 w-4 mr-2" />}
-              Invoices &amp; payment methods in Stripe
-            </Button>
-          )}
+          <Button variant="ghost" size="sm" onClick={openPortal} disabled={portal.isPending} className="px-0">
+            {portal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ExternalLink className="h-4 w-4 mr-2" />}
+            Invoices &amp; payment methods in Stripe
+          </Button>
         </CardContent>
       </Card>
+      </>}
     </div>
   );
 }
