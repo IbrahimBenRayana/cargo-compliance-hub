@@ -324,7 +324,7 @@ export function extractDenormFromPayload(payload: any): {
 
   return {
     entryType: p.entryType ?? '01',
-    modeOfTransport: p.modeOfTransport ?? '40',
+    modeOfTransport: p.modeOfTransport ?? '', // unset on drafts; required before transmit
     entryNumber,
     mbolNumber: firstManifest?.bill?.mBOL ?? null,
     hbolNumber: firstManifest?.bill?.hBOL || null,
