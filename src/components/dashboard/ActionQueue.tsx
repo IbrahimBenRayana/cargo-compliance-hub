@@ -76,9 +76,9 @@ function QueueLane({ data, first, now, showCount }: { data: LaneData; first: boo
 export function ActionQueue({ lanes, now }: { lanes: LaneData[]; now: number }) {
   const shown = lanes.filter((l) => l.total > 0);
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
-      {/* The headline already holds the Now count. */}
+    <>
+      {/* The command panel already holds the Now count. */}
       {shown.map((l, i) => <QueueLane key={l.lane} data={l} first={i === 0} now={now} showCount={l.lane !== 'now'} />)}
-    </div>
+    </>
   );
 }

@@ -42,6 +42,21 @@ export interface AwaitingItem {
   href: string;
 }
 
+export interface RateMetric { rate: number | null; sample: number; prior: number | null }
+export interface CountMetric { total: number; prior: number; series: number[] }
+
+export interface DashboardMetrics {
+  windowDays: number;
+  sentOnTime: RateMetric;
+  firstPass: RateMetric;
+  isfSent: CountMetric;
+  outcomes: { accepted: number[]; rejected: number[]; acceptedTotal: number; rejectedTotal: number };
+  entriesAccepted: CountMetric | null;
+  arrivals: number[];
+  rejectionReasons: Array<{ reason: string; count: number }>;
+  exposureUsd: number;
+}
+
 export interface LaneData { lane: Lane; total: number; items: ActionItem[]; nextCursor: string | null }
 
 export interface DashboardResponse {
@@ -53,6 +68,8 @@ export interface DashboardResponse {
   horizon: { startsAt: string; bucketHours: 6; buckets: number[] } | null;
   lanes: LaneData[];
   awaiting: { count: number; noResponse: number; items: AwaitingItem[] };
+  workload: Array<{ name: string; count: number }>;
+  metrics: DashboardMetrics;
   recent: Array<{ id: string; at: string; text: string; href: string }>;
   month: { isfAccepted: number; isfRejected: number; entriesAccepted: number } | null;
   blockers: Blocker[];

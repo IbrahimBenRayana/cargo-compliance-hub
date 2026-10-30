@@ -5,6 +5,10 @@ Owner: Ibrahim. Surfaces: `src/pages/Dashboard.tsx` (route `/`) and a new server
 
 <!-- mock:hero -->
 
+> **Revised 2026-10-30 after the first build.** Ibrahim rejected the plain queue as too simple. The
+> page is now a rich dashboard with KPIs, charts and motion, with the ranked queue inside it. Section
+> 16 records what changed. Where it conflicts with earlier sections, section 16 wins.
+
 ## The short version
 
 The dashboard should answer one question: **what do I need to do next, and how long do I have?**
@@ -1004,6 +1008,41 @@ Each has a recommendation, so a one-word answer is enough.
 | 8 | Keep overdue ISFs in Now for 7 days, then move them to Later? | **Yes.** After that the vessel has likely sailed and the item is a record to resolve, not a race |
 | 9 | Run Phase 0 now, ahead of the decision on the rest? | **Yes.** The live page has untrue labels, it costs half a day, and it stands alone |
 | 10 | Build here in this session? | **Your call after review.** Phase 1 is a fine next step, with Phase 2 as the go or no-go |
+
+## 16. Revision after the first build
+
+The first build followed sections 3, 5 and 10 closely and looked like an ordinary list. Ibrahim's
+direction: merge practicality and beauty, with KPIs and metrics that are highly useful to customers.
+This reverses three earlier calls.
+
+| Earlier call | Now |
+|---|---|
+| Metrics leave the page (5.2, question 4) | Metrics stay, from real filing data |
+| Motion is minimal, charts never animate (10) | One choreographed opening per session, then figures glide on update |
+| No figure is shown twice (13) | Every figure has one source, and repeats are fine when they help |
+
+**Layout, top to bottom:** blocker band; navy command panel with the Now count in the Focus Frame and
+the 72-hour cutoff chart; Filing health ring; four KPI tiles; proportional stage bar; filter chips and
+queue beside a rail of Awaiting response, ISF outcomes, Busiest importers, Top rejection reasons and
+Recent.
+
+**Measures, all over 30 days against the 30 before, all from recorded dates (`dashboard/metrics.ts`):**
+
+| Measure | Definition |
+|---|---|
+| Sent before cutoff | ISFs sent on or before their computed cutoff, of those with a cutoff |
+| Accepted first time | Accepted ISFs with no rejection in their history, of all accepted |
+| ISFs sent | Count, with a daily trend |
+| ISF outcomes | Accepted and rejected per day |
+| Arriving, next 7 days | Live shipments by estimated arrival |
+| Busiest importers | Open queue items per importer, top 5 |
+| Top rejection reasons | Translated reasons, top 3. Internal names become "Other reason" |
+| Late ISF exposure | Overdue ISFs times up to $5,000, shown as an upper figure, never a charge |
+
+A rate with nothing behind it is shown as no data, never as 100%.
+
+**Measured** on a real Postgres with the real migrations, synthetic data: 12,000 filings p50 76 ms,
+35 KB. The 120,000-filing case in 9.6 has not been remeasured with the metrics added.
 
 ## Sources
 

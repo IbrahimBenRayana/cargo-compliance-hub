@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({ get: vi.fn(), actions: vi.fn() }));
 const auth = vi.hoisted(() => ({ role: 'operator' }));
 vi.mock('@/api/client', () => ({ dashboardApi: api }));
 vi.mock('@/hooks/useAuth', () => ({ useCurrentUser: () => ({ data: { role: auth.role } }) }));
+vi.mock('@/hooks/useBilling', () => ({ useCapabilities: () => ({ can: () => true }) }));
 vi.mock('@/components/CelebrationModal', () => ({
   CelebrationModal: ({ planId }: { planId: string | null }) => (planId ? <div>WELCOME {planId}</div> : null),
 }));
@@ -28,12 +29,15 @@ beforeEach(() => {
   vi.clearAllMocks();
   auth.role = 'operator';
   vi.spyOn(Date, 'now').mockReturnValue(NOW);
+  // Figures settle at once, as they do for anyone who prefers reduced motion.
+  window.matchMedia = ((q: string) => ({ matches: q.includes('reduce'), addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
 });
 
 describe('WorkQueuePage', () => {
   it('leads with the count and what is overdue', async () => {
     show();
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('4 items need you now. 1 overdue.');
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('4 items need you now.');
+    expect(screen.getByText(/1 overdue/)).toBeInTheDocument();
   });
 
   it('puts the most urgent row first, under the Focus Frame', async () => {
@@ -136,7 +140,7 @@ describe('WorkQueuePage', () => {
     api.get.mockRejectedValue(new Error('down'));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><MemoryRouter><WorkQueuePage /></MemoryRouter></QueryClientProvider>);
-    expect(await screen.findByText('We could not load your work.')).toBeInTheDocument();
+    expect(await screen.findByText('We could not load your dashboard.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Shipments' })).toBeInTheDocument();
   });
@@ -144,6 +148,56 @@ describe('WorkQueuePage', () => {
   it('keeps the welcome modal the upgrade flow relies on', async () => {
     show(undefined, '/?welcome=entry');
     expect(await screen.findByText('WELCOME entry')).toBeInTheDocument();
+  });
+
+  it('shows the share of ISFs sent before their cutoff, and how many it is based on', async () => {
+    show();
+    expect(await screen.findByText('Sent before cutoff')).toBeInTheDocument();
+    expect(screen.getByText('118 ISFs with a cutoff')).toBeInTheDocument();
+    expect(screen.getByText('96')).toBeInTheDocument();
+  });
+
+  it('shows no rate rather than a perfect one when nothing was sent', async () => {
+    const d = dashboard();
+    d.metrics.sentOnTime = { rate: null, sample: 0, prior: null };
+    show(d);
+    expect(await screen.findByText('No sends yet')).toBeInTheDocument();
+  });
+
+  it('states exposure as an upper figure', async () => {
+    show();
+    expect(await screen.findByText('$5,000')).toBeInTheDocument();
+    expect(screen.getByText('Up to $5,000 per overdue ISF')).toBeInTheDocument();
+  });
+
+  it('says nothing is overdue when exposure is zero', async () => {
+    const d = dashboard();
+    d.metrics.exposureUsd = 0;
+    show(d);
+    expect(await screen.findByText('Nothing overdue')).toBeInTheDocument();
+  });
+
+  it('counts each stage and links to it', async () => {
+    const d = dashboard({ flow: [{ key: 'isf_to_send', label: 'ISF to send', count: 14, href: '/shipments?stage=isf_to_send' }] });
+    show(d);
+    expect(await screen.findByRole('link', { name: /ISF to send/ })).toHaveAttribute('href', '/shipments?stage=isf_to_send');
+  });
+
+  it('describes waiting items by what is known, with no promise about timing', async () => {
+    const d = dashboard({ awaiting: { count: 2, noResponse: 1, items: [
+      { id: 'a', ref: 'AAA', kind: 'isf', state: 'UNKNOWN', sentAt: null, href: '/shipments/1' },
+      { id: 'b', ref: 'BBB', kind: 'isf', state: 'SENT', sentAt: new Date(NOW - 8 * 60_000).toISOString(), href: '/shipments/2' },
+    ] } });
+    show(d);
+    expect(await screen.findByText('Outcome unknown')).toBeInTheDocument();
+    expect(screen.getByText('Sent 8m ago')).toBeInTheDocument();
+  });
+
+  it('leads with what stops filing, and offers the fix when there is one', async () => {
+    const d = dashboard({ blockers: [{ code: 'PAYMENT_FAILED', scope: 'all', title: 'Filing is paused.', detail: 'Update your payment method.', fix: { label: 'Update payment', href: '/settings?tab=billing' } }] });
+    show(d);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Filing is paused.');
+    expect(screen.getByRole('link', { name: 'Update payment' })).toBeInTheDocument();
   });
 
   it('never says cleared or with CBP', async () => {

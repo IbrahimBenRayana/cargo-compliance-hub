@@ -37,7 +37,18 @@ export function dashboard(over: Partial<DashboardResponse> = {}): DashboardRespo
       { lane: 'soon', total: soon.length, items: soon, nextCursor: null },
       { lane: 'later', total: later.length, items: later, nextCursor: null },
     ],
-    awaiting: { count: 0, noResponse: 0, items: [] }, recent: [], month: null, blockers: [], setup: null,
+    awaiting: { count: 0, noResponse: 0, items: [] }, recent: [], month: null, blockers: [], setup: null, workload: [],
+    metrics: {
+      windowDays: 30,
+      sentOnTime: { rate: 96, sample: 118, prior: 91 },
+      firstPass: { rate: 88, sample: 104, prior: 83 },
+      isfSent: { total: 127, prior: 109, series: new Array(30).fill(4) },
+      outcomes: { accepted: new Array(30).fill(3), rejected: new Array(30).fill(0), acceptedTotal: 112, rejectedTotal: 7 },
+      entriesAccepted: { total: 63, prior: 58, series: new Array(30).fill(2) },
+      arrivals: [3, 1, 4, 6, 2, 0, 5],
+      rejectionReasons: [],
+      exposureUsd: 5000,
+    },
     ...over,
   };
 }
