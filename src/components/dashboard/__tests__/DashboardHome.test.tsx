@@ -51,7 +51,7 @@ describe('DashboardHome', () => {
   it('opens on the numbers that matter today', async () => {
     show();
     expect(await screen.findByRole('heading', { level: 1, name: 'Today' })).toBeInTheDocument();
-    expect(screen.getByText('Needs attention', { selector: 'dt' })).toBeInTheDocument();
+    expect(screen.getByText('Needs attention', { selector: 'dt span' })).toBeInTheDocument();
     expect(screen.getByText('1 overdue')).toBeInTheDocument();
     expect(screen.getByText('Next ISF cutoff')).toBeInTheDocument();
   });
@@ -80,40 +80,83 @@ describe('DashboardHome', () => {
     expect(await screen.findByText('Change rejected. Earlier version on file.')).toBeInTheDocument();
   });
 
-  it('keeps Later closed until asked', async () => {
+  it('labels each lane once, where it starts', async () => {
     show();
     await screen.findByRole('table');
-    expect(screen.queryByText('ISF draft')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /later/i }));
-    expect(screen.getByText('ISF draft')).toBeInTheDocument();
+    expect(screen.getAllByRole('rowheader').map((h) => h.textContent)).toEqual(['Now4', 'Soon3', 'Later1']);
   });
 
-  it('shows the first rows of a lane, then the rest on request', async () => {
+  it('says where you are in the list', async () => {
     const d = dashboard();
-    d.lanes[0] = { ...d.lanes[0], total: 12, items: Array.from({ length: 12 }, (_, i) => action({ id: `n${i}`, ref: `REF${i}` })) };
+    d.actions = { ...d.actions, total: 23, pageCount: 3 };
     show(d);
-    await screen.findAllByText('REF7');
-    expect(screen.queryAllByText('REF8')).toHaveLength(0);
-    fireEvent.click(screen.getByRole('button', { name: /show 4 more/i }));
-    expect((await screen.findAllByText('REF11')).length).toBeGreaterThan(0);
+    expect(await screen.findByText('1-10 of 23')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Page 1' })).toHaveAttribute('aria-current', 'page');
   });
 
-  it('asks the server for rows it does not have yet', async () => {
+  it('fetches the page you ask for', async () => {
     const d = dashboard();
-    d.lanes[0] = { ...d.lanes[0], total: 30, nextCursor: 'c1' };
-    api.actions.mockResolvedValue({ items: [action({ id: 'y', title: 'Row 26' })], nextCursor: null, total: 30 });
+    d.actions = { ...d.actions, total: 23, pageCount: 3 };
+    api.actions.mockResolvedValue({ items: [action({ id: 'p2', title: 'Row on page two' })], total: 23, page: 2, pageCount: 3 });
     show(d);
-    fireEvent.click(await screen.findByRole('button', { name: /more of/i }));
-    expect(await screen.findByText('Row 26')).toBeInTheDocument();
-    expect(api.actions).toHaveBeenCalledWith({ lane: 'now', cursor: 'c1', limit: 25 });
+    fireEvent.click(await screen.findByRole('button', { name: 'Page 2' }));
+    expect(await screen.findByText('Row on page two')).toBeInTheDocument();
+    expect(api.actions).toHaveBeenCalledWith({ filter: 'all', page: 2 });
+    expect(screen.getByText('11-20 of 23')).toBeInTheDocument();
+  });
+
+  it('turns pages with the arrows, and stops at the ends', async () => {
+    const d = dashboard();
+    d.actions = { ...d.actions, total: 23, pageCount: 3 };
+    api.actions.mockResolvedValue({ items: [action({ id: 'p2', title: 'Row on page two' })], total: 23, page: 2, pageCount: 3 });
+    show(d);
+    expect(await screen.findByRole('button', { name: 'Previous page' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(await screen.findByText('Row on page two')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous page' })).toBeEnabled();
+  });
+
+  it('goes back to the first page when the filter changes', async () => {
+    const d = dashboard();
+    d.actions = { ...d.actions, total: 23, pageCount: 3 };
+    api.actions.mockResolvedValue({ items: [action({ id: 'x', title: 'Found' })], total: 1, page: 1, pageCount: 1 });
+    show(d);
+    fireEvent.click(await screen.findByRole('button', { name: 'Page 2' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^rejected/i }));
+    await screen.findByText('1-1 of 1');
+    expect(api.actions).toHaveBeenLastCalledWith({ filter: 'rejected', page: 1 });
+  });
+
+  it('shortens a long list of pages around the current one', async () => {
+    const d = dashboard();
+    d.actions = { ...d.actions, total: 120, pageCount: 12 };
+    show(d);
+    await screen.findByRole('button', { name: 'Page 12' });
+    expect(screen.getByRole('button', { name: 'Page 2' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Page 6' })).toBeNull();
+  });
+
+  it('shows no page buttons when everything fits', async () => {
+    show();
+    await screen.findByRole('table');
+    expect(screen.queryByRole('button', { name: 'Next page' })).toBeNull();
+  });
+
+  it('shows a moving bar while a page loads', async () => {
+    const d = dashboard();
+    d.actions = { ...d.actions, total: 23, pageCount: 3 };
+    api.actions.mockReturnValue(new Promise(() => {}));
+    show(d);
+    fireEvent.click(await screen.findByRole('button', { name: 'Page 2' }));
+    expect(await screen.findByRole('progressbar', { name: 'Loading action items' })).toBeInTheDocument();
   });
 
   it('filters through the server, so the result covers the whole org', async () => {
-    api.actions.mockResolvedValue({ items: [action({ id: 'x', title: 'Filtered row' })], nextCursor: null, total: 1 });
+    api.actions.mockResolvedValue({ items: [action({ id: 'x', title: 'Filtered row' })], total: 1, page: 1, pageCount: 1 });
     show();
     fireEvent.click(await screen.findByRole('button', { name: /^rejected/i }));
     expect(await screen.findByText('Filtered row')).toBeInTheDocument();
-    expect(api.actions).toHaveBeenCalledWith({ filter: 'rejected', limit: 50 });
+    expect(api.actions).toHaveBeenCalledWith({ filter: 'rejected', page: 1 });
   });
 
   it('disables a filter with nothing behind it', async () => {
@@ -123,8 +166,8 @@ describe('DashboardHome', () => {
 
   it('expands a group into its house bills', async () => {
     const d = dashboard();
-    d.lanes[0].items = [action({ id: 'group:c', title: '12 house bills: ISF due', group: { id: 'c1', count: 12, label: '12 house bills' }, primary: { label: 'Show 12', href: '/shipments/1/edit', enabled: true, disabledReason: null } })];
-    api.actions.mockResolvedValue({ items: [action({ id: 'm', title: 'One house bill' })], nextCursor: null, total: 1 });
+    d.actions.items = [action({ id: 'group:c', title: '12 house bills: ISF due', group: { id: 'c1', count: 12, label: '12 house bills' }, primary: { label: 'Show 12', href: '/shipments/1/edit', enabled: true, disabledReason: null } })];
+    api.actions.mockResolvedValue({ items: [action({ id: 'm', title: 'One house bill' })], total: 1, page: 1, pageCount: 1 });
     show(d);
     fireEvent.click(await screen.findByRole('button', { name: '12 house bills: ISF due' }));
     expect(await screen.findByText('One house bill')).toBeInTheDocument();
@@ -136,7 +179,7 @@ describe('DashboardHome', () => {
   });
 
   it('stays quiet about the penalty when nothing is close', async () => {
-    const d = dashboard({ attention: { now: 0, soon: 0, later: 0, overdue: 0, nextCutoffAt: null }, lanes: [] });
+    const d = dashboard({ attention: { now: 0, soon: 0, later: 0, overdue: 0, nextCutoffAt: null }, actions: { items: [], total: 0, page: 1, pageCount: 1 } });
     d.filters = d.filters.map((f) => ({ ...f, count: 0 }));
     show(d);
     expect(await screen.findByText('Nothing needs attention right now.')).toBeInTheDocument();
@@ -166,7 +209,7 @@ describe('DashboardHome', () => {
 
   it('counts shipments near arrival with no entry, on plans with entries', async () => {
     show();
-    expect(await screen.findByText('Arriving without entry')).toBeInTheDocument();
+    expect(await screen.findByText('Arriving, no entry')).toBeInTheDocument();
   });
 
   it('counts plain arrivals on a plan without entries', async () => {

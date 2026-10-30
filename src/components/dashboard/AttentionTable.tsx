@@ -1,35 +1,61 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CalendarX, CheckCircle2, Clock, FilePen, FilePlus2, Hourglass, Info, Lock, PauseCircle, XCircle } from 'lucide-react';
 import { dashboardApi } from '@/api/client';
-import { useFilteredActions } from '@/hooks/useDashboard';
-import { countdownLabel, urgencyOf } from '@/lib/countdown';
+import { useActionsPage } from '@/hooks/useDashboard';
+import { countdownLabel, urgencyOf, type Urgency } from '@/lib/countdown';
 import { cn } from '@/lib/utils';
-import type { ActionFilter, ActionItem, ActionKind, DashboardResponse, Lane, LaneData } from '@/types/dashboard';
+import type { ActionFilter, ActionItem, ActionKind, DashboardResponse, Lane } from '@/types/dashboard';
+import { Pagination } from './Pagination';
+import { FILL, TINT, type Tone } from './tones';
 
-const LANE_NAME: Record<Lane, string> = { now: 'Now', soon: 'Soon', later: 'Later' };
-const FIRST_ROWS = 8;
-/** Beyond this the full lists are the better tool. */
-const MAX_ROWS = 100;
+const PAGE_SIZE = 10;
 const COLUMNS = 5;
 
-const STATE: Partial<Record<ActionKind, { text: string; urgent?: boolean }>> = {
-  isf_rejected: { text: 'Rejected', urgent: true },
-  entry_rejected: { text: 'Rejected', urgent: true },
-  isf_change_rejected: { text: 'Rejected', urgent: true },
-  entry_change_rejected: { text: 'Rejected', urgent: true },
-  entry_release_rejected: { text: 'Rejected', urgent: true },
-  isf_no_date: { text: 'No date' },
-  isf_on_hold: { text: 'On hold' },
-  tracking_hold: { text: 'Hold' },
-  cbp_no_response: { text: 'No response' },
-  cbp_outcome_unknown: { text: 'Unknown' },
-  cbp_conditional: { text: 'Review' },
+const LANE: Record<Lane, { name: string; tone: Tone }> = {
+  now: { name: 'Now', tone: 'urgent' },
+  soon: { name: 'Soon', tone: 'soon' },
+  later: { name: 'Later', tone: 'calm' },
 };
 
-const URGENCY_CLASS = { overdue: 'font-medium text-urgent', urgent: 'text-urgent', soon: 'text-soon', calm: 'text-muted-foreground' };
+const KIND: Record<ActionKind, { icon: LucideIcon; tone: Tone }> = {
+  isf_overdue: { icon: AlertTriangle, tone: 'urgent' },
+  isf_due: { icon: Clock, tone: 'soon' },
+  isf_rejected: { icon: XCircle, tone: 'urgent' },
+  isf_change_rejected: { icon: XCircle, tone: 'urgent' },
+  entry_rejected: { icon: XCircle, tone: 'urgent' },
+  entry_change_rejected: { icon: XCircle, tone: 'urgent' },
+  entry_release_rejected: { icon: XCircle, tone: 'urgent' },
+  isf_no_date: { icon: CalendarX, tone: 'soon' },
+  isf_on_hold: { icon: PauseCircle, tone: 'soon' },
+  isf_draft: { icon: FilePen, tone: 'calm' },
+  entry_draft: { icon: FilePen, tone: 'entry' },
+  entry_needed: { icon: FilePlus2, tone: 'entry' },
+  cbp_no_response: { icon: Hourglass, tone: 'info' },
+  cbp_outcome_unknown: { icon: Hourglass, tone: 'info' },
+  cbp_conditional: { icon: Hourglass, tone: 'info' },
+  tracking_hold: { icon: Lock, tone: 'soon' },
+};
+
+const STATE: Partial<Record<ActionKind, { text: string; tone: Tone }>> = {
+  isf_rejected: { text: 'Rejected', tone: 'urgent' },
+  entry_rejected: { text: 'Rejected', tone: 'urgent' },
+  isf_change_rejected: { text: 'Rejected', tone: 'urgent' },
+  entry_change_rejected: { text: 'Rejected', tone: 'urgent' },
+  entry_release_rejected: { text: 'Rejected', tone: 'urgent' },
+  isf_no_date: { text: 'No date', tone: 'soon' },
+  isf_on_hold: { text: 'On hold', tone: 'soon' },
+  tracking_hold: { text: 'Hold', tone: 'soon' },
+  cbp_no_response: { text: 'No response', tone: 'info' },
+  cbp_outcome_unknown: { text: 'Unknown', tone: 'info' },
+  cbp_conditional: { text: 'Review', tone: 'info' },
+};
+
+const URGENCY_TONE: Record<Urgency, Tone> = { overdue: 'urgent', urgent: 'urgent', soon: 'soon', calm: 'calm' };
+const BADGE = 'inline-flex rounded-md px-2 py-0.5 text-[12px] font-medium tabular-nums';
 
 function Due({ item, now }: { item: ActionItem; now: number }) {
   if (item.due) {
@@ -39,7 +65,7 @@ function Due({ item, now }: { item: ActionItem; now: number }) {
     return (
       <time
         dateTime={item.due.at}
-        className={URGENCY_CLASS[level]}
+        className={cn(BADGE, TINT[URGENCY_TONE[level]])}
         title={estimated ? `Estimated from the sailing date: ${date}. Add a lading date to make it exact.` : date}
       >
         {countdownLabel(item.due.at, item.due.basis, now)}
@@ -47,48 +73,63 @@ function Due({ item, now }: { item: ActionItem; now: number }) {
     );
   }
   const state = STATE[item.kind];
-  return state ? <span className={state.urgent ? 'text-urgent' : 'text-muted-foreground'}>{state.text}</span> : null;
+  return state ? <span className={cn(BADGE, TINT[state.tone])}>{state.text}</span> : null;
 }
 
-const ROW = 'group relative border-t border-border/70 transition-colors duration-100 can-hover:hover:bg-muted/50';
-const CELL_FIRST = 'w-full max-w-0 py-2.5 pl-4 pr-3';
-const TITLE = 'block line-clamp-2 font-medium text-foreground outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring sm:truncate';
+const ROW = 'group relative border-t border-border/60 transition-colors duration-150 can-hover:hover:bg-muted/40';
+const TITLE = 'line-clamp-2 font-medium text-foreground outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring';
 const REF = 'font-mono text-[12.5px]';
+
+function Lead({ item, children }: { item: ActionItem; children: React.ReactNode }) {
+  const { icon: Icon, tone } = KIND[item.kind];
+  return (
+    <td className="w-full max-w-0 py-2 pl-4 pr-3">
+      <span aria-hidden className={cn('dash-accent absolute inset-y-0 left-0 w-0.5 origin-center', FILL[tone])} />
+      <div className="flex items-center gap-3">
+        <span className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', TINT[tone])}>
+          <Icon className="h-3.5 w-3.5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          {children}
+          <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground sm:hidden">
+            <span className={REF}>{item.ref}</span>
+            {item.party && <>, {item.party}</>}
+          </span>
+        </div>
+      </div>
+    </td>
+  );
+}
 
 function Cells({ item, now, action }: { item: ActionItem; now: number; action: string }) {
   return (
     <>
-      <td className="hidden whitespace-nowrap px-3 py-2.5 sm:table-cell"><span className={REF}>{item.ref}</span></td>
-      <td className="hidden max-w-[170px] truncate px-3 py-2.5 text-muted-foreground min-[1360px]:table-cell" title={item.party ?? undefined}>{item.party}</td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums"><Due item={item} now={now} /></td>
-      <td className="hidden whitespace-nowrap py-2.5 pl-3 pr-4 text-right text-muted-foreground transition-colors duration-100 can-hover:group-hover:text-foreground sm:table-cell">{action}</td>
+      <td className="hidden whitespace-nowrap px-3 py-2 sm:table-cell"><span className={REF}>{item.ref}</span></td>
+      <td className="hidden max-w-[170px] truncate px-3 py-2 text-muted-foreground min-[1360px]:table-cell" title={item.party ?? undefined}>{item.party}</td>
+      <td className="whitespace-nowrap px-3 py-2 text-right"><Due item={item} now={now} /></td>
+      <td className="hidden whitespace-nowrap py-2 pl-3 pr-4 text-right sm:table-cell">
+        <span className="inline-flex items-center gap-1 text-muted-foreground transition-colors duration-150 can-hover:group-hover:text-primary">
+          {action}
+          <ArrowRight aria-hidden className="h-3.5 w-3.5 opacity-0 transition duration-150 ease-out can-hover:-translate-x-1 can-hover:group-hover:translate-x-0 can-hover:group-hover:opacity-100" />
+        </span>
+      </td>
     </>
   );
 }
 
-function Sub({ item }: { item: ActionItem }) {
+function ActionRow({ item, now, index }: { item: ActionItem; now: number; index: number }) {
   return (
-    <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground sm:hidden">
-      <span className={REF}>{item.ref}</span>
-      {item.party && <>, {item.party}</>}
-    </span>
-  );
-}
-
-function ActionRow({ item, now }: { item: ActionItem; now: number }) {
-  return (
-    <tr className={ROW}>
-      <td className={CELL_FIRST}>
+    <tr className={cn(ROW, 'dash-row')} style={{ '--i': index } as React.CSSProperties}>
+      <Lead item={item}>
         <Link to={item.primary.href} aria-label={`${item.primary.label}: ${item.title}, ${item.ref}`} className={TITLE}>{item.title}</Link>
-        <Sub item={item} />
-      </td>
+      </Lead>
       <Cells item={item} now={now} action={item.primary.label} />
     </tr>
   );
 }
 
 /** A consolidation: one row of work until someone needs its house bills. */
-function GroupRow({ item, now }: { item: ActionItem; now: number }) {
+function GroupRow({ item, now, index }: { item: ActionItem; now: number; index: number }) {
   const [open, setOpen] = useState(false);
   const { data } = useQuery({
     queryKey: ['dashboard', 'group', item.group!.id, item.kind],
@@ -98,93 +139,59 @@ function GroupRow({ item, now }: { item: ActionItem; now: number }) {
   const members = data?.items.filter((m) => m.kind === item.kind && m.lane === item.lane) ?? [];
   return (
     <>
-      <tr className={ROW}>
-        <td className={CELL_FIRST}>
+      <tr className={cn(ROW, 'dash-row')} style={{ '--i': index } as React.CSSProperties}>
+        <Lead item={item}>
           <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className={cn(TITLE, 'w-full text-left')}>{item.title}</button>
-          <Sub item={item} />
-        </td>
+        </Lead>
         <Cells item={item} now={now} action={open ? 'Hide' : item.primary.label} />
       </tr>
-      {open && members.map((m) => <ActionRow key={m.id} item={m} now={now} />)}
+      {open && members.map((m, i) => <ActionRow key={m.id} item={m} now={now} index={i} />)}
     </>
   );
 }
 
-export function Rows({ items, now }: { items: ActionItem[]; now: number }) {
+function LaneRow({ lane, count }: { lane: Lane; count: number | null }) {
+  const { name, tone } = LANE[lane];
+  return (
+    <tr className="border-t border-border/60 bg-muted/30">
+      <th colSpan={COLUMNS} scope="rowgroup" className="px-4 py-1.5 text-left text-[12.5px] font-medium">
+        <span className="inline-flex items-center gap-2">
+          {name}
+          {count !== null && <span className={cn('rounded-md px-1.5 py-px text-[11.5px] font-medium tabular-nums', TINT[tone])}>{count.toLocaleString()}</span>}
+        </span>
+      </th>
+    </tr>
+  );
+}
+
+function Rows({ items, now, counts }: { items: ActionItem[]; now: number; counts: Record<Lane, number> | null }) {
   return (
     <>
-      {items.map((item) => {
+      {items.map((item, i) => {
         const Row = item.group ? GroupRow : ActionRow;
-        return <Row key={item.id} item={item} now={now} />;
+        const newLane = i === 0 || items[i - 1].lane !== item.lane;
+        return (
+          <FragmentRow key={item.id} lane={newLane ? item.lane : null} count={counts ? counts[item.lane] : null}>
+            <Row item={item} now={now} index={i} />
+          </FragmentRow>
+        );
       })}
     </>
   );
 }
 
-function LaneRows({ data, now }: { data: LaneData; now: number }) {
-  const [open, setOpen] = useState(data.lane !== 'later');
-  const [more, setMore] = useState<ActionItem[]>([]);
-  const [cursor, setCursor] = useState(data.nextCursor);
-  const [limit, setLimit] = useState(FIRST_ROWS);
-  const [busy, setBusy] = useState(false);
-
-  const items = [...data.items, ...more];
-  const visible = items.slice(0, limit);
-  const hidden = data.total - visible.length;
-
-  async function showMore() {
-    const next = limit + 25;
-    if (cursor && items.length < next) {
-      setBusy(true);
-      try {
-        const page = await dashboardApi.actions({ lane: data.lane, cursor, limit: 25 });
-        setMore((m) => [...m, ...page.items]);
-        setCursor(page.nextCursor);
-      } finally {
-        setBusy(false);
-      }
-    }
-    setLimit(next);
-  }
-
+function FragmentRow({ lane, count, children }: { lane: Lane | null; count: number | null; children: React.ReactNode }) {
   return (
-    <tbody>
-      <tr className="border-t border-border/70 bg-muted/30">
-        <th colSpan={COLUMNS} scope="rowgroup" className="p-0 text-left">
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={() => setOpen(!open)}
-            className="flex w-full items-center gap-1.5 px-4 py-1.5 text-[12.5px] font-medium text-muted-foreground outline-none transition-colors duration-100 can-hover:hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-          >
-            <ChevronRight aria-hidden className={cn('h-3.5 w-3.5 transition-transform duration-150', open && 'rotate-90')} />
-            {LANE_NAME[data.lane]}
-            <span className="tabular-nums">{data.total.toLocaleString()}</span>
-          </button>
-        </th>
-      </tr>
-      {open && <Rows items={visible} now={now} />}
-      {open && hidden > 0 && visible.length < MAX_ROWS && (
-        <tr className="border-t border-border/70">
-          <td colSpan={COLUMNS} className="p-0">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={showMore}
-              className="w-full px-4 py-2 text-left text-[13px] font-medium text-primary outline-none can-hover:hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            >
-              {busy ? 'Loading' : `Show ${Math.min(25, hidden)} more of ${hidden.toLocaleString()}`}
-            </button>
-          </td>
-        </tr>
-      )}
-    </tbody>
+    <>
+      {lane && <LaneRow lane={lane} count={count} />}
+      {children}
+    </>
   );
 }
 
 function Tabs({ filters, active, onChange }: { filters: DashboardResponse['filters']; active: ActionFilter; onChange: (f: ActionFilter) => void }) {
   return (
-    <div role="group" aria-label="Filter" className="-mb-px flex gap-5 overflow-x-auto px-4 [scrollbar-width:none]">
+    <div role="group" aria-label="Filter" className="-mb-px flex gap-4 overflow-x-auto px-4 [scrollbar-width:none]">
       {filters.map((f) => {
         const on = f.key === active;
         return (
@@ -195,12 +202,15 @@ function Tabs({ filters, active, onChange }: { filters: DashboardResponse['filte
             disabled={f.count === 0 && f.key !== 'all'}
             onClick={() => onChange(f.key)}
             className={cn(
-              'relative shrink-0 pb-2.5 pt-1 text-[13px] font-medium outline-none transition-colors duration-100 disabled:opacity-45 focus-visible:text-foreground focus-visible:underline',
+              'relative shrink-0 pb-2.5 pt-1 text-[13px] font-medium outline-none transition-colors duration-150 disabled:opacity-45 focus-visible:underline',
               on ? 'text-foreground' : 'text-muted-foreground can-hover:hover:text-foreground',
             )}
           >
-            {f.label} <span className="tabular-nums text-muted-foreground">{f.count.toLocaleString()}</span>
-            {on && <motion.span layoutId="attention-tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-primary" transition={{ type: 'spring', bounce: 0, duration: 0.3 }} />}
+            {f.label}
+            <span className={cn('ml-1.5 rounded-md px-1.5 py-px text-[11.5px] tabular-nums transition-colors duration-150', on ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+              {f.count.toLocaleString()}
+            </span>
+            {on && <motion.span layoutId="attention-tab" className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary" transition={{ type: 'spring', bounce: 0, duration: 0.3 }} />}
           </button>
         );
       })}
@@ -225,28 +235,53 @@ function Head() {
 
 export function AttentionTable({ data, now }: { data: DashboardResponse; now: number }) {
   const [filter, setFilter] = useState<ActionFilter>('all');
-  const filtered = useFilteredActions(filter);
-  const { attention, filters, lanes } = data;
+  const [page, setPage] = useState(1);
+  const fetched = useActionsPage(filter, page);
+  const first = filter === 'all' && page === 1;
+  const view = first ? data.actions : fetched.data ?? data.actions;
+  const busy = !first && (fetched.isFetching || fetched.isPlaceholderData);
+
+  // A page can disappear as work gets done; the server answers with the last one.
+  useEffect(() => {
+    if (!busy && view.page !== page) setPage(view.page);
+  }, [busy, view.page, page]);
+
+  function changeFilter(f: ActionFilter) {
+    setFilter(f);
+    setPage(1);
+  }
+
+  const { attention, filters } = data;
   const dueSoon = attention.overdue + (filters.find((f) => f.key === 'due_today')?.count ?? 0);
-  const shown = lanes.filter((l) => l.total > 0);
+  const counts = filter === 'all' ? attention : null;
   return (
-    <section aria-labelledby="attention-title" className="min-w-0 overflow-hidden rounded-lg border border-border bg-card">
+    <section aria-labelledby="attention-title" className="dash-in relative min-w-0 overflow-hidden rounded-xl border border-border/70 bg-card shadow-card" style={{ '--i': 2 } as React.CSSProperties}>
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-1 border-b border-border pt-3">
         <h2 id="attention-title" className="px-4 pb-2.5 text-[14px] font-semibold">Action items</h2>
-        <Tabs filters={filters} active={filter} onChange={setFilter} />
+        <Tabs filters={filters} active={filter} onChange={changeFilter} />
       </div>
-      {shown.length === 0 ? (
-        <p className="px-4 py-10 text-center text-[13px] text-muted-foreground">Nothing needs attention right now.</p>
+      {busy && <div className="dash-progress" role="progressbar" aria-label="Loading action items" />}
+      {view.total === 0 ? (
+        <div className="px-4 py-12 text-center">
+          <span className={cn('mx-auto grid h-10 w-10 place-items-center rounded-xl', TINT.done)}>
+            <CheckCircle2 className="h-5 w-5" aria-hidden />
+          </span>
+          <p className="mt-3 text-[13px] font-medium">Nothing needs attention right now.</p>
+        </div>
       ) : (
-        <table className="w-full text-[13px]">
-          <Head />
-          {filter === 'all'
-            ? shown.map((l) => <LaneRows key={l.lane} data={l} now={now} />)
-            : <tbody><Rows items={filtered.data?.items ?? []} now={now} /></tbody>}
-        </table>
+        <>
+          <table className={cn('w-full text-[13px] transition-opacity duration-150', busy && 'opacity-60')}>
+            <Head />
+            <tbody key={`${filter}-${view.page}`}>
+              <Rows items={view.items} now={now} counts={counts} />
+            </tbody>
+          </table>
+          <Pagination page={view.page} pageCount={view.pageCount} total={view.total} pageSize={PAGE_SIZE} onChange={setPage} />
+        </>
       )}
       {dueSoon > 0 && (
-        <p className="border-t border-border/70 px-4 py-2 text-[12.5px] text-muted-foreground">
+        <p className="flex items-center gap-2 border-t border-border/60 bg-soon-tint px-4 py-2 text-[12.5px] text-soon">
+          <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
           A late ISF can draw liquidated damages of up to $5,000.
         </p>
       )}

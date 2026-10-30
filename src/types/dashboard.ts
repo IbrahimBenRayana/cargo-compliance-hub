@@ -42,6 +42,8 @@ export interface AwaitingItem {
   href: string;
 }
 
+export interface ActionsPage { items: ActionItem[]; total: number; page: number; pageCount: number }
+
 export interface RateMetric { rate: number | null; sample: number; prior: number | null }
 export interface CountMetric { total: number; prior: number; series: number[]; priorSeries: number[] }
 
@@ -57,8 +59,6 @@ export interface DashboardMetrics {
   rejectionReasons: Array<{ reason: string; count: number }>;
 }
 
-export interface LaneData { lane: Lane; total: number; items: ActionItem[]; nextCursor: string | null }
-
 export interface DashboardResponse {
   generatedAt: string;
   isEmpty: boolean;
@@ -66,7 +66,7 @@ export interface DashboardResponse {
   flow: Array<{ key: Stage; label: string; count: number; href: string }>;
   filters: Array<{ key: ActionFilter; label: string; count: number }>;
   horizon: { startsAt: string; bucketHours: 6; buckets: number[] } | null;
-  lanes: LaneData[];
+  actions: ActionsPage;
   awaiting: { count: number; noResponse: number; items: AwaitingItem[] };
   workload: Array<{ name: string; count: number }>;
   arrivingWithoutEntry: number | null;
@@ -76,4 +76,3 @@ export interface DashboardResponse {
   setup: SetupStep[] | null;
 }
 
-export interface ActionsPage { items: ActionItem[]; nextCursor: string | null; total: number }

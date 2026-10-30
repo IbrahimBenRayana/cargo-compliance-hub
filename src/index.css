@@ -61,6 +61,16 @@
     --soon-tint: 38 92% 50% / 0.12;
     --calm-fg: 220 14% 40%;
     --done-fg: 160 84% 24%;
+    --done-tint: 160 84% 39% / 0.1;
+    --info-fg: 221 70% 42%;
+    --info-tint: 221 83% 53% / 0.1;
+    --entry-fg: 262 60% 46%;
+    --entry-tint: 262 83% 58% / 0.1;
+    --urgent-fill: 0 72% 51%;
+    --soon-fill: 36 92% 46%;
+    --info-fill: 221 83% 53%;
+    --entry-fill: 262 83% 58%;
+    --done-fill: 160 84% 36%;
     --focus-frame: 222 47% 22%;
   }
 
@@ -117,6 +127,16 @@
     --soon-tint: 38 92% 56% / 0.12;
     --calm-fg: 215 20% 66%;
     --done-fg: 160 60% 56%;
+    --done-tint: 160 60% 50% / 0.12;
+    --info-fg: 217 91% 74%;
+    --info-tint: 217 91% 60% / 0.14;
+    --entry-fg: 262 83% 78%;
+    --entry-tint: 262 83% 58% / 0.16;
+    --urgent-fill: 0 90% 70%;
+    --soon-fill: 38 92% 60%;
+    --info-fill: 217 91% 68%;
+    --entry-fill: 262 83% 72%;
+    --done-fill: 160 60% 50%;
     --focus-frame: 43 96% 56%;
   }
 }
@@ -404,3 +424,55 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Dashboard motion ─────────────────────────────────────────────── */
+/* Transform and opacity only. Everything here is readable if it never runs. */
+:root { --dash-ease: cubic-bezier(0.23, 1, 0.32, 1); }
+
+.dash-sk { position: relative; overflow: hidden; border-radius: 6px; background: hsl(var(--muted)); }
+.dash-sk::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, hsl(var(--card) / 0.75), transparent);
+  animation: dash-sweep 1.5s linear infinite;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+.dash-progress { position: absolute; inset: 0 0 auto 0; height: 2px; overflow: hidden; }
+.dash-progress::after {
+  content: "";
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: hsl(var(--primary));
+  animation: dash-slide 1s linear infinite;
+}
+.dash-accent { transform: scaleY(0); transition: transform 180ms var(--dash-ease); }
+.dash-bar { transform-origin: left; transition: transform 240ms var(--dash-ease); }
+.dash-col { transform-origin: bottom; transition: opacity 150ms ease; }
+.dash-tip { opacity: 0; transform: translate(var(--tx, -50%), 4px); transition: opacity 125ms ease, transform 125ms var(--dash-ease); }
+@media (hover: hover) and (pointer: fine) {
+  .group:hover > td .dash-accent { transform: none; }
+  .group\/bar:hover .dash-tip { opacity: 1; transform: translate(var(--tx, -50%), 0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dash-enter .dash-in { animation: dash-in 280ms var(--dash-ease) both; animation-delay: calc(var(--i, 0) * 50ms); }
+  .dash-enter .dash-col { animation: dash-grow-y 280ms var(--dash-ease) both; animation-delay: calc(160ms + var(--i, 0) * 30ms); }
+  .dash-enter .dash-bar { animation: dash-grow-x 280ms var(--dash-ease) both; animation-delay: calc(160ms + var(--i, 0) * 40ms); }
+  .dash-enter .dash-draw { animation: dash-draw 700ms var(--dash-ease) 200ms both; }
+  .dash-row { animation: dash-row 200ms var(--dash-ease) both; animation-delay: calc(var(--i, 0) * 30ms); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-sk::after { animation: none; display: none; }
+  .dash-progress::after { width: 100%; animation: none; opacity: 0.5; }
+  .dash-accent, .dash-bar { transition: none; }
+}
+@keyframes dash-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes dash-row { from { opacity: 0; transform: translateY(4px); } }
+@keyframes dash-grow-y { from { transform: scaleY(0); } }
+@keyframes dash-grow-x { from { transform: scaleX(0); } }
+@keyframes dash-draw { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes dash-sweep { to { transform: translateX(100%); } }
+@keyframes dash-slide { from { transform: translateX(-100%); } to { transform: translateX(350%); } }

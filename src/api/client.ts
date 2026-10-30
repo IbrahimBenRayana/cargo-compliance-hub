@@ -2,7 +2,7 @@
  * API Client — Typed fetch wrapper with auto-refresh JWT tokens
  */
 
-import type { ActionFilter, ActionsPage, DashboardResponse, Lane } from '@/types/dashboard';
+import type { ActionFilter, ActionsPage, DashboardResponse } from '@/types/dashboard';
 import type { HtsClassifyResult } from '@/types/htsClassify';
 import type { AuthSession, LoginResult, MfaMethod, User } from '@/types/auth';
 import type { Filing } from '@/types/shipment';
@@ -2856,7 +2856,7 @@ export const dashboardApi = {
   get() {
     return apiFetch<DashboardResponse>('/api/v1/dashboard');
   },
-  actions(q: { lane?: Lane; filter?: ActionFilter; group?: string; cursor?: string; limit?: number }) {
+  actions(q: { filter?: ActionFilter; group?: string; page?: number; limit?: number }) {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(q)) if (v !== undefined) params.set(k, String(v));
     return apiFetch<ActionsPage>(`/api/v1/dashboard/actions?${params}`);

@@ -36,11 +36,7 @@ export function dashboard(over: Partial<DashboardResponse> = {}): DashboardRespo
       { key: 'all', label: 'All', count: 8 }, { key: 'overdue', label: 'Overdue', count: 1 }, { key: 'due_today', label: 'Due today', count: 2 },
       { key: 'rejected', label: 'Rejected', count: 2 }, { key: 'no_response', label: 'No response', count: 0 },
     ],
-    lanes: [
-      { lane: 'now', total: now.length, items: now, nextCursor: null },
-      { lane: 'soon', total: soon.length, items: soon, nextCursor: null },
-      { lane: 'later', total: later.length, items: later, nextCursor: null },
-    ],
+    actions: { items: [...now, ...soon, ...later], total: 8, page: 1, pageCount: 1 },
     awaiting: { count: 0, noResponse: 0, items: [] }, blockers: [], setup: null, workload: [],
     arrivingWithoutEntry: 6, holds: { total: 2, lastFreeDaySoon: 1 },
     metrics: {

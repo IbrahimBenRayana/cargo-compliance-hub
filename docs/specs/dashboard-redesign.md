@@ -1020,7 +1020,7 @@ belong as a KPI. The current build is a flat, table-led page in the Stripe and M
 | Earlier call | Now |
 |---|---|
 | Metrics leave the page (5.2, question 4) | Metrics stay, from real filing data |
-| Motion only where needed (10) | Kept: no entrance animation. Motion is interaction only: tab underline, chart morph between measures, hover crosshair |
+| Motion only where needed (10) | Short and functional: see the polish round below |
 | Focus Frame, Cutoff horizon as hero, clear-state logo (1) | Removed. They read as decoration |
 | No figure shown twice (13) | Every figure has one source, and a repeat is fine when it helps |
 
@@ -1028,6 +1028,14 @@ belong as a KPI. The current build is a flat, table-led page in the Stripe and M
 figures; Action items table with Issue, Shipment, Importer, Due and action columns, grouped Now, Soon,
 Later; beside it ISF cutoffs, Awaiting response and Shipments by stage; Filing activity chart with
 measure tabs and a previous-period line; beside it Top rejection reasons and Open items by importer.
+
+**Polish round.** Same layout and same data. Every section gained colour from one small vocabulary
+(urgent, soon, info, entry, done), and rail panels became cards. Action items now has numbered
+pagination at 10 rows per page, with Now, Soon and Later as labels in the ranked list rather than
+collapsible groups. Loading is a shimmering skeleton of the real layout, plus a thin moving bar while a
+page of rows loads. Motion: one short opening per session, rows easing in on a new page, bars growing,
+the chart drawing in and gliding between measures, sliding tab and page indicators, a row accent and
+arrow on hover. All of it uses transform and opacity and respects reduced motion.
 
 **Rules that keep it from looking generated:** flat surfaces with hairlines, no shadows, no gradients,
 no rings, no equal KPI tiles, no trend arrows, no pastel pills on rows, no uppercase eyebrows, no
@@ -1041,7 +1049,7 @@ count-ups, one hue for charts, plain words for change ("up 5 pts"), straight lin
 | Next ISF cutoff | How long there is | Open ISFs |
 | Sent before cutoff | Are we filing on time | 30 days, against the 30 before |
 | Accepted first time | Is our data good | 30 days, against the 30 before |
-| Arriving without entry | Which entries to start | Stage rules, 7 days. Plain Arriving on ISF-only plans |
+| Arriving, no entry | Which entries to start | Stage rules, 7 days. Plain Arriving on ISF-only plans |
 | On hold | What is stuck, and what risks storage charges | Filing holds, terminal holds, last free day within 3 days |
 | Filing activity | How volume is trending | Daily counts, with the previous period |
 | Billed this month, or included ISFs used | What it costs | Billing, owners and admins only |

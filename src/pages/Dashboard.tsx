@@ -4,6 +4,7 @@
  */
 import { Suspense } from 'react';
 import { useCurrentUser } from '@/hooks/useAuth';
+import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton';
 import { PageLoading } from '@/components/PageLoading';
 import { lazyPage } from '@/lib/lazyPage';
 
@@ -13,7 +14,7 @@ const Home = lazyPage(() => import('@/components/dashboard/DashboardHome'), 'def
 export default function Dashboard() {
   const { data: user } = useCurrentUser();
   return (
-    <Suspense fallback={<PageLoading />}>
+    <Suspense fallback={user?.features?.dashboardV2 ? <DashboardSkeleton /> : <PageLoading />}>
       {user?.features?.dashboardV2 ? <Home /> : <Classic />}
     </Suspense>
   );

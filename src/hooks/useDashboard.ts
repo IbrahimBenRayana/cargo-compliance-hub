@@ -14,11 +14,12 @@ export function useDashboard() {
   });
 }
 
-export function useFilteredActions(filter: ActionFilter) {
+/** Any page of the queue. The first unfiltered page already came with the dashboard. */
+export function useActionsPage(filter: ActionFilter, page: number) {
   return useQuery({
-    queryKey: ['dashboard', 'actions', filter],
-    queryFn: () => dashboardApi.actions({ filter, limit: 50 }),
-    enabled: filter !== 'all',
+    queryKey: ['dashboard', 'actions', filter, page],
+    queryFn: () => dashboardApi.actions({ filter, page }),
+    enabled: filter !== 'all' || page > 1,
     staleTime: 15_000,
     placeholderData: keepPreviousData,
   });
