@@ -12,7 +12,6 @@ import { computeMetrics, type MetricRows } from './metrics.js';
 import type { DashboardResponse } from './types.js';
 
 const DAY = 86_400_000;
-const RECENT_SHOWN = 8;
 
 const FILING_COLUMNS = {
   id: true, filingType: true, status: true, cbpState: true, pendingAction: true, lastTransmissionId: true,
@@ -73,47 +72,15 @@ export async function loadLive(orgId: string, opts: { abi: boolean; tracking: bo
 
   const holds = tracking
     ? await prisma.trackedShipment.findMany({
-        where: { orgId, hasHolds: true },
-        select: { id: true, filingId: true, requestNumber: true, updatedAt: true, createdById: true },
+        where: {
+          orgId,
+          OR: [{ hasHolds: true }, { earliestPickupLfd: { gte: now, lte: new Date(now.getTime() + 3 * DAY) } }],
+        },
+        select: { id: true, filingId: true, requestNumber: true, updatedAt: true, createdById: true, hasHolds: true, earliestPickupLfd: true },
       })
     : [];
 
   return { filings, entries, transmissions: new Map(txRows.map((t) => [t.id, t])), holds };
-}
-
-const FILING_VERB: Record<string, string> = { accepted: 'ISF accepted', rejected: 'ISF rejected', submitted: 'ISF sent', amended: 'ISF change sent', cancelled: 'ISF cancelled' };
-const ENTRY_VERB: Record<string, string> = { ACCEPTED: 'Entry accepted', REJECTED: 'Entry rejected', SENT: 'Entry sent', CANCELLED: 'Entry cancelled' };
-
-async function loadRecent(orgId: string, abi: boolean) {
-  const [filings, entries] = await Promise.all([
-    prisma.filing.findMany({
-      where: { orgId, status: { in: Object.keys(FILING_VERB) } },
-      orderBy: { updatedAt: 'desc' }, take: RECENT_SHOWN,
-      select: { id: true, status: true, updatedAt: true, houseBol: true, masterBol: true },
-    }),
-    abi
-      ? prisma.abiDocument.findMany({
-          where: { orgId, status: { in: Object.keys(ENTRY_VERB) } },
-          orderBy: { updatedAt: 'desc' }, take: RECENT_SHOWN,
-          select: { id: true, status: true, updatedAt: true, entryNumber: true, mbolNumber: true },
-        })
-      : [],
-  ]);
-  return [
-    ...filings.map((f) => ({ id: `isf:${f.id}`, at: f.updatedAt, text: `${FILING_VERB[f.status]} ${f.houseBol || f.masterBol || f.id.slice(0, 8)}`, href: `/shipments/${f.id}` })),
-    ...entries.map((e) => ({ id: `entry:${e.id}`, at: e.updatedAt, text: `${ENTRY_VERB[e.status]} ${e.entryNumber || e.mbolNumber || e.id.slice(0, 8)}`, href: `/abi-documents/${e.id}` })),
-  ].sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, RECENT_SHOWN)
-    .map((r) => ({ ...r, at: r.at.toISOString() }));
-}
-
-async function loadMonth(orgId: string, abi: boolean, now: Date) {
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const [isfAccepted, isfRejected, entriesAccepted] = await Promise.all([
-    prisma.filing.count({ where: { orgId, acceptedAt: { gte: start } } }),
-    prisma.filing.count({ where: { orgId, rejectedAt: { gte: start } } }),
-    abi ? prisma.abiDocument.count({ where: { orgId, status: 'ACCEPTED', updatedAt: { gte: start } } }) : 0,
-  ]);
-  return { isfAccepted, isfRejected, entriesAccepted };
 }
 
 /** Dates only, for the last 60 days: enough for two 30-day windows. */
@@ -170,21 +137,18 @@ export async function capabilitiesOf(orgId: string) {
 export async function loadDashboard({ orgId, role, now }: Viewer): Promise<DashboardResponse> {
   const { ent, abi, tracking } = await capabilitiesOf(orgId);
   const canFix = canManage(role);
-  const [data, metricRows, recent, month, cfg, anyFiling, anyEntry] = await Promise.all([
+  const [data, metricRows, cfg, anyFiling, anyEntry] = await Promise.all([
     loadLive(orgId, { abi, tracking, now }),
     loadMetricRows(orgId, abi, now),
-    loadRecent(orgId, abi),
-    canFix ? loadMonth(orgId, abi, now) : null,
     prisma.orgCbpConfig.findUnique({ where: { orgId }, select: { filerCode: true, isfFilerModeDefault: true, serviceCenterApprovedAt: true } }),
     prisma.filing.findFirst({ where: { orgId }, select: { id: true } }),
     abi ? prisma.abiDocument.findFirst({ where: { orgId }, select: { id: true } }) : null,
   ]);
   const isEmpty = !anyFiling && !anyEntry;
-  const summary = buildSummary(data, { abi, canAct: role !== 'viewer', now });
   return {
-    ...summary,
-    metrics: computeMetrics(metricRows, { abi, overdue: summary.attention.overdue, now }),
-    isEmpty, recent, month,
+    ...buildSummary(data, { abi, canAct: role !== 'viewer', now }),
+    metrics: computeMetrics(metricRows, { abi, now }),
+    isEmpty,
     blockers: computeBlockers(ent, cfg, { canFix, abi }),
     setup: isEmpty ? computeSetup(ent, { canFix }) : null,
   };

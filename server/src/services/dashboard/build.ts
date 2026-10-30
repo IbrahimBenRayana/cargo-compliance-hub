@@ -34,7 +34,15 @@ export interface EntryRow extends EntryFacts {
   userId: string;
   sentAt: Date | null;
 }
-export interface HoldRow { id: string; filingId: string | null; requestNumber: string; updatedAt: Date; createdById: string }
+export interface HoldRow {
+  id: string;
+  filingId: string | null;
+  requestNumber: string;
+  updatedAt: Date;
+  createdById: string;
+  hasHolds: boolean;
+  earliestPickupLfd: Date | null;
+}
 
 export interface Loaded {
   filings: FilingRow[];
@@ -146,7 +154,7 @@ function assemble(data: Loaded, opts: { abi: boolean; canAct: boolean; now: Date
   // A hold shows only when nothing else is already asking about that shipment.
   const busy = new Set(shipments.filter((s) => s.row && s.filing).map((s) => s.filing!.id));
   for (const h of data.holds) {
-    if (h.filingId && busy.has(h.filingId)) continue;
+    if (!h.hasHolds || (h.filingId && busy.has(h.filingId))) continue;
     const c: Classification = { kind: 'tracking_hold', lane: 'soon', due: null };
     const filing = h.filingId ? data.filings.find((f) => f.id === h.filingId) ?? null : null;
     shipments.push({
@@ -273,7 +281,7 @@ function awaitingState(tx: TransmissionFacts | undefined, now: Date): AwaitingIt
 }
 
 export function buildSummary(data: Loaded, opts: { abi: boolean; canAct: boolean; now: Date }):
-  Omit<DashboardResponse, 'isEmpty' | 'recent' | 'month' | 'blockers' | 'setup' | 'metrics'> {
+  Omit<DashboardResponse, 'isEmpty' | 'blockers' | 'setup' | 'metrics'> {
   const { abi, now } = opts;
   const shipments = assemble(data, opts);
   const rows = shipments.flatMap((s) => (s.row ? [s.row] : [])).sort(compareRows);
@@ -332,6 +340,21 @@ export function buildSummary(data: Loaded, opts: { abi: boolean; canAct: boolean
     .slice(0, WORKLOAD_SHOWN)
     .map(([name, n]) => ({ name, count: n }));
 
+  const weekOut = now.getTime() + 7 * 24 * HOUR;
+  const arrivingWithoutEntry = abi
+    ? shipments.filter((s) => s.stage === 'entry_needed' && s.filing?.estimatedArrival && s.filing.estimatedArrival.getTime() <= weekOut).length
+    : null;
+
+  const onHold = shipments.filter((s) => s.filing?.status === 'on_hold').length;
+  const threeDaysOut = now.getTime() + 3 * 24 * HOUR;
+  const holds = {
+    total: onHold + data.holds.filter((h) => h.hasHolds).length,
+    lastFreeDaySoon: data.holds.filter((h) => {
+      const lfd = h.earliestPickupLfd?.getTime();
+      return lfd !== undefined && lfd >= now.getTime() && lfd <= threeDaysOut;
+    }).length,
+  };
+
   const STUCK = new Set(['NO_RESPONSE', 'UNKNOWN', 'CONDITIONAL']);
   const byUrgency = [...awaitingAll].sort((a, b) =>
     Number(STUCK.has(b.state)) - Number(STUCK.has(a.state)) || (a.sentAt ?? '').localeCompare(b.sentAt ?? ''));
@@ -342,7 +365,7 @@ export function buildSummary(data: Loaded, opts: { abi: boolean; canAct: boolean
       now: inLane('now').length, soon: inLane('soon').length, later: inLane('later').length,
       overdue: count('overdue'), nextCutoffAt,
     },
-    flow, filters, lanes, workload,
+    flow, filters, lanes, workload, arrivingWithoutEntry, holds,
     horizon: buckets.some(Boolean) ? { startsAt: now.toISOString(), bucketHours: HORIZON_BUCKET_HOURS, buckets } : null,
     awaiting: { count: awaitingAll.length, noResponse: awaitingAll.filter((a) => STUCK.has(a.state)).length, items: byUrgency.slice(0, AWAITING_SHOWN) },
   };

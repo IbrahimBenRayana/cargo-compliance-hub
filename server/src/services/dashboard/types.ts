@@ -38,20 +38,20 @@ export interface AwaitingItem {
 }
 
 export interface RateMetric { rate: number | null; sample: number; prior: number | null }
-export interface CountMetric { total: number; prior: number; series: number[] }
+export interface CountMetric { total: number; prior: number; series: number[]; priorSeries: number[] }
 
 export interface DashboardMetrics {
   windowDays: number;
   sentOnTime: RateMetric;
   firstPass: RateMetric;
   isfSent: CountMetric;
-  outcomes: { accepted: number[]; rejected: number[]; acceptedTotal: number; rejectedTotal: number };
+  isfAccepted: CountMetric;
+  isfRejected: CountMetric;
   /** Null on plans without entries. */
   entriesAccepted: CountMetric | null;
   /** Next seven days, soonest first. */
   arrivals: number[];
   rejectionReasons: Array<{ reason: string; count: number }>;
-  exposureUsd: number;
 }
 
 export interface DashboardResponse {
@@ -64,9 +64,10 @@ export interface DashboardResponse {
   lanes: Array<{ lane: Lane; total: number; items: ActionItem[]; nextCursor: string | null }>;
   awaiting: { count: number; noResponse: number; items: AwaitingItem[] };
   workload: Array<{ name: string; count: number }>;
+  /** Shipments arrived or arriving within 7 days with no entry started. Null without entries. */
+  arrivingWithoutEntry: number | null;
+  holds: { total: number; lastFreeDaySoon: number };
   metrics: DashboardMetrics;
-  recent: Array<{ id: string; at: string; text: string; href: string }>;
-  month: { isfAccepted: number; isfRejected: number; entriesAccepted: number } | null;
   blockers: Blocker[];
   setup: SetupStep[] | null;
 }

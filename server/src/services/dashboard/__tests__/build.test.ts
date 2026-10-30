@@ -81,9 +81,41 @@ describe('buildSummary', () => {
   it('hides a hold when the shipment already has a row, and shows it otherwise', () => {
     const busy = filing({ status: 'rejected' });
     const quiet = filing({ status: 'accepted', acceptedAt: days(-30), estimatedArrival: days(-30) });
-    const hold = (id: string, filingId: string) => ({ id, filingId, requestNumber: 'TCLU1', updatedAt: hours(-1), createdById: 'u1' });
+    const hold = (id: string, filingId: string) => ({ id, filingId, requestNumber: 'TCLU1', updatedAt: hours(-1), createdById: 'u1', hasHolds: true, earliestPickupLfd: null });
     const s = buildSummary(data({ filings: [busy, quiet], holds: [hold('h1', busy.id), hold('h2', quiet.id)] }), opts);
     expect(s.lanes[1].items.map((i) => i.id)).toEqual(['tracking:h2']);
+  });
+
+  it('counts shipments near arrival with no entry, and ignores those with one', () => {
+    const near = filing({ status: 'accepted', acceptedAt: days(-1), estimatedArrival: days(3) });
+    const arrived = filing({ status: 'accepted', acceptedAt: days(-9), estimatedArrival: days(-2) });
+    const far = filing({ status: 'accepted', acceptedAt: days(-1), estimatedArrival: days(9) });
+    const covered = filing({ status: 'accepted', acceptedAt: days(-1), estimatedArrival: days(2) });
+    const s = buildSummary(data({ filings: [near, arrived, far, covered], entries: [entry({ filingId: covered.id })] }), opts);
+    expect(s.arrivingWithoutEntry).toBe(2);
+  });
+
+  it('has no arriving-without-entry figure on a plan without entries', () => {
+    expect(buildSummary(data({}), { ...opts, abi: false }).arrivingWithoutEntry).toBeNull();
+  });
+
+  it('counts CBP and terminal holds together, and last free days coming up', () => {
+    const base = { filingId: null, requestNumber: 'T', updatedAt: hours(-1), createdById: 'u1' };
+    const s = buildSummary(data({
+      filings: [filing({ status: 'on_hold' })],
+      holds: [
+        { ...base, id: 'h1', hasHolds: true, earliestPickupLfd: null },
+        { ...base, id: 'h2', hasHolds: false, earliestPickupLfd: days(2) },
+        { ...base, id: 'h3', hasHolds: false, earliestPickupLfd: days(5) },
+        { ...base, id: 'h4', hasHolds: false, earliestPickupLfd: days(-1) },
+      ],
+    }), opts);
+    expect(s.holds).toEqual({ total: 2, lastFreeDaySoon: 1 });
+  });
+
+  it('never raises a queue row for a last free day alone', () => {
+    const s = buildSummary(data({ holds: [{ id: 'h', filingId: null, requestNumber: 'T', updatedAt: hours(-1), createdById: 'u1', hasHolds: false, earliestPickupLfd: days(1) }] }), opts);
+    expect(s.filters[0].count).toBe(0);
   });
 
   it('counts awaiting items, stuck ones first, with no promise about timing', () => {

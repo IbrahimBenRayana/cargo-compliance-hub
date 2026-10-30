@@ -11,8 +11,6 @@ const DAY = 86_400_000;
 const WINDOW_DAYS = 30;
 const ARRIVAL_DAYS = 7;
 const REASONS_SHOWN = 3;
-/** Liquidated damages per ISF violation. Shown as an upper figure, never as a charge. */
-export const ISF_EXPOSURE_USD = 5_000;
 
 export interface MetricRows {
   filings: Array<{
@@ -32,15 +30,19 @@ export interface MetricRows {
   everRejected: Set<string>;
 }
 
-export function computeMetrics(rows: MetricRows, opts: { abi: boolean; overdue: number; now: Date }): DashboardMetrics {
-  const { abi, overdue, now } = opts;
+export function computeMetrics(rows: MetricRows, opts: { abi: boolean; now: Date }): DashboardMetrics {
+  const { abi, now } = opts;
   const age = (d: Date) => (now.getTime() - d.getTime()) / DAY;
   const inWindow = (d: Date | null): d is Date => !!d && age(d) >= 0 && age(d) < WINDOW_DAYS;
   const inPrior = (d: Date | null): d is Date => !!d && age(d) >= WINDOW_DAYS && age(d) < 2 * WINDOW_DAYS;
 
-  const series = (dates: Array<Date | null>) => {
+  const series = (dates: Array<Date | null>, offsetDays = 0) => {
     const out = new Array<number>(WINDOW_DAYS).fill(0);
-    for (const d of dates) if (inWindow(d)) out[WINDOW_DAYS - 1 - Math.floor(age(d))] += 1;
+    for (const d of dates) {
+      if (!d) continue;
+      const days = Math.floor(age(d)) - offsetDays;
+      if (days >= 0 && days < WINDOW_DAYS) out[WINDOW_DAYS - 1 - days] += 1;
+    }
     return out;
   };
   const sumOf = (a: number[]) => a.reduce((x, y) => x + y, 0);
@@ -59,9 +61,11 @@ export function computeMetrics(rows: MetricRows, opts: { abi: boolean; overdue: 
     return { rate: pct(clean, accepted.length), sample: accepted.length };
   }
 
-  const sent = series(filings.map((f) => f.submittedAt));
-  const accepted = series(filings.map((f) => f.acceptedAt));
-  const rejected = series(filings.map((f) => f.rejectedAt));
+  const count = (dates: Array<Date | null>) => {
+    const current = series(dates);
+    const prior = series(dates, WINDOW_DAYS);
+    return { total: sumOf(current), prior: sumOf(prior), series: current, priorSeries: prior };
+  };
 
   const arrivals = new Array<number>(ARRIVAL_DAYS).fill(0);
   for (const f of filings) {
@@ -77,22 +81,18 @@ export function computeMetrics(rows: MetricRows, opts: { abi: boolean; overdue: 
     reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
   }
 
-  const entrySeries = series(rows.entries.map((e) => e.at));
-
   return {
     windowDays: WINDOW_DAYS,
     sentOnTime: { ...onTime(inWindow), prior: onTime(inPrior).rate },
     firstPass: { ...firstPass(inWindow), prior: firstPass(inPrior).rate },
-    isfSent: { total: sumOf(sent), prior: filings.filter((f) => inPrior(f.submittedAt)).length, series: sent },
-    outcomes: { accepted, rejected, acceptedTotal: sumOf(accepted), rejectedTotal: sumOf(rejected) },
-    entriesAccepted: abi
-      ? { total: sumOf(entrySeries), prior: rows.entries.filter((e) => inPrior(e.at)).length, series: entrySeries }
-      : null,
+    isfSent: count(filings.map((f) => f.submittedAt)),
+    isfAccepted: count(filings.map((f) => f.acceptedAt)),
+    isfRejected: count(filings.map((f) => f.rejectedAt)),
+    entriesAccepted: abi ? count(rows.entries.map((e) => e.at)) : null,
     arrivals,
     rejectionReasons: [...reasons.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .slice(0, REASONS_SHOWN)
-      .map(([reason, count]) => ({ reason, count })),
-    exposureUsd: overdue * ISF_EXPOSURE_USD,
+      .map(([reason, n]) => ({ reason, count: n })),
   };
 }

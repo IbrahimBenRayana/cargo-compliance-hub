@@ -61,12 +61,6 @@ describe('GET /dashboard data access', () => {
     expect(r.flow.map((f) => f.key)).toEqual(['isf_to_send', 'isf_sent', 'accepted']);
   });
 
-  it('gives month figures to owners and admins only', async () => {
-    expect((await loadDashboard({ orgId: ORG, role: 'admin', now: new Date() })).month).not.toBeNull();
-    expect((await loadDashboard({ orgId: ORG, role: 'operator', now: new Date() })).month).toBeNull();
-    expect((await loadDashboard({ orgId: ORG, role: 'viewer', now: new Date() })).month).toBeNull();
-  });
-
   it('never selects a JSON payload', async () => {
     capabilities.push(CAPABILITIES.ABI_ENTRY);
     await loadDashboard({ orgId: ORG, role: 'owner', now: new Date() });

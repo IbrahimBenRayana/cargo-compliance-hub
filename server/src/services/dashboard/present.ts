@@ -16,7 +16,7 @@ export function safeRejectionSummary(raw: string | null | undefined): string | n
   return text.length > MAX_REASON ? `${text.slice(0, MAX_REASON - 1)}…` : text;
 }
 
-const CHANGE_REJECTED = 'CBP rejected your change. The earlier version is on file.';
+const CHANGE_REJECTED = 'Change rejected. Earlier version on file.';
 
 export function titleFor(c: Classification, reason: string | null, arrived: boolean): string {
   switch (c.kind) {

@@ -9,7 +9,7 @@ function isf(over: Partial<MetricRows['filings'][number]> = {}): MetricRows['fil
   return { id: 'f', status: 'accepted', submittedAt: null, acceptedAt: null, rejectedAt: null, estimatedDeparture: null, estimatedLading: null, estimatedArrival: null, rejectionReason: null, ...over };
 }
 const rows = (over: Partial<MetricRows> = {}): MetricRows => ({ filings: [], entries: [], everRejected: new Set(), ...over });
-const opts = { abi: true, overdue: 0, now: NOW };
+const opts = { abi: true, now: NOW };
 
 describe('computeMetrics: sent before cutoff', () => {
   it('compares each send with its cutoff', () => {
@@ -52,11 +52,17 @@ describe('computeMetrics: volume', () => {
     expect(m.isfSent.series[0]).toBe(1);
     expect(m.isfSent).toMatchObject({ total: 2, prior: 1 });
   });
+  it('keeps the window before, day by day, so the two can be drawn together', () => {
+    const m = computeMetrics(rows({ filings: [isf({ submittedAt: days(-30.5) }), isf({ submittedAt: days(-59.5) })] }), opts);
+    expect(m.isfSent.priorSeries).toHaveLength(30);
+    expect(m.isfSent.priorSeries[29]).toBe(1);
+    expect(m.isfSent.priorSeries[0]).toBe(1);
+  });
   it('splits accepted from rejected', () => {
     const m = computeMetrics(rows({ filings: [isf({ acceptedAt: hours(-1) }), isf({ status: 'rejected', rejectedAt: hours(-1) })] }), opts);
-    expect(m.outcomes.accepted[29]).toBe(1);
-    expect(m.outcomes.rejected[29]).toBe(1);
-    expect(m.outcomes).toMatchObject({ acceptedTotal: 1, rejectedTotal: 1 });
+    expect(m.isfAccepted).toMatchObject({ total: 1 });
+    expect(m.isfRejected).toMatchObject({ total: 1 });
+    expect(m.isfRejected.series[29]).toBe(1);
   });
   it('leaves entries out of a plan without them', () => {
     const m = computeMetrics(rows({ entries: [{ at: hours(-1) }] }), { ...opts, abi: false });
@@ -96,9 +102,3 @@ describe('computeMetrics: rejection reasons', () => {
   });
 });
 
-describe('computeMetrics: exposure', () => {
-  it('counts up to $5,000 for each overdue ISF', () => {
-    expect(computeMetrics(rows(), { ...opts, overdue: 2 }).exposureUsd).toBe(10_000);
-    expect(computeMetrics(rows(), opts).exposureUsd).toBe(0);
-  });
-});
