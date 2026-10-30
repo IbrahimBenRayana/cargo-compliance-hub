@@ -992,8 +992,8 @@ export const billingApi = {
         id: string;
         name: string;
         description: string | null;
-        /** This org's price of one accepted ISF (cents). */
-        perFilingCents: number;
+        /** This org's price of one accepted ISF (cents). Owners and admins only. */
+        perFilingCents: number | null;
         /** Self-serve plan (false = set up by MyCargoLens). */
         isPublic: boolean;
         capabilities: string[];
@@ -1006,13 +1006,15 @@ export const billingApi = {
       canFile: boolean;
       status: string | null;
       delinquent: boolean;
-      /** Saved card summary, or null when none on file. */
+      /** A card is on file. Every role sees this. */
+      cardOnFile: boolean;
+      /** Saved card summary. Owners and admins only; null otherwise or when none on file. */
       card: BillingCard | null;
       /** "card" = charged per filing; "invoiced" = monthly invoice by ACH. */
       billingMode: 'card' | 'invoiced';
       /** New submissions are on hold (e.g. an overdue invoice). */
       billingHold: boolean;
-      /** Invoiced accounts only: terms, ACH account and this month so far. */
+      /** Invoiced accounts only: terms, ACH account and this month so far. Owners and admins only. */
       invoicing: {
         monthlyMinimumCents: number;
         includedIsfs: number;
@@ -1024,7 +1026,8 @@ export const billingApi = {
         periodStart: string | null;
         periodEnd: string | null;
         filingsBilled: number;
-        amountCents: number;
+        /** Owners and admins only. */
+        amountCents: number | null;
       };
     }>('/api/v1/billing/subscription');
   },
