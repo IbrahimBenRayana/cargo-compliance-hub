@@ -173,23 +173,17 @@ describe('DashboardHome', () => {
     expect(await screen.findByText('One house bill')).toBeInTheDocument();
   });
 
-  it('mentions the penalty only while an ISF is late or due today', async () => {
-    show();
-    expect(await screen.findByText(/liquidated damages of up to \$5,000/)).toBeInTheDocument();
-  });
-
-  it('stays quiet about the penalty when nothing is close', async () => {
+  it('says so when nothing needs attention', async () => {
     const d = dashboard({ attention: { now: 0, soon: 0, later: 0, overdue: 0, nextCutoffAt: null }, actions: { items: [], total: 0, page: 1, pageCount: 1 } });
     d.filters = d.filters.map((f) => ({ ...f, count: 0 }));
     show(d);
     expect(await screen.findByText('Nothing needs attention right now.')).toBeInTheDocument();
-    expect(screen.queryByText(/\$5,000/)).toBeNull();
   });
 
-  it('never presents a penalty figure as a number on the dashboard', async () => {
-    show();
+  it('shows no penalty figure anywhere', async () => {
+    const { container } = show();
     await screen.findByRole('table');
-    expect(screen.queryByText('Late ISF exposure')).toBeNull();
+    expect(container.textContent).not.toMatch(/\$5,000|liquidated damages|exposure/i);
   });
 
   it('offers no create buttons to a viewer', async () => {

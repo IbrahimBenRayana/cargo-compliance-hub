@@ -1059,8 +1059,8 @@ count-ups, one hue for charts, plain words for change ("up 5 pts"), straight lin
 **Not available yet, because the data is not stored:** duty and fees paid, continuous bond usage, and
 days to cargo release. All three would be valuable and need new fields first.
 
-**Removed:** Late ISF exposure as a KPI. A one-line note under the table says a late ISF can draw
-liquidated damages of up to $5,000, shown only while an ISF is overdue or due within 24 hours.
+**Removed:** any $5,000 penalty figure. It was a KPI, then a note under the table, and is now gone. The
+wording was never confirmed, so it does not appear on this page.
 
 **Measured** on a real Postgres with the real migrations, synthetic data: 12,000 filings p50 73 ms,
 34 KB. The 120,000-filing case in 9.6 has not been remeasured.

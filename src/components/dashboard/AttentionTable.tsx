@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
-import { AlertTriangle, ArrowRight, CalendarX, CheckCircle2, Clock, FilePen, FilePlus2, Hourglass, Info, Lock, PauseCircle, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CalendarX, CheckCircle2, Clock, FilePen, FilePlus2, Hourglass, Lock, PauseCircle, XCircle } from 'lucide-react';
 import { dashboardApi } from '@/api/client';
 import { useActionsPage } from '@/hooks/useDashboard';
 import { countdownLabel, urgencyOf, type Urgency } from '@/lib/countdown';
@@ -252,7 +252,6 @@ export function AttentionTable({ data, now }: { data: DashboardResponse; now: nu
   }
 
   const { attention, filters } = data;
-  const dueSoon = attention.overdue + (filters.find((f) => f.key === 'due_today')?.count ?? 0);
   const counts = filter === 'all' ? attention : null;
   return (
     <section aria-labelledby="attention-title" className="dash-in relative min-w-0 overflow-hidden rounded-xl border border-border/70 bg-card shadow-card" style={{ '--i': 2 } as React.CSSProperties}>
@@ -278,12 +277,6 @@ export function AttentionTable({ data, now }: { data: DashboardResponse; now: nu
           </table>
           <Pagination page={view.page} pageCount={view.pageCount} total={view.total} pageSize={PAGE_SIZE} onChange={setPage} />
         </>
-      )}
-      {dueSoon > 0 && (
-        <p className="flex items-center gap-2 border-t border-border/60 bg-soon-tint px-4 py-2 text-[12.5px] text-soon">
-          <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          A late ISF can draw liquidated damages of up to $5,000.
-        </p>
       )}
     </section>
   );
