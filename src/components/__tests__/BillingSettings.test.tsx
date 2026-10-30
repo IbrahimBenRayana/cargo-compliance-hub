@@ -60,6 +60,37 @@ describe('BillingSettings', () => {
     expect(screen.getByText(/Only owners and admins can change billing/)).toBeInTheDocument();
   });
 
+  describe('the trimmed response an operator or viewer gets', () => {
+    const trimmed = { pricing: null, card: null, cardOnFile: true, usage: { filingsBilled: 3, amountCents: null } };
+
+    it('says a card is on file instead of asking them to add one', () => {
+      role = 'operator';
+      extra = trimmed;
+      renderIt();
+      expect(screen.getByText(/A card is on file/)).toBeInTheDocument();
+      expect(screen.queryByText(/No card on file/)).not.toBeInTheDocument();
+    });
+
+    it('leaves out the total rather than showing $0', () => {
+      role = 'viewer';
+      extra = trimmed;
+      renderIt();
+      expect(screen.getByText('Shipments charged')).toBeInTheDocument();
+      expect(screen.queryByText('Total charged')).not.toBeInTheDocument();
+    });
+
+    it('an invoiced account shows no made-up prices, bank state or $0 estimate', () => {
+      role = 'operator';
+      extra = { ...trimmed, billingMode: 'invoiced', cardOnFile: false, invoicing: null };
+      renderIt();
+      expect(screen.getByText('ISF Filing')).toBeInTheDocument();
+      expect(screen.getByText(/Only owners and admins can change billing/)).toBeInTheDocument();
+      expect(screen.queryByText(/ISFs at no charge/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/No bank account yet/)).not.toBeInTheDocument();
+      expect(screen.queryByText('Estimated total')).not.toBeInTheDocument();
+    });
+  });
+
   it('an invoiced account sees its monthly terms, the ACH account and the month so far — no card', () => {
     extra = {
       billingMode: 'invoiced',
