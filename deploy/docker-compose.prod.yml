@@ -104,6 +104,8 @@ services:
       # and the prospect confirmation email (off until the founder approves copy).
       LEADS_NOTIFY_TO: ${LEADS_NOTIFY_TO:-ibrahim.rayana@mycargolens.com}
       LEAD_CONFIRMATION_EMAIL: ${LEAD_CONFIRMATION_EMAIL:-false}
+      # Which dashboard people see: off | staff | all. Setting off is the rollback.
+      DASHBOARD_V2: ${DASHBOARD_V2:-off}
 
       # AI — provider-agnostic. AI_PROVIDER chooses backend; AI_API_KEY is matching credential.
       AI_ASSESSMENT_ENABLED:    ${AI_ASSESSMENT_ENABLED:-false}

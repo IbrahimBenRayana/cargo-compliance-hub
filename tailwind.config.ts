@@ -48,6 +48,12 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        urgent: { DEFAULT: "hsl(var(--urgent-fg))", tint: "hsl(var(--urgent-tint))" },
+        soon: { DEFAULT: "hsl(var(--soon-fg))", tint: "hsl(var(--soon-tint))" },
+        calm: "hsl(var(--calm-fg))",
+        done: { DEFAULT: "hsl(var(--done-fg))", tint: "hsl(var(--done-tint))" },
+        info: { DEFAULT: "hsl(var(--info-fg))", tint: "hsl(var(--info-tint))" },
+        entry: { DEFAULT: "hsl(var(--entry-fg))", tint: "hsl(var(--entry-tint))" },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
