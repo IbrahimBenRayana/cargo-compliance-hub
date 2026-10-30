@@ -390,6 +390,8 @@ model Filing {
   @@index([filingDeadline])
   @@index([masterBol])
   @@index([consolidationId])
+  @@index([orgId, status, filingDeadline])
+  @@index([orgId, updatedAt(sort: Desc)])
   @@map("filings")
 }
 
@@ -951,6 +953,7 @@ model AbiDocument {
   @@index([mbolNumber])
   @@index([entryNumber])
   @@index([orgId, createdAt])
+  @@index([orgId, filingId, updatedAt(sort: Desc)])
   @@map("abi_documents")
 }
 

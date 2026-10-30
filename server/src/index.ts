@@ -27,6 +27,7 @@ import apiKeyRoutes from './routes/apiKeys.js';
 import webhookRoutes from './routes/webhooks.js';
 import publicApiRoutes from './routes/publicApi.js';
 import complianceRoutes from './routes/compliance.js';
+import dashboardRoutes from './routes/dashboard.js';
 import filingRoutes from './routes/filings.js';
 import submissionLogRoutes from './routes/submissionLogs.js';
 import notificationRoutes from './routes/notifications.js';
@@ -158,6 +159,7 @@ app.use('/api/v1/manifest-queries', manifestQueryRoutes);
 app.use('/api/v1/abi-documents', abiDocumentsRoutes);
 app.use('/api/v1/duty-calculation', dutyCalculationRoutes);
 app.use('/api/v1/compliance', complianceRoutes);
+app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/tracking', trackingRoutes);
 // Public, unauthenticated — marketing-site contact form. Rate-limited per IP
 // inside the route module. Mount here so it sits under the same /api/v1
