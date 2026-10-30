@@ -259,7 +259,7 @@ router.get('/liquidation-tracker', async (req: AuthRequest, res: Response): Prom
 // ranked by urgency. This endpoint aggregates ALL sources of action a US
 // importer should know about RIGHT NOW:
 //
-//   1. ISF deadline imminent  — filings due within 72h, not yet submitted
+//   1. ISF deadline           — draft or rejected, due within 72h or overdue
 //   2. CBP rejection           — every currently-rejected filing
 //   3. UFLPA high/elevated     — supply-chain risk to triage
 //   4. PSC window closing      — accepted filings within 14d of PSC deadline
@@ -306,10 +306,14 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
   const awaitingCbp = filings.filter((f) => f.status === 'submitted').length;
   // "Issues" means: rejected, on-hold, or draft with deadline within 7d.
   const sevenDaysOut = new Date(now + 7 * DAY);
+  const sailsWithinWeek = (f: typeof filings[number]) => {
+    const sailing = f.estimatedDeparture ?? f.estimatedLading;
+    return !!sailing && sailing <= sevenDaysOut;
+  };
   const withIssues = filings.filter((f) =>
     f.status === 'rejected' ||
     f.status === 'on_hold' ||
-    (f.status === 'draft' && f.estimatedDeparture && f.estimatedDeparture <= sevenDaysOut),
+    (f.status === 'draft' && sailsWithinWeek(f)),
   ).length;
 
   // High-risk: every filing whose UFLPA assessment is 'high'. (Elevated is
@@ -416,18 +420,24 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
     return next;
   }
 
-  // 1. ISF deadlines — submitted-by clock is estimatedDeparture - 24h.
-  //    Anything within 72h of that cutoff is an action item.
+  // 1. ISF deadlines — the clock runs until CBP has the ISF, so a rejected
+  //    filing counts too. Within 72h of the cutoff is an action item, and it
+  //    stays one once overdue: the filing is still owed.
   for (const f of filings) {
-    if (f.status !== 'draft') continue;
-    if (!f.estimatedDeparture) continue;
-    const cutoff = isfFilingDeadline(f.estimatedDeparture, f.estimatedLading).getTime();
+    if (f.status !== 'draft' && f.status !== 'rejected') continue;
+    const deadline = isfFilingDeadline(f.estimatedDeparture, f.estimatedLading);
+    if (!deadline) continue;
+    const cutoff = deadline.getTime();
     const hoursToCutoff = (cutoff - now) / (60 * 60 * 1000);
-    if (hoursToCutoff < -24 || hoursToCutoff > 72) continue;
+    if (hoursToCutoff > 72) continue;
     const bol = f.houseBol || f.masterBol || f.id.slice(0, 8);
     const severity: ActionItem['severity'] =
       hoursToCutoff <= 24 ? 'critical' : hoursToCutoff <= 48 ? 'high' : 'medium';
     const en = enrich(f);
+    const shortDate = (d: Date) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const sailing = f.estimatedDeparture
+      ? `Vessel departs ${shortDate(f.estimatedDeparture)}.`
+      : `Cargo lades ${shortDate(f.estimatedLading!)}.`;
     items.push({
       id: `deadline:${f.id}`,
       kind: 'deadline',
@@ -436,7 +446,9 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
         hoursToCutoff <= 0
           ? `ISF deadline passed — ${bol}`
           : `ISF deadline in ${Math.round(hoursToCutoff)}h — ${bol}`,
-      context: `Vessel departs ${new Date(f.estimatedDeparture).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. Submit before cutoff to avoid CBP penalty.`,
+      context: hoursToCutoff <= 0
+        ? `${sailing} The cutoff has passed. File as soon as you can to limit CBP penalty exposure.`
+        : `${sailing} Submit before cutoff to avoid CBP penalty.`,
       filingId: f.id,
       bol,
       timestamp: f.createdAt.getTime(),
