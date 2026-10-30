@@ -49,7 +49,7 @@ export function CutoffPanel({ horizon, index }: { horizon: NonNullable<Dashboard
       </div>
       <div className="mt-3 flex items-center gap-4 text-[12.5px] text-muted-foreground">
         <span className="flex items-center gap-1.5"><i className={cn('h-2 w-2 rounded-[2px]', FILL.urgent)} /><b className="font-medium tabular-nums text-foreground">{in24}</b> within 24h</span>
-        <span className="flex items-center gap-1.5"><i className={cn('h-2 w-2 rounded-[2px]', FILL.soon)} /><b className="font-medium tabular-nums text-foreground">{total - in24}</b> within 72h</span>
+        <span className="flex items-center gap-1.5"><i className={cn('h-2 w-2 rounded-[2px]', FILL.soon)} /><b className="font-medium tabular-nums text-foreground">{total - in24}</b> in 24 to 72h</span>
       </div>
     </Panel>
   );

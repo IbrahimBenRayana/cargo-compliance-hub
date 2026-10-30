@@ -51,7 +51,7 @@ describe('DashboardHome', () => {
   it('opens on the numbers that matter today', async () => {
     show();
     expect(await screen.findByRole('heading', { level: 1, name: 'Today' })).toBeInTheDocument();
-    expect(screen.getByText('Needs attention', { selector: 'dt span' })).toBeInTheDocument();
+    expect(screen.getByText('Needs attention', { selector: 'dt' })).toBeInTheDocument();
     expect(screen.getByText('1 overdue')).toBeInTheDocument();
     expect(screen.getByText('Next ISF cutoff')).toBeInTheDocument();
   });

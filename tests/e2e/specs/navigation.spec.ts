@@ -5,7 +5,7 @@ import { gotoAuthed } from './helpers';
 // (no error boundary, no blank page). Uses a text matcher per route so it is
 // resilient to small markup changes.
 const ROUTES: Array<{ path: string; expect: RegExp; name: string }> = [
-  { name: 'Dashboard',       path: '/',                 expect: /shipments? in flight|your shipments will flow through here/i },
+  { name: 'Dashboard',       path: '/',                 expect: /^Today$|open shipments?|your shipments will flow through here/i },
   { name: 'Shipments',       path: '/shipments',        expect: /manage.*isf|create new isf|shipments/i },
   { name: 'Compliance',      path: '/compliance',       expect: /compliance/i },
   { name: 'Manifest Query',  path: '/manifest-query',   expect: /manifest query/i },

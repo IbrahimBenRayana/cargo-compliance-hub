@@ -71,13 +71,13 @@ export function StatStrip({ data, now }: { data: DashboardResponse; now: number 
     <dl className="dash-in grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border/70 bg-border/70 shadow-card sm:grid-cols-3 xl:grid-cols-6" style={{ '--i': 1 } as React.CSSProperties}>
       {buildStats(data, now).map((s) => (
         <div key={s.label} className="min-w-0 bg-card p-4 transition-colors duration-150 can-hover:hover:bg-muted/30">
-          <dt className="flex items-start justify-between gap-1.5 text-[12px] leading-[18px] text-muted-foreground sm:gap-2 sm:text-[12.5px]">
-            <span className="min-w-0 truncate">{s.label}</span>
-            <span className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-lg sm:h-7 sm:w-7', TINT[s.tone])}>
-              <s.icon className="h-3.5 w-3.5" aria-hidden />
+          <dt className="truncate text-[12.5px] leading-[18px] text-muted-foreground" title={s.label}>{s.label}</dt>
+          <dd className="mt-1 flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate text-[22px] font-semibold leading-7 tracking-[-0.015em] tabular-nums">{s.value}</span>
+            <span aria-hidden className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', TINT[s.tone])}>
+              <s.icon className="h-3.5 w-3.5" />
             </span>
-          </dt>
-          <dd className="mt-1 text-[22px] font-semibold leading-7 tracking-[-0.015em] tabular-nums">{s.value}</dd>
+          </dd>
           <dd className="mt-1 flex min-h-[20px] items-center gap-1.5 text-[12px] tabular-nums text-muted-foreground">
             {s.note && <span className="min-w-0 truncate" title={s.note}>{s.note}</span>}
             {s.badge && <span className={cn('shrink-0 rounded-md px-1.5 py-0.5 text-[11.5px] font-medium', TINT[s.badge.tone])}>{s.badge.text}</span>}
