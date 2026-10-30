@@ -7,15 +7,14 @@ import { isOverdue } from '../cbp/unanswered.js';
 import { classifyEntry, classifyFiling, compareActions, isfCutoff, stageOf } from './rules.js';
 import type { Classification, EntryFacts, FilingFacts, Lane, Stage, TransmissionFacts } from './rules.js';
 import { primaryFor, safeRejectionSummary, titleFor } from './present.js';
-import type { ActionFilter, ActionItem, AwaitingItem, DashboardResponse } from './types.js';
+import type { ActionFilter, ActionItem, ActionsPage, AwaitingItem, DashboardResponse } from './types.js';
 
-export const PAGE_SIZE = 25;
+export const PAGE_SIZE = 10;
 const HOUR = 3_600_000;
 const HORIZON_BUCKETS = 12;
 const HORIZON_BUCKET_HOURS = 6;
 const AWAITING_SHOWN = 5;
 const WORKLOAD_SHOWN = 5;
-const LANES: Lane[] = ['now', 'soon', 'later'];
 
 export interface FilingRow extends FilingFacts {
   houseBol: string | null;
@@ -218,48 +217,25 @@ export function collapseGroups(rows: QueueRow[]): ActionItem[] {
   return out;
 }
 
-export function encodeCursor(r: QueueRow): string {
-  return Buffer.from(JSON.stringify([r.lane, r.due?.at.getTime() ?? null, r.occurredAt.getTime(), r.id])).toString('base64url');
-}
-
-export function decodeCursor(cursor: string): Pick<QueueRow, 'lane' | 'due' | 'occurredAt' | 'id'> | null {
-  try {
-    const [lane, due, occurred, id] = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-    if (!LANES.includes(lane) || typeof id !== 'string' || typeof occurred !== 'number') return null;
-    return { lane, id, occurredAt: new Date(occurred), due: typeof due === 'number' ? { at: new Date(due), basis: 'LADING' } : null };
-  } catch {
-    return null;
-  }
-}
-
-function pageOf(rows: QueueRow[], limit: number) {
-  const page = rows.slice(0, limit);
-  const nextCursor = rows.length > limit ? encodeCursor(page[page.length - 1]) : null;
-  return { items: collapseGroups(page), nextCursor };
-}
-
 export function sortedRows(data: Loaded, opts: { abi: boolean; canAct: boolean; now: Date }): QueueRow[] {
   return assemble(data, opts).flatMap((s) => (s.row ? [s.row] : [])).sort(compareRows);
 }
 
 export function queryActions(rows: QueueRow[], q: {
   lane?: Lane; filter?: ActionFilter; mine?: boolean; userId: string; importer?: string; group?: string;
-  cursor?: Pick<QueueRow, 'lane' | 'due' | 'occurredAt' | 'id'> | null; limit: number; now: Date;
-}) {
+  page: number; limit: number; now: Date;
+}): ActionsPage {
   const hit = rows.filter((r) =>
     (!q.lane || r.lane === q.lane)
     && matchesFilter(r, q.filter ?? 'all', q.now)
     && (!q.mine || r.createdById === q.userId)
     && (!q.importer || r.importer === q.importer)
     && (!q.group || r.consolidationId === q.group));
-  const from = q.cursor ? hit.filter((r) => compareActions(r, q.cursor!) > 0) : hit;
   // A group's members are the answer when expanding it, so they stay separate rows.
-  const page = from.slice(0, q.limit);
-  return {
-    items: q.group ? page.map((r) => r.item) : collapseGroups(page),
-    nextCursor: from.length > q.limit ? encodeCursor(page[page.length - 1]) : null,
-    total: hit.length,
-  };
+  const all = q.group ? hit.map((r) => r.item) : collapseGroups(hit);
+  const pageCount = Math.max(1, Math.ceil(all.length / q.limit));
+  const page = Math.min(q.page, pageCount);
+  return { items: all.slice((page - 1) * q.limit, page * q.limit), total: all.length, page, pageCount };
 }
 
 const FLOW: Record<Stage, { label: string; list: string }> = {
@@ -293,10 +269,6 @@ export function buildSummary(data: Loaded, opts: { abi: boolean; canAct: boolean
   }));
 
   const inLane = (lane: Lane) => rows.filter((r) => r.lane === lane);
-  const lanes = LANES.map((lane) => {
-    const all = inLane(lane);
-    return { lane, total: all.length, ...pageOf(all, PAGE_SIZE) };
-  });
 
   const count = (filter: ActionFilter) => rows.filter((r) => matchesFilter(r, filter, now)).length;
   const filters: DashboardResponse['filters'] = [
@@ -365,7 +337,8 @@ export function buildSummary(data: Loaded, opts: { abi: boolean; canAct: boolean
       now: inLane('now').length, soon: inLane('soon').length, later: inLane('later').length,
       overdue: count('overdue'), nextCutoffAt,
     },
-    flow, filters, lanes, workload, arrivingWithoutEntry, holds,
+    flow, filters, workload, arrivingWithoutEntry, holds,
+    actions: queryActions(rows, { userId: '', page: 1, limit: PAGE_SIZE, now }),
     horizon: buckets.some(Boolean) ? { startsAt: now.toISOString(), bucketHours: HORIZON_BUCKET_HOURS, buckets } : null,
     awaiting: { count: awaitingAll.length, noResponse: awaitingAll.filter((a) => STUCK.has(a.state)).length, items: byUrgency.slice(0, AWAITING_SHOWN) },
   };

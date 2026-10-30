@@ -37,6 +37,8 @@ export interface AwaitingItem {
   href: string;
 }
 
+export interface ActionsPage { items: ActionItem[]; total: number; page: number; pageCount: number }
+
 export interface RateMetric { rate: number | null; sample: number; prior: number | null }
 export interface CountMetric { total: number; prior: number; series: number[]; priorSeries: number[] }
 
@@ -61,7 +63,8 @@ export interface DashboardResponse {
   flow: Array<{ key: Stage; label: string; count: number; href: string }>;
   filters: Array<{ key: ActionFilter; label: string; count: number }>;
   horizon: { startsAt: string; bucketHours: 6; buckets: number[] } | null;
-  lanes: Array<{ lane: Lane; total: number; items: ActionItem[]; nextCursor: string | null }>;
+  /** First page of the ranked queue; later pages come from /actions. */
+  actions: ActionsPage;
   awaiting: { count: number; noResponse: number; items: AwaitingItem[] };
   workload: Array<{ name: string; count: number }>;
   /** Shipments arrived or arriving within 7 days with no entry started. Null without entries. */

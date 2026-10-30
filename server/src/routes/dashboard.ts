@@ -11,7 +11,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import logger from '../config/logger.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { decodeCursor, queryActions, sortedRows } from '../services/dashboard/build.js';
+import { PAGE_SIZE, queryActions, sortedRows } from '../services/dashboard/build.js';
 import { capabilitiesOf, loadDashboard, loadLive } from '../services/dashboard/load.js';
 
 const router = Router();
@@ -40,8 +40,8 @@ const actionsQuery = z.object({
   mine: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
   importer: z.string().min(1).max(255).optional(),
   group: z.string().uuid().optional(),
-  cursor: z.string().max(400).optional(),
-  limit: z.coerce.number().int().min(1).max(50).default(25),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(PAGE_SIZE),
 });
 
 router.get('/actions', async (req: AuthRequest, res: Response): Promise<void> => {
@@ -50,18 +50,12 @@ router.get('/actions', async (req: AuthRequest, res: Response): Promise<void> =>
     res.status(400).json({ error: 'Invalid query params', details: parsed.error.flatten() });
     return;
   }
-  const { cursor: rawCursor, mine, ...q } = parsed.data;
-  const cursor = rawCursor ? decodeCursor(rawCursor) : null;
-  if (rawCursor && !cursor) {
-    res.status(400).json({ error: 'Invalid cursor', code: 'INVALID_CURSOR' });
-    return;
-  }
   noStore(res);
   const now = new Date();
   const { orgId, role, id: userId } = req.user!;
   const { abi, tracking } = await capabilitiesOf(orgId);
   const rows = sortedRows(await loadLive(orgId, { abi, tracking, now }), { abi, canAct: role !== 'viewer', now });
-  res.json(queryActions(rows, { ...q, mine, userId, cursor, now }));
+  res.json(queryActions(rows, { ...parsed.data, userId, now }));
 });
 
 export default router;

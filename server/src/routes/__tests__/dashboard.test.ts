@@ -84,7 +84,7 @@ describe('GET /dashboard/actions input', () => {
 
   it.each([
     [{ lane: 'urgent' }], [{ filter: 'everything' }], [{ limit: '500' }], [{ group: 'nope' }],
-    [{ cursor: 'not-a-cursor' }], [{ importer: 'x'.repeat(256) }],
+    [{ page: '0' }], [{ importer: 'x'.repeat(256) }],
   ])('refuses %j', async (q) => {
     expect((await call(q as Record<string, string>)).statusCode).toBe(400);
   });

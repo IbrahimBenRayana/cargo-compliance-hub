@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSummary, collapseGroups, decodeCursor, encodeCursor, queryActions, sortedRows, type EntryRow, type FilingRow, type Loaded } from '../build.js';
+import { buildSummary, collapseGroups, queryActions, sortedRows, type EntryRow, type FilingRow, type Loaded } from '../build.js';
 import { safeRejectionSummary, primaryFor } from '../present.js';
 
 const NOW = new Date('2026-10-30T12:00:00Z');
@@ -50,14 +50,14 @@ describe('buildSummary', () => {
     const late = filing(dueIn(20));
     const urgent = filing(dueIn(2));
     const s = buildSummary(data({ filings: [late, urgent] }), opts);
-    expect(s.lanes[0].items.map((i) => i.id)).toEqual([`isf:${urgent.id}`, `isf:${late.id}`]);
+    expect(s.actions.items.map((i) => i.id)).toEqual([`isf:${urgent.id}`, `isf:${late.id}`]);
   });
 
-  it('caps a lane at 25 rows but counts them all', () => {
+  it('sends the first page of rows and counts them all', () => {
     const s = buildSummary(data({ filings: Array.from({ length: 40 }, () => filing(dueIn(2))) }), opts);
-    expect(s.lanes[0].total).toBe(40);
-    expect(s.lanes[0].items).toHaveLength(25);
-    expect(s.lanes[0].nextCursor).toBeTruthy();
+    expect(s.attention.now).toBe(40);
+    expect(s.actions).toMatchObject({ total: 40, page: 1, pageCount: 4 });
+    expect(s.actions.items).toHaveLength(10);
   });
 
   it('keeps entries away from an ISF-only plan', () => {
@@ -69,7 +69,7 @@ describe('buildSummary', () => {
     const f = filing({ status: 'rejected' });
     const s = buildSummary(data({ filings: [f], entries: [entry({ filingId: f.id })] }), opts);
     expect(s.filters[0].count).toBe(1);
-    expect(s.lanes[0].items[0].kind).toBe('isf_rejected');
+    expect(s.actions.items[0].kind).toBe('isf_rejected');
   });
 
   it('does not ask for an entry that already exists', () => {
@@ -83,7 +83,7 @@ describe('buildSummary', () => {
     const quiet = filing({ status: 'accepted', acceptedAt: days(-30), estimatedArrival: days(-30) });
     const hold = (id: string, filingId: string) => ({ id, filingId, requestNumber: 'TCLU1', updatedAt: hours(-1), createdById: 'u1', hasHolds: true, earliestPickupLfd: null });
     const s = buildSummary(data({ filings: [busy, quiet], holds: [hold('h1', busy.id), hold('h2', quiet.id)] }), opts);
-    expect(s.lanes[1].items.map((i) => i.id)).toEqual(['tracking:h2']);
+    expect(s.actions.items.filter((i) => i.lane === 'soon').map((i) => i.id)).toEqual(['tracking:h2']);
   });
 
   it('counts shipments near arrival with no entry, and ignores those with one', () => {
@@ -140,7 +140,7 @@ describe('buildSummary', () => {
   it('lets a viewer open a row but not act on it', () => {
     const f = filing(dueIn(2));
     const s = buildSummary(data({ filings: [f] }), { ...opts, canAct: false });
-    expect(s.lanes[0].items[0].primary).toMatchObject({ label: 'Open', href: `/shipments/${f.id}` });
+    expect(s.actions.items[0].primary).toMatchObject({ label: 'Open', href: `/shipments/${f.id}` });
   });
 });
 
@@ -148,10 +148,10 @@ describe('groups', () => {
   const cid = 'c0000000-0000-4000-8000-000000000000';
   it('collapses house bills of one consolidation and keeps shipment counts', () => {
     const s = buildSummary(data({ filings: [filing({ ...dueIn(3), consolidationId: cid }), filing({ ...dueIn(5), consolidationId: cid }), filing(dueIn(4))] }), opts);
-    expect(s.lanes[0].total).toBe(3);
-    expect(s.lanes[0].items).toHaveLength(2);
-    expect(s.lanes[0].items[0].group).toMatchObject({ id: cid, count: 2 });
-    expect(s.lanes[0].items[0].due?.at).toBe(hours(3).toISOString());
+    expect(s.attention.now).toBe(3);
+    expect(s.actions.items).toHaveLength(2);
+    expect(s.actions.items[0].group).toMatchObject({ id: cid, count: 2 });
+    expect(s.actions.items[0].due?.at).toBe(hours(3).toISOString());
   });
   it('leaves a single house bill as a plain row', () => {
     const rows = sortedRows(data({ filings: [filing({ ...dueIn(3), consolidationId: cid })] }), opts);
@@ -159,7 +159,7 @@ describe('groups', () => {
   });
   it('expands to its members', () => {
     const rows = sortedRows(data({ filings: [filing({ ...dueIn(3), consolidationId: cid }), filing({ ...dueIn(5), consolidationId: cid }), filing(dueIn(4))] }), opts);
-    const r = queryActions(rows, { group: cid, userId: 'u1', limit: 25, now: NOW });
+    const r = queryActions(rows, { group: cid, userId: 'u1', page: 1, limit: 25, now: NOW });
     expect(r.items).toHaveLength(2);
     expect(r.items.every((i) => i.group === null)).toBe(true);
   });
@@ -168,37 +168,39 @@ describe('groups', () => {
 describe('queryActions', () => {
   it('filters by person and importer', () => {
     const rows = sortedRows(data({ filings: [filing(dueIn(2)), filing({ ...dueIn(2), createdById: 'u2', importerName: 'Other' })] }), opts);
-    expect(queryActions(rows, { mine: true, userId: 'u2', limit: 25, now: NOW }).total).toBe(1);
-    expect(queryActions(rows, { importer: 'Acme', userId: 'u1', limit: 25, now: NOW }).total).toBe(1);
+    expect(queryActions(rows, { mine: true, userId: 'u2', page: 1, limit: 25, now: NOW }).total).toBe(1);
+    expect(queryActions(rows, { importer: 'Acme', userId: 'u1', page: 1, limit: 25, now: NOW }).total).toBe(1);
   });
   it('filters by chip', () => {
     const rows = sortedRows(data({ filings: [filing(dueIn(-2)), filing(dueIn(2)), filing({ status: 'rejected' })] }), opts);
-    const count = (filter: 'overdue' | 'due_today' | 'rejected') => queryActions(rows, { filter, userId: 'u1', limit: 25, now: NOW }).total;
+    const count = (filter: 'overdue' | 'due_today' | 'rejected') => queryActions(rows, { filter, userId: 'u1', page: 1, limit: 25, now: NOW }).total;
     expect([count('overdue'), count('due_today'), count('rejected')]).toEqual([1, 1, 1]);
   });
   it('pages without repeating or skipping a row', () => {
     const rows = sortedRows(data({ filings: Array.from({ length: 7 }, (_, i) => filing(dueIn(i + 1))) }), opts);
     const seen: string[] = [];
-    let cursor = null as ReturnType<typeof decodeCursor>;
-    do {
-      const page = queryActions(rows, { userId: 'u1', limit: 3, cursor, now: NOW });
-      seen.push(...page.items.map((i) => i.id));
-      cursor = page.nextCursor ? decodeCursor(page.nextCursor) : null;
-    } while (cursor);
+    for (let page = 1; page <= 3; page += 1) seen.push(...queryActions(rows, { userId: 'u1', page, limit: 3, now: NOW }).items.map((i) => i.id));
     expect(new Set(seen).size).toBe(7);
   });
-  it('stays stable when a new row lands before the cursor', () => {
-    const f = Array.from({ length: 4 }, (_, i) => filing(dueIn(i + 2)));
-    const first = queryActions(sortedRows(data({ filings: f }), opts), { userId: 'u1', limit: 2, now: NOW });
-    const after = sortedRows(data({ filings: [filing(dueIn(1)), ...f] }), opts);
-    const second = queryActions(after, { userId: 'u1', limit: 2, cursor: decodeCursor(first.nextCursor!), now: NOW });
-    expect(second.items.map((i) => i.id)).toEqual([`isf:${f[2].id}`, `isf:${f[3].id}`]);
+  it('says how many pages there are', () => {
+    const rows = sortedRows(data({ filings: Array.from({ length: 7 }, (_, i) => filing(dueIn(i + 1))) }), opts);
+    expect(queryActions(rows, { userId: 'u1', page: 1, limit: 3, now: NOW })).toMatchObject({ total: 7, page: 1, pageCount: 3 });
   });
-  it('round-trips a cursor and refuses a forged one', () => {
-    const rows = sortedRows(data({ filings: [filing(dueIn(2))] }), opts);
-    expect(decodeCursor(encodeCursor(rows[0]))?.id).toBe(rows[0].id);
-    expect(decodeCursor('not-a-cursor')).toBeNull();
-    expect(decodeCursor(Buffer.from('["bad",1,1,"x"]').toString('base64url'))).toBeNull();
+  it('lands on the last page when asked for one past the end', () => {
+    const rows = sortedRows(data({ filings: [filing(dueIn(1)), filing(dueIn(2))] }), opts);
+    const r = queryActions(rows, { userId: 'u1', page: 9, limit: 1, now: NOW });
+    expect(r.page).toBe(2);
+    expect(r.items).toHaveLength(1);
+  });
+  it('has one empty page when nothing matches', () => {
+    expect(queryActions([], { userId: 'u1', page: 1, limit: 10, now: NOW })).toMatchObject({ total: 0, page: 1, pageCount: 1, items: [] });
+  });
+  it('pages on the rows people see, so a group counts once', () => {
+    const cid = 'c0000000-0000-4000-8000-000000000000';
+    const rows = sortedRows(data({ filings: [filing({ ...dueIn(1), consolidationId: cid }), filing({ ...dueIn(2), consolidationId: cid }), filing(dueIn(3))] }), opts);
+    const r = queryActions(rows, { userId: 'u1', page: 1, limit: 10, now: NOW });
+    expect(r.total).toBe(2);
+    expect(r.items[0].group?.count).toBe(2);
   });
 });
 
