@@ -46,6 +46,44 @@ describe('applyEntryVerdict', () => {
     expect(b.billShipment).not.toHaveBeenCalled();
   });
 
+  describe('a rejected change to an entry CBP already holds', () => {
+    const ON_FILE = { ...SENT, cbpState: 'ON_FILE', entrySummaryStatus: 'ACCEPTED', cargoReleaseStatus: 'ACCEPTED' };
+    const refused = { ...ax('REJECTED'), conditions: [{ code: '204', narrative: 'Prelim Stmt Date is Sat, Sun, or Hol' }] };
+
+    it('tells people a rejected replace was rejected, never accepted', async () => {
+      prisma.abiDocument.findUnique.mockResolvedValue({ ...ON_FILE, pendingAction: 'REPLACE' });
+      await applyEntryVerdict({ docId: 'd1', transmissionId: 't1', summary: refused as never });
+      const event = n.notify.mock.calls[0][0];
+      expect(event.kind).toBe('entry_rejected');
+      expect(event.title).toBe('Entry Replace Rejected by CBP');
+      expect(event.message).toContain('Prelim Stmt Date is Sat, Sun, or Hol');
+      expect(event.message).toContain('stays on file');
+      expect(event.audience).toEqual({ orgId: 'o1', roles: ['OPERATOR', 'ADMIN', 'OWNER'] });
+      expect(w.emitWebhook).toHaveBeenCalledWith('o1', 'entry.rejected', expect.objectContaining({ abiDocumentId: 'd1', action: 'REPLACE', onFile: true }));
+      expect(w.emitWebhook).not.toHaveBeenCalledWith('o1', 'entry.accepted', expect.anything());
+    });
+
+    it('tells people a rejected delete was rejected, never accepted', async () => {
+      prisma.abiDocument.findUnique.mockResolvedValue({ ...ON_FILE, pendingAction: 'DELETE' });
+      await applyEntryVerdict({ docId: 'd1', transmissionId: 't1', summary: refused as never });
+      expect(n.notify.mock.calls[0][0]).toMatchObject({ kind: 'entry_rejected', title: 'Entry Delete Rejected by CBP' });
+      expect(w.emitWebhook).toHaveBeenCalledWith('o1', 'entry.rejected', expect.objectContaining({ action: 'DELETE', onFile: true }));
+    });
+
+    it('still speaks up while the cargo release is outstanding', async () => {
+      prisma.abiDocument.findUnique.mockResolvedValue({ ...ON_FILE, pendingAction: 'REPLACE', cargoReleaseStatus: null });
+      await applyEntryVerdict({ docId: 'd1', transmissionId: 't1', summary: refused as never });
+      expect(prisma.abiDocument.updateMany.mock.calls[0][0].data.status).toBe('SENT');
+      expect(n.notify.mock.calls[0][0].kind).toBe('entry_rejected');
+    });
+
+    it('an accepted replace still reads as accepted', async () => {
+      prisma.abiDocument.findUnique.mockResolvedValue({ ...ON_FILE, pendingAction: 'REPLACE' });
+      await applyEntryVerdict({ docId: 'd1', transmissionId: 't1', summary: ax('ACCEPTED') as never });
+      expect(n.notify.mock.calls[0][0].kind).toBe('entry_accepted');
+    });
+  });
+
   it('ignores a response for an older transmission', async () => {
     prisma.abiDocument.findUnique.mockResolvedValue({ ...SENT, lastTransmissionId: 't2' });
     await applyEntryVerdict({ docId: 'd1', transmissionId: 't1', summary: ax('ACCEPTED') as never });
