@@ -84,7 +84,7 @@ describe('transmitIsfNative', () => {
   it('keeps the filing awaiting CBP when the outcome is unknown', async () => {
     transmit.transmitNative.mockResolvedValue({ id: 't1', userDataTag: 'MCLX', status: 'UNKNOWN', lastError: 'timeout' });
     const out = await transmitIsfNative(ARGS);
-    expect(prisma.filing.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.not.objectContaining({ pendingAction: null }) }));
+    expect(prisma.filing.update).not.toHaveBeenCalled();
     expect(out).toMatchObject({ httpStatus: 202, body: { outcome: 'UNKNOWN' } });
   });
 
