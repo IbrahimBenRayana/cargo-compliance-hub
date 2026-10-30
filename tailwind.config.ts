@@ -48,6 +48,10 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        urgent: { DEFAULT: "hsl(var(--urgent-fg))", tint: "hsl(var(--urgent-tint))" },
+        soon: { DEFAULT: "hsl(var(--soon-fg))", tint: "hsl(var(--soon-tint))" },
+        calm: "hsl(var(--calm-fg))",
+        done: "hsl(var(--done-fg))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

@@ -606,7 +606,7 @@ The first matching row wins, so a shipment appears once. Rows below are in match
 | `isf_on_hold` | Now | Filing `on_hold` | `Review hold` |
 | `entry_needed` | Now | Arrived, no entry, arrival at most 15 days past | `Start entry` |
 | `isf_due` | Soon | Draft with cutoff within 72h | `Finish ISF` |
-| `isf_no_date` | Soon | Draft with no ETD and no lading date, so no clock can run | `Add sailing date` |
+| `isf_no_date` | Soon | Draft with no ETD and no lading date, so no clock can run | `Add date` |
 | `entry_needed` | Soon | Arrival within 5 days | `Start entry` |
 | `tracking_hold` | Soon | `hasHolds`, not already shown for this shipment. `CONTAINER_TRACKING` capability | `View hold` |
 | `isf_draft` | Later | Draft, cutoff beyond 72h | `Finish ISF` |

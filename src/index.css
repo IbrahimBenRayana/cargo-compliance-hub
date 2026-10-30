@@ -53,6 +53,15 @@
     --status-accepted: 142 71% 40%;
     --status-rejected: 0 72% 51%;
     --status-warning: 43 96% 52%;
+
+    /* ── Urgency (text and icons; each clears 4.5:1 on --card) ── */
+    --urgent-fg: 0 72% 40%;
+    --urgent-tint: 0 72% 51% / 0.08;
+    --soon-fg: 30 90% 30%;
+    --soon-tint: 38 92% 50% / 0.12;
+    --calm-fg: 220 14% 40%;
+    --done-fg: 160 84% 24%;
+    --focus-frame: 222 47% 22%;
   }
 
   .dark {
@@ -101,6 +110,14 @@
     --status-accepted: 142 71% 45%;
     --status-rejected: 0 65% 55%;
     --status-warning: 43 96% 56%;
+
+    --urgent-fg: 0 90% 74%;
+    --urgent-tint: 0 90% 70% / 0.12;
+    --soon-fg: 38 92% 64%;
+    --soon-tint: 38 92% 56% / 0.12;
+    --calm-fg: 215 20% 66%;
+    --done-fg: 160 60% 56%;
+    --focus-frame: 43 96% 56%;
   }
 }
 
@@ -386,4 +403,19 @@
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* The logo's four brackets on the current queue row. Keyboard moves are instant;
+   it settles once per session, on load only. */
+.focus-frame {
+  position: absolute;
+  inset: 3px;
+  pointer-events: none;
+  --c: hsl(var(--focus-frame));
+  background:
+    linear-gradient(var(--c), var(--c)) 0 0 / 12px 2px, linear-gradient(var(--c), var(--c)) 0 0 / 2px 12px,
+    linear-gradient(var(--c), var(--c)) 100% 0 / 12px 2px, linear-gradient(var(--c), var(--c)) 100% 0 / 2px 12px,
+    linear-gradient(var(--c), var(--c)) 100% 100% / 12px 2px, linear-gradient(var(--c), var(--c)) 100% 100% / 2px 12px,
+    linear-gradient(var(--c), var(--c)) 0 100% / 12px 2px, linear-gradient(var(--c), var(--c)) 0 100% / 2px 12px;
+  background-repeat: no-repeat;
 }

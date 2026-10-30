@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import Dashboard from '../Dashboard';
+import Dashboard from '../DashboardClassic';
 
 vi.mock('@/hooks/useFilings', () => ({
   useFilings: () => ({

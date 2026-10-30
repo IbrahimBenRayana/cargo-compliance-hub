@@ -40,7 +40,7 @@ export function titleFor(c: Classification, reason: string | null, arrived: bool
 }
 
 const LABEL: Record<ActionKind, string> = {
-  isf_overdue: 'Finish ISF', isf_due: 'Finish ISF', isf_draft: 'Finish ISF', isf_no_date: 'Add sailing date',
+  isf_overdue: 'Finish ISF', isf_due: 'Finish ISF', isf_draft: 'Finish ISF', isf_no_date: 'Add date',
   isf_rejected: 'Fix ISF', isf_change_rejected: 'Review change', isf_on_hold: 'Review hold',
   entry_rejected: 'Fix entry', entry_change_rejected: 'Review change', entry_release_rejected: 'Replace entry',
   entry_draft: 'Finish entry', entry_needed: 'Start entry',
