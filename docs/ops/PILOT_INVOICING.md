@@ -23,8 +23,9 @@ Staging uses Stripe **test mode**. Prod uses live mode, and live mode changes ar
 
 1. Provision the org on **ISF + Entry**, or on **ISF Filing** if it files ISFs only.
 2. Open ⋯ → **Pricing & billing…** and choose **Invoiced monthly (ACH)**. The pilot terms prefill as a
-   $250 monthly minimum that includes 50 accepted ISFs, then $5 per ISF. Match them to the signed order
-   form.
+   $250 monthly minimum that includes 50 accepted ISFs, then $5 per ISF, and a lower rate of $4 per ISF
+   from the 251st accepted ISF of the month. Match them to the signed order form. Above 1,000 ISFs the $4
+   runs on unless a written amendment sets another band (API: `isfBands` on the pricing endpoint).
    - **Billing starts**: the date of the pilot's first accepted ISF on the production connection, or day
      90 under the one allowed concession. Nothing accepted before this date is invoiced, and a month that
      ends before it carries no minimum.
@@ -39,7 +40,8 @@ Staging uses Stripe **test mode**. Prod uses live mode, and live mode changes ar
 ## Month end (first working day, UTC months)
 
 1. Open ⋯ → **Usage & invoices…** and pick last month. Check the rated lines against the order form:
-   the minimum, ISFs beyond the included count, and entries.
+   the minimum, ISFs beyond the included count (one line per band), and entries. The usage CSV shows
+   each ISF at its locked $5; the $4 band is applied on the invoice, not on the CSV rows.
 2. Click **Usage CSV** if the client wants the statement with every accepted shipment.
 3. Click **Draft usage invoice**. This creates a **draft** in Stripe; nothing is sent yet.
 4. Open the draft from the ↗ link. Attach the CSV if wanted, then **Finalize**. Stripe debits the bank
