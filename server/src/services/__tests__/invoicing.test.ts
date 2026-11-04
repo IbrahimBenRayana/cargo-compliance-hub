@@ -63,6 +63,18 @@ describe('createMonthlyInvoice (usage)', () => {
     });
   });
 
+  it("bills the org's ISF bands: 300 ISFs on the pilot ladder → $250 + 200 × $5 + 50 × $4", async () => {
+    prisma.subscription.findUnique.mockResolvedValue({ ...SUB, isfBands: [{ fromIsf: 251, cents: 400 }] });
+    prisma.shipmentCharge.findMany.mockResolvedValue(rows(300));
+    const out = await createMonthlyInvoice({ orgId: 'o1', periodStart: SEP, kind: 'usage', createdById: 'u1' });
+    expect(out).toMatchObject({ ok: true, invoice: { totalCents: 145000 } });
+    expect(stripeApi.invoiceItems.create.mock.calls.map((c) => [c[0].amount, c[0].description])).toEqual([
+      [25000, expect.stringMatching(/^Monthly minimum/)],
+      [100000, 'Accepted ISFs 51-250: 200 × $5'],
+      [20000, 'Accepted ISFs 251 and above: 50 × $4'],
+    ]);
+  });
+
   it('no bank account saved → a hosted invoice payable by ACH, net 14', async () => {
     prisma.subscription.findUnique.mockResolvedValue({ ...SUB, achPaymentMethodId: null });
     await createMonthlyInvoice({ orgId: 'o1', periodStart: SEP, kind: 'usage', createdById: 'u1' });

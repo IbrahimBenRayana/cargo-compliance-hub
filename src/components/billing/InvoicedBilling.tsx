@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { useCreatePortalSession } from '@/hooks/useBilling';
 import { CardCapture } from '@/components/billing/CardCapture';
 import type { billingApi } from '@/api/client';
-import { money } from '@/lib/pricing';
+import { isfBandLines, money } from '@/lib/pricing';
 
 type Subscription = Awaited<ReturnType<typeof billingApi.subscription>>;
 
@@ -61,6 +61,7 @@ export function InvoicedBilling({ data, canManage }: { data: Subscription; canMa
               {isfRate > 0 ? `${money(isfRate)} per accepted ISF` : 'ISFs at no charge'}
               {inv && inv.includedIsfs > 0 ? ` above the ${inv.includedIsfs} included` : ''}
             </li>
+            {isfBandLines(inv?.isfBands).map((line) => <li key={line}>{line}</li>)}
             {linked != null && entryOnly != null && (
               <>
                 <li>{money(linked)} per entry on an ISF shipment</li>

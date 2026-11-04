@@ -12,13 +12,13 @@ import {
 } from '@/components/ui/dialog';
 import { adminApi } from '@/api/client';
 import type { AdminOrganization } from '@/api/client';
-import { money, dollarsToCents } from '@/lib/pricing';
+import { money, dollarsToCents, isfBandLines } from '@/lib/pricing';
 
 const centsToDollars = (c: number | null | undefined) => (c == null ? '' : (c / 100).toFixed(c % 100 === 0 ? 0 : 2));
 
 /** Founder-approved pilot terms (pricing plan v2 §5.1), prefilled when an
  *  org is switched to invoiced. Mirrors server PILOT_DEFAULTS. */
-const PILOT = { minimum: '250', included: '50', isf: '5' };
+const PILOT = { minimum: '250', included: '50', isf: '5', bandFrom: '251', bandIsf: '4' };
 
 /**
  * Set a client's own prices and how it pays (pricing plan v2). Prices are per
@@ -29,7 +29,8 @@ const PILOT = { minimum: '250', included: '50', isf: '5' };
  * Card: each accepted filing is charged to the client's card at once.
  * Invoiced (pilots, contracts): accepted filings accrue for a monthly Stripe
  * invoice, debited by ACH — a minimum that includes N ISFs, then the ISF price
- * for each ISF above N.
+ * for each ISF above N, and a lower band rate from a set ISF count (the pilot
+ * ladder: $4 from the 251st). Further bands are kept as they are.
  */
 export function PricingDialog({ org, onClose }: { org: AdminOrganization | null; onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -40,6 +41,8 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
   const [minimum, setMinimum] = useState('');
   const [included, setIncluded] = useState('');
   const [startsOn, setStartsOn] = useState('');
+  const [bandFrom, setBandFrom] = useState('');
+  const [bandIsf, setBandIsf] = useState('');
   const [hold, setHold] = useState(false);
 
   useEffect(() => {
@@ -51,6 +54,9 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
     setMinimum(centsToDollars(org.billing?.monthlyMinimumCents));
     setIncluded(org.billing?.includedIsfs == null ? '' : String(org.billing.includedIsfs));
     setStartsOn(org.billing?.billingStartsOn ?? '');
+    const band = org.billing?.isfBands?.[0];
+    setBandFrom(band ? String(band.fromIsf) : '');
+    setBandIsf(centsToDollars(band?.cents));
     setHold(org.billing?.billingHold ?? false);
   }, [org]);
 
@@ -61,7 +67,13 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
       // Prefill the pilot terms for anything not set yet.
       if (!minimum) setMinimum(PILOT.minimum);
       if (!included) setIncluded(PILOT.included);
-      if (org?.billing?.mode !== 'invoiced') setIsf(PILOT.isf);
+      if (org?.billing?.mode !== 'invoiced') {
+        setIsf(PILOT.isf);
+        if (!bandFrom && !bandIsf) {
+          setBandFrom(PILOT.bandFrom);
+          setBandIsf(PILOT.bandIsf);
+        }
+      }
     } else if (org?.billing?.mode === 'invoiced') {
       setIsf(''); // back to the plan default card price
     }
@@ -74,17 +86,28 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
   const minimumCents = dollarsToCents(minimum);
   const includedTrim = included.trim();
   const includedIsfs = includedTrim === '' ? null : /^\d+$/.test(includedTrim) ? Number(includedTrim) : Number.NaN;
+  const bandFromTrim = bandFrom.trim();
+  const bandFromIsf = bandFromTrim === '' ? null : /^\d+$/.test(bandFromTrim) ? Number(bandFromTrim) : Number.NaN;
+  const bandCents = dollarsToCents(bandIsf);
+  const halfBand = (bandFromIsf == null) !== (bandCents == null);
+  const laterBands = org?.billing?.isfBands?.slice(1) ?? [];
+  const bandOrder = bandFromIsf != null && laterBands.length > 0 && bandFromIsf >= laterBands[0].fromIsf;
+  const bandTooLow = bandFromIsf != null && includedIsfs != null && bandFromIsf <= includedIsfs;
+  const isfBands = bandFromIsf != null && bandCents != null ? [{ fromIsf: bandFromIsf, cents: bandCents }, ...laterBands] : [];
   const defaultIsf = org?.pricing ? (org.pricing.isfCents == null ? org.pricing.effective.isfCents : null) : null;
   const effectiveIsf = isfCents ?? defaultIsf ?? 4500;
 
-  const badNumber = [isfCents, linkedCents, entryOnlyCents, ...(invoiced ? [minimumCents, includedIsfs] : [])].some((c) => Number.isNaN(c));
+  const badNumber = [isfCents, linkedCents, entryOnlyCents, ...(invoiced ? [minimumCents, includedIsfs, bandFromIsf, bandCents] : [])].some((c) => Number.isNaN(c));
   const halfEntry = (linkedCents == null) !== (entryOnlyCents == null);
   const entriesSet = linkedCents != null && entryOnlyCents != null && !badNumber;
   // CR1: buying ISF + entry-only separately must never beat the linked bundle.
   const unbundleCheaper = !invoiced && entriesSet && entryOnlyCents! < linkedCents!;
   const error = badNumber
     ? 'Enter dollar amounts like 45 or 45.50, and a whole number of ISFs.'
-    : halfEntry ? 'Set both entry prices, or clear both.' : undefined;
+    : halfEntry ? 'Set both entry prices, or clear both.'
+    : invoiced && halfBand ? 'Set both the band start and its price, or clear both.'
+    : invoiced && bandTooLow ? 'The lower rate must start after the included ISFs.'
+    : invoiced && bandOrder ? `The lower rate must start before the next band (ISF ${laterBands[0].fromIsf}).` : undefined;
 
   const save = useMutation({
     mutationFn: () =>
@@ -94,7 +117,7 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
         entryOnlyCents,
         billingMode: mode,
         billingHold: hold,
-        ...(invoiced && { monthlyMinimumCents: minimumCents, includedIsfs, billingStartsOn: startsOn || null }),
+        ...(invoiced && { monthlyMinimumCents: minimumCents, includedIsfs, isfBands, billingStartsOn: startsOn || null }),
       }),
     onSuccess: () => {
       toast.success(`Pricing saved for ${org!.name}`);
@@ -159,6 +182,22 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
             />
             {!invoiced && <p className="text-xs text-muted-foreground">Leave blank for the plan default.</p>}
           </div>
+          {invoiced && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="band-from">Lower rate from ISF number</Label>
+                <Input id="band-from" inputMode="numeric" value={bandFrom} onChange={(e) => setBandFrom(e.target.value)} placeholder="None" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="band-isf">Lower rate per ISF ($)</Label>
+                <Input id="band-isf" inputMode="decimal" value={bandIsf} onChange={(e) => setBandIsf(e.target.value)} placeholder="None" />
+              </div>
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                Counted each month. Leave both blank for one rate above the included ISFs.
+                {laterBands.length > 0 && ` ${laterBands.length} further band${laterBands.length > 1 ? 's are' : ' is'} kept as set.`}
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="price-linked">Entry on an ISF ($)</Label>
@@ -175,7 +214,8 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
           <div className="rounded-lg border bg-muted/40 p-3 text-sm">
             {invoiced && minimumCents != null && !badNumber && (
               <p className="mb-1">
-                {money(minimumCents)} a month including {includedIsfs ?? 0} ISFs, then {money(isfCents ?? 0)} per ISF.
+                {money(minimumCents)} a month including {includedIsfs ?? 0} ISFs, then {money(isfCents ?? 0)} per ISF
+                {isfBands.length > 0 ? `; ${isfBandLines(isfBands).join('; ')}.` : '.'}
               </p>
             )}
             {!entriesSet ? (

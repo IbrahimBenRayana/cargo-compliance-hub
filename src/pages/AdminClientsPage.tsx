@@ -58,7 +58,8 @@ function pricingSummary(org: AdminOrganization) {
   if (!e) return null;
   const b = org.billing;
   const isf = b?.mode === 'invoiced'
-    ? `Invoiced ${money(b.monthlyMinimumCents ?? 0)}/mo incl. ${b.includedIsfs ?? 0} · then ${money(e.isfCents)}/ISF`
+    ? `Invoiced ${money(b.monthlyMinimumCents ?? 0)}/mo incl. ${b.includedIsfs ?? 0} · then ${money(e.isfCents)}/ISF` +
+      (b.isfBands ?? []).map((band) => `, ${money(band.cents)} from #${band.fromIsf.toLocaleString('en-US')}`).join('')
     : `ISF ${money(e.isfCents)}`;
   if (e.entryLinkedCents == null || e.entryOnlyCents == null) return isf;
   return `${isf} · entry +${money(e.entryLinkedCents)} / ${money(e.entryOnlyCents)}`;
