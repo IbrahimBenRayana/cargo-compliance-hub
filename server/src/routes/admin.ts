@@ -26,7 +26,7 @@ import { sendAccountSetupEmail } from '../services/email.js';
 import { TIERS, tierById } from '../config/plans.js';
 import { checkPriceInput, resolvePricing } from '../services/pricing.js';
 import { statusAfterPlanChange } from '../services/billingAccount.js';
-import { PILOT_DEFAULTS, parsePeriod } from '../services/invoiceRating.js';
+import { PILOT_DEFAULTS, checkIsfBands, isfBandsOf, parsePeriod } from '../services/invoiceRating.js';
 import { previewMonth, createMonthlyInvoice, usageCsv, stripeDashboardUrl } from '../services/invoicing.js';
 import logger from '../config/logger.js';
 import { notifyLead } from '../services/leads.js';
@@ -92,6 +92,7 @@ router.get('/organizations', async (_req: AuthRequest, res: Response): Promise<v
               mode: o.subscription.billingMode,
               monthlyMinimumCents: o.subscription.monthlyMinimumCents,
               includedIsfs: o.subscription.includedIsfs,
+              isfBands: isfBandsOf(o.subscription.isfBands),
               billingStartsOn: o.subscription.billingStartsOn?.toISOString().slice(0, 10) ?? null,
               billingHold: o.subscription.billingHold,
               bankAccount: o.subscription.achLast4
@@ -325,7 +326,8 @@ router.patch('/organizations/:id/plan', async (req: AuthRequest, res: Response):
 //   billingMode "invoiced" (pilots, contracts): no per-filing card charge;
 //   accepted shipments accrue for a monthly Stripe invoice paid by ACH. When an
 //   org is switched to invoiced, any term left null gets the founder-approved
-//   pilot default: $250/month minimum including 50 ISFs, then $5 per ISF.
+//   pilot default: $250/month minimum including 50 ISFs, then $5 per ISF, and
+//   $4 per ISF from the 251st (isfBands). An empty band list means one rate.
 const centsField = z.number().int().min(0).nullable();
 const pricingSchema = z.object({
   isfCents: centsField,
@@ -334,6 +336,7 @@ const pricingSchema = z.object({
   billingMode: z.enum(['card', 'invoiced']).optional(),
   monthlyMinimumCents: centsField.optional(),
   includedIsfs: z.number().int().min(0).max(1_000_000).nullable().optional(),
+  isfBands: z.array(z.object({ fromIsf: z.number(), cents: z.number() }).strict()).nullable().optional(),
   billingStartsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   billingHold: z.boolean().optional(),
 }).strict();
@@ -345,7 +348,7 @@ router.put('/organizations/:id/pricing', async (req: AuthRequest, res: Response)
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
-  const problem = checkPriceInput(parsed.data);
+  const problem = checkPriceInput(parsed.data) ?? checkIsfBands(parsed.data.isfBands);
   if (problem) {
     res.status(400).json({ error: problem });
     return;
@@ -355,9 +358,11 @@ router.put('/organizations/:id/pricing', async (req: AuthRequest, res: Response)
     res.status(404).json({ error: 'This organization has no plan yet. Assign a plan first.' });
     return;
   }
-  const { billingStartsOn, ...rest } = parsed.data;
+  const { billingStartsOn, isfBands, ...rest } = parsed.data;
   const data: Record<string, unknown> = {
     ...rest,
+    // Cleared bands are stored as [] so a later save doesn't put the defaults back.
+    ...(isfBands !== undefined && { isfBands: isfBands ?? [] }),
     ...(billingStartsOn !== undefined && { billingStartsOn: billingStartsOn ? new Date(`${billingStartsOn}T00:00:00Z`) : null }),
   };
   const mode = parsed.data.billingMode ?? existing.billingMode;
@@ -366,6 +371,7 @@ router.put('/organizations/:id/pricing', async (req: AuthRequest, res: Response)
     data.isfCents ??= PILOT_DEFAULTS.isfCents;
     if ((parsed.data.monthlyMinimumCents ?? existing.monthlyMinimumCents) == null) data.monthlyMinimumCents = PILOT_DEFAULTS.monthlyMinimumCents;
     if ((parsed.data.includedIsfs ?? existing.includedIsfs) == null) data.includedIsfs = PILOT_DEFAULTS.includedIsfs;
+    if (isfBands === undefined && existing.isfBands == null) data.isfBands = PILOT_DEFAULTS.isfBands;
   }
   const updated = await prisma.subscription.update({
     where: { orgId },
@@ -381,7 +387,7 @@ router.put('/organizations/:id/pricing', async (req: AuthRequest, res: Response)
     oldValue: {
       isfCents: existing.isfCents, entryLinkedCents: existing.entryLinkedCents, entryOnlyCents: existing.entryOnlyCents,
       billingMode: existing.billingMode, monthlyMinimumCents: existing.monthlyMinimumCents, includedIsfs: existing.includedIsfs,
-      billingStartsOn: existing.billingStartsOn, billingHold: existing.billingHold,
+      isfBands: existing.isfBands, billingStartsOn: existing.billingStartsOn, billingHold: existing.billingHold,
     },
     newValue: data,
     ...getRequestMeta(req),
@@ -394,7 +400,7 @@ router.put('/organizations/:id/pricing', async (req: AuthRequest, res: Response)
     },
     billing: {
       mode: updated.billingMode, monthlyMinimumCents: updated.monthlyMinimumCents, includedIsfs: updated.includedIsfs,
-      billingStartsOn: updated.billingStartsOn?.toISOString().slice(0, 10) ?? null, billingHold: updated.billingHold,
+      isfBands: isfBandsOf(updated.isfBands), billingStartsOn: updated.billingStartsOn?.toISOString().slice(0, 10) ?? null, billingHold: updated.billingHold,
     },
   });
 });
