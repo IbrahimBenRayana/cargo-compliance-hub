@@ -424,6 +424,7 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
       ? {
           monthlyMinimumCents: invoiced.terms.minimumCents,
           includedIsfs: invoiced.terms.includedIsfs,
+          isfBands: invoiced.terms.isfBands,
           bankAccount: sub?.achLast4 ? { bankName: sub.achBankName, last4: sub.achLast4 } : null,
           monthToDate: { isfs: invoiced.isfCount, shipments: invoiced.rows.length, estimatedCents: invoiced.totalCents, lines: invoiced.lines },
         }

@@ -18,7 +18,7 @@
 import type Stripe from 'stripe';
 import { prisma } from '../config/database.js';
 import { getStripe, stripeConfigured, createStripeCustomer } from './stripe.js';
-import { rateMonth, prepayLines, monthWindow, periodLabel, type InvoiceLine, type RatedRow } from './invoiceRating.js';
+import { rateMonth, prepayLines, monthWindow, periodLabel, isfBandsOf, type InvoiceLine, type IsfBand, type RatedRow } from './invoiceRating.js';
 import type { ChargeKind } from './pricing.js';
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
@@ -31,11 +31,17 @@ const LIVE_INVOICE = ['creating', 'draft', 'open', 'paid'];
 interface Terms {
   minimumCents: number;
   includedIsfs: number;
+  isfBands: IsfBand[];
   billingStartsOn: Date | null;
 }
 
-function termsOf(sub: { monthlyMinimumCents: number | null; includedIsfs: number | null; billingStartsOn: Date | null }): Terms {
-  return { minimumCents: sub.monthlyMinimumCents ?? 0, includedIsfs: sub.includedIsfs ?? 0, billingStartsOn: sub.billingStartsOn };
+function termsOf(sub: { monthlyMinimumCents: number | null; includedIsfs: number | null; isfBands?: unknown; billingStartsOn: Date | null }): Terms {
+  return {
+    minimumCents: sub.monthlyMinimumCents ?? 0,
+    includedIsfs: sub.includedIsfs ?? 0,
+    isfBands: isfBandsOf(sub.isfBands),
+    billingStartsOn: sub.billingStartsOn,
+  };
 }
 
 /** Nothing before the org's billing start date is invoiced (the pilot's
@@ -64,6 +70,7 @@ export async function previewMonth(orgId: string, periodStart: Date) {
   const rated = rateMonth(rows as Array<RatedRow & { id: string }>, {
     minimumCents: minimumApplies ? terms.minimumCents : 0,
     includedIsfs: terms.includedIsfs,
+    isfBands: terms.isfBands,
     minimumPrepaid: !!prepay && LIVE_INVOICE.includes(prepay.status),
   });
   return { billingMode: sub.billingMode, terms, period: { start, end }, closed: end <= new Date(), rows, ...rated };

@@ -6,7 +6,7 @@ import type { ActionFilter, ActionsPage, DashboardResponse } from '@/types/dashb
 import type { HtsClassifyResult } from '@/types/htsClassify';
 import type { AuthSession, LoginResult, MfaMethod, User } from '@/types/auth';
 import type { Filing } from '@/types/shipment';
-import type { OrgPricing } from '@/lib/pricing';
+import type { IsfBand, OrgPricing } from '@/lib/pricing';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -973,13 +973,13 @@ export const exportApi = {
 };
 
 // ─── Billing API (card-on-file, immediate per-shipment charge) ─────────────
-export type { OrgPricing };
+export type { IsfBand, OrgPricing };
 export type BillingCard = { brand: string | null; last4: string | null; expMonth: number | null; expYear: number | null };
 export type BillingBankAccount = { bankName: string | null; last4: string | null };
 
 /** One line of a monthly invoice (or of the month-to-date estimate). */
 export interface InvoiceLine {
-  code: 'minimum' | 'isf_overage' | 'entry_linked' | 'entry';
+  code: 'minimum' | 'isf_overage' | 'isf_band' | 'entry_linked' | 'entry';
   description: string;
   quantity: number;
   unitCents: number | null;
@@ -1017,6 +1017,8 @@ export const billingApi = {
       invoicing: {
         monthlyMinimumCents: number;
         includedIsfs: number;
+        /** Lower rates by monthly volume, in order (pilot ladder: $4 from the 251st). */
+        isfBands: IsfBand[];
         bankAccount: BillingBankAccount | null;
         monthToDate: { isfs: number; shipments: number; estimatedCents: number; lines: InvoiceLine[] };
       } | null;
@@ -1163,6 +1165,7 @@ export interface AdminBillingTerms {
   mode: 'card' | 'invoiced';
   monthlyMinimumCents: number | null;
   includedIsfs: number | null;
+  isfBands: IsfBand[];
   /** YYYY-MM-DD; nothing before it is invoiced. */
   billingStartsOn: string | null;
   billingHold: boolean;
@@ -1243,6 +1246,7 @@ export const adminApi = {
     billingMode: 'card' | 'invoiced';
     monthlyMinimumCents: number | null;
     includedIsfs: number | null;
+    isfBands: IsfBand[] | null;
     billingStartsOn: string | null;
     billingHold: boolean;
   }>) {

@@ -743,6 +743,10 @@ model Subscription {
   // accepted ISFs; nothing is invoiced for usage before billingStartsOn.
   monthlyMinimumCents    Int?      @map("monthly_minimum_cents")
   includedIsfs           Int?      @map("included_isfs")
+  // Volume bands above includedIsfs, in order: [{ fromIsf, cents }]. From the
+  // fromIsf-th accepted ISF of the month on, each costs cents (pilot ladder:
+  // [{ fromIsf: 251, cents: 400 }]). null = every ISF above includedIsfs at isfCents.
+  isfBands               Json?     @map("isf_bands")
   billingStartsOn        DateTime? @map("billing_starts_on") @db.Date
   // Manual submit hold (e.g. an overdue invoice): blocks new submissions.
   billingHold            Boolean   @default(false) @map("billing_hold")
