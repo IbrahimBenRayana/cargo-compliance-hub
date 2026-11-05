@@ -3,7 +3,7 @@ import { withGuidance } from '../services/cbp/conditions.js';
 import { isOverdue } from '../services/cbp/unanswered.js';
 import { loadOrgCbpConfig } from '../services/cbp/filerIdentity.js';
 import { transmitIsfNative } from '../services/cbp/nativeIsf.js';
-import { canStartIsfAction } from '../services/cbp/isfLifecycle.js';
+import { canStartIsfAction, invalidIsfDates } from '../services/cbp/isfLifecycle.js';
 import { isfFilingDeadline } from '../services/isfDeadline.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -155,7 +155,7 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
       return;
     }
 
-    const filingDeadline: Date | null = shared.estimatedDeparture ? isfFilingDeadline(shared.estimatedDeparture, shared.estimatedLading) : null;
+    const filingDeadline = isfFilingDeadline(shared.estimatedDeparture, shared.estimatedLading);
 
     const consolidationId = randomUUID();
 
@@ -365,8 +365,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     // Recalculate deadline if departure or lading changed
     let filingDeadline = existing.filingDeadline;
     if (data.estimatedDeparture || data.estimatedLading) {
-      const etd = data.estimatedDeparture ?? existing.estimatedDeparture;
-      if (etd) filingDeadline = isfFilingDeadline(etd, data.estimatedLading ?? existing.estimatedLading);
+      filingDeadline = isfFilingDeadline(data.estimatedDeparture ?? existing.estimatedDeparture, data.estimatedLading ?? existing.estimatedLading);
     }
 
     // Atomic org-scoped write (updateMany accepts the orgId in its where; the
@@ -432,7 +431,7 @@ router.post('/:id/submit', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolle
 router.get('/:id/cbp', async (req: AuthRequest, res: Response): Promise<void> => {
   const filing = await prisma.filing.findFirst({
     where: { id: paramId(req), orgId: req.user!.orgId },
-    select: { id: true, status: true, cbpState: true, pendingAction: true, isfFilerCode: true, cbpTransactionId: true },
+    select: { id: true, status: true, cbpState: true, pendingAction: true, isfFilerCode: true, cbpTransactionId: true, rejectedChanges: true },
   });
   if (!filing) {
     res.status(404).json({ error: 'Filing not found' });
@@ -469,8 +468,8 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
   }
 
   // Native gateway: an amendment is a CBP REPLACE of the ISF on file. The
-  // filing's data is updated, then sent; CBP's verdict settles the status
-  // (a rejected replace leaves the previously accepted version on file).
+  // edits are sent but held off the filing; CBP's verdict settles it (a
+  // rejected replace leaves the filing as the version CBP still holds).
   if (((await loadOrgCbpConfig(req.user!.orgId))?.gateway ?? 'NATIVE') === 'NATIVE') {
     const parsedUpdates = createFilingSchema.partial().safeParse(req.body);
     if (!parsedUpdates.success) {
@@ -482,20 +481,13 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
       res.status(409).json({ error: allowed.reason, code: 'ISF_ACTION_NOT_ALLOWED' });
       return;
     }
-    const u = parsedUpdates.data;
-    if (Object.keys(u).length > 0) {
-      await prisma.filing.update({
-        where: { id: filing.id },
-        data: {
-          ...u,
-          estimatedDeparture: u.estimatedDeparture ? new Date(u.estimatedDeparture) : undefined,
-          estimatedArrival: u.estimatedArrival ? new Date(u.estimatedArrival) : undefined,
-          estimatedLading: u.estimatedLading ? new Date(u.estimatedLading) : undefined,
-          filingDeadline: u.estimatedDeparture ? isfFilingDeadline(u.estimatedDeparture, u.estimatedLading ?? filing.estimatedLading) : undefined,
-        } as never,
-      });
+    const badDates = invalidIsfDates(parsedUpdates.data);
+    if (badDates.length > 0) {
+      res.status(400).json({ error: 'Validation failed', details: { fieldErrors: Object.fromEntries(badDates.map((f) => [f, ['Invalid date']])) } });
+      return;
     }
-    const out = await transmitIsfNative({ filingId: filing.id, orgId: req.user!.orgId, userId: req.user!.id, action: 'REPLACE' });
+    const edits = Object.keys(parsedUpdates.data).length > 0 ? parsedUpdates.data : undefined;
+    const out = await transmitIsfNative({ filingId: filing.id, orgId: req.user!.orgId, userId: req.user!.id, action: 'REPLACE', edits });
     res.status(out.httpStatus).json(out.body);
     return;
   }
@@ -518,10 +510,10 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
     // Apply any updated fields from the request body
     const updates = createFilingSchema.partial().parse(req.body);
 
-    // Recalculate deadline if departure changed
+    // Recalculate deadline if departure or lading changed
     let filingDeadline = filing.filingDeadline;
-    if (updates.estimatedDeparture) {
-      filingDeadline = isfFilingDeadline(updates.estimatedDeparture, updates.estimatedLading ?? filing.estimatedLading);
+    if (updates.estimatedDeparture || updates.estimatedLading) {
+      filingDeadline = isfFilingDeadline(updates.estimatedDeparture ?? filing.estimatedDeparture, updates.estimatedLading ?? filing.estimatedLading);
     }
 
     // Update the filing locally first

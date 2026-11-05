@@ -101,6 +101,8 @@ export interface ISF5Data {
 }
 
 export interface Filing {
+  /** Edits from the last amendment CBP rejected, kept to fix and resend through POST /amend. */
+  rejectedChanges?: Record<string, unknown> | null;
   id: string;
   orgId: string;
   createdById: string;
