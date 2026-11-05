@@ -5,7 +5,7 @@ import { rejectedChanges } from '@/lib/isfRejectedChanges';
 
 /**
  * BUG-015: CBP rejected the last ISF changes and still holds the earlier
- * accepted version; the details on this page are the rejected edits.
+ * accepted version, which is what this page shows.
  * Shares the CBP timeline's query, so it costs no extra request.
  */
 export function IsfRejectedChangesBanner({ filingId }: { filingId: string }) {
@@ -20,7 +20,11 @@ export function IsfRejectedChangesBanner({ filingId }: { filingId: string }) {
       <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" aria-hidden />
       <div className="text-sm space-y-1">
         <p className="font-semibold">CBP rejected your last changes. It still has the version it accepted before.</p>
-        <p>The details on this page are the changes CBP rejected. Fix them and amend again, or check the CBP activity below.</p>
+        <p>
+          The details on this page are the version CBP holds.
+          {data?.filing.rejectedChanges ? ' Your rejected changes are saved on this filing, so they can be corrected and sent again.' : ''}
+          {' '}See the CBP activity below.
+        </p>
         {r.reasons.length > 0 && (
           <ul className="list-disc pl-5">
             {r.reasons.map((x) => <li key={x}>{x}</li>)}

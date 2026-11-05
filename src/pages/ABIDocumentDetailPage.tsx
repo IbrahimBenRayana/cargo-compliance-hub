@@ -241,6 +241,7 @@ export default function ABIDocumentDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [cbpAction, setCbpAction] = useState<'REPLACE' | 'DELETE' | null>(null);
   const [cbpActionPending, setCbpActionPending] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const queryClient = useQueryClient();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
@@ -367,6 +368,19 @@ export default function ABIDocumentDetailPage() {
       toast.error(err?.body?.error || err?.message || 'Could not send to CBP');
     } finally {
       setCbpActionPending(false);
+    }
+  };
+
+  const handleReopenRejected = async () => {
+    setReopening(true);
+    try {
+      await abiDocumentsApi.reopenRejected(doc.id);
+      await queryClient.invalidateQueries({ queryKey: ['abi-documents', doc.id] });
+      navigate(`/abi-documents/${doc.id}/edit`);
+    } catch (err: any) {
+      toast.error(err?.body?.error || err?.message || 'Could not reopen the rejected changes');
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -560,6 +574,21 @@ export default function ABIDocumentDetailPage() {
           <AlertTitle>Last error</AlertTitle>
           <AlertDescription className="whitespace-pre-wrap">
             {doc.lastError}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* A rejected replace: the entry went back to what CBP holds; the edits wait here. */}
+      {onFile && doc.rejectedPayload && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>CBP rejected your replacement</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>CBP still holds the version it accepted before. Reopen your changes to fix and resend them; this replaces any edits made since the rejection.</span>
+            <Button size="sm" variant="outline" disabled={reopening} onClick={handleReopenRejected}>
+              {reopening ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Reopen rejected changes
+            </Button>
           </AlertDescription>
         </Alert>
       )}

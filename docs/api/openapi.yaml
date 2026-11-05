@@ -31,6 +31,10 @@ info:
     endpoint's signing secret (`whsec_…`). Verify the signature by recomputing
     the HMAC over the raw bytes and comparing in constant time. Delivery is
     best-effort with retries; the last outcome is shown on the endpoint.
+    When CBP rejects a change to something it already holds (an ISF amendment or
+    delete, an entry replace or delete), `filing.rejected` and `entry.rejected`
+    carry `action` (`REPLACE` or `DELETE`) and `onFile: true`: the earlier version
+    stays on file at CBP.
 servers:
   - url: https://app.mycargolens.com/api/public/v1
     description: Production

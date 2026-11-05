@@ -138,4 +138,16 @@ describe('transmitEntryNative', () => {
     expect(prisma.abiDocument.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'DRAFT', pendingAction: null }) }));
     expect(out.httpStatus).toBe(502);
   });
+
+  it('puts releaseRequested back when nothing reached CBP', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DOC, status: 'ACCEPTED', cbpState: 'ON_FILE', entrySummaryStatus: 'ACCEPTED', releaseRequested: true });
+    transmit.transmitNative.mockResolvedValue({ id: 't1', userDataTag: 'MCLX', status: 'FAILED', lastError: 'refused' });
+    await transmitEntryNative({ ...ARGS, action: 'REPLACE' });
+    expect(prisma.abiDocument.update.mock.calls[0][0].data.releaseRequested).toBe(true);
+  });
+
+  it('refuses to claim an entry edited after it was built, so CBP gets what the row holds', async () => {
+    await transmitEntryNative(ARGS);
+    expect(prisma.abiDocument.updateMany.mock.calls[0][0].where).toMatchObject({ payload: { equals: PAYLOAD } });
+  });
 });

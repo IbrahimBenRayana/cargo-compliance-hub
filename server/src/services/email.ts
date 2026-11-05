@@ -916,7 +916,20 @@ function renderFilingAccepted(n: RenderableNotification): RenderedEmail {
   return { subject: `ISF filing accepted — ${bol}`, html: wrapTemplate(body, `Good news — CBP accepted your ISF filing for ${bol}.`) };
 }
 
+function renderFilingChangeRejected(n: RenderableNotification, change: string): RenderedEmail {
+  const bol = meta(n, 'bolNumber') ?? 'unknown';
+  const dashboardUrl = n.linkUrl ? `${env.FRONTEND_URL}${n.linkUrl}` : env.FRONTEND_URL;
+  const body = `
+    <h2 style="margin:0 0 16px; font-size:20px; color:#14213D;">${n.title}</h2>
+    <p style="margin:0 0 16px; font-size:15px; line-height:1.6; color:#475569;">${n.message ?? ''}</p>
+    ${buttonHtml('Review filing', dashboardUrl)}
+  `;
+  return { subject: `ISF ${change} rejected — ${bol}`, html: wrapTemplate(body, `CBP rejected the ISF ${change} for ${bol}. The ISF stays on file.`) };
+}
+
 function renderFilingRejected(n: RenderableNotification): RenderedEmail {
+  const change = meta(n, 'rejectedChange');
+  if (change) return renderFilingChangeRejected(n, change);
   const bol = meta(n, 'bolNumber') ?? 'unknown';
   const reason = meta(n, 'reason');
   const dashboardUrl = n.linkUrl ? `${env.FRONTEND_URL}${n.linkUrl}` : env.FRONTEND_URL;

@@ -13,6 +13,7 @@
  *   5. atomic claim, then transmitNative (row first; FAILED rolls back,
  *      UNKNOWN stays awaiting CBP); CBP's AX/SX settle it (entryVerdicts)
  */
+import { Prisma } from '@prisma/client';
 import { entryRuleIssues } from '../../schemas/abiDocument.js';
 import { prisma } from '../../config/database.js';
 import { env } from '../../config/env.js';
@@ -242,7 +243,9 @@ export async function transmitEntryNative(opts: {
   const sender = requireCbpSender();
   const started = entryStateOnStart(doc, opts.action);
   const claimed = await prisma.abiDocument.updateMany({
-    where: { id: doc.id, pendingAction: null, status: doc.status },
+    // payload: an edit landing after the build must not go out unsent, or the
+    // row would record as CBP's version something CBP never received.
+    where: { id: doc.id, pendingAction: null, status: doc.status, payload: { equals: doc.payload as Prisma.InputJsonValue } },
     data: {
       status: started.status,
       pendingAction: started.pendingAction,
@@ -278,6 +281,7 @@ export async function transmitEntryNative(opts: {
         pendingAction: null,
         entrySummaryStatus: doc.entrySummaryStatus,
         cargoReleaseStatus: doc.cargoReleaseStatus,
+        releaseRequested: doc.releaseRequested,
         lastTransmissionId: result.id,
         lastError: result.lastError ?? 'Not sent',
       },
