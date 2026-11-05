@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { canonicaliseEntryNumber, buildSendPayload } from '../abiDocumentMapper.js';
+import { canonicaliseEntryNumber, buildSendPayload, extractDenormFromPayload } from '../abiDocumentMapper.js';
 
 describe('canonicaliseEntryNumber', () => {
   it('inserts hyphens into a hyphen-less 11-char entry number', () => {
@@ -75,5 +75,17 @@ describe('buildSendPayload — entry-type-aware transmission', () => {
   it('throws when MBOL or entry number is missing', () => {
     expect(() => buildSendPayload({ mbolNumber: null, entryNumber: 'ABC12345678', entryType: '86' }, 'add')).toThrow();
     expect(() => buildSendPayload({ mbolNumber: 'M', entryNumber: null, entryType: '86' }, 'add')).toThrow();
+  });
+});
+
+describe('extractDenormFromPayload modeOfTransport', () => {
+  it('keeps the mode the payload carries', () => {
+    expect(extractDenormFromPayload({ modeOfTransport: '11' }).modeOfTransport).toBe('11');
+    expect(extractDenormFromPayload({ modeOfTransport: '40' }).modeOfTransport).toBe('40');
+  });
+
+  it('does not invent a mode for a draft that has none yet', () => {
+    expect(extractDenormFromPayload({}).modeOfTransport).toBe('');
+    expect(extractDenormFromPayload(undefined).modeOfTransport).toBe('');
   });
 });
