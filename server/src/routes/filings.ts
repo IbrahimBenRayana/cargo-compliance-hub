@@ -155,7 +155,7 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
       return;
     }
 
-    const filingDeadline: Date | null = shared.estimatedDeparture ? isfFilingDeadline(shared.estimatedDeparture, shared.estimatedLading) : null;
+    const filingDeadline = isfFilingDeadline(shared.estimatedDeparture, shared.estimatedLading);
 
     const consolidationId = randomUUID();
 
@@ -365,8 +365,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     // Recalculate deadline if departure or lading changed
     let filingDeadline = existing.filingDeadline;
     if (data.estimatedDeparture || data.estimatedLading) {
-      const etd = data.estimatedDeparture ?? existing.estimatedDeparture;
-      if (etd) filingDeadline = isfFilingDeadline(etd, data.estimatedLading ?? existing.estimatedLading);
+      filingDeadline = isfFilingDeadline(data.estimatedDeparture ?? existing.estimatedDeparture, data.estimatedLading ?? existing.estimatedLading);
     }
 
     // Atomic org-scoped write (updateMany accepts the orgId in its where; the
@@ -491,7 +490,7 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
           estimatedDeparture: u.estimatedDeparture ? new Date(u.estimatedDeparture) : undefined,
           estimatedArrival: u.estimatedArrival ? new Date(u.estimatedArrival) : undefined,
           estimatedLading: u.estimatedLading ? new Date(u.estimatedLading) : undefined,
-          filingDeadline: u.estimatedDeparture ? isfFilingDeadline(u.estimatedDeparture, u.estimatedLading ?? filing.estimatedLading) : undefined,
+          filingDeadline: isfFilingDeadline(u.estimatedDeparture ?? filing.estimatedDeparture, u.estimatedLading ?? filing.estimatedLading) ?? undefined,
         } as never,
       });
     }
@@ -518,10 +517,10 @@ router.post('/:id/amend', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled
     // Apply any updated fields from the request body
     const updates = createFilingSchema.partial().parse(req.body);
 
-    // Recalculate deadline if departure changed
+    // Recalculate deadline if departure or lading changed
     let filingDeadline = filing.filingDeadline;
-    if (updates.estimatedDeparture) {
-      filingDeadline = isfFilingDeadline(updates.estimatedDeparture, updates.estimatedLading ?? filing.estimatedLading);
+    if (updates.estimatedDeparture || updates.estimatedLading) {
+      filingDeadline = isfFilingDeadline(updates.estimatedDeparture ?? filing.estimatedDeparture, updates.estimatedLading ?? filing.estimatedLading);
     }
 
     // Update the filing locally first

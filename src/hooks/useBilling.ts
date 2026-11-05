@@ -30,7 +30,7 @@ export function useCapabilities() {
     hasActivePlan: !!data?.plan,
     /** A usable card is on file (or a $0 tier) and the org isn't delinquent. */
     canFile: !!data?.canFile,
-    cardOnFile: !!data?.card,
+    cardOnFile: !!data?.cardOnFile,
     delinquent: !!data?.delinquent,
     card: data?.card ?? null,
     capabilities,
