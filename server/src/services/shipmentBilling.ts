@@ -25,6 +25,10 @@
  *     delinquent; the next attempt (new card, or hourly for 30 days) uses a new
  *     key so Stripe actually retries.
  *
+ * Invoiced orgs (pilots, contracts) are never charged here: each accepted
+ * shipment is recorded 'accrued' at its locked price, and the monthly Stripe
+ * invoice (services/invoicing.ts) bills them.
+ *
  * Nothing here throws: by acceptance time the filing is done at CBP.
  */
 import { randomUUID } from 'node:crypto';
@@ -68,11 +72,18 @@ interface ChargeRow {
   attempt: number;
 }
 
-type Initial = { status: 'processing' | 'skipped' | 'failed'; attempt: number; lastError: string | null };
+type Initial = { status: 'processing' | 'skipped' | 'failed' | 'accrued'; attempt: number; lastError: string | null };
 
 /** What a new charge row starts as. Pure, so the rules are easy to test. */
-export function initialChargeState(amountCents: number | null, ent: Pick<OrgEntitlements, 'stripeCustomerId' | 'defaultPaymentMethodId'>, stripeOn: boolean): Initial {
+export function initialChargeState(
+  amountCents: number | null,
+  ent: Pick<OrgEntitlements, 'stripeCustomerId' | 'defaultPaymentMethodId'> & { billingMode?: OrgEntitlements['billingMode'] },
+  stripeOn: boolean,
+): Initial {
   if (amountCents == null) return { status: 'skipped', attempt: 0, lastError: 'Not priced for this org (no entry pricing)' };
+  // Invoiced orgs: no per-filing charge; the row waits for the monthly invoice
+  // (even at $0, so included ISFs are counted against the minimum).
+  if (ent.billingMode === 'invoiced') return { status: 'accrued', attempt: 0, lastError: null };
   if (amountCents <= 0) return { status: 'skipped', attempt: 0, lastError: null };
   if (!stripeOn) return { status: 'skipped', attempt: 0, lastError: 'Stripe not configured' };
   if (!ent.stripeCustomerId || !ent.defaultPaymentMethodId) {
@@ -97,6 +108,10 @@ export async function billShipment(anchor: ShipmentAnchor, orgId: string): Promi
       : await insertEntryCharge(anchor.abiDocumentId!, orgId, ent);
     if (!row) return; // already billed (a repeat acceptance)
 
+    if (row.status === 'accrued') {
+      logger.info({ ...anchorLog, orgId, kind: row.kind, amountCents: row.amountCents }, '✓ Shipment accrued for the monthly invoice');
+      return;
+    }
     if (row.status === 'skipped') {
       if (row.lastError?.startsWith('Not priced')) {
         logger.error({ ...anchorLog, orgId, kind: row.kind }, '[Billing] Accepted entry has no price for this org; recorded unbilled');

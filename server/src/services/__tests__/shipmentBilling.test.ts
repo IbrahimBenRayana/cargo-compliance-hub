@@ -78,6 +78,16 @@ describe('pricing by what was filed (G4)', () => {
   });
 });
 
+describe('invoiced mode', () => {
+  it('records the ISF at its rate and never calls Stripe', async () => {
+    entitlements.getOrgEntitlements.mockResolvedValue({ ...ENT, billingMode: 'invoiced', pricing: { ...PRICING, isfCents: 500 } });
+    await billShipment({ filingId: 'f1' }, 'o1');
+    expect(insertedRow(0)).toMatchObject({ kind: 'isf', amount_cents: 500, status: 'accrued' });
+    expect(stripe.chargeSavedCard).not.toHaveBeenCalled();
+    expect(prisma.subscription.update).not.toHaveBeenCalled();
+  });
+});
+
 describe('one linked entry per ISF (G3)', () => {
   it('a second entry on the same ISF bills entry-only', async () => {
     prisma.abiDocument.findUnique.mockResolvedValue({ filingId: 'f1' });
@@ -145,6 +155,10 @@ describe('charge outcomes', () => {
 
 describe('initialChargeState', () => {
   const card = { stripeCustomerId: 'c', defaultPaymentMethodId: 'p' };
+  it('invoiced orgs accrue every accepted shipment for the monthly invoice, even at $0 and without a card', () => {
+    expect(initialChargeState(500, { stripeCustomerId: null, defaultPaymentMethodId: null, billingMode: 'invoiced' }, true)).toMatchObject({ status: 'accrued', attempt: 0 });
+    expect(initialChargeState(0, { ...card, billingMode: 'invoiced' }, true).status).toBe('accrued');
+  });
   it('an unpriced entry is recorded with a reason, never charged', () => {
     expect(initialChargeState(null, card, true)).toMatchObject({ status: 'skipped', lastError: expect.stringMatching(/Not priced/) });
   });
