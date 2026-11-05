@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { getJobStatus } from '../services/backgroundJobs.js';
+import { env } from '../config/env.js';
+import { evaluateCbpHealth } from '../services/cbp/health.js';
+import { jobHealthSnapshot } from '../services/jobHealth.js';
 
 const router = Router();
 
@@ -28,6 +31,20 @@ const ADD_CVD_HEALTHY_WINDOW_MS = 26 * 60 * 60 * 1000;
 
 // Bounded by the app-wide generalLimiter (index.ts); mounting it again here
 // counted each status call twice.
+// For the external uptime monitor: 503 when CBP responses have stopped being
+// pulled. /api/health stays 200 through a CBP outage, so it can't catch one.
+// Timings only; the job's error text stays out of this public response.
+router.get('/cbp', (_req, res) => {
+  const health = evaluateCbpHealth({
+    transport: env.ABI_TRANSPORT,
+    lastSuccessAt: jobHealthSnapshot()['cbp-inbound']?.lastSuccessAt ?? null,
+    uptimeMs: Date.now() - SERVER_STARTED_AT,
+    now: Date.now(),
+  });
+  res.set('Cache-Control', 'no-store');
+  res.status(health.healthy ? 200 : 503).json(health);
+});
+
 router.get('/', (_req, res) => {
   const jobs = getJobStatus();
   const now = Date.now();
