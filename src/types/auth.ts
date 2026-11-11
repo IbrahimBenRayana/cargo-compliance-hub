@@ -28,7 +28,7 @@ export interface User {
   /** True when the org enforces MFA and the user hasn't enrolled yet — hard gate. */
   mfaSetupRequired?: boolean;
   /** Server-decided rollouts. */
-  features?: { dashboardV2?: boolean };
+  features?: { dashboardV2?: boolean; shipmentsV2?: boolean };
   organization: UserOrganizationSummary;
 }
 
