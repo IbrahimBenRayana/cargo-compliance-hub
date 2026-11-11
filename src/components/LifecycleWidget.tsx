@@ -232,6 +232,17 @@ export function computeShipmentLifecycle(args: {
 
 // ─── presentation ────────────────────────────────────────────────────
 
+/** "Blocked at the ISF", not "Blocked at isf". */
+const AT: Record<Stage, string> = { isf: 'the ISF', manifest: 'the manifest', entry: 'the entry', accepted: 'entry acceptance' };
+
+export function lifecycleSummary(stages: StageNode[]): string {
+  const done = stages.filter(s => s.state === 'done').length;
+  const blocked = stages.find(s => s.state === 'blocked');
+  if (stages[0].state === 'stopped') return 'The ISF was cancelled';
+  if (blocked) return `Blocked at ${AT[blocked.stage]}`;
+  return done === stages.length ? 'Every stage done' : `${done} of ${stages.length} done`;
+}
+
 const STATE_TONE: Record<State, Tone> = { done: 'done', active: 'info', blocked: 'urgent', pending: 'calm', stopped: 'calm' };
 const RING: Record<Tone, string> = {
   urgent: 'ring-[hsl(var(--urgent-fill)/0.4)]', soon: 'ring-[hsl(var(--soon-fill)/0.45)]', info: 'ring-[hsl(var(--info-fill)/0.45)]',
@@ -287,10 +298,7 @@ export function LifecycleWidget({ filing, abiDocs = [], manifestQueries = [] }: 
 
   const done = stages.filter(s => s.state === 'done').length;
   const blocked = stages.find(s => s.state === 'blocked');
-  const summary = stages[0].state === 'stopped' ? 'The ISF was cancelled'
-    : blocked ? `Blocked at ${blocked.title.toLowerCase()}`
-    : done === 4 ? 'Every stage done'
-    : `${done} of 4 done`;
+  const summary = lifecycleSummary(stages);
 
   return (
     <section aria-labelledby="lifecycle-title" className="rounded-xl border border-border/70 bg-card p-5 shadow-card">

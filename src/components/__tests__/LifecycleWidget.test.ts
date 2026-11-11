@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeShipmentLifecycle } from '../LifecycleWidget';
+import { computeShipmentLifecycle, lifecycleSummary } from '../LifecycleWidget';
 import type { Filing } from '@/types/shipment';
 
 const filing = (over: Partial<Filing> = {}) =>
@@ -56,5 +56,12 @@ describe('computeShipmentLifecycle', () => {
       linkedMq: { id: 'q1', bolNumber: 'MAEU1', status: 'completed', createdAt: '2026-11-03T00:00:00Z', completedAt: '2026-11-03T00:05:00Z' },
     });
     expect(manifest).toMatchObject({ state: 'done', detail: 'Manifest checked' });
+  });
+
+  it('sums up where it stands in plain words', () => {
+    expect(lifecycleSummary(stages(filing({ status: 'rejected' })))).toBe('Blocked at the ISF');
+    expect(lifecycleSummary(stages(filing({ status: 'accepted' }), entry('REJECTED')))).toBe('Blocked at the entry');
+    expect(lifecycleSummary(stages(filing({ status: 'cancelled' })))).toBe('The ISF was cancelled');
+    expect(lifecycleSummary(stages(filing({ status: 'accepted' }), entry('SENT')))).toBe('2 of 4 done');
   });
 });
