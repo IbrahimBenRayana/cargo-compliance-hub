@@ -24,6 +24,7 @@ import { billShipmentForFiling } from '../services/shipmentBilling.js';
 import { CAPABILITIES } from '../config/plans.js';
 import { addressSchema, commoditySchema, containerSchema, createFilingSchema } from '../schemas/filing.js';
 import { createFilingForOrg, submitFilingToCBP } from '../services/filingWrite.js';
+import { listQuerySchema, listWhere, withListFacts } from '../services/filings/listQuery.js';
 
 const router = Router();
 
@@ -266,41 +267,21 @@ router.post('/consolidation', filingMutationLimiter, async (req: AuthRequest, re
 
 // ─── GET /api/v1/filings — List filings ───────────────────
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
-  const {
-    status,
-    filingType,
-    search,
-    sortBy = 'createdAt',
-    sortOrder = 'desc',
-    page = '1',
-    limit = '20',
-  } = req.query as Record<string, string>;
-
-  const pageNum = Math.max(1, parseInt(page) || 1);
-  const pageSize = Math.min(100, Math.max(1, parseInt(limit) || 20));
-  const skip = (pageNum - 1) * pageSize;
-
-  const where: any = { orgId: req.user!.orgId };
-  if (status) where.status = status;
-  if (filingType) where.filingType = filingType;
-  if (search) {
-    where.OR = [
-      { importerName: { contains: search, mode: 'insensitive' } },
-      { masterBol: { contains: search, mode: 'insensitive' } },
-      // House bill = the shipment's heading; ISF ID = CBP's transaction number (BUG-028).
-      { houseBol: { contains: search, mode: 'insensitive' } },
-      { cbpTransactionId: { contains: search, mode: 'insensitive' } },
-      { vesselName: { contains: search, mode: 'insensitive' } },
-      { consigneeName: { contains: search, mode: 'insensitive' } },
-    ];
+  const parsed = listQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
+    return;
   }
+  const q = parsed.data;
+  const orgId = req.user!.orgId;
+  const where = listWhere(orgId, q);
 
   const [filings, total] = await Promise.all([
     prisma.filing.findMany({
       where,
-      orderBy: { [sortBy]: sortOrder },
-      skip,
-      take: pageSize,
+      orderBy: { [q.sortBy]: q.sortOrder },
+      skip: (q.page - 1) * q.limit,
+      take: q.limit,
       include: {
         createdBy: {
           select: { firstName: true, lastName: true, email: true },
@@ -310,14 +291,44 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     prisma.filing.count({ where }),
   ]);
 
+  // House bills of one master can land on different pages, so count them here.
+  const groupIds = [...new Set(filings.map((f) => f.consolidationId).filter((id): id is string => !!id))];
+  const groups = groupIds.length
+    ? await prisma.filing.groupBy({ by: ['consolidationId'], where: { orgId, consolidationId: { in: groupIds } }, _count: { _all: true } })
+    : [];
+  const groupSizes = new Map(groups.map((g) => [g.consolidationId as string, g._count._all]));
+
   res.json({
-    data: filings,
+    data: withListFacts(filings, groupSizes),
     pagination: {
       total,
-      page: pageNum,
-      limit: pageSize,
-      totalPages: Math.ceil(total / pageSize),
+      page: q.page,
+      limit: q.limit,
+      totalPages: Math.ceil(total / q.limit),
     },
+  });
+});
+
+// ─── GET /api/v1/filings/facets — Counts for the list's filters ──
+// Status counts follow every other filter, so a tab's number matches what it opens.
+router.get('/facets', async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = listQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
+    return;
+  }
+  const orgId = req.user!.orgId;
+  const [byStatus, origins] = await Promise.all([
+    prisma.filing.groupBy({ by: ['status'], where: listWhere(orgId, parsed.data, { skipStatus: true }), _count: { _all: true } }),
+    prisma.$queryRaw<{ code: string; count: number }[]>`
+      SELECT commodities->0->>'countryOfOrigin' AS code, COUNT(*)::int AS count
+      FROM filings
+      WHERE org_id = ${orgId}::uuid AND commodities->0->>'countryOfOrigin' IS NOT NULL
+      GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 60`,
+  ]);
+  res.set('Cache-Control', 'private, no-store').json({
+    status: Object.fromEntries(byStatus.map((s) => [s.status, s._count._all])),
+    origins,
   });
 });
 
