@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { prisma } = vi.hoisted(() => ({
   prisma: {
-    filing: { findMany: vi.fn(), count: vi.fn(), groupBy: vi.fn() },
+    filing: { findMany: vi.fn(), count: vi.fn(), groupBy: vi.fn(), findFirst: vi.fn() },
     $queryRaw: vi.fn(),
   },
 }));
@@ -28,7 +28,7 @@ function call(path: string, query: Record<string, string>) {
     set(name: string, value: string) { this.headers[name] = value; return this; },
     json(body: unknown) { this.body = body; return this; },
   };
-  return Promise.resolve(handler(path)({ query, user: { id: 'u1', orgId: 'o1', role: 'admin' } }, res, vi.fn())).then(() => res);
+  return Promise.resolve(handler(path)({ query, params: { id: 'f1' }, user: { id: 'u1', orgId: 'o1', role: 'admin' } }, res, vi.fn())).then(() => res);
 }
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -102,5 +102,21 @@ describe('GET /filings/facets', () => {
   it('answers 400 for a filter it does not understand', async () => {
     const res = await call('/facets', { status: 'cleared' });
     expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('GET /filings/:id', () => {
+  it('carries the ISF cutoff by the same rule as the list, so the page never works it out itself', async () => {
+    const lading = new Date('2026-11-20T12:00:00.000Z');
+    prisma.filing.findFirst.mockResolvedValue(row({ estimatedDeparture: new Date('2026-11-21T00:00:00.000Z'), estimatedLading: lading }));
+    const res = await call('/:id', {});
+    expect(res.body.cutoff).toEqual({ at: new Date(lading.getTime() - 24 * 3_600_000).toISOString(), basis: 'LADING' });
+    expect(prisma.filing.findFirst.mock.calls[0][0].where).toEqual({ id: 'f1', orgId: 'o1' });
+  });
+
+  it('still answers 404 for a shipment that is not this organisation\'s', async () => {
+    prisma.filing.findFirst.mockResolvedValue(null);
+    const res = await call('/:id', {});
+    expect(res.statusCode).toBe(404);
   });
 });

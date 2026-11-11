@@ -53,14 +53,17 @@ interface ListFacts {
   estimatedLading: Date | null;
 }
 
-/** The cutoff follows the dashboard's rule, and a house bill knows how many share its master. */
+/** The ISF cutoff by the dashboard's rule, as the app shows it. */
+export function cutoffOf(row: Pick<ListFacts, 'estimatedDeparture' | 'estimatedLading'>) {
+  const due = isfCutoff(row);
+  return due ? { at: due.at.toISOString(), basis: due.basis } : null;
+}
+
+/** Each row's cutoff, and how many house bills share its master. */
 export function withListFacts<T extends ListFacts>(rows: T[], groupSizes: Map<string, number>) {
-  return rows.map((row) => {
-    const due = isfCutoff(row);
-    return {
-      ...row,
-      cutoff: due ? { at: due.at.toISOString(), basis: due.basis } : null,
-      consolidationSize: row.consolidationId ? groupSizes.get(row.consolidationId) ?? null : null,
-    };
-  });
+  return rows.map((row) => ({
+    ...row,
+    cutoff: cutoffOf(row),
+    consolidationSize: row.consolidationId ? groupSizes.get(row.consolidationId) ?? null : null,
+  }));
 }

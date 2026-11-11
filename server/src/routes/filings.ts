@@ -24,7 +24,7 @@ import { billShipmentForFiling } from '../services/shipmentBilling.js';
 import { CAPABILITIES } from '../config/plans.js';
 import { addressSchema, commoditySchema, containerSchema, createFilingSchema } from '../schemas/filing.js';
 import { createFilingForOrg, submitFilingToCBP } from '../services/filingWrite.js';
-import { listQuerySchema, listWhere, withListFacts } from '../services/filings/listQuery.js';
+import { cutoffOf, listQuerySchema, listWhere, withListFacts } from '../services/filings/listQuery.js';
 
 const router = Router();
 
@@ -352,7 +352,7 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     return;
   }
 
-  res.json(filing);
+  res.json({ ...filing, cutoff: cutoffOf(filing) });
 });
 
 // ─── PATCH /api/v1/filings/:id — Update draft filing ──────
