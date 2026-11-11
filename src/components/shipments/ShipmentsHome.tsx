@@ -2,7 +2,7 @@
  * The Shipments page in the dashboard's language: every ISF, paged and counted
  * on the server, with the cutoffs that still matter in colour.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
 import { AlertTriangle, Plus, Search, Ship } from 'lucide-react';
@@ -53,6 +53,7 @@ export default function ShipmentsHome() {
   const bulkDelete = useBulkDelete();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const listTop = useRef<HTMLElement>(null);
   const viewKey = JSON.stringify(listQuery(state));
   useEffect(() => setSelected(new Set()), [viewKey]);
 
@@ -145,7 +146,11 @@ export default function ShipmentsHome() {
             onSend={send}
           />
         </div>
-        <Pagination page={state.page} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onChange={(page) => update({ page })} label="Shipment pages" layoutId="shipments-page" />
+        <Pagination page={state.page} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onChange={(page) => {
+            update({ page });
+            // Pages are long; a new one starts at its first row, not where the last one ended.
+            if ((listTop.current?.getBoundingClientRect().top ?? 0) < 0) listTop.current?.scrollIntoView({ block: 'start' });
+          }} label="Shipment pages" layoutId="shipments-page" />
       </>
     );
   }
@@ -169,7 +174,7 @@ export default function ShipmentsHome() {
           </div>
         </header>
 
-        <section aria-label="Shipments" className={CARD}>
+        <section ref={listTop} aria-label="Shipments" className={cn(CARD, 'scroll-mt-4')}>
           <div className="border-b border-border pt-3">
             <FilterTabs items={tabs} active={state.tab} onChange={(tab) => update({ tab })} layoutId="shipments-tab" />
           </div>

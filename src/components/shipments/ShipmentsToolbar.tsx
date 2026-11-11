@@ -14,7 +14,8 @@ import { cn } from '@/lib/utils';
 import { countryName } from './countries';
 import { hasFilters, toDay, type ListState } from './useListState';
 
-const FILTER = 'h-8 gap-1.5 text-[13px] font-medium';
+/** Outline buttons fill with the accent on hover; a filter that is not set stays quiet. */
+const FILTER = 'h-8 gap-1.5 text-[13px] font-medium hover:bg-muted hover:text-foreground data-[state=open]:bg-muted';
 const ACTIVE = 'border-primary/40 text-primary';
 const COUNT = 'rounded bg-primary px-1 text-[11px] tabular-nums text-primary-foreground';
 
@@ -24,7 +25,7 @@ function departsLabel(from: string | null, to: string | null) {
   if (from && to) return from === to ? `Departs ${dayLabel(from)}` : `Departs ${dayLabel(from)} – ${dayLabel(to)}`;
   if (from) return `Departs from ${dayLabel(from)}`;
   if (to) return `Departs by ${dayLabel(to)}`;
-  return 'Departs';
+  return 'Departure date';
 }
 
 /** Typing waits a moment before it asks the server. */
