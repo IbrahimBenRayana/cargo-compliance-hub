@@ -13,7 +13,8 @@ test.describe('Shipments', () => {
 
   test('status filter chips are present and clickable', async ({ page }) => {
     await gotoAuthed(page, '/shipments');
-    const submitted = page.getByText(/submitted/i).first();
+    // Classic page: "Submitted" cards. Redesigned page (SHIPMENTS_V2): a "Sent" tab.
+    const submitted = page.getByRole('button', { name: /^(Submitted|Sent)\s*\d+/ }).first();
     await expect(submitted).toBeVisible();
     await submitted.click(); // should not throw / crash
     await expect(page).toHaveURL(/\/shipments/);
@@ -21,7 +22,7 @@ test.describe('Shipments', () => {
 
   test('"Create New ISF" opens the filing wizard', async ({ page }) => {
     await gotoAuthed(page, '/shipments');
-    await page.getByRole('link', { name: /create new isf/i }).first().click();
+    await page.getByRole('link', { name: /create new isf|new shipment/i }).first().click();
     await expect(page).toHaveURL(/\/shipments\/new/);
     await expect(page.getByText(/new isf filing/i)).toBeVisible();
   });

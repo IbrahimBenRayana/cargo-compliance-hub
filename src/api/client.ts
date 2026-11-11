@@ -317,13 +317,26 @@ export const authApi = {
 
 // ─── Filings API ──────────────────────────────────────────
 export interface FilingListParams {
+  /** One status, or several joined with commas. */
   status?: string;
   filingType?: string;
   search?: string;
+  /** Country codes of the first commodity, joined with commas. */
+  origin?: string;
+  /** ISO instants bounding the estimated departure. */
+  etdFrom?: string;
+  etdTo?: string;
+  consolidationId?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+}
+
+/** Counts for the Shipments filters: statuses under the other filters, and every origin shipped from. */
+export interface FilingFacets {
+  status: Record<string, number>;
+  origins: { code: string; count: number }[];
 }
 
 /** A CBP condition as the server describes it (services/cbp/conditions). */
@@ -388,6 +401,15 @@ export const filingsApi = {
     }
     const qs = query.toString();
     return apiFetch<PaginatedResponse<Filing>>(`/api/v1/filings${qs ? `?${qs}` : ''}`);
+  },
+
+  facets(params?: Pick<FilingListParams, 'search' | 'origin' | 'etdFrom' | 'etdTo'>) {
+    const query = new URLSearchParams();
+    Object.entries(params ?? {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') query.set(k, String(v));
+    });
+    const qs = query.toString();
+    return apiFetch<FilingFacets>(`/api/v1/filings/facets${qs ? `?${qs}` : ''}`);
   },
 
   get(id: string) {
