@@ -234,9 +234,9 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
   };
 
   const stepConfig = [
-    { key: 'validate' as PipelineStep, label: 'Validate Fields', desc: 'Check all required fields and formats', icon: Shield },
-    { key: 'send_cc' as PipelineStep, label: 'Create Filing', desc: 'Prepare document for CBP submission', icon: Zap },
-    { key: 'send_cbp' as PipelineStep, label: 'Send to CBP', desc: 'Transmit filing to U.S. Customs', icon: Send },
+    { key: 'validate' as PipelineStep, label: 'Validate fields', desc: 'Check every required field and format', icon: Shield },
+    { key: 'send_cc' as PipelineStep, label: 'Create filing', desc: 'Prepare the document for CBP', icon: Zap },
+    { key: 'send_cbp' as PipelineStep, label: 'Send to CBP', desc: 'Send the ISF to US Customs', icon: Send },
   ];
 
   return (
@@ -250,12 +250,12 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
       onConfirm={transmit}
       pending={submitFiling.isPending}
     />
-    <Card>
+    <Card className="rounded-xl border-border/70 shadow-card">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-primary" />
-            <CardTitle className="text-base font-semibold">Submission Pipeline</CardTitle>
+            <CardTitle className="text-[14px] font-semibold">Submission pipeline</CardTitle>
           </div>
           <Button
             onClick={runPipeline}
@@ -267,10 +267,10 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
             ) : (
               <Send className="h-4 w-4" />
             )}
-            {isRunning ? 'Processing...' : 'Start Submission'}
+            {isRunning ? 'Working…' : 'Start submission'}
           </Button>
         </div>
-        <CardDescription>Validate, prepare, and transmit your filing to CBP</CardDescription>
+        <CardDescription>Check, prepare and send this ISF to CBP.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-0">
         {stepConfig.map((cfg, i) => {
@@ -439,7 +439,7 @@ function CBPStatusChecker({ filing, onStatusUpdate }: { filing: Filing; onStatus
               <Radio className={cn('h-4 w-4', autoPolling ? 'text-primary' : 'text-muted-foreground')} />
             </div>
             <div>
-              <CardTitle className="text-base font-semibold">CBP Response Status</CardTitle>
+              <CardTitle className="text-[14px] font-semibold">CBP response status</CardTitle>
               <CardDescription className="text-xs">
                 {autoPolling
                   ? 'Auto-checking every 30s for CBP response...'
@@ -628,6 +628,7 @@ function ConsolidationStrip({
 // ─── Main Component ────────────────────────────────────────
 
 const PANEL = 'rounded-xl border border-border/70 bg-card p-5 shadow-card';
+const longDate = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 /** A section's heading: its icon on the brand tint, its name, and a count when it has one. */
 function PanelTitle({ icon: Icon, count, children }: { icon: React.ElementType; count?: number; children: React.ReactNode }) {
@@ -792,58 +793,48 @@ export default function ShipmentDetails() {
   const isf5 = (filing as any).isf5Data ?? {};
 
   const sections = isISF5 ? [
-    { title: 'ISF Filer & Booking Party', icon: Users, items: [
-      ['ISF Filer', isf5.ISFFilerName || filing.importerName || ''],
+    { title: 'ISF filer and booking party', icon: Users, items: [
+      ['ISF filer', isf5.ISFFilerName || filing.importerName || ''],
       ['Filer EIN', isf5.ISFFilerNumber || filing.importerNumber || ''],
-      ['Booking Party', isf5.bookingPartyName || ''],
-      ['Booking Party Country', isf5.bookingPartyCountry || ''],
-      ['Bond Holder ID', isf5.bondHolderID || ''],
+      ['Booking party', isf5.bookingPartyName || ''],
+      ['Booking party country', isf5.bookingPartyCountry || ''],
+      ['Bond holder ID', isf5.bondHolderID || ''],
     ]},
     { title: 'Parties', icon: Users, items: [
-      ['Ship-to Party', getPartyName(filing.shipToParty)],
+      ['Ship-to party', getPartyName(filing.shipToParty)],
       ['Manufacturer', getPartyName(filing.manufacturer)],
     ]},
-    { title: 'Shipment Info', icon: Ship, items: [
+    { title: 'Shipment', icon: Ship, items: [
       ['Master BOL', filing.masterBol || ''],
       ['House BOL', filing.houseBol || ''],
-      ['US Port of Arrival', isf5.USPortOfArrival || filing.foreignPortOfUnlading || ''],
-      ['Bond Type', filing.bondType || ''],
-      ['Est. Arrival', filing.estimatedArrival ? new Date(filing.estimatedArrival).toLocaleDateString() : ''],
-    ]},
-    { title: 'Product Info', icon: Package, items: [
-      ['HTS Code', commodity.htsCode],
-      ['Country of Origin', commodity.countryOfOrigin],
-      ['Description', commodity.description],
+      ['US port of arrival', isf5.USPortOfArrival || filing.foreignPortOfUnlading || ''],
+      ['Bond type', filing.bondType || ''],
+      ['Est. arrival', filing.estimatedArrival ? longDate(filing.estimatedArrival) : ''],
     ]},
   ] : [
     { title: 'Parties', icon: Users, items: [
       ['Manufacturer', getPartyName(filing.manufacturer)],
       ['Seller', getPartyName(filing.seller)],
       ['Buyer', getPartyName(filing.buyer)],
-      ['Ship-to Party', getPartyName(filing.shipToParty)],
+      ['Ship-to party', getPartyName(filing.shipToParty)],
       ['Importer', filing.importerName || ''],
       ['Consignee', filing.consigneeName || ''],
     ]},
-    { title: 'Shipment Info', icon: Ship, items: [
+    { title: 'Shipment', icon: Ship, items: [
       ['Master BOL', filing.masterBol || ''],
       ['House BOL', filing.houseBol || ''],
-      ['Vessel Name', filing.vesselName || ''],
-      ['Voyage Number', filing.voyageNumber || ''],
-      ['SCAC Code', filing.scacCode || ''],
-      ['Foreign Port', filing.foreignPortOfUnlading || ''],
-      ['Place of Delivery', filing.placeOfDelivery || ''],
-    ]},
-    { title: 'Product Info', icon: Package, items: [
-      ['HTS Code', commodity.htsCode],
-      ['Country of Origin', commodity.countryOfOrigin],
-      ['Description', commodity.description],
+      ['Vessel', filing.vesselName || ''],
+      ['Voyage', filing.voyageNumber || ''],
+      ['SCAC', filing.scacCode || ''],
+      ['Port of unlading', filing.foreignPortOfUnlading || ''],
+      ['Place of delivery', filing.placeOfDelivery || ''],
     ]},
     { title: 'Logistics', icon: Globe, items: [
-      ['Container Stuffing', getPartyName(filing.containerStuffingLocation)],
+      ['Container stuffing', getPartyName(filing.containerStuffingLocation)],
       ['Consolidator', getPartyName(filing.consolidator)],
-      ['Bond Type', filing.bondType || ''],
-      ['Est. Departure', filing.estimatedDeparture ? new Date(filing.estimatedDeparture).toLocaleDateString() : ''],
-      ['Est. Arrival', filing.estimatedArrival ? new Date(filing.estimatedArrival).toLocaleDateString() : ''],
+      ['Bond type', filing.bondType || ''],
+      ['Est. departure', filing.estimatedDeparture ? longDate(filing.estimatedDeparture) : ''],
+      ['Est. arrival', filing.estimatedArrival ? longDate(filing.estimatedArrival) : ''],
     ]},
   ];
 

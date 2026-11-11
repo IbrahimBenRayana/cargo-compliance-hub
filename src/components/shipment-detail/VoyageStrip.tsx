@@ -86,7 +86,10 @@ function IsfPanel({ filing, now }: { filing: Filing; now: number }) {
 
 export function VoyageStrip({ filing, now }: { filing: Filing; now: number }) {
   const start = startOf(filing);
-  const port = filing.foreignPortOfUnlading || filing.placeOfDelivery;
+  // Shown under the names they were filed with: these fields hold US and foreign codes alike.
+  const end = filing.placeOfDelivery
+    ? { label: 'Place of delivery', code: filing.placeOfDelivery, also: filing.foreignPortOfUnlading && `Port of unlading ${filing.foreignPortOfUnlading}` }
+    : filing.foreignPortOfUnlading ? { label: 'Port of unlading', code: filing.foreignPortOfUnlading, also: null } : null;
   const trip = sailing(filing.estimatedDeparture, filing.estimatedArrival, now);
   const share = trip?.share ?? 0;
   const vessel = filing.vesselName && (
@@ -99,18 +102,19 @@ export function VoyageStrip({ filing, now }: { filing: Filing; now: number }) {
   return (
     <section aria-label="Voyage" className="grid overflow-hidden rounded-xl border border-border/70 bg-card shadow-card lg:grid-cols-[minmax(0,1fr)_232px]">
       <div className="min-w-0 p-5">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3">
           <div className="min-w-0">
             <p className={LABEL}>{start?.label ?? 'From'}</p>
             <p className="truncate text-[15px] font-semibold">{start?.place ?? <span className="font-normal text-muted-foreground">Not on file</span>}</p>
           </div>
           <div className="min-w-0 text-center max-sm:hidden">
             <p className={LABEL}>Vessel</p>
-            <p className="truncate text-[13px] font-medium">{vessel || <span className="text-muted-foreground">Not on file</span>}</p>
+            <p className="truncate text-[15px] font-semibold">{vessel || <span className="font-normal text-muted-foreground">Not on file</span>}</p>
           </div>
           <div className="min-w-0 text-right">
-            <p className={LABEL}>US port</p>
-            <p className="truncate font-mono text-[15px] font-semibold">{port || <span className="font-sans font-normal text-muted-foreground">Not on file</span>}</p>
+            <p className={LABEL}>{end?.label ?? 'Destination'}</p>
+            <p className="truncate font-mono text-[15px] font-semibold">{end?.code || <span className="font-sans font-normal text-muted-foreground">Not on file</span>}</p>
+            {end?.also && <p className="truncate font-mono text-[11.5px] text-muted-foreground">{end.also}</p>}
           </div>
         </div>
 
