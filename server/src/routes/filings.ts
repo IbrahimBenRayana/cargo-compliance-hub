@@ -279,7 +279,8 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   const [filings, total] = await Promise.all([
     prisma.filing.findMany({
       where,
-      orderBy: { [q.sortBy]: q.sortOrder },
+      // Ties (same status, same importer) need a fixed order, or rows repeat or vanish between pages.
+      orderBy: [{ [q.sortBy]: q.sortOrder }, { id: 'asc' }],
       skip: (q.page - 1) * q.limit,
       take: q.limit,
       include: {

@@ -55,7 +55,7 @@ describe('GET /filings', () => {
     const res = await call('/', { status: 'submitted,pending_cbp', page: '3', limit: '25', sortBy: 'masterBol', sortOrder: 'asc' });
     const args = prisma.filing.findMany.mock.calls[0][0];
     expect(args.where).toMatchObject({ orgId: 'o1', status: { in: ['submitted', 'pending_cbp'] } });
-    expect(args).toMatchObject({ skip: 50, take: 25, orderBy: { masterBol: 'asc' } });
+    expect(args).toMatchObject({ skip: 50, take: 25, orderBy: [{ masterBol: 'asc' }, { id: 'asc' }] });
     expect(res.body.pagination).toEqual({ total: 57, page: 3, limit: 25, totalPages: 3 });
   });
 

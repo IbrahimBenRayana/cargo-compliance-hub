@@ -15,6 +15,7 @@ describe('listQuerySchema', () => {
 
   it('keeps the old lenient paging: a bad page is 1, a bad limit is 20, and limits stop at 100', () => {
     expect(parse({ page: 'abc' }).page).toBe(1);
+    expect(parse({ page: '99999999999' }).page).toBe(100_000);
     expect(parse({ limit: '500' }).limit).toBe(100);
     expect(parse({ limit: '0' }).limit).toBe(20);
     expect(parse({}).limit).toBe(20);

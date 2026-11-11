@@ -27,7 +27,7 @@ export const listQuerySchema = z.object({
   consolidationId: z.string().uuid().optional(),
   sortBy: z.enum(SORTABLE).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
-  page: clampedInt(1, 1, Number.MAX_SAFE_INTEGER),
+  page: clampedInt(1, 1, 100_000),
   limit: clampedInt(20, 1, 100),
 });
 
