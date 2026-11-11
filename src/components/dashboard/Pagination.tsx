@@ -11,13 +11,13 @@ function pageList(page: number, pageCount: number): Array<number | 'gap'> {
 
 const BTN = 'relative grid h-8 min-w-8 place-items-center rounded-lg px-1.5 text-[13px] font-medium tabular-nums outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40';
 
-export function Pagination({ page, pageCount, total, pageSize, onChange }: {
-  page: number; pageCount: number; total: number; pageSize: number; onChange: (p: number) => void;
+export function Pagination({ page, pageCount, total, pageSize, onChange, label = 'Action items pages', layoutId = 'attention-page' }: {
+  page: number; pageCount: number; total: number; pageSize: number; onChange: (p: number) => void; label?: string; layoutId?: string;
 }) {
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
   return (
-    <nav aria-label="Action items pages" className="flex items-center justify-between gap-3 border-t border-border/70 px-4 py-2">
+    <nav aria-label={label} className="flex items-center justify-between gap-3 border-t border-border/70 px-4 py-2">
       <p className="text-[12.5px] tabular-nums text-muted-foreground">{from}-{to} of {total.toLocaleString()}</p>
       {pageCount > 1 && (
         <div className="flex items-center gap-0.5">
@@ -35,7 +35,7 @@ export function Pagination({ page, pageCount, total, pageSize, onChange }: {
               onClick={() => onChange(p)}
               className={cn(BTN, 'max-sm:hidden', p === page ? 'text-primary-foreground' : 'text-muted-foreground can-hover:hover:bg-muted can-hover:hover:text-foreground')}
             >
-              {p === page && <motion.span layoutId="attention-page" className="absolute inset-0 rounded-lg bg-primary" transition={{ type: 'spring', bounce: 0, duration: 0.3 }} />}
+              {p === page && <motion.span layoutId={layoutId} className="absolute inset-0 rounded-lg bg-primary" transition={{ type: 'spring', bounce: 0, duration: 0.3 }} />}
               <span className="relative">{p}</span>
             </button>
           )))}

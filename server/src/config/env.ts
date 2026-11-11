@@ -116,6 +116,8 @@ const envSchema = z.object({
   // Which dashboard people see: off = the classic page, staff = platform admins
   // get the new one, all = everyone. Rolling back is setting this to off.
   DASHBOARD_V2: z.enum(['off', 'staff', 'all']).default('off'),
+  // The same choice for the Shipments page.
+  SHIPMENTS_V2: z.enum(['off', 'staff', 'all']).default('off'),
   // Native CBP connection (services/cbp/environment.ts): ABI_TRANSPORT,
   // CBP_ENVIRONMENT (staging = CERT, production = PROD), mq-bridge URL+token.
   ...cbpEnvShape,

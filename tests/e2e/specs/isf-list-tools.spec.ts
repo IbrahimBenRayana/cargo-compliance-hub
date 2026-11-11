@@ -25,11 +25,14 @@ const rows = (page: import('@playwright/test').Page) => page.locator('tbody tr')
 
 test('status filter chips show only that status; search finds one bill', async ({ page }) => {
   await gotoAuthed(page, '/shipments');
-  await page.getByRole('button', { name: /^Rejected \d+/ }).click();
+  await page.getByRole('button', { name: /^Rejected\s*\d+/ }).click();
   await expect(rows(page).first()).toBeVisible();
   for (const text of await rows(page).allInnerTexts()) expect(text).toMatch(/Rejected/);
-  await page.getByRole('button', { name: /^Rejected \d+/ }).click(); // clear
-  await page.getByPlaceholder(/Search bill of lading/).fill(BOL);
+  // Clear: the classic page toggles its card off; the redesigned page has an All tab.
+  const all = page.getByRole('button', { name: /^All\s*\d+/ });
+  if (await all.count()) await all.click();
+  else await page.getByRole('button', { name: /^Rejected\s*\d+/ }).click();
+  await page.getByRole('searchbox').or(page.getByPlaceholder(/Search bill of lading/)).first().fill(BOL);
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first()).toContainText(BOL);
 });
@@ -47,8 +50,8 @@ test('export CSV and summary PDF download real files', async ({ page }) => {
 
 test('duplicate, save as template, start from template, use as starting point', async ({ page }) => {
   await gotoAuthed(page, '/shipments');
-  await page.getByPlaceholder(/Search bill of lading/).fill(BOL);
-  await rows(page).first().getByRole('link', { name: 'View shipment' }).click();
+  await page.getByRole('searchbox').or(page.getByPlaceholder(/Search bill of lading/)).first().fill(BOL);
+  await rows(page).first().locator('a[href^="/shipments/"]').first().click();
   await expect(page).toHaveURL(/\/shipments\/[0-9a-f-]{36}$/);
   const shipmentUrl = new URL(page.url()).pathname;
 
@@ -64,7 +67,7 @@ test('duplicate, save as template, start from template, use as starting point', 
   await expect(page.getByText(`Template "${templateName}" saved!`)).toBeVisible();
 
   await gotoAuthed(page, '/shipments');
-  await page.getByRole('button', { name: /From Template/ }).click();
+  await page.getByRole('button', { name: /From template/i }).click();
   await page.getByRole('menuitem', { name: new RegExp(templateName) }).click();
   await expect(page).toHaveURL(/\/shipments\/[0-9a-f-]{36}\/edit$/, { timeout: 15_000 });
   await expectMostlyFilled(page); // parties, ports, cargo carried over; bills left blank
