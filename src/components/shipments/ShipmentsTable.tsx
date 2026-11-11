@@ -4,14 +4,14 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, ArrowUpDown, Layers, Loader2, Pencil, Send } from 'lucide-react';
 import { filingsApi } from '@/api/client';
 import { CutoffBadge } from '@/components/dashboard/CutoffBadge';
-import { FILL } from '@/components/dashboard/tones';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { getFirstCommodity, type Filing, type ShipmentStatus } from '@/types/shipment';
+import { getFirstCommodity, type Filing } from '@/types/shipment';
 import { countryName } from './countries';
-import { cutoffMatters, refOf, STATUS } from './status';
+import { cutoffMatters, refOf } from './status';
+import { StatusPill, StatusTile } from './StatusPill';
 import type { Sort } from './useListState';
 
 const ROW = 'group relative border-t border-border/60 transition-colors duration-150 can-hover:hover:bg-muted/40';
@@ -24,16 +24,6 @@ function shortDate(iso: string, now: number) {
   const d = new Date(iso);
   const sameYear = d.getFullYear() === new Date(now).getFullYear();
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
-}
-
-export function StatusWord({ status }: { status: string }) {
-  const s = STATUS[status as ShipmentStatus] ?? { word: status, tone: 'calm' as const };
-  return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-      <span aria-hidden className={cn('h-1.5 w-1.5 shrink-0 rounded-full', FILL[s.tone])} />
-      {s.word}
-    </span>
-  );
 }
 
 /** Coarse on purpose: "3h ago", not "3h 12m ago". */
@@ -82,7 +72,7 @@ function Consolidation({ f }: { f: Filing }) {
                 className="flex items-center justify-between gap-2 px-3 py-1.5 text-[12.5px] outline-none can-hover:hover:bg-muted focus-visible:bg-muted aria-[current=page]:font-medium"
               >
                 <span className="truncate font-mono">{s.houseBol || s.id.slice(0, 8)}</span>
-                <StatusWord status={s.status} />
+                <StatusPill status={s.status} />
               </Link>
             </li>
           ))}
@@ -139,9 +129,9 @@ export function ShipmentsTable({ rows, now, sort, dir, onSort, canWrite, selecte
             </th>
           )}
           <SortHead field="masterBol" label="Shipment" {...head} className={cn(!canWrite && 'pl-4')} />
-          <SortHead field="importerName" label="Importer" {...head} className="hidden w-[24%] md:table-cell xl:w-[15%]" />
-          <th scope="col" className={cn(TH, 'hidden w-[17%] xl:table-cell')}>Goods</th>
-          <SortHead field="status" label="Status" {...head} className="w-[100px]" />
+          <SortHead field="importerName" label="Importer" {...head} className="hidden w-[24%] md:table-cell xl:w-[14%]" />
+          <th scope="col" className={cn(TH, 'hidden w-[16%] xl:table-cell')}>Goods</th>
+          <SortHead field="status" label="Status" {...head} className="w-[108px]" />
           <SortHead field="estimatedDeparture" label="Departs" {...head} className="hidden w-[76px] lg:table-cell" />
           <SortHead field="filingDeadline" label="ISF cutoff" {...head} className="hidden w-[124px] sm:table-cell" />
           <SortHead field="createdAt" label="Created" {...head} className="hidden w-[80px] min-[1360px]:table-cell" />
@@ -161,14 +151,19 @@ export function ShipmentsTable({ rows, now, sort, dir, onSort, canWrite, selecte
                 </td>
               )}
               <td className={cn('py-2.5 pr-3', canWrite ? 'pl-4 sm:pl-3' : 'pl-4')}>
-                <Link to={`/shipments/${f.id}`} className={cn(LINK, 'block truncate')}>{ref}</Link>
-                <div className="mt-0.5 flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
-                  <span className="min-w-0 truncate">
-                    {f.houseBol && f.masterBol && <span className="max-md:hidden">MBL <span className="font-mono">{f.masterBol}</span></span>}
-                    <span className="md:hidden">{f.importerName || 'No importer yet'}</span>
-                  </span>
-                  {/* Phones keep the importer instead; the house bills are one tap away on the shipment. */}
-                  {f.consolidationId && (f.consolidationSize ?? 0) > 1 && <span className="flex max-md:hidden"><Consolidation f={f} /></span>}
+                <div className="flex min-w-0 items-center gap-3">
+                  <StatusTile status={f.status} />
+                  <div className="min-w-0 flex-1">
+                    <Link to={`/shipments/${f.id}`} className={cn(LINK, 'block truncate')}>{ref}</Link>
+                    <div className="mt-0.5 flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
+                      <span className="min-w-0 truncate">
+                        {f.houseBol && f.masterBol && <span className="max-md:hidden">MBL <span className="font-mono">{f.masterBol}</span></span>}
+                        <span className="md:hidden">{f.importerName || 'No importer yet'}</span>
+                      </span>
+                      {/* Phones keep the importer instead; the house bills are one tap away on the shipment. */}
+                      {f.consolidationId && (f.consolidationSize ?? 0) > 1 && <span className="flex max-md:hidden"><Consolidation f={f} /></span>}
+                    </div>
+                  </div>
                 </div>
               </td>
               <td className="hidden truncate px-3 py-2.5 md:table-cell" title={f.importerName ?? undefined}>
@@ -179,7 +174,7 @@ export function ShipmentsTable({ rows, now, sort, dir, onSort, canWrite, selecte
                 {goods.countryOfOrigin && <p className="truncate text-[12px] text-muted-foreground">{countryName(goods.countryOfOrigin)}</p>}
               </td>
               <td className="w-[112px] whitespace-nowrap px-3 py-2.5">
-                <StatusWord status={f.status} />
+                <StatusPill status={f.status} />
                 <div className="mt-1 sm:hidden"><Cutoff f={f} now={now} /></div>
               </td>
               <td className="hidden whitespace-nowrap px-3 py-2.5 tabular-nums lg:table-cell">

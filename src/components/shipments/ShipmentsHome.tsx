@@ -104,9 +104,13 @@ export default function ShipmentsHome() {
     }
   };
 
-  const summary = facets.data
-    ? `${all.toLocaleString()} ${all === 1 ? 'ISF' : 'ISFs'}${filtered ? ' match your filters' : ''}${toSend ? `, ${toSend.toLocaleString()} to send or fix` : ''}.`
-    : ' ';
+  // The work waiting is the part of this line worth colour.
+  const summary = facets.data ? (
+    <>
+      {all.toLocaleString()} {all === 1 ? 'ISF' : 'ISFs'}{filtered ? ' match your filters' : ''}
+      {toSend > 0 && <>, <span className="font-medium text-soon">{toSend.toLocaleString()} to send or fix</span></>}.
+    </>
+  ) : '\u00a0';
 
   let body: React.ReactNode;
   if (list.isError && !list.data) {
