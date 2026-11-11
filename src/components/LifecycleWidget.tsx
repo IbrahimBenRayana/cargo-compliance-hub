@@ -1,29 +1,18 @@
 /**
- * LifecycleWidget — horizontal stage tracker for a single shipment.
+ * LifecycleWidget: where one shipment stands, in four stages (ISF, Manifest,
+ * Entry filed, Entry accepted). Each stage says only what is stored: the app
+ * never sees CBP release a cargo, so nothing here says cleared or released.
  *
- * Drops into ShipmentDetails right after the page header. Shows the
- * 4-stage import lifecycle (ISF Filed → Manifest Verified → Entry
- * Filed → Cleared) with the current shipment's progress overlaid:
- *
- *   ●─────●─────⊙─────○
- *   done  done  active pending
- *
- * The visual language matches the Dashboard pipeline:
- *   ISF      = blue   (cool, beginning)
- *   Manifest = amber  (warm, action)
- *   Entry    = violet (formal, serious)
- *   Cleared  = emerald (success, complete)
- *
- * Each stage shows: title, status detail, age, and (when applicable)
- * a contextual CTA button. The horizontal connector line fills with
- * stage-tinted gradient as stages complete.
+ * Colours follow the rest of the app by state, not by stage: green done, blue
+ * in progress, red blocked, amber on hold, grey not started or stopped.
  */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Filing } from '@/types/shipment';
 import { Button } from '@/components/ui/button';
-import { Check, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Ban, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { FILL, TINT, type Tone } from '@/components/dashboard/tones';
 import { useCapabilities } from '@/hooks/useBilling';
 import { CAPABILITIES } from '@/lib/planMeta';
 import { parseRejectionReason } from '@/components/RejectionDetailsCard';
@@ -98,8 +87,8 @@ function ExpandableDetail({ text, className }: { text: string; className?: strin
 
 // ─── stage definition + computation ──────────────────────────────────
 
-type Stage = 'isf' | 'manifest' | 'entry' | 'cleared';
-type State = 'done' | 'active' | 'pending' | 'blocked';
+type Stage = 'isf' | 'manifest' | 'entry' | 'accepted';
+type State = 'done' | 'active' | 'pending' | 'blocked' | 'stopped';
 
 interface AbiLite {
   id: string;
@@ -120,9 +109,11 @@ interface MqLite {
 
 interface StageNode {
   stage: Stage;
-  index: string;       // "01" / "02" / "03" / "04"
+  index: string;
   title: string;
   state: State;
+  /** Overrides the state's colour, for an ISF on hold. */
+  tone?: Tone;
   detail: string;
   age: string | null;
   cta?: { label: string; to: string; variant?: 'default' | 'outline' };
@@ -142,218 +133,136 @@ function relTime(ts: string | null | undefined) {
   return `${Math.floor(day / 30)}mo ago`;
 }
 
+const AFTER_ISF = 'After the ISF is accepted';
+const STOPPED = 'ISF cancelled';
+
+function isfStage(filing: Filing): Omit<StageNode, 'stage' | 'index' | 'title' | 'age'> {
+  const edit = `/shipments/${filing.id}/edit`;
+  switch (filing.status) {
+    case 'accepted': return { state: 'done', detail: 'Accepted by CBP' };
+    case 'amended': return { state: 'done', detail: 'Accepted by CBP, amended' };
+    case 'submitted':
+    case 'pending_cbp': return { state: 'active', detail: 'Sent, waiting for CBP' };
+    case 'draft': return { state: 'active', detail: 'Draft, not sent yet', cta: { label: 'Edit and send', to: edit } };
+    case 'on_hold': return { state: 'active', tone: 'soon', detail: 'On hold' };
+    case 'rejected': return { state: 'blocked', detail: rejectionOneLiner(filing.rejectionReason), cta: { label: 'Fix and resend', to: edit } };
+    case 'cancelled': return { state: 'stopped', detail: 'Cancelled' };
+    default: return { state: 'active', detail: filing.status };
+  }
+}
+
 export function computeShipmentLifecycle(args: {
   filing: Filing;
   linkedAbi: AbiLite | null;
   linkedMq: MqLite | null;
   // ABI Entry is a gated capability (Entry+ tiers). When false, the Entry
-  // stage still shows as part of the lifecycle but we omit the "File Entry"
+  // stage still shows as part of the lifecycle but we omit the "File entry"
   // action so ISF-only orgs aren't sent to a feature they can't use. Defaults
   // true to preserve behavior for any caller that doesn't pass it.
   canFileEntry?: boolean;
 }): StageNode[] {
   const { filing, linkedAbi, linkedMq, canFileEntry = true } = args;
+  const isf = isfStage(filing);
+  const isfDone = isf.state === 'done';
+  const stopped = isf.state === 'stopped';
+  const waiting = (): Omit<StageNode, 'stage' | 'index' | 'title'> =>
+    stopped ? { state: 'stopped', detail: STOPPED, age: null } : { state: 'pending', detail: AFTER_ISF, age: null };
 
-  // ── Stage 1: ISF Filed
-  const isfState: State =
-    filing.status === 'accepted' ? 'done'
-    : filing.status === 'rejected' ? 'blocked'
-    : filing.status === 'cancelled' ? 'pending'
-    : 'active';
-  const isfDetail =
-    filing.status === 'draft' ? 'Draft'
-    : filing.status === 'submitted' ? 'At CBP'
-    : filing.status === 'pending_cbp' ? 'At CBP'
-    : filing.status === 'on_hold' ? 'On hold'
-    : filing.status === 'rejected' ? rejectionOneLiner(filing.rejectionReason) : filing.status === 'accepted' ? 'Accepted by CBP'
-    : filing.status === 'cancelled' ? 'Cancelled'
-    : filing.status === 'amended' ? 'Amended'
-    : filing.status;
-  const isfCta: StageNode['cta'] | undefined =
-    filing.status === 'draft' ? { label: 'Edit & submit', to: `/shipments/${filing.id}/edit` }
-    : filing.status === 'rejected' ? { label: 'Review & resubmit', to: `/shipments/${filing.id}/edit` }
-    : undefined;
+  // ── Manifest: the latest query for this master bill.
+  let manifest: Omit<StageNode, 'stage' | 'index' | 'title'>;
+  const query = filing.masterBol ? `/manifest-query?bol=${encodeURIComponent(filing.masterBol)}` : null;
+  if (!isfDone) manifest = waiting();
+  else if (linkedMq?.status === 'completed') manifest = { state: 'done', detail: 'Manifest checked', age: relTime(linkedMq.completedAt || linkedMq.createdAt) };
+  else if (linkedMq?.status === 'pending') manifest = { state: 'active', detail: 'Lookup running', age: relTime(linkedMq.createdAt) };
+  else if (linkedMq?.status === 'failed' || linkedMq?.status === 'timeout') {
+    manifest = {
+      state: 'blocked',
+      detail: linkedMq.status === 'failed' ? 'Lookup failed' : 'Lookup timed out',
+      age: relTime(linkedMq.createdAt),
+      cta: query ? { label: 'Try again', to: query } : undefined,
+    };
+  } else manifest = { state: 'active', detail: 'Not checked yet', age: null, cta: query ? { label: 'Check manifest', to: query, variant: 'outline' } : undefined };
 
-  // ── Stage 2: Manifest Verified
-  let manifestState: State;
-  let manifestDetail: string;
-  let manifestAge: string | null = null;
-  let manifestCta: StageNode['cta'] | undefined;
-  if (isfState !== 'done') {
-    manifestState = 'pending';
-    manifestDetail = 'Awaiting ISF acceptance';
-  } else if (linkedMq?.status === 'completed') {
-    manifestState = 'done';
-    manifestDetail = 'Verified at CBP';
-    manifestAge = relTime(linkedMq.completedAt || linkedMq.createdAt);
-  } else if (linkedMq?.status === 'pending') {
-    manifestState = 'active';
-    manifestDetail = 'CBP lookup in progress';
-    manifestAge = relTime(linkedMq.createdAt);
-  } else if (linkedMq?.status === 'failed' || linkedMq?.status === 'timeout') {
-    manifestState = 'blocked';
-    manifestDetail = `Lookup ${linkedMq.status}`;
-    manifestAge = relTime(linkedMq.createdAt);
-    manifestCta = filing.masterBol
-      ? { label: 'Retry lookup', to: `/manifest-query?bol=${encodeURIComponent(filing.masterBol)}` }
-      : undefined;
-  } else {
-    manifestState = 'active';
-    manifestDetail = 'Run a manifest query';
-    manifestCta = filing.masterBol
-      ? { label: 'Run query', to: `/manifest-query?bol=${encodeURIComponent(filing.masterBol)}`, variant: 'outline' }
-      : undefined;
-  }
-
-  // ── Stage 3: Entry Filed
-  let entryState: State;
-  let entryDetail: string;
-  let entryAge: string | null = null;
-  let entryCta: StageNode['cta'] | undefined;
-  if (isfState !== 'done') {
-    entryState = 'pending';
-    entryDetail = 'Awaiting ISF acceptance';
+  // ── Entry filed, and entry accepted: the latest entry made from this shipment.
+  let entry: Omit<StageNode, 'stage' | 'index' | 'title'>;
+  let accepted: Omit<StageNode, 'stage' | 'index' | 'title'>;
+  const open = linkedAbi ? { label: 'Open entry', to: `/abi-documents/${linkedAbi.id}` } : undefined;
+  const at = relTime(linkedAbi?.updatedAt);
+  if (!isfDone) {
+    entry = waiting();
+    accepted = waiting();
   } else if (!linkedAbi) {
-    entryState = 'active';
-    entryDetail = 'Ready to file 7501 + 3461';
-    if (canFileEntry) {
-      entryCta = { label: 'File Entry', to: `/abi-documents/new?fromShipment=${filing.id}` };
+    entry = { state: 'active', detail: 'Not filed yet', age: null, cta: canFileEntry ? { label: 'File entry', to: `/abi-documents/new?fromShipment=${filing.id}` } : undefined };
+    accepted = { state: 'pending', detail: 'After the entry is filed', age: null };
+  } else {
+    switch (linkedAbi.status) {
+      case 'ACCEPTED':
+        entry = { state: 'done', detail: 'Sent to CBP', age: null };
+        accepted = { state: 'done', detail: 'Accepted by CBP', age: at, cta: open };
+        break;
+      case 'SENT':
+        entry = { state: 'done', detail: 'Sent to CBP', age: at };
+        accepted = { state: 'active', detail: 'Waiting for CBP', age: null, cta: open };
+        break;
+      case 'SENDING':
+        entry = { state: 'active', detail: 'Sending to CBP', age: at, cta: open };
+        accepted = { state: 'pending', detail: 'After the entry is filed', age: null };
+        break;
+      case 'REJECTED':
+        entry = { state: 'blocked', detail: 'Rejected by CBP', age: at, cta: open };
+        accepted = { state: 'blocked', detail: 'Entry rejected', age: null };
+        break;
+      case 'DRAFT':
+        entry = { state: 'active', detail: 'Entry draft, not sent yet', age: at, cta: open };
+        accepted = { state: 'pending', detail: 'After the entry is filed', age: null };
+        break;
+      default:
+        entry = { state: 'active', detail: `Entry ${linkedAbi.status.toLowerCase()}`, age: at, cta: open };
+        accepted = { state: 'pending', detail: 'After the entry is filed', age: null };
     }
-  } else if (linkedAbi.status === 'ACCEPTED') {
-    entryState = 'done';
-    entryDetail = 'Transmitted to CBP';
-    entryAge = relTime(linkedAbi.updatedAt);
-  } else if (linkedAbi.status === 'REJECTED') {
-    entryState = 'blocked';
-    entryDetail = 'Rejected by CBP';
-    entryAge = relTime(linkedAbi.updatedAt);
-    entryCta = { label: 'Open entry', to: `/abi-documents/${linkedAbi.id}` };
-  } else if (linkedAbi.status === 'DRAFT') {
-    entryState = 'active';
-    entryDetail = 'Draft — ready to transmit';
-    entryAge = relTime(linkedAbi.updatedAt);
-    entryCta = { label: 'Open entry', to: `/abi-documents/${linkedAbi.id}` };
-  } else if (linkedAbi.status === 'SENDING') {
-    entryState = 'active';
-    entryDetail = 'Transmitting…';
-    entryAge = relTime(linkedAbi.updatedAt);
-    entryCta = { label: 'Open entry', to: `/abi-documents/${linkedAbi.id}` };
-  } else if (linkedAbi.status === 'SENT') {
-    entryState = 'active';
-    entryDetail = 'Awaiting CBP disposition';
-    entryAge = relTime(linkedAbi.updatedAt);
-    entryCta = { label: 'Open entry', to: `/abi-documents/${linkedAbi.id}` };
-  } else {
-    entryState = 'active';
-    entryDetail = `Entry ${linkedAbi.status.toLowerCase()}`;
-    entryAge = relTime(linkedAbi.updatedAt);
-  }
-
-  // ── Stage 4: Cleared
-  let clearedState: State;
-  let clearedDetail: string;
-  let clearedAge: string | null = null;
-  if (linkedAbi?.status === 'ACCEPTED') {
-    clearedState = 'done';
-    clearedDetail = 'Cleared by CBP';
-    clearedAge = relTime(linkedAbi.updatedAt);
-  } else if (entryState === 'blocked') {
-    clearedState = 'blocked';
-    clearedDetail = 'Blocked by entry rejection';
-  } else {
-    clearedState = 'pending';
-    clearedDetail = 'Awaiting entry acceptance';
   }
 
   return [
-    { stage: 'isf',      index: '01', title: 'ISF Filed',         state: isfState,      detail: isfDetail,      age: relTime(filing.submittedAt || filing.updatedAt), cta: isfCta },
-    { stage: 'manifest', index: '02', title: 'Manifest Verified', state: manifestState, detail: manifestDetail, age: manifestAge,                                    cta: manifestCta },
-    { stage: 'entry',    index: '03', title: 'Entry Filed',       state: entryState,    detail: entryDetail,    age: entryAge,                                       cta: entryCta },
-    { stage: 'cleared',  index: '04', title: 'Cleared',           state: clearedState,  detail: clearedDetail,  age: clearedAge,                                     cta: undefined },
+    { stage: 'isf', index: '1', title: 'ISF', ...isf, age: relTime(filing.submittedAt || filing.updatedAt) },
+    { stage: 'manifest', index: '2', title: 'Manifest', ...manifest },
+    { stage: 'entry', index: '3', title: 'Entry filed', ...entry },
+    { stage: 'accepted', index: '4', title: 'Entry accepted', ...accepted },
   ];
 }
 
-// ─── stage style maps ────────────────────────────────────────────────
+// ─── presentation ────────────────────────────────────────────────────
 
-const STAGE_HEX: Record<Stage, { fill: string; ring: string; glow: string }> = {
-  isf:      { fill: 'hsl(217 91% 60%)', ring: 'hsl(217 91% 60% / 0.25)', glow: 'hsl(217 91% 60% / 0.55)' },
-  manifest: { fill: 'hsl(38 92% 55%)',  ring: 'hsl(38 92% 55% / 0.25)',  glow: 'hsl(38 92% 55% / 0.55)' },
-  entry:    { fill: 'hsl(262 83% 58%)', ring: 'hsl(262 83% 58% / 0.25)', glow: 'hsl(262 83% 58% / 0.55)' },
-  cleared:  { fill: 'hsl(160 84% 39%)', ring: 'hsl(160 84% 39% / 0.25)', glow: 'hsl(160 84% 39% / 0.55)' },
+const STATE_TONE: Record<State, Tone> = { done: 'done', active: 'info', blocked: 'urgent', pending: 'calm', stopped: 'calm' };
+const RING: Record<Tone, string> = {
+  urgent: 'ring-[hsl(var(--urgent-fill)/0.4)]', soon: 'ring-[hsl(var(--soon-fill)/0.45)]', info: 'ring-[hsl(var(--info-fill)/0.45)]',
+  entry: 'ring-[hsl(var(--entry-fill)/0.45)]', done: 'ring-[hsl(var(--done-fill)/0.45)]', calm: 'ring-border',
 };
+const toneOf = (node: StageNode) => node.tone ?? STATE_TONE[node.state];
 
-const STAGE_LABEL_TINT: Record<Stage, string> = {
-  isf:      'text-blue-700    dark:text-blue-300',
-  manifest: 'text-amber-700   dark:text-amber-400',
-  entry:    'text-violet-700  dark:text-violet-300',
-  cleared:  'text-emerald-700 dark:text-emerald-400',
-};
-
-// ─── stage circle component ──────────────────────────────────────────
-
-function StageCircle({ node }: { node: StageNode }) {
-  const colors = STAGE_HEX[node.stage];
-  const { state } = node;
-
-  if (state === 'done') {
-    return (
-      <div
-        className="relative h-12 w-12 rounded-full flex items-center justify-center text-white shadow-md transition-transform duration-300 group-hover:scale-105"
-        style={{ background: colors.fill, boxShadow: `0 4px 14px -4px ${colors.glow}` }}
-        role="img"
-        aria-label={`${node.title} done`}
-      >
-        <Check className="h-5 w-5" strokeWidth={3} />
-      </div>
-    );
+function StageDot({ node }: { node: StageNode }) {
+  const tone = toneOf(node);
+  const base = 'relative z-10 grid h-9 w-9 shrink-0 place-items-center rounded-full text-[12px] font-semibold tabular-nums';
+  if (node.state === 'done') {
+    return <span className={cn(base, FILL.done, 'text-white dark:text-background')}><Check className="h-4 w-4" strokeWidth={3} aria-hidden /></span>;
   }
-
-  if (state === 'active') {
+  if (node.state === 'blocked') return <span className={cn(base, TINT.urgent, 'ring-1 ring-inset', RING.urgent)}><AlertTriangle className="h-4 w-4" aria-hidden /></span>;
+  if (node.state === 'stopped') return <span className={cn(base, 'bg-muted text-muted-foreground')}><Ban className="h-4 w-4" aria-hidden /></span>;
+  if (node.state === 'active') {
     return (
-      <div
-        className="relative h-12 w-12 rounded-full flex items-center justify-center bg-card border-[2px] transition-all duration-300 group-hover:scale-105"
-        style={{ borderColor: colors.fill, boxShadow: `0 0 0 4px ${colors.ring}` }}
-        role="img"
-        aria-label={`${node.title} active`}
-      >
-        {/* inner pulsing dot */}
-        <span className="relative flex h-3 w-3">
-          <span
-            className="absolute inset-0 rounded-full opacity-60 animate-ping motion-reduce:animate-none"
-            style={{ background: colors.fill }}
-          />
-          <span className="relative h-3 w-3 rounded-full" style={{ background: colors.fill }} />
+      <span className={cn(base, TINT[tone], 'ring-2 ring-inset', RING[tone])}>
+        <span className="relative flex h-2.5 w-2.5" aria-hidden>
+          <span className={cn('absolute inset-0 rounded-full opacity-60 motion-safe:animate-ping', FILL[tone])} />
+          <span className={cn('relative h-2.5 w-2.5 rounded-full', FILL[tone])} />
         </span>
-      </div>
+      </span>
     );
   }
-
-  if (state === 'blocked') {
-    return (
-      <div
-        className="relative h-12 w-12 rounded-full flex items-center justify-center bg-card border-[2px] border-red-500 text-red-600 dark:text-red-400 transition-transform duration-300 group-hover:scale-105"
-        style={{ boxShadow: '0 0 0 4px hsl(0 84% 60% / 0.18)' }}
-        role="img"
-        aria-label={`${node.title} blocked`}
-      >
-        <AlertTriangle className="h-5 w-5" strokeWidth={2.5} />
-      </div>
-    );
-  }
-
-  // pending
-  return (
-    <div
-      className="relative h-12 w-12 rounded-full flex items-center justify-center bg-card border-[1.5px] border-dashed border-border text-muted-foreground transition-transform duration-300 group-hover:scale-105"
-      role="img"
-        aria-label={`${node.title} pending`}
-    >
-      <span className="text-[11px] font-mono font-semibold tabular-nums">{node.index}</span>
-    </div>
-  );
+  return <span className={cn(base, 'border border-dashed border-border bg-card text-muted-foreground')}>{node.index}</span>;
 }
 
-// ─── main widget ─────────────────────────────────────────────────────
+const DETAIL_TEXT: Record<Tone, string> = {
+  done: 'text-done', info: 'text-info', urgent: 'text-urgent', soon: 'text-soon', entry: 'text-entry', calm: 'text-muted-foreground',
+};
 
 interface LifecycleWidgetProps {
   filing: Filing;
@@ -362,157 +271,64 @@ interface LifecycleWidgetProps {
 }
 
 export function LifecycleWidget({ filing, abiDocs = [], manifestQueries = [] }: LifecycleWidgetProps) {
-  // Find most-recent linked ABI doc (by filingId)
+  // The most recent entry made from this shipment, and query for its master bill.
   const linkedAbi = abiDocs
     .filter(d => d.filingId === filing.id)
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0]
     ?? null;
-
-  // Find most-recent manifest query (by master BOL)
   const linkedMq = filing.masterBol
     ? manifestQueries
         .filter(q => q.bolNumber === filing.masterBol)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
         ?? null
     : null;
-
   const { can } = useCapabilities();
-  const stages = computeShipmentLifecycle({
-    filing,
-    linkedAbi,
-    linkedMq,
-    canFileEntry: can(CAPABILITIES.ABI_ENTRY),
-  });
-  const doneCount = stages.filter(s => s.state === 'done').length;
-  const blocked = stages.find(s => s.state === 'blocked');
+  const stages = computeShipmentLifecycle({ filing, linkedAbi, linkedMq, canFileEntry: can(CAPABILITIES.ABI_ENTRY) });
 
-  // Connector progress: how far the colored line should reach.
-  // 0 done → 0%, 1 done → 33%, 2 done → 67%, 3+ done → 100%.
-  const progress = Math.min(doneCount, 3) / 3;
+  const done = stages.filter(s => s.state === 'done').length;
+  const blocked = stages.find(s => s.state === 'blocked');
+  const summary = stages[0].state === 'stopped' ? 'The ISF was cancelled'
+    : blocked ? `Blocked at ${blocked.title.toLowerCase()}`
+    : done === 4 ? 'Every stage done'
+    : `${done} of 4 done`;
 
   return (
-    <section className="relative rounded-2xl border border-border/60 bg-card overflow-hidden">
-      {/* Subtle ambient gradient based on overall progress */}
-      <div
-        className="absolute inset-x-0 top-0 h-24 pointer-events-none opacity-50"
-        aria-hidden
-        style={{
-          background:
-            doneCount === 4 ? 'radial-gradient(ellipse 60% 80% at 50% 0%, hsl(160 84% 45% / 0.15), transparent 70%)'
-            : blocked ? 'radial-gradient(ellipse 60% 80% at 50% 0%, hsl(0 84% 60% / 0.12), transparent 70%)'
-            : 'radial-gradient(ellipse 60% 80% at 50% 0%, hsl(var(--primary) / 0.10), transparent 70%)',
-        }}
-      />
-
-      <div className="relative p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2.5">
-            <div className="h-7 w-7 rounded-lg bg-primary/10 ring-1 ring-inset ring-primary/15 flex items-center justify-center">
-              {doneCount === 4 ? (
-                <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
-              ) : blocked ? (
-                <AlertTriangle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" strokeWidth={2.5} />
-              ) : (
-                <Loader2 className="h-3.5 w-3.5 text-primary animate-spin motion-reduce:animate-none" strokeWidth={2.5} />
+    <section aria-labelledby="lifecycle-title" className="rounded-xl border border-border/70 bg-card p-5 shadow-card">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
+        <h2 id="lifecycle-title" className="text-[14px] font-semibold">Shipment lifecycle</h2>
+        <p className={cn('text-[12.5px]', blocked ? 'text-urgent' : done === 4 ? 'text-done' : 'text-muted-foreground')}>{summary}</p>
+      </div>
+      <ol className="grid gap-5 sm:grid-cols-4 sm:gap-3">
+        {stages.map((node, i) => {
+          const next = stages[i + 1];
+          // The line to the next stage is coloured once this one is done.
+          const line = node.state === 'done' && next ? (next.state === 'pending' || next.state === 'stopped' ? 'bg-[linear-gradient(90deg,hsl(var(--done-fill)),hsl(var(--border)))] max-sm:bg-[linear-gradient(180deg,hsl(var(--done-fill)),hsl(var(--border)))]' : FILL.done) : 'bg-border';
+          return (
+            <li key={node.stage} className="relative flex gap-3 sm:flex-col sm:items-center sm:text-center">
+              {next && (
+                <span
+                  aria-hidden
+                  className={cn('absolute rounded-full max-sm:bottom-[-20px] max-sm:left-[17px] max-sm:top-10 max-sm:w-0.5 sm:left-[calc(50%+24px)] sm:right-[calc(-50%+12px)] sm:top-[17px] sm:h-0.5', line)}
+                />
               )}
-            </div>
-            <div>
-              <p className="text-sm font-semibold">Shipment lifecycle</p>
-              <p className="text-xs text-muted-foreground">
-                {doneCount === 4 ? 'All four stages complete'
-                 : blocked ? `Blocked at ${blocked.title}`
-                 : `${doneCount} of 4 stages complete`}
-              </p>
-            </div>
-          </div>
-          <div className="text-[11px] tabular-nums text-muted-foreground/70">
-            {doneCount}/4
-          </div>
-        </div>
-
-        {/* Pipeline */}
-        <div className="relative">
-          {/* Connector line layer (SVG) — sits behind the circles, top-aligned with them */}
-          <svg
-            className="absolute inset-x-0 w-full pointer-events-none"
-            style={{ top: 18, height: 2 }}
-            preserveAspectRatio="none"
-            aria-hidden
-          >
-            {/* base track from circle 1 center to circle 4 center */}
-            <line
-              x1="12.5%" y1="1" x2="87.5%" y2="1"
-              stroke="hsl(var(--border))" strokeWidth="1.5" strokeDasharray="3 3"
-            />
-            {/* progress overlay — gradient that fades through stage colors */}
-            {progress > 0 && (
-              <line
-                x1="12.5%" y1="1"
-                x2={`${12.5 + progress * 75}%`} y2="1"
-                stroke="url(#lifecycleGradient)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                style={{ transition: 'all 0.6s ease-out' }}
-              />
-            )}
-            <defs>
-              <linearGradient id="lifecycleGradient" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%"   stopColor="hsl(217 91% 60%)" />
-                <stop offset="40%"  stopColor="hsl(38 92% 55%)" />
-                <stop offset="75%"  stopColor="hsl(262 83% 58%)" />
-                <stop offset="100%" stopColor="hsl(160 84% 39%)" />
-              </linearGradient>
-            </defs>
-          </svg>
-
-          {/* Stage nodes */}
-          <div className="grid grid-cols-4 gap-3 relative">
-            {stages.map((node) => (
-              <div key={node.stage} className="group flex flex-col items-center text-center min-w-0">
-                {/* Circle */}
-                <StageCircle node={node} />
-
-                {/* Label */}
-                <div className="mt-3 space-y-0.5 max-w-full">
-                  <p className={cn(
-                    'text-[10.5px] font-semibold uppercase tracking-[0.18em]',
-                    node.state === 'done' || node.state === 'active' ? STAGE_LABEL_TINT[node.stage] : 'text-muted-foreground',
-                  )}>
-                    {node.title}
-                  </p>
-                  <ExpandableDetail
-                    text={node.detail}
-                    className={cn(
-                      'text-[12.5px] font-medium leading-snug px-1 hyphens-auto',
-                      node.state === 'pending' ? 'text-muted-foreground' : 'text-foreground',
-                    )}
-                  />
-                  {node.age && (
-                    <p className="text-[10.5px] text-muted-foreground tabular-nums">
-                      {node.age}
-                    </p>
-                  )}
-                </div>
-
-                {/* CTA */}
+              <StageDot node={node} />
+              <div className="min-w-0 sm:mt-2.5">
+                <p className="text-[13px] font-semibold">{node.title}</p>
+                <ExpandableDetail text={node.detail} className={cn('text-[12.5px] font-medium leading-snug', DETAIL_TEXT[toneOf(node)])} />
+                {node.age && <p className="mt-0.5 text-[11.5px] tabular-nums text-muted-foreground">{node.age}</p>}
                 {node.cta && (
-                  <Link to={node.cta.to} className="mt-2.5 max-w-full">
-                    <Button
-                      size="sm"
-                      variant={node.cta.variant === 'outline' ? 'outline' : 'default'}
-                      className="h-auto min-h-7 max-w-full whitespace-normal py-1 px-2.5 text-[11px] leading-tight gap-1 rounded-lg font-medium"
-                    >
+                  <Button asChild size="sm" variant={node.cta.variant === 'outline' ? 'outline' : 'default'} className="mt-2 h-7 gap-1 px-2.5 text-[12px]">
+                    <Link to={node.cta.to}>
                       {node.cta.label}
-                      <ArrowRight className="hidden sm:block h-3 w-3 shrink-0" />
-                    </Button>
-                  </Link>
+                      <ArrowRight className="h-3 w-3" aria-hidden />
+                    </Link>
+                  </Button>
                 )}
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }
