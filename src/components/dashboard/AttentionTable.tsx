@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 import { AlertTriangle, ArrowRight, CalendarX, CheckCircle2, Clock, FilePen, FilePlus2, Hourglass, Lock, PauseCircle, XCircle } from 'lucide-react';
 import { dashboardApi } from '@/api/client';
 import { useActionsPage } from '@/hooks/useDashboard';
-import { countdownLabel, urgencyOf, type Urgency } from '@/lib/countdown';
 import { cn } from '@/lib/utils';
 import type { ActionFilter, ActionItem, ActionKind, DashboardResponse, Lane } from '@/types/dashboard';
+import { BADGE, CutoffBadge } from './CutoffBadge';
+import { FilterTabs } from './FilterTabs';
 import { Pagination } from './Pagination';
 import { FILL, TINT, type Tone } from './tones';
 
@@ -54,24 +54,9 @@ const STATE: Partial<Record<ActionKind, { text: string; tone: Tone }>> = {
   cbp_conditional: { text: 'Review', tone: 'info' },
 };
 
-const URGENCY_TONE: Record<Urgency, Tone> = { overdue: 'urgent', urgent: 'urgent', soon: 'soon', calm: 'calm' };
-const BADGE = 'inline-flex rounded-md px-2 py-0.5 text-[12px] font-medium tabular-nums';
 
 function Due({ item, now }: { item: ActionItem; now: number }) {
-  if (item.due) {
-    const level = urgencyOf(new Date(item.due.at).getTime() - now);
-    const date = new Date(item.due.at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
-    const estimated = item.due.basis === 'ETD_ESTIMATE';
-    return (
-      <time
-        dateTime={item.due.at}
-        className={cn(BADGE, TINT[URGENCY_TONE[level]])}
-        title={estimated ? `Estimated from the sailing date: ${date}. Add a lading date to make it exact.` : date}
-      >
-        {countdownLabel(item.due.at, item.due.basis, now)}
-      </time>
-    );
-  }
+  if (item.due) return <CutoffBadge at={item.due.at} basis={item.due.basis} now={now} />;
   const state = STATE[item.kind];
   return state ? <span className={cn(BADGE, TINT[state.tone])}>{state.text}</span> : null;
 }
@@ -189,35 +174,6 @@ function FragmentRow({ lane, count, children }: { lane: Lane | null; count: numb
   );
 }
 
-function Tabs({ filters, active, onChange }: { filters: DashboardResponse['filters']; active: ActionFilter; onChange: (f: ActionFilter) => void }) {
-  return (
-    <div role="group" aria-label="Filter" className="-mb-px flex gap-4 overflow-x-auto px-4 [scrollbar-width:none]">
-      {filters.map((f) => {
-        const on = f.key === active;
-        return (
-          <button
-            key={f.key}
-            type="button"
-            aria-pressed={on}
-            disabled={f.count === 0 && f.key !== 'all'}
-            onClick={() => onChange(f.key)}
-            className={cn(
-              'relative shrink-0 pb-2.5 pt-1 text-[13px] font-medium outline-none transition-colors duration-150 disabled:opacity-45 focus-visible:underline',
-              on ? 'text-foreground' : 'text-muted-foreground can-hover:hover:text-foreground',
-            )}
-          >
-            {f.label}
-            <span className={cn('ml-1.5 rounded-md px-1.5 py-px text-[11.5px] tabular-nums transition-colors duration-150', on ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
-              {f.count.toLocaleString()}
-            </span>
-            {on && <motion.span layoutId="attention-tab" className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary" transition={{ type: 'spring', bounce: 0, duration: 0.3 }} />}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function Head() {
   const th = 'px-3 py-2 text-[12px] font-medium text-muted-foreground';
   return (
@@ -257,7 +213,7 @@ export function AttentionTable({ data, now }: { data: DashboardResponse; now: nu
     <section aria-labelledby="attention-title" className="dash-in relative min-w-0 overflow-hidden rounded-xl border border-border/70 bg-card shadow-card" style={{ '--i': 2 } as React.CSSProperties}>
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-1 border-b border-border pt-3">
         <h2 id="attention-title" className="px-4 pb-2.5 text-[14px] font-semibold">Action items</h2>
-        <Tabs filters={filters} active={filter} onChange={changeFilter} />
+        <FilterTabs items={filters} active={filter} onChange={changeFilter} layoutId="attention-tab" />
       </div>
       {busy && <div className="dash-progress" role="progressbar" aria-label="Loading action items" />}
       {view.total === 0 ? (
