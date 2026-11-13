@@ -108,7 +108,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
   const { status, mbolNumber, entryNumber, skip, take } = parsed.data;
   const where: any = { orgId: req.user!.orgId };
-  if (status) where.status = status;
+  if (status) where.status = status.length === 1 ? status[0] : { in: status };
   if (mbolNumber) where.mbolNumber = { contains: mbolNumber, mode: 'insensitive' };
   if (entryNumber) where.entryNumber = { contains: entryNumber, mode: 'insensitive' };
 
@@ -129,6 +129,23 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     data: docs,
     pagination: { total, skip, take, totalPages: Math.ceil(total / take) },
   });
+});
+
+// ── GET /facets — status counts for the list's tabs ────────────────
+// Counts follow the search but not the open tab, so every tab's number
+// matches what it opens. Registered BEFORE /:id.
+router.get('/facets', async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = listABIDocumentsQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid query params', details: parsed.error.flatten() });
+    return;
+  }
+  const { mbolNumber, entryNumber } = parsed.data;
+  const where: any = { orgId: req.user!.orgId };
+  if (mbolNumber) where.mbolNumber = { contains: mbolNumber, mode: 'insensitive' };
+  if (entryNumber) where.entryNumber = { contains: entryNumber, mode: 'insensitive' };
+  const rows = await prisma.abiDocument.groupBy({ by: ['status'], where, _count: { _all: true } });
+  res.set('Cache-Control', 'private, no-store').json({ status: Object.fromEntries(rows.map((r) => [r.status, r._count._all])) });
 });
 
 // ── GET /overlay-hts?q= — Chapter 99 overlay subheading lookup ─────

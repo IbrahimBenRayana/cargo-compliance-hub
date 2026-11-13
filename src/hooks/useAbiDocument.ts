@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   abiDocumentsApi,
   ABIDocumentDraft,
@@ -12,6 +12,23 @@ export function useAbiDocumentsList(params?: AbiDocumentListParams, options?: { 
     queryKey: ['abi-documents', 'list', params],
     queryFn: () => abiDocumentsApi.list(params),
     enabled: options?.enabled ?? true,
+  });
+}
+
+/** One page of the Entries list; the last page stays on screen while the next loads. */
+export function useAbiDocumentsPage(params: AbiDocumentListParams) {
+  return useQuery({
+    queryKey: ['abi-documents', 'list', params],
+    queryFn: () => abiDocumentsApi.list(params),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAbiDocumentFacets(params: Parameters<typeof abiDocumentsApi.facets>[0]) {
+  return useQuery({
+    queryKey: ['abi-documents', 'list', 'facets', params],
+    queryFn: () => abiDocumentsApi.facets(params),
+    placeholderData: keepPreviousData,
   });
 }
 
