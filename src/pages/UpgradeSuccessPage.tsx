@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Sparkles } from 'lucide-react';
+import { Check, Sparkles } from '@/components/icons';
 import { toast } from 'sonner';
 import { useSubscription } from '@/hooks/useBilling';
 import { CAPABILITY_LABEL, type Capability } from '@/lib/planMeta';
@@ -159,7 +159,7 @@ export default function UpgradeSuccessPage() {
                       initial={{ pathLength: 0 }}
                       animate={{ pathLength: 1 }}
                     >
-                      <Check className="h-12 w-12 text-gold" strokeWidth={3} />
+                      <Check className="h-12 w-12 text-gold" weight="bold" />
                     </motion.div>
                   </motion.div>
                 </div>
@@ -178,7 +178,7 @@ export default function UpgradeSuccessPage() {
                         key={cap}
                         className="inline-flex items-center gap-1 rounded-full bg-gold/10 border border-gold/30 px-3 py-1 text-xs font-medium text-foreground/85"
                       >
-                        <Check className="h-3 w-3 text-gold" strokeWidth={3} />
+                        <Check className="h-3 w-3 text-gold" weight="bold" />
                         {CAPABILITY_LABEL[cap] ?? cap}
                       </span>
                     ))}

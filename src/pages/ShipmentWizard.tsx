@@ -20,7 +20,7 @@ import { Separator } from '@/components/ui/separator';
 import {
   ArrowLeft, ArrowRight, Check, ChevronsUpDown, Loader2, Info, Ship, Package, Users, FileText,
   Building2, MapPin, Plus, Trash2, AlertCircle, CheckCircle2, Sparkles, Container, X, Layers,
-} from 'lucide-react';
+} from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { matchesEveryWord } from '@/components/wizard/optionSearch';

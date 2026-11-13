@@ -24,7 +24,7 @@ import {
   Building2, UserPlus, Loader2, MoreHorizontal, CheckCircle2, Clock,
   Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck, Radio, Landmark,
   Activity, DollarSign, FileText,
-} from 'lucide-react';
+} from '@/components/icons';
 import { CbpSetupDialog } from '@/components/admin/CbpSetupDialog';
 import { PricingDialog } from '@/components/admin/PricingDialog';
 import { UsageInvoicesDialog } from '@/components/admin/UsageInvoicesDialog';

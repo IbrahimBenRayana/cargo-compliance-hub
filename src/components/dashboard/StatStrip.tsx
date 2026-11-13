@@ -1,5 +1,5 @@
-import type { LucideIcon } from 'lucide-react';
-import { AlertCircle, BadgeCheck, PauseCircle, Send, Ship, Timer } from 'lucide-react';
+import type { IconType } from '@/components/icons';
+import { AlertCircle, BadgeCheck, PauseCircle, Send, Ship, Timer } from '@/components/icons';
 import { formatDuration, urgencyOf } from '@/lib/countdown';
 import { cn } from '@/lib/utils';
 import type { DashboardResponse, RateMetric } from '@/types/dashboard';
@@ -9,7 +9,7 @@ interface Stat {
   label: string;
   value: string;
   note: string;
-  icon: LucideIcon;
+  icon: IconType;
   tone: Tone;
   badge?: { text: string; tone: Tone };
 }
@@ -20,7 +20,7 @@ function changeBadge(m: RateMetric): Stat['badge'] {
   return { text: `${change > 0 ? '+' : ''}${change} pts`, tone: change > 0 ? 'done' : 'urgent' };
 }
 
-function rate(label: string, m: RateMetric, unit: string, icon: LucideIcon): Stat {
+function rate(label: string, m: RateMetric, unit: string, icon: IconType): Stat {
   return {
     label, icon, tone: 'done',
     value: m.rate === null ? 'No data' : `${m.rate}%`,
@@ -75,7 +75,7 @@ export function StatStrip({ data, now }: { data: DashboardResponse; now: number 
           <dd className="mt-1 flex items-center justify-between gap-2">
             <span className="min-w-0 truncate text-[22px] font-semibold leading-7 tracking-[-0.015em] tabular-nums">{s.value}</span>
             <span aria-hidden className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', TINT[s.tone])}>
-              <s.icon className="h-3.5 w-3.5" />
+              <s.icon weight="duotone" className="h-4 w-4" />
             </span>
           </dd>
           <dd className="mt-1 flex min-h-[20px] items-center gap-1.5 text-[12px] tabular-nums text-muted-foreground">

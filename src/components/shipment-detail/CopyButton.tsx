@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy } from '@/components/icons';
 import { cn } from '@/lib/utils';
 
 /** Copies a reference so it can be pasted into an email or a carrier portal. */

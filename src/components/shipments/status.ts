@@ -2,13 +2,13 @@
  * The Shipments page names states the way the dashboard does: an ISF that has
  * gone out is "Sent", whatever CBP has or has not answered yet.
  */
-import type { LucideIcon } from 'lucide-react';
-import { Ban, CheckCircle2, FileCheck2, FilePen, PauseCircle, Send, XCircle } from 'lucide-react';
+import type { IconType } from '@/components/icons';
+import { Ban, CheckCircle2, FileCheck2, FilePen, PauseCircle, Send, XCircle } from '@/components/icons';
 import type { Filing, ShipmentStatus } from '@/types/shipment';
 import type { FilterTab } from '@/components/dashboard/FilterTabs';
 import type { Tone } from '@/components/dashboard/tones';
 
-export const STATUS: Record<ShipmentStatus, { word: string; tone: Tone; icon: LucideIcon }> = {
+export const STATUS: Record<ShipmentStatus, { word: string; tone: Tone; icon: IconType }> = {
   draft: { word: 'Draft', tone: 'calm', icon: FilePen },
   submitted: { word: 'Sent', tone: 'info', icon: Send },
   pending_cbp: { word: 'Sent', tone: 'info', icon: Send },

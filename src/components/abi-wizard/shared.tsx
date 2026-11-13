@@ -7,7 +7,7 @@
  * a flat ISF form model.
  */
 import { memo, useId, useState, type ReactNode } from 'react';
-import { AlertCircle, Check, ChevronsUpDown, Info } from 'lucide-react';
+import { AlertCircle, Check, ChevronsUpDown, Info } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Eye, EyeOff, Check, X, Loader2 } from 'lucide-react';
+import { Shield, Eye, EyeOff, Check, X, Loader2 } from '@/components/icons';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';

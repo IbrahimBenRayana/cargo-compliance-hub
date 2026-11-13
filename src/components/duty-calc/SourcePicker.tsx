@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Sparkles, Search, X, ExternalLink, AlertTriangle, FileText, FileCheck } from 'lucide-react';
+import { Sparkles, Search, X, ExternalLink, AlertTriangle, FileText, FileCheck } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
@@ -366,7 +366,7 @@ export function ProvenanceChip({ source }: ProvenanceChipProps) {
         'hover:ring-amber-500/40 transition-colors',
       )}
     >
-      <Sparkles className="h-2.5 w-2.5" strokeWidth={2.5} />
+      <Sparkles className="h-2.5 w-2.5" weight="bold" />
       <span className="tabular-nums">{source.label.slice(0, 12)}</span>
     </Link>
   );

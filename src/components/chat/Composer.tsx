@@ -1,5 +1,5 @@
 import { useState, useRef, type KeyboardEvent } from 'react';
-import { Send } from 'lucide-react';
+import { Send } from '@/components/icons';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -76,7 +76,7 @@ export function Composer({
           aria-label="Send message"
           className="h-8 w-8 shrink-0 rounded-lg bg-[hsl(43_96%_56%)] text-amber-950 hover:bg-[hsl(43_96%_50%)]"
         >
-          <Send className="h-4 w-4" />
+          <Send className="icon-send h-4 w-4" />
         </Button>
       </div>
     </div>

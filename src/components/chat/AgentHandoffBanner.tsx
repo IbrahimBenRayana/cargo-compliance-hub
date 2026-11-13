@@ -1,4 +1,4 @@
-import { Headset, Loader2 } from 'lucide-react';
+import { Headset, Loader2 } from '@/components/icons';
 import type { ChatMode } from '@/api/client';
 
 /**

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Bookmark, ChevronDown, Download, FileText } from 'lucide-react';
+import { Bookmark, ChevronDown, Download, FileText } from '@/components/icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {

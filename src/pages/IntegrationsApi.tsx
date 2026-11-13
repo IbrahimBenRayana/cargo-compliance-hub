@@ -24,7 +24,7 @@ import {
   CheckCircle2, XCircle, Loader2, Plug, Zap, Search, Activity, Globe,
   FileText, Mail, Send, Server, ShieldCheck, Radio, Sparkles, ArrowUpRight,
   KeyRound, Copy, Trash2, Plus, AlertTriangle,
-} from 'lucide-react';
+} from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 

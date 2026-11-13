@@ -1,4 +1,4 @@
-import { Sparkles, Loader2, Headset, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Loader2, Headset, CheckCircle2 } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import type { ChatMode } from '@/api/client';
 

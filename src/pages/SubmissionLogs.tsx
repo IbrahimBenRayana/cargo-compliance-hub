@@ -5,7 +5,7 @@ import { ApiSubmissionLog } from '@/types/shipment';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText } from '@/components/icons';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 

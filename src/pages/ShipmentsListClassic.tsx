@@ -25,7 +25,7 @@ import {
   Plus, Search, Eye, Pencil, Filter, X, Ship, CalendarIcon,
   ArrowUpDown, ArrowUp, ArrowDown, Package, Globe, FileText, Clock, Loader2, Send, Bookmark, ChevronDown,
   Trash2, CheckCheck, Download, Layers,
-} from 'lucide-react';
+} from '@/components/icons';
 import { ShipmentStatus, Filing, getPartyName, getFirstCommodity } from '@/types/shipment';
 import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -322,7 +322,7 @@ export default function ShipmentsList() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between animate-fade-in-up motion-reduce:animate-none" style={{ animationDelay: '40ms' }}>
         <div className="min-w-0">
           <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground inline-flex items-center gap-3">
-            <Ship className="h-7 w-7 text-primary shrink-0" strokeWidth={2} />
+            <Ship className="h-7 w-7 text-primary shrink-0" />
             Shipments
             {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground motion-reduce:animate-none" />}
           </h1>

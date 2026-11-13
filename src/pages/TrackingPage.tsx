@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Ship, MapPin, AlertTriangle, Loader2, RefreshCw, Search, Plus, ArrowRight } from 'lucide-react';
+import { Container, Ship, MapPin, AlertTriangle, Loader2, RefreshCw, Search, Plus, ArrowRight } from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

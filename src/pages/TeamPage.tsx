@@ -32,7 +32,7 @@ import {
   Users, UserPlus, Mail, Shield, Building2, Crown, Eye,
   Loader2, MoreHorizontal, Trash2, ChevronDown, Clock,
   CheckCircle2, XCircle, Copy, FileText, AlertTriangle,
-} from 'lucide-react';
+} from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 

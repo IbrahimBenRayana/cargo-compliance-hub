@@ -4,7 +4,7 @@
  * Phase 1 models a single manifest (`manifest[0]`). Invoices/items belong to
  * that manifest and are handled in Step 5.
  */
-import { Ship } from 'lucide-react';
+import { Ship } from '@/components/icons';
 import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
 import { BILL_TYPES, QUANTITY_UOM, YES_NO } from '@/data/abiEnums';
 import { ENTRY_PORTS } from '@/data/schedule-d-ports';

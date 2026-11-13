@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ArrowUpDown, Layers, Loader2, Pencil, Send } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Layers, Loader2, Pencil, Send } from '@/components/icons';
 import { filingsApi } from '@/api/client';
 import { CutoffBadge } from '@/components/dashboard/CutoffBadge';
 import { Button } from '@/components/ui/button';
@@ -192,7 +192,7 @@ export function ShipmentsTable({ rows, now, sort, dir, onSort, canWrite, selecte
                         <Link to={`/shipments/${f.id}/edit`} aria-label={`Edit ${ref}`} title="Edit"><Pencil className="h-3.5 w-3.5" /></Link>
                       </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Send ${ref} to CBP`} title="Send to CBP" disabled={sendingId === f.id} onClick={() => onSend(f)}>
-                        {sendingId === f.id ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Send className="h-3.5 w-3.5" />}
+                        {sendingId === f.id ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Send className="icon-send h-3.5 w-3.5" />}
                       </Button>
                     </div>
                   )}

@@ -1,4 +1,4 @@
-import { Plus, Scale, Trash2 } from 'lucide-react';
+import { Plus, Scale, Trash2 } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import type { ABIAdCvdCase } from '@/api/client';
 import { SelectField, TextField } from './shared';

@@ -34,7 +34,7 @@ import {
   Send,
   Ship,
   Users,
-} from 'lucide-react';
+} from '@/components/icons';
 import { toast } from 'sonner';
 import { StepProgress } from '@/components/wizard/StepProgress';
 
@@ -432,7 +432,7 @@ export default function ABIDocumentWizard() {
                       </>
                     ) : (
                       <>
-                        <Send className="h-4 w-4 mr-2" />
+                        <Send className="icon-send h-4 w-4 mr-2" />
                         {replacing ? 'Send replacement to CBP' : resending ? 'Send again to CBP' : 'Transmit to CBP'}
                       </>
                     )}

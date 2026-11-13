@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Loader2, Eye, EyeOff, Copy, Check, ArrowLeft } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Copy, Check, ArrowLeft } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

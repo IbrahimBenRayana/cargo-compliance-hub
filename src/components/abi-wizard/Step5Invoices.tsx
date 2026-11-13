@@ -6,7 +6,7 @@
  * flags) are tucked into a per-item Advanced accordion to keep the primary
  * form focused on the ~8 fields most items need.
  */
-import { Plus, Trash2, Users } from 'lucide-react';
+import { Plus, Trash2, Users } from '@/components/icons';
 import type {
   ABIDocumentDraft,
   ABIInvoice,

@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeftRight, Plus, Search, MoreHorizontal, Eye, Pencil, Trash2, Loader2,
   FilePlus, Radio, X,
-} from 'lucide-react';
+} from '@/components/icons';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -158,7 +158,7 @@ export default function InbondListPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
               <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground inline-flex items-center gap-3">
-                <ArrowLeftRight className="h-7 w-7 text-teal-500 shrink-0" strokeWidth={2} />
+                <ArrowLeftRight className="h-7 w-7 text-teal-500 shrink-0" />
                 In-Bond Movements
               </h1>
               <p className="text-[14px] text-muted-foreground mt-2">

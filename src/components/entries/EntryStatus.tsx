@@ -16,7 +16,7 @@ export function EntryStatusTile({ status, className }: { status: string; classNa
   const { icon: Icon, tone } = entryStatusOf(status);
   return (
     <span aria-hidden className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', TINT[tone], className)}>
-      <Icon className="h-3.5 w-3.5" />
+      <Icon weight="duotone" className="h-4 w-4" />
     </span>
   );
 }

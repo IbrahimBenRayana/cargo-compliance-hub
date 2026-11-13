@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
   Archive, Calendar, Clock, FileText, ArrowRight, Search,
-  AlertTriangle, type LucideIcon,
-} from 'lucide-react';
+  AlertTriangle, type IconType,
+} from '@/components/icons';
 import { complianceApi, type LiquidationTracked } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -155,7 +155,7 @@ function KpiTile({
   value: number;
   sub: string;
   tone: KpiTone;
-  Icon: LucideIcon;
+  Icon: IconType;
 }) {
   const palette = TONE_PALETTE[tone];
   const animated = useCountUp(value, 700);
@@ -179,7 +179,7 @@ function KpiTile({
             palette.iconBg,
           )}
         >
-          <Icon className={cn('h-[18px] w-[18px]', palette.iconFg)} strokeWidth={2.4} />
+          <Icon className={cn('h-[18px] w-[18px]', palette.iconFg)} weight="bold" />
         </div>
         <div className="flex-1 min-w-0">
           <p className={cn('text-[10.5px] font-semibold uppercase tracking-[0.1em]', palette.labelFg)}>
@@ -247,7 +247,7 @@ function PipelineCard({
     return (
       <article className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-10 text-center">
         <div className="mx-auto h-12 w-12 rounded-2xl bg-gradient-to-br from-slate-400 to-slate-600 ring-1 ring-slate-300/60 dark:ring-slate-500/40 shadow-[0_8px_20px_-10px_rgba(71,85,105,0.5)] flex items-center justify-center mb-3">
-          <Archive className="h-6 w-6 text-slate-50" strokeWidth={2.5} />
+          <Archive className="h-6 w-6 text-slate-50" weight="bold" />
         </div>
         <p className="text-[14px] font-semibold text-slate-900 dark:text-slate-50 mb-1">
           No accepted entries yet
@@ -273,7 +273,7 @@ function PipelineCard({
         {/* Header */}
         <div className="flex items-start gap-4 mb-5">
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 dark:from-slate-600 dark:to-slate-800 ring-1 ring-slate-500/40 shadow-[0_8px_20px_-10px_rgba(15,23,42,0.5)] flex items-center justify-center shrink-0">
-            <Archive className="h-5 w-5 text-slate-50" strokeWidth={2.5} />
+            <Archive className="h-5 w-5 text-slate-50" weight="bold" />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-50">

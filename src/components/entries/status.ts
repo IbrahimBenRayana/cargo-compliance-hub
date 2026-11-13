@@ -3,12 +3,12 @@
  * "Sent" whatever CBP has or has not answered, as with ISFs. An accepted
  * entry is accepted, never cleared or released: the app does not see a release.
  */
-import type { LucideIcon } from 'lucide-react';
-import { Ban, CheckCircle2, FilePen, Send, XCircle } from 'lucide-react';
+import type { IconType } from '@/components/icons';
+import { Ban, CheckCircle2, FilePen, Send, XCircle } from '@/components/icons';
 import type { Tone } from '@/components/dashboard/tones';
 import type { FilterTab } from '@/components/dashboard/FilterTabs';
 
-export const ENTRY_STATUS: Record<string, { word: string; tone: Tone; icon: LucideIcon }> = {
+export const ENTRY_STATUS: Record<string, { word: string; tone: Tone; icon: IconType }> = {
   DRAFT: { word: 'Draft', tone: 'calm', icon: FilePen },
   SENDING: { word: 'Sending', tone: 'info', icon: Send },
   SENT: { word: 'Sent', tone: 'info', icon: Send },

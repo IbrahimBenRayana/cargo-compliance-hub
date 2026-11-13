@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { billingApi } from '@/api/client';
 import { useCreateSetupIntent, useSaveCard } from '@/hooks/useBilling';
 import { Button } from '@/components/ui/button';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock } from '@/components/icons';
 
 /**
  * Card-on-file capture via Stripe Elements. Loads the publishable key from the

@@ -9,7 +9,7 @@
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Hash, Loader2, Plus } from 'lucide-react';
+import { Hash, Loader2, Plus } from '@/components/icons';
 import { toast } from 'sonner';
 import { settingsApi, organizationApi, type EntryNumberBlock } from '@/api/client';
 import { Badge } from '@/components/ui/badge';

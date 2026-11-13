@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Loader2, RefreshCw, Package, Ship, Plane, MapPin, Hash, Calendar, AlertCircle, FileCheck, ArrowRight } from 'lucide-react';
+import { Search, Loader2, RefreshCw, Package, Ship, Plane, MapPin, Hash, Calendar, AlertCircle, FileCheck, ArrowRight } from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -317,7 +317,7 @@ export default function ManifestQueryPage() {
         </div>
         <div className="min-w-0">
           <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground inline-flex items-center gap-3">
-            <Search className="h-7 w-7 text-amber-500 shrink-0" strokeWidth={2} />
+            <Search className="h-7 w-7 text-amber-500 shrink-0" />
             Manifest Query
           </h1>
           <p className="text-[14px] text-muted-foreground mt-2">Look up cargo status at CBP by BOL number</p>

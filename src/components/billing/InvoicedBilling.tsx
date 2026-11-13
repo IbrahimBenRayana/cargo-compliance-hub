@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Landmark, Loader2, AlertTriangle, ExternalLink, Receipt, Pencil } from 'lucide-react';
+import { Landmark, Loader2, AlertTriangle, ExternalLink, Receipt, Pencil } from '@/components/icons';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

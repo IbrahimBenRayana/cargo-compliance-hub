@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import type { LucideIcon } from 'lucide-react';
-import { AlertTriangle, ArrowRight, CalendarX, CheckCircle2, Clock, FilePen, FilePlus2, Hourglass, Lock, PauseCircle, XCircle } from 'lucide-react';
+import type { IconType } from '@/components/icons';
+import { AlertTriangle, ArrowRight, CalendarX, CheckCircle2, Clock, FilePen, FilePlus2, Hourglass, Lock, PauseCircle, XCircle } from '@/components/icons';
 import { dashboardApi } from '@/api/client';
 import { useActionsPage } from '@/hooks/useDashboard';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,7 @@ const LANE: Record<Lane, { name: string; tone: Tone }> = {
   later: { name: 'Later', tone: 'calm' },
 };
 
-const KIND: Record<ActionKind, { icon: LucideIcon; tone: Tone }> = {
+const KIND: Record<ActionKind, { icon: IconType; tone: Tone }> = {
   isf_overdue: { icon: AlertTriangle, tone: 'urgent' },
   isf_due: { icon: Clock, tone: 'soon' },
   isf_rejected: { icon: XCircle, tone: 'urgent' },
@@ -72,7 +72,7 @@ function Lead({ item, children }: { item: ActionItem; children: React.ReactNode 
       <span aria-hidden className={cn('dash-accent absolute inset-y-0 left-0 w-0.5 origin-center', FILL[tone])} />
       <div className="flex items-center gap-3">
         <span className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', TINT[tone])}>
-          <Icon className="h-3.5 w-3.5" aria-hidden />
+          <Icon weight="duotone" className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           {children}

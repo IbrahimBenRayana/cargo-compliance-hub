@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { CalendarDays, ChevronDown, Globe, Loader2, Search, Send, Trash2, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, Globe, Loader2, Search, Send, Trash2, X } from '@/components/icons';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -137,7 +137,7 @@ export function SelectionBar({ count, drafts, sending, deleting, onSend, onDelet
       {drafts > 0 ? (
         <>
           <Button size="sm" className="h-8 gap-1.5 text-[13px]" disabled={sending} onClick={onSend}>
-            {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden /> : <Send className="h-3.5 w-3.5" aria-hidden />}
+            {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden /> : <Send className="icon-send h-3.5 w-3.5" aria-hidden />}
             Send {drafts} {noun}
           </Button>
           <AlertDialog>

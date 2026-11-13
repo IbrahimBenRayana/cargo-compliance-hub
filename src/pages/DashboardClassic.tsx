@@ -32,7 +32,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/Sparkline';
 import {
   Plus, Search, FileCheck, ChevronRight, Activity, Sparkles,
-} from 'lucide-react';
+} from '@/components/icons';
 import { cn } from '@/lib/utils';
 
 // ─── design tokens ───────────────────────────────────────────────────
@@ -496,7 +496,7 @@ function EmptyHero({ greeting, firstName }: { greeting: string; firstName: strin
       <div className="absolute inset-0 aurora-bg opacity-50 pointer-events-none" aria-hidden />
       <div className="relative">
         <div className="mx-auto h-12 w-12 rounded-2xl bg-primary/10 ring-1 ring-inset ring-primary/15 flex items-center justify-center mb-5">
-          <Sparkles className="h-5 w-5 text-primary" strokeWidth={2} />
+          <Sparkles className="h-5 w-5 text-primary" />
         </div>
         <h2 className="text-[28px] leading-tight font-semibold tracking-tight">
           {greeting}{firstName ? `, ${firstName}` : ''}
@@ -900,7 +900,7 @@ export default function Dashboard() {
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <Link to="/shipments/new">
               <Button size="default" className="gap-1.5 h-9 px-4 rounded-lg font-medium shadow-sm transition-shadow duration-150 hover:shadow-md">
-                <Plus className="h-4 w-4" strokeWidth={2.5} /> New Shipment
+                <Plus className="h-4 w-4" weight="bold" /> New Shipment
               </Button>
             </Link>
             {can(CAPABILITIES.ABI_ENTRY) && (
@@ -989,7 +989,7 @@ export default function Dashboard() {
             style={{ animationDelay: '320ms', animationFillMode: 'forwards' }}
           >
             <div className="h-6 w-6 rounded-md bg-muted/60 flex items-center justify-center text-muted-foreground">
-              <Activity className="h-3 w-3" strokeWidth={2.5} />
+              <Activity className="h-3 w-3" weight="bold" />
             </div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Recent activity

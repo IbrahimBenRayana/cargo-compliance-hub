@@ -4,7 +4,7 @@
  * when it has something to say.
  */
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight } from '@/components/icons';
 import { FILL, type Tone } from '@/components/dashboard/tones';
 import { statusOf } from '@/components/shipments/status';
 import { StatusPill } from '@/components/shipments/StatusPill';

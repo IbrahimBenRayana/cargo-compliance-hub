@@ -7,7 +7,7 @@
  * the wizard's own state, so autosave persists them like any edit.
  */
 import { useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, Download, FileUp, Loader2, Upload } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, FileUp, Loader2, Upload } from '@/components/icons';
 import { toast } from 'sonner';
 import { abiDocumentsApi } from '@/api/client';
 import type { ABIItem, LineImportError } from '@/api/client';

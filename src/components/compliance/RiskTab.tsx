@@ -5,8 +5,8 @@ import { motion, useReducedMotion } from 'framer-motion';
 import {
   ShieldAlert, Search, Building2, ArrowRight, AlertTriangle, ShieldCheck,
   ChevronDown, Loader2, Hash, FileBadge2, Globe2,
-  type LucideIcon,
-} from 'lucide-react';
+  type IconType,
+} from '@/components/icons';
 import { complianceApi, type UflpaScanResponse } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -105,7 +105,7 @@ function KpiTile({
   value: number;
   sub: string;
   tone: KpiTone;
-  Icon: LucideIcon;
+  Icon: IconType;
 }) {
   const palette = TONE_PALETTE[tone];
   const animated = useCountUp(value, 700);
@@ -129,7 +129,7 @@ function KpiTile({
             palette.iconBg,
           )}
         >
-          <Icon className={cn('h-[18px] w-[18px]', palette.iconFg)} strokeWidth={2.4} />
+          <Icon className={cn('h-[18px] w-[18px]', palette.iconFg)} weight="bold" />
         </div>
         <div className="flex-1 min-w-0">
           <p className={cn('text-[10.5px] font-semibold uppercase tracking-[0.1em]', palette.labelFg)}>
@@ -224,7 +224,7 @@ function RiskInbox() {
         {/* Header */}
         <div className="flex items-start gap-4 mb-5">
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-rose-400 to-rose-600 ring-1 ring-rose-300/60 dark:ring-rose-400/40 shadow-[0_8px_20px_-10px_rgba(244,63,94,0.5)] flex items-center justify-center shrink-0">
-            <ShieldAlert className="h-5 w-5 text-rose-50" strokeWidth={2.5} />
+            <ShieldAlert className="h-5 w-5 text-rose-50" weight="bold" />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-50">
@@ -420,7 +420,7 @@ function EmptyAllClear({ scanned }: { scanned: number }) {
       />
       <div className="relative">
         <div className="mx-auto h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 ring-1 ring-emerald-300/60 dark:ring-emerald-400/40 shadow-[0_8px_20px_-10px_rgba(16,185,129,0.5)] flex items-center justify-center mb-3">
-          <ShieldCheck className="h-6 w-6 text-emerald-50" strokeWidth={2.5} />
+          <ShieldCheck className="h-6 w-6 text-emerald-50" weight="bold" />
         </div>
         <p className="text-[14px] font-semibold text-slate-900 dark:text-slate-50">
           {scanned === 0 ? 'No filings scanned yet' : 'All clear — no UFLPA risk detected'}
@@ -453,7 +453,7 @@ function PgaLookupCard() {
       <div className="p-5">
         <div className="flex items-start gap-3 mb-3">
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 ring-1 ring-blue-300/60 dark:ring-blue-400/40 shadow-[0_8px_20px_-10px_rgba(59,130,246,0.5)] flex items-center justify-center shrink-0">
-            <Search className="h-[18px] w-[18px] text-blue-50" strokeWidth={2.5} />
+            <Search className="h-[18px] w-[18px] text-blue-50" weight="bold" />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-[14px] font-semibold text-slate-900 dark:text-slate-50">
@@ -524,7 +524,7 @@ function FiveOneSixCard() {
       <div className="p-5">
         <div className="flex items-start gap-3 mb-3">
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 ring-1 ring-slate-400/60 dark:ring-slate-500/40 shadow-[0_8px_20px_-10px_rgba(71,85,105,0.5)] flex items-center justify-center shrink-0">
-            <Building2 className="h-[18px] w-[18px] text-slate-50" strokeWidth={2.5} />
+            <Building2 className="h-[18px] w-[18px] text-slate-50" weight="bold" />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-[14px] font-semibold text-slate-900 dark:text-slate-50">
