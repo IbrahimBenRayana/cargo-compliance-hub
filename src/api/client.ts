@@ -1728,9 +1728,11 @@ export interface ManifestQueryRecord {
   bolType: string;
   houseBOLNumber: string | null;
   status: 'pending' | 'polling' | 'completed' | 'failed' | 'timeout';
-  responseData: Record<string, unknown> | null;
+  /** The answer as it arrived; the manifest query page reads it. */
+  response: unknown;
   errorMessage: string | null;
   createdAt: string;
+  completedAt: string | null;
   updatedAt: string;
 }
 
