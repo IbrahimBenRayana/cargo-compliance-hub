@@ -2,10 +2,9 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, Info } from 'lucide-react';
 import { complianceApi, type ScoreHistoryPoint } from '@/api/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { statusOf } from '@/components/shipments/status';
+import { StatusPill } from '@/components/shipments/StatusPill';
 
 /**
  * Compliance score trajectory for a single filing.
@@ -18,6 +17,17 @@ import { cn } from '@/lib/utils';
  * Scores are status-band approximations — see the backend route
  * (GET /filings/:id/score-history) for the mapping rationale.
  */
+const PANEL = 'rounded-xl border border-border/70 bg-card p-5 shadow-card';
+
+function Title() {
+  return (
+    <h2 className="flex items-center gap-2.5 text-[14px] font-semibold">
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary"><Activity className="h-3.5 w-3.5" aria-hidden /></span>
+      Compliance score history
+    </h2>
+  );
+}
+
 export function ScoreHistoryCard({ filingId }: { filingId: string }) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['compliance', 'score-history', filingId],
@@ -25,50 +35,36 @@ export function ScoreHistoryCard({ filingId }: { filingId: string }) {
     staleTime: 60_000,
   });
 
-  if (isLoading) return <Skeleton className="h-32 rounded-xl" />;
+  if (isLoading) return <div className="dash-sk h-32 rounded-xl" />;
   if (isError || !data) return null;
 
   // Nothing meaningful to show if there's only one point.
   if (data.points.length < 2) {
     return (
-      <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '250ms', animationFillMode: 'forwards' }}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-semibold">Compliance score history</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-[12.5px] text-muted-foreground">
-            Score trajectory will appear here once this filing has been submitted and reviewed by CBP.
-          </p>
-        </CardContent>
-      </Card>
+      <section aria-label="Compliance score history" className={PANEL}>
+        <Title />
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          The score's history shows here once this ISF has been sent and CBP has answered.
+        </p>
+      </section>
     );
   }
 
   return (
-    <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '250ms', animationFillMode: 'forwards' }}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-semibold">Compliance score history</CardTitle>
-          </div>
-          <Badge variant="outline" className="text-[10.5px] font-bold uppercase tabular-nums">
-            Now {data.currentScore}/100
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <section aria-label="Compliance score history" className={PANEL}>
+      <div className="flex items-center justify-between gap-2">
+        <Title />
+        <span className="rounded-md bg-muted px-2 py-0.5 text-[12px] font-medium tabular-nums">Now {data.currentScore}/100</span>
+      </div>
+      <div className="mt-4 space-y-4">
         <Sparkline points={data.points} />
         <EventTicker points={data.points} />
-        <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground border-t border-slate-200 dark:border-slate-800 pt-2.5">
-          <Info className="h-3 w-3 mt-0.5 shrink-0" />
+        <div className="flex items-start gap-1.5 border-t border-border/70 pt-2.5 text-[12px] text-muted-foreground">
+          <Info className="mt-0.5 h-3 w-3 shrink-0" />
           <span>{data.note}</span>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -133,7 +129,7 @@ function Sparkline({ points }: { points: ScoreHistoryPoint[] }) {
               stroke={stroke}
               strokeWidth="1.5"
             />
-            <title>{`${fmtAt(p.at)} · ${labelFor(p.status)} · ${p.score}/100`}</title>
+            <title>{`${fmtAt(p.at)} · ${statusOf(p.status).word} · ${p.score}/100`}</title>
           </g>
         ))}
       </svg>
@@ -168,12 +164,7 @@ function EventTicker({ points }: { points: ScoreHistoryPoint[] }) {
             <span className="font-mono tabular-nums text-slate-500 dark:text-slate-400 w-24 shrink-0">
               {fmtAt(p.at)}
             </span>
-            <span className={cn(
-              'text-[10px] font-bold uppercase tracking-[0.06em] px-1.5 py-0.5 rounded shrink-0',
-              STATUS_TONE[p.status] ?? STATUS_TONE.default,
-            )}>
-              {labelFor(p.status)}
-            </span>
+            <StatusPill status={p.status} className="shrink-0" />
             <span className="text-slate-700 dark:text-slate-300 tabular-nums w-12 shrink-0">{p.score}/100</span>
             <span className={cn('font-semibold tabular-nums w-10 shrink-0', deltaColor)}>{deltaLabel}</span>
             {/* Snapshot enrichment: validation breakdown shown inline when available */}
@@ -201,22 +192,6 @@ function EventTicker({ points }: { points: ScoreHistoryPoint[] }) {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
-
-const STATUS_TONE: Record<string, string> = {
-  draft:     'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-  submitted: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
-  on_hold:   'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
-  rejected:  'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
-  accepted:  'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-  amended:   'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-  cancelled: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
-  default:   'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-};
-
-function labelFor(status: string): string {
-  if (status === 'on_hold') return 'On hold';
-  return status.charAt(0).toUpperCase() + status.slice(1);
-}
 
 function fmtAt(iso: string): string {
   try {

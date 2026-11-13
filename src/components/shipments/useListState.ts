@@ -2,6 +2,7 @@
  * The list's filters, sort and page live in the URL, so Back from a shipment
  * returns to the same page and a filtered view can be linked to.
  */
+import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { endOfDay, isValid, parse, startOfDay } from 'date-fns';
 import type { FilingListParams } from '@/api/client';
@@ -83,9 +84,28 @@ export function listQuery(s: ListState): FilingListParams {
   };
 }
 
+const LAST_VIEW = 'shipments:last-view';
+
+/** The list's address as last left, for the detail page's link back. Empty when there is none. */
+export function lastListView(): string {
+  try {
+    return sessionStorage.getItem(LAST_VIEW) ?? '';
+  } catch {
+    return '';
+  }
+}
+
 export function useListState() {
   const [params, setParams] = useSearchParams();
   const state = readState(params);
+  const search = params.toString();
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(LAST_VIEW, search ? `?${search}` : '');
+    } catch {
+      // Private windows can refuse storage; the link back then opens the plain list.
+    }
+  }, [search]);
   /** Any change but the page itself starts again at page 1. */
   const update = (patch: Partial<ListState>) =>
     setParams(writeState({ ...state, ...patch, page: patch.page ?? 1 }), { replace: true });

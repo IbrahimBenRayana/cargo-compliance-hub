@@ -126,7 +126,7 @@ export interface Filing {
   consolidationId?: string | null;
   /** List rows only: how many house bills share this consolidation. */
   consolidationSize?: number | null;
-  /** List rows only: the ISF cutoff by the dashboard's rule, estimated when there is no lading date. */
+  /** From the list and the shipment endpoints: the ISF cutoff by the dashboard's rule, estimated when there is no lading date. */
   cutoff?: { at: string; basis: 'LADING' | 'ETD_ESTIMATE' } | null;
   masterBol?: string | null;
   houseBol?: string | null;

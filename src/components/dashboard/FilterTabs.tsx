@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { TINT, type Tone } from './tones';
 
-export interface FilterTab<K extends string> { key: K; label: string; count: number }
+/** `tone` colours the count of a tab that is not open, so a red Rejected count stands out from the row. */
+export interface FilterTab<K extends string> { key: K; label: string; count: number; tone?: Tone }
 
 /** Underlined filters with their counts. An empty one is disabled unless it is "all" or open. */
 export function FilterTabs<K extends string>({ items, active, onChange, layoutId }: {
@@ -24,7 +26,7 @@ export function FilterTabs<K extends string>({ items, active, onChange, layoutId
             )}
           >
             {f.label}
-            <span className={cn('ml-1.5 rounded-md px-1.5 py-px text-[11.5px] tabular-nums transition-colors duration-150', on ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+            <span className={cn('ml-1.5 rounded-md px-1.5 py-px text-[11.5px] tabular-nums transition-colors duration-150', on ? 'bg-primary text-primary-foreground' : f.tone && f.count > 0 ? cn(TINT[f.tone], 'font-medium') : 'bg-muted text-muted-foreground')}>
               {f.count.toLocaleString()}
             </span>
             {on && <motion.span layoutId={layoutId} className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary" transition={{ type: 'spring', bounce: 0, duration: 0.3 }} />}

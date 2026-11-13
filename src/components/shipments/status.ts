@@ -2,30 +2,35 @@
  * The Shipments page names states the way the dashboard does: an ISF that has
  * gone out is "Sent", whatever CBP has or has not answered yet.
  */
+import type { LucideIcon } from 'lucide-react';
+import { Ban, CheckCircle2, FileCheck2, FilePen, PauseCircle, Send, XCircle } from 'lucide-react';
 import type { Filing, ShipmentStatus } from '@/types/shipment';
 import type { FilterTab } from '@/components/dashboard/FilterTabs';
 import type { Tone } from '@/components/dashboard/tones';
 
-export const STATUS: Record<ShipmentStatus, { word: string; tone: Tone }> = {
-  draft: { word: 'Draft', tone: 'calm' },
-  submitted: { word: 'Sent', tone: 'info' },
-  pending_cbp: { word: 'Sent', tone: 'info' },
-  accepted: { word: 'Accepted', tone: 'done' },
-  amended: { word: 'Amended', tone: 'done' },
-  rejected: { word: 'Rejected', tone: 'urgent' },
-  on_hold: { word: 'On hold', tone: 'soon' },
-  cancelled: { word: 'Cancelled', tone: 'calm' },
+export const STATUS: Record<ShipmentStatus, { word: string; tone: Tone; icon: LucideIcon }> = {
+  draft: { word: 'Draft', tone: 'calm', icon: FilePen },
+  submitted: { word: 'Sent', tone: 'info', icon: Send },
+  pending_cbp: { word: 'Sent', tone: 'info', icon: Send },
+  accepted: { word: 'Accepted', tone: 'done', icon: CheckCircle2 },
+  amended: { word: 'Amended', tone: 'done', icon: FileCheck2 },
+  rejected: { word: 'Rejected', tone: 'urgent', icon: XCircle },
+  on_hold: { word: 'On hold', tone: 'soon', icon: PauseCircle },
+  cancelled: { word: 'Cancelled', tone: 'calm', icon: Ban },
 };
+
+/** Any status the server sends, including one this build has not heard of. */
+export const statusOf = (status: string) => STATUS[status as ShipmentStatus] ?? { word: status, tone: 'calm' as Tone, icon: FilePen };
 
 export type Tab = 'all' | 'draft' | 'sent' | 'accepted' | 'rejected' | 'on_hold' | 'cancelled';
 
-export const TABS: { key: Tab; label: string; statuses: ShipmentStatus[] }[] = [
+export const TABS: { key: Tab; label: string; statuses: ShipmentStatus[]; tone?: Tone }[] = [
   { key: 'all', label: 'All', statuses: [] },
   { key: 'draft', label: 'Drafts', statuses: ['draft'] },
-  { key: 'sent', label: 'Sent', statuses: ['submitted', 'pending_cbp'] },
-  { key: 'accepted', label: 'Accepted', statuses: ['accepted', 'amended'] },
-  { key: 'rejected', label: 'Rejected', statuses: ['rejected'] },
-  { key: 'on_hold', label: 'On hold', statuses: ['on_hold'] },
+  { key: 'sent', label: 'Sent', statuses: ['submitted', 'pending_cbp'], tone: 'info' },
+  { key: 'accepted', label: 'Accepted', statuses: ['accepted', 'amended'], tone: 'done' },
+  { key: 'rejected', label: 'Rejected', statuses: ['rejected'], tone: 'urgent' },
+  { key: 'on_hold', label: 'On hold', statuses: ['on_hold'], tone: 'soon' },
   { key: 'cancelled', label: 'Cancelled', statuses: ['cancelled'] },
 ];
 
@@ -39,6 +44,7 @@ export function tabsWithCounts(byStatus: Record<string, number> | undefined): Fi
   return TABS.map((t) => ({
     key: t.key,
     label: t.label,
+    tone: t.tone,
     count: t.key === 'all' ? all : t.statuses.reduce((n, s) => n + (byStatus?.[s] ?? 0), 0),
   }));
 }

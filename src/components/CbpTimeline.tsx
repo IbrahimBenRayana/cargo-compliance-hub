@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, XCircle, Clock, Loader2, Send, AlertTriangle, Info } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { TINT, type Tone } from '@/components/dashboard/tones';
 import { abiDocumentsApi, filingsApi } from '@/api/client';
 import type { CbpConditionView, CbpTransmissionView, EntryCbpActivity, FilingCbpActivity } from '@/api/client';
 import { cn } from '@/lib/utils';
@@ -17,13 +16,16 @@ const ACTION_LABEL: Record<string, string> = { A: 'Add', R: 'Replace', D: 'Delet
 
 const fmt = (ts: string | null) => (ts ? new Date(ts).toLocaleString() : '');
 
-function StatusIcon({ status }: { status: string }) {
-  if (status === 'ACCEPTED') return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-  if (status === 'REJECTED' || status === 'FAILED') return <XCircle className="h-4 w-4 text-red-600" />;
-  if (status === 'UNKNOWN') return <AlertTriangle className="h-4 w-4 text-amber-600" />;
-  if (status === 'SENT') return <Clock className="h-4 w-4 text-primary" />;
-  return <Send className="h-4 w-4 text-muted-foreground" />;
-}
+/** Each answer in the app's colours: green accepted, red rejected, blue sent, amber unknown. */
+const STATUS_LOOK: Record<string, { icon: typeof Send; tone: Tone }> = {
+  ACCEPTED: { icon: CheckCircle2, tone: 'done' },
+  REJECTED: { icon: XCircle, tone: 'urgent' },
+  FAILED: { icon: XCircle, tone: 'urgent' },
+  UNKNOWN: { icon: AlertTriangle, tone: 'soon' },
+  SENT: { icon: Clock, tone: 'info' },
+  CONDITIONAL: { icon: Info, tone: 'info' },
+  QUEUED: { icon: Send, tone: 'calm' },
+};
 
 const STATUS_TEXT: Record<string, string> = {
   QUEUED: 'Preparing',
@@ -35,20 +37,24 @@ const STATUS_TEXT: Record<string, string> = {
   UNKNOWN: 'Outcome unknown, waiting for CBP',
 };
 
+const PILL = 'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-medium';
+
 function Condition({ c }: { c: CbpConditionView }) {
+  const tone: Tone = c.blocking ? 'urgent' : 'info';
+  const Icon = c.blocking ? XCircle : Info;
   return (
-    <li className={cn('rounded-md border p-2.5 text-sm', c.blocking ? 'border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/30' : 'bg-muted/30')}>
-      <div className="flex items-start gap-2">
-        {c.blocking ? <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" /> : <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+    <li className={cn('rounded-lg p-3 text-[13px]', c.blocking ? 'bg-urgent-tint' : 'bg-info-tint')}>
+      <div className="flex items-start gap-2.5">
+        <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', c.blocking ? 'text-urgent' : 'text-info')} aria-hidden />
         <div className="min-w-0">
-          <div className="font-medium">
-            <span className="font-mono text-xs text-muted-foreground mr-1.5">{c.code}</span>
+          <p className="font-medium text-foreground">
+            <span className={cn('mr-1.5 rounded px-1 py-px font-mono text-[11.5px]', TINT[tone])}>{c.code}</span>
             {c.narrative}
-          </div>
-          {c.explanation && <p className="mt-0.5 text-xs text-muted-foreground">{c.explanation}</p>}
-          {c.guidance && <p className="mt-1 text-xs text-foreground">{c.guidance}</p>}
+          </p>
+          {c.explanation && <p className="mt-1 text-[12.5px] text-muted-foreground">{c.explanation}</p>}
+          {c.guidance && <p className="mt-1 text-[12.5px] text-foreground">{c.guidance}</p>}
           {c.audience === 'operations' && (
-            <p className="mt-0.5 text-xs text-muted-foreground">This is about our connection, not your data. MyCargoLens has been alerted.</p>
+            <p className="mt-1 text-[12.5px] text-muted-foreground">This is about our connection, not your data. MyCargoLens has been alerted.</p>
           )}
         </div>
       </div>
@@ -56,7 +62,7 @@ function Condition({ c }: { c: CbpConditionView }) {
   );
 }
 
-/** The shared card: transmissions newest first, each with CBP's answer. */
+/** The shared card: transmissions newest first, each with CBP's answer, on a coloured line. */
 function CbpActivityCard({
   transmissions,
   pending,
@@ -71,76 +77,74 @@ function CbpActivityCard({
   if (transmissions.length === 0) return null;
   const noAnswer = transmissions.some((t) => t.overdue);
   return (
-    <Card className="border-primary/20">
-      <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-base font-semibold">CBP activity</CardTitle>
-          {badges}
-          {pending && !noAnswer && (
-            <Badge variant="secondary" className="text-[11px]">
-              <Loader2 className="mr-1 h-3 w-3 animate-spin" /> Waiting for CBP
-            </Badge>
-          )}
-          {noAnswer && (
-            <Badge variant="outline" className="text-[11px] border-amber-300 text-amber-800 dark:text-amber-300">
-              <AlertTriangle className="mr-1 h-3 w-3" /> No answer from CBP
-            </Badge>
-          )}
-        </div>
-        <CardDescription>
-          Every transmission to CBP and CBP&apos;s answer. CBP usually responds within a few minutes.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ol className="space-y-4">
-          {transmissions.map((t) => {
-            const responses = t.inbound.filter((m) => m.parsed && m.parsed.verdict !== 'INFO');
-            const advisories = t.inbound.filter((m) => m.parsed?.verdict === 'INFO' && m.parsed.conditions.length > 0);
-            return (
-              <li key={t.id} className="rounded-lg border p-3">
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <StatusIcon status={t.status} />
-                  <span className="font-medium">{subject(t)}</span>
-                  <span className="text-muted-foreground">{STATUS_TEXT[t.status] ?? t.status}</span>
-                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">{fmt(t.respondedAt ?? t.sentAt ?? t.createdAt)}</span>
+    <section aria-labelledby="cbp-activity-title" className="rounded-xl border border-border/70 bg-card p-5 shadow-card">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 id="cbp-activity-title" className="text-[14px] font-semibold">CBP activity</h2>
+        {badges}
+        {pending && !noAnswer && (
+          <span className={cn(PILL, TINT.info)}>
+            <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" aria-hidden /> Waiting for CBP
+          </span>
+        )}
+        {noAnswer && (
+          <span className={cn(PILL, TINT.soon)}>
+            <AlertTriangle className="h-3 w-3" aria-hidden /> No answer from CBP
+          </span>
+        )}
+      </div>
+      <p className="mt-1 text-[13px] text-muted-foreground">Every message sent to CBP and CBP&apos;s answer, newest first.</p>
+      <ol className="mt-4">
+        {transmissions.map((t, i) => {
+          const responses = t.inbound.filter((m) => m.parsed && m.parsed.verdict !== 'INFO');
+          const advisories = t.inbound.filter((m) => m.parsed?.verdict === 'INFO' && m.parsed.conditions.length > 0);
+          const conditions = [...responses.flatMap((m) => m.parsed!.conditions), ...advisories.flatMap((m) => m.parsed!.conditions)];
+          const { icon: Icon, tone } = STATUS_LOOK[t.status] ?? STATUS_LOOK.QUEUED;
+          const last = i === transmissions.length - 1;
+          return (
+            <li key={t.id} className="relative flex gap-3 pb-5 last:pb-0">
+              {!last && <span aria-hidden className="absolute bottom-0 left-[15px] top-9 w-0.5 rounded-full bg-border" />}
+              <span className={cn('relative grid h-8 w-8 shrink-0 place-items-center rounded-full', TINT[tone])}>
+                <Icon className="h-4 w-4" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1 pt-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-[13.5px] font-semibold">{subject(t)}</span>
+                  <span className={cn(PILL, TINT[tone])}>{STATUS_TEXT[t.status] ?? t.status}</span>
+                  <span className="ml-auto text-[12px] tabular-nums text-muted-foreground">{fmt(t.respondedAt ?? t.sentAt ?? t.createdAt)}</span>
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Filer {t.filerCode}{t.environment !== 'PROD' ? ` · CBP ${t.environment}` : ''}{t.sentAt ? ` · sent ${fmt(t.sentAt)}` : ''}
-                </div>
-                {t.lastError && t.status !== 'SENT' && <p className="mt-2 text-xs text-red-600">{t.lastError}</p>}
+                <p className="mt-0.5 text-[12px] text-muted-foreground">
+                  Filer <span className="font-mono">{t.filerCode}</span>{t.environment !== 'PROD' ? ` · CBP ${t.environment}` : ''}{t.sentAt ? ` · sent ${fmt(t.sentAt)}` : ''}
+                </p>
+                {t.lastError && t.status !== 'SENT' && <p className="mt-2 text-[12.5px] text-urgent">{t.lastError}</p>}
                 {t.overdue && (
-                  <div role="alert" className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
-                    <p className="font-semibold">No answer from CBP yet. CBP normally answers within minutes.</p>
+                  <div role="alert" className="mt-2 rounded-lg bg-soon-tint p-3 text-[12.5px] text-foreground">
+                    <p className="font-semibold text-soon">No answer from CBP yet.</p>
                     <p className="mt-0.5">
                       If you file under your own filer code, check with your CBP client representative that our queue is approved for filer code {t.filerCode}.
                       MyCargoLens support has been alerted. Watch your ISF deadline.
                     </p>
                   </div>
                 )}
-                {responses.flatMap((m) => m.parsed!.conditions).length > 0 && (
+                {conditions.length > 0 && (
                   <ul className="mt-3 space-y-2">
-                    {responses.flatMap((m) => m.parsed!.conditions).map((c, i) => <Condition key={i} c={c} />)}
+                    {conditions.map((c, k) => <Condition key={k} c={c} />)}
                   </ul>
                 )}
-                {advisories.length > 0 && (
-                  <ul className="mt-3 space-y-2">
-                    {advisories.flatMap((m) => m.parsed!.conditions).map((c, i) => <Condition key={`a${i}`} c={c} />)}
-                  </ul>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-      </CardContent>
-    </Card>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 
 function LoadingCard() {
   return (
-    <Card>
-      <CardContent className="py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent>
-    </Card>
+    <div role="status" aria-label="Loading CBP activity" className="rounded-xl border border-border/70 bg-card p-5 shadow-card">
+      <div className="dash-sk h-4 w-28" />
+      <div className="dash-sk mt-4 h-12 w-full" />
+    </div>
   );
 }
 
@@ -170,7 +174,7 @@ export function CbpTimeline({ filingId }: { filingId: string }) {
     <CbpActivityCard
       transmissions={data.transmissions}
       pending={!!filing.pendingAction}
-      badges={filing.cbpTransactionId && <Badge variant="outline" className="font-mono text-[11px]">ISF {filing.cbpTransactionId}</Badge>}
+      badges={filing.cbpTransactionId && <span className={cn(PILL, 'bg-muted font-mono text-[11.5px] text-foreground')}>ISF {filing.cbpTransactionId}</span>}
       subject={(t) => `ISF ${ACTION_LABEL[t.action ?? ''] ?? t.action}`}
     />
   );
@@ -204,10 +208,10 @@ export function EntryCbpTimeline({ entryId }: { entryId: string }) {
       badges={
         <>
           {entry.entrySummaryStatus && (
-            <Badge variant="outline" className="text-[11px]">Summary {PART_TEXT[entry.entrySummaryStatus] ?? entry.entrySummaryStatus.toLowerCase()}</Badge>
+            <span className={cn(PILL, 'bg-muted text-foreground')}>Summary {PART_TEXT[entry.entrySummaryStatus] ?? entry.entrySummaryStatus.toLowerCase()}</span>
           )}
           {entry.releaseRequested && entry.cargoReleaseStatus && (
-            <Badge variant="outline" className="text-[11px]">Release {PART_TEXT[entry.cargoReleaseStatus] ?? entry.cargoReleaseStatus.toLowerCase()}</Badge>
+            <span className={cn(PILL, 'bg-muted text-foreground')}>Release {PART_TEXT[entry.cargoReleaseStatus] ?? entry.cargoReleaseStatus.toLowerCase()}</span>
           )}
         </>
       }

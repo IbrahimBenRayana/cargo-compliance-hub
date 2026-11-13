@@ -58,7 +58,8 @@ describe('ShipmentsHome', () => {
   it('counts every ISF on the server, not the ones on this page', async () => {
     show();
     expect(await screen.findByRole('heading', { level: 1, name: 'Shipments' })).toBeInTheDocument();
-    expect(await screen.findByText('312 ISFs, 15 to send or fix.')).toBeInTheDocument();
+    const line = await screen.findByText((_, el) => el?.tagName === 'P' && el.textContent === '312 ISFs, 15 to send or fix.');
+    expect(within(line).getByText('15 to send or fix')).toHaveClass('text-soon');
     expect(screen.getByRole('button', { name: /^Sent\s*3$/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Accepted\s*281$/ })).toBeInTheDocument();
   });
@@ -82,6 +83,14 @@ describe('ShipmentsHome', () => {
     show('/shipments?tab=rejected&origin=CN&page=2&sort=importerName&dir=asc');
     await screen.findByRole('table');
     expect(lastList()).toMatchObject({ status: 'rejected', origin: 'CN', page: 2, sortBy: 'importerName', sortOrder: 'asc' });
+  });
+
+  it('colours each status, and colours the counts of tabs that need a look', async () => {
+    api.list.mockResolvedValue(page([filing({ id: 'a', status: 'rejected' })]));
+    show();
+    await screen.findByRole('table');
+    expect(screen.getByText('Rejected', { selector: 'td span' })).toHaveClass('bg-urgent-tint');
+    expect(within(screen.getByRole('button', { name: /^Rejected\s*3$/ })).getByText('3')).toHaveClass('bg-urgent-tint');
   });
 
   it('says Sent for an ISF that has gone out, as the dashboard does', async () => {
@@ -175,5 +184,16 @@ describe('ShipmentsHome', () => {
     show();
     expect(await screen.findByText('We could not load your shipments.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+});
+
+describe('the link back from a shipment', () => {
+  it('remembers the list view it came from', async () => {
+    const { lastListView } = await import('../useListState');
+    api.list.mockResolvedValue(page([filing()], 60, 2));
+    api.facets.mockResolvedValue(FACETS);
+    show('/shipments?tab=rejected&page=2');
+    await screen.findByRole('table');
+    expect(lastListView()).toBe('?tab=rejected&page=2');
   });
 });
