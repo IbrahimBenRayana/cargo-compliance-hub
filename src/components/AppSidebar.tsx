@@ -1,4 +1,4 @@
-import { LayoutDashboard, Ship, Shield, ShieldCheck, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator, Container, MessagesSquare } from '@/components/icons';
+import { LayoutDashboard, Ship, Shield, ShieldCheck, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator, MessagesSquare } from '@/components/icons';
 import { LogoMark } from '@/components/LogoMark';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -68,7 +68,6 @@ const navSections: NavSection[] = [
   {
     label: 'Lookups',
     items: [
-      { title: 'Tracking',        url: '/tracking',        icon: Container, requiredCapability: CAPABILITIES.CONTAINER_TRACKING },
       { title: 'Manifest Query',  url: '/manifest-query',  icon: Search },
       { title: 'Duty Calculator', url: '/duty-calculator', icon: Calculator, requiredCapability: CAPABILITIES.HTS_CLASSIFICATION },
     ],
