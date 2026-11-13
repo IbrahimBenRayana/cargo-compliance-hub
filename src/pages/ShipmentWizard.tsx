@@ -60,20 +60,20 @@ const QUANTITY_UOMS = [
 // ─── Wizard Step Definitions ───────────────────────────────
 
 const STEPS_ISF10 = [
-  { id: 'filing',    label: 'Filing Info',      icon: FileText,  desc: 'ISF type, BOL numbers & bond info' },
-  { id: 'importer',  label: 'IOR & Consignee',  icon: Building2, desc: 'Importer of Record & consignee details' },
-  { id: 'parties',   label: 'Trade Parties',     icon: Users,     desc: 'Buyer, seller, ship-to & manufacturer' },
-  { id: 'transport', label: 'Transport',         icon: Ship,      desc: 'Vessel, voyage & port information' },
-  { id: 'cargo',     label: 'Cargo',             icon: Package,   desc: 'Commodities, HTS & containers' },
-  { id: 'review',    label: 'Review & Submit',   icon: Check,     desc: 'Final review before submission' },
+  { id: 'filing',    label: 'Filing info',      icon: FileText,  desc: 'ISF type, bill numbers and bond' },
+  { id: 'importer',  label: 'IOR & consignee',  icon: Building2, desc: 'Importer of record and consignee' },
+  { id: 'parties',   label: 'Trade parties',     icon: Users,     desc: 'Buyer, seller, ship-to and manufacturer' },
+  { id: 'transport', label: 'Transport',         icon: Ship,      desc: 'Vessel, voyage, ports and dates' },
+  { id: 'cargo',     label: 'Cargo',             icon: Package,   desc: 'Commodities, HTS codes and containers' },
+  { id: 'review',    label: 'Review & submit',   icon: Check,     desc: 'Check everything before you create the filing' },
 ];
 
 const STEPS_ISF5 = [
-  { id: 'filing',    label: 'Filing Info',          icon: FileText,  desc: 'ISF-5 type, BOL numbers & bond info' },
-  { id: 'filer',     label: 'Filer & Booking Party', icon: Building2, desc: 'ISF Filer (carrier/NVOCC) & booking party' },
-  { id: 'parties',   label: 'Ship-To & Manufacturer', icon: Users,   desc: 'Ship-to party & manufacturer details' },
-  { id: 'cargo',     label: 'Cargo',                 icon: Package,  desc: 'Commodities, HTS & containers' },
-  { id: 'review',    label: 'Review & Submit',       icon: Check,    desc: 'Final review before submission' },
+  { id: 'filing',    label: 'Filing info',          icon: FileText,  desc: 'ISF-5 type, bill numbers and bond' },
+  { id: 'filer',     label: 'Filer & booking party', icon: Building2, desc: 'ISF filer (carrier or NVOCC) and booking party' },
+  { id: 'parties',   label: 'Ship-to & manufacturer', icon: Users,   desc: 'Ship-to party and manufacturer' },
+  { id: 'cargo',     label: 'Cargo',                 icon: Package,  desc: 'Commodities, HTS codes and containers' },
+  { id: 'review',    label: 'Review & submit',       icon: Check,    desc: 'Check everything before you create the filing' },
 ];
 
 // ─── Types ─────────────────────────────────────────────────
@@ -267,6 +267,9 @@ const initialForm = (): ISFFormState => ({
   isf5: emptyISF5(),
 });
 
+/** Sections inside a step are divided by a hairline, not boxed: the step itself is the card. */
+const FLAT = 'rounded-none border-0 border-t border-border/70 bg-transparent shadow-none first:border-t-0';
+
 // ─── Reusable Field Components ─────────────────────────────
 
 // htmlFor wires the Label to its input by id so clicking the label focuses
@@ -276,7 +279,7 @@ const initialForm = (): ISFFormState => ({
 const HintLabel = memo(function HintLabel({ label, hint, required, htmlFor }: { label: string; hint?: string; required?: boolean; htmlFor?: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <Label htmlFor={htmlFor} className="text-sm font-medium">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</Label>
+      <Label htmlFor={htmlFor} className="text-[13px] font-medium">{label}{required && <span className="ml-0.5 text-urgent" aria-hidden>*</span>}</Label>
       {hint && (
         <TooltipProvider delayDuration={200}>
           <Tooltip>
@@ -312,9 +315,9 @@ const TextField = memo(function TextField({
         placeholder={placeholder}
         maxLength={maxLength}
         pattern={pattern}
-        className={cn(error && 'border-red-500 focus-visible:ring-red-500')}
+        className={cn(error && 'border-urgent focus-visible:ring-urgent')}
       />
-      {error && <p id={errorId} className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
+      {error && <p id={errorId} className="flex items-center gap-1 text-[12px] text-urgent"><AlertCircle className="h-3 w-3" />{error}</p>}
       {maxLength && value.length > maxLength * 0.8 && !error && (
         <p className="text-xs text-muted-foreground text-right">{value.length}/{maxLength}</p>
       )}
@@ -340,7 +343,7 @@ const SelectField = memo(function SelectField({
           id={fieldId}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className={cn(error && 'border-red-500')}
+          className={cn(error && 'border-urgent')}
         >
           <SelectValue placeholder={placeholder || 'Select...'} />
         </SelectTrigger>
@@ -348,7 +351,7 @@ const SelectField = memo(function SelectField({
           {options.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
         </SelectContent>
       </Select>
-      {error && <p id={errorId} className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
+      {error && <p id={errorId} className="flex items-center gap-1 text-[12px] text-urgent"><AlertCircle className="h-3 w-3" />{error}</p>}
     </div>
   );
 });
@@ -383,7 +386,7 @@ const PortSelectField = memo(function PortSelectField({
           <Button id={fieldId} variant="outline" role="combobox" aria-expanded={open}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
-            className={cn('w-full justify-between font-normal h-9 px-3', !selected && 'text-muted-foreground', error && 'border-red-500')}>
+            className={cn('w-full justify-between font-normal h-9 px-3', !selected && 'text-muted-foreground', error && 'border-urgent')}>
             <span className="truncate">{selected ? selected.label : (placeholder || 'Select…')}</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
@@ -405,7 +408,7 @@ const PortSelectField = memo(function PortSelectField({
           </Command>
         </PopoverContent>
       </Popover>
-      {error && <p id={errorId} className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
+      {error && <p id={errorId} className="flex items-center gap-1 text-[12px] text-urgent"><AlertCircle className="h-3 w-3" />{error}</p>}
     </div>
   );
 });
@@ -422,16 +425,16 @@ const PartyCard = memo(function PartyCard({
 }) {
   const up = (field: keyof PartyFormData, val: string) => onChange({ ...party, [field]: val });
   return (
-    <Card className="border-border/60">
-      <CardHeader className="pb-3 pt-4 px-4">
+    <Card className="rounded-none border-0 bg-transparent shadow-none">
+      <CardHeader className="px-0 pb-3 pt-2">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Icon className="h-4 w-4 text-primary" />
+          <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+            <Icon className="h-4 w-4 text-muted-foreground" />
           </div>
-          <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+          <CardTitle className="text-[14px] font-semibold">{title}</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="px-4 pb-4 space-y-3">
+      <CardContent className="space-y-3 px-0 pb-5">
         <TextField label="Company / Name" required value={party.name} onChange={v => up('name', v)}
           maxLength={nameMaxLen} placeholder="Letters, numbers, spaces, dashes only"
           hint={`Max ${nameMaxLen} chars. No periods or special characters.`} error={errors?.name} />
@@ -441,7 +444,7 @@ const PartyCard = memo(function PartyCard({
           <TextField label="Address Line 2" value={party.address2} onChange={v => up('address2', v)}
             maxLength={35} placeholder="Suite, unit, floor" hint="Optional. Don't use a single period." />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <TextField label="City" required value={party.city} onChange={v => up('city', v)}
             placeholder="City" maxLength={35} error={errors?.city} />
           <TextField label="State" value={party.state} onChange={v => up('state', v)}
@@ -1425,27 +1428,27 @@ export default function ShipmentWizard() {
     return (
     <div className="space-y-6">
       {isLcl && (
-        <div className="rounded-md border border-amber-200/70 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2 flex items-center gap-2">
-          <Layers className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" />
+        <div className="flex items-center gap-2 rounded-lg bg-info-tint px-3 py-2">
+          <Layers className="h-3.5 w-3.5 text-info" />
           <p className="text-[12px] text-foreground/80">
             LCL mode — fields below are the shared baseline. Use the per-HBL section at the bottom to set
             distinct importer + consignee for each house bill.
           </p>
         </div>
       )}
-      <Card className="border-blue-200 bg-blue-50/30 dark:bg-blue-950/10 dark:border-blue-900/40">
-        <CardHeader className="pb-3 pt-4 px-4">
+      <Card className={FLAT}>
+        <CardHeader className="px-0 pb-3 pt-5">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-              <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
             </div>
             <div>
-              <CardTitle className="text-sm font-semibold">Importer of Record (IOR)</CardTitle>
+              <CardTitle className="text-[14px] font-semibold">Importer of Record (IOR)</CardTitle>
               <CardDescription className="text-xs">The entity responsible for the ISF filing. Uses EIN (XX-XXXXXXXXX) format.</CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="px-4 pb-4 space-y-3">
+        <CardContent className="space-y-3 px-0 pb-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <TextField label="Importer Name" required value={form.importerName}
               onChange={v => set('importerName', v)} maxLength={35} error={errors.importerName}
@@ -1457,19 +1460,19 @@ export default function ShipmentWizard() {
         </CardContent>
       </Card>
 
-      <Card className="border-green-200 bg-green-50/30 dark:bg-green-950/10 dark:border-green-900/40">
-        <CardHeader className="pb-3 pt-4 px-4">
+      <Card className={FLAT}>
+        <CardHeader className="px-0 pb-3 pt-5">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
-              <Building2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
             </div>
             <div>
-              <CardTitle className="text-sm font-semibold">Consignee</CardTitle>
+              <CardTitle className="text-[14px] font-semibold">Consignee</CardTitle>
               <CardDescription className="text-xs">The party to whom the shipment is ultimately delivered.</CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="px-4 pb-4 space-y-3">
+        <CardContent className="space-y-3 px-0 pb-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <TextField label="Consignee Name" required value={form.consigneeName}
               onChange={v => set('consigneeName', v)} maxLength={35} error={errors.consigneeName}
@@ -1507,7 +1510,7 @@ export default function ShipmentWizard() {
       {isLcl && (
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <Layers className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <Layers className="h-3.5 w-3.5 text-soon" />
             <h3 className="text-sm font-semibold">Per-house-bill importer + consignee</h3>
             <span className="text-[11px] text-muted-foreground">
               LCL — each HBL has its own IOR + consignee. Empty fields inherit the shared baseline above.
@@ -1522,7 +1525,7 @@ export default function ShipmentWizard() {
                 return (
                   <TabsTrigger key={idx} value={`hbl-${idx}`} className="text-xs">
                     HBL {idx + 1}: {hbl.length > 14 ? hbl.slice(0, 14) + '…' : hbl}
-                    {customCount > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">·{customCount}</span>}
+                    {customCount > 0 && <span className="ml-1 text-soon">·{customCount}</span>}
                   </TabsTrigger>
                 );
               })}
@@ -1534,11 +1537,11 @@ export default function ShipmentWizard() {
                   <p className="text-[11px] text-muted-foreground">
                     HBL {idx + 1}: <span className="font-mono">{hbl}</span>
                   </p>
-                  <Card className="border-border/60">
-                    <CardHeader className="pb-3 pt-4 px-4">
-                      <CardTitle className="text-sm font-semibold">Importer (HBL {idx + 1})</CardTitle>
+                  <Card className={FLAT}>
+                    <CardHeader className="px-0 pb-3 pt-5">
+                      <CardTitle className="text-[14px] font-semibold">Importer (HBL {idx + 1})</CardTitle>
                     </CardHeader>
-                    <CardContent className="px-4 pb-4 space-y-3">
+                    <CardContent className="space-y-3 px-0 pb-5">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <TextField label="Importer Name" value={o.importerName ?? ''}
                           onChange={v => setHblField(idx, 'importerName', v || undefined)}
@@ -1549,11 +1552,11 @@ export default function ShipmentWizard() {
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="border-border/60">
-                    <CardHeader className="pb-3 pt-4 px-4">
-                      <CardTitle className="text-sm font-semibold">Consignee (HBL {idx + 1})</CardTitle>
+                  <Card className={FLAT}>
+                    <CardHeader className="px-0 pb-3 pt-5">
+                      <CardTitle className="text-[14px] font-semibold">Consignee (HBL {idx + 1})</CardTitle>
                     </CardHeader>
-                    <CardContent className="px-4 pb-4 space-y-3">
+                    <CardContent className="space-y-3 px-0 pb-5">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <TextField label="Consignee Name" value={o.consigneeName ?? ''}
                           onChange={v => setHblField(idx, 'consigneeName', v || undefined)}
@@ -1683,7 +1686,7 @@ export default function ShipmentWizard() {
       {isConsolidation && perHblKeys.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <Layers className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <Layers className="h-3.5 w-3.5 text-soon" />
             <h3 className="text-sm font-semibold">
               Per-house-bill parties
             </h3>
@@ -1705,7 +1708,7 @@ export default function ShipmentWizard() {
                     aria-label={hasError ? `HBL ${idx + 1}: ${hbl}, has missing parties` : undefined}>
                     {hasError && <AlertCircle className="h-3 w-3 mr-1" aria-hidden="true" />}
                     HBL {idx + 1}: {hbl.length > 14 ? hbl.slice(0, 14) + '…' : hbl}
-                    {customCount > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">·{customCount}</span>}
+                    {customCount > 0 && <span className="ml-1 text-soon">·{customCount}</span>}
                   </TabsTrigger>
                 );
               })}
@@ -1754,7 +1757,7 @@ export default function ShipmentWizard() {
                           >
                             Customize for this HBL
                           </Button>
-                          {cardError && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{cardError}</p>}
+                          {cardError && <p className="flex items-center gap-1 text-[12px] text-urgent"><AlertCircle className="h-3 w-3" />{cardError}</p>}
                         </div>
                       );
                     }
@@ -1818,8 +1821,8 @@ export default function ShipmentWizard() {
         <div className="space-y-1.5">
           <HintLabel label="Est. Arrival Date" required hint="When the vessel arrives at the US port" htmlFor="isf-est-arrival" />
           <Input id="isf-est-arrival" type="date" value={form.estimatedArrival} onChange={e => set('estimatedArrival', e.target.value)}
-            className={cn(errors.estimatedArrival && 'border-red-500')} />
-          {errors.estimatedArrival && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.estimatedArrival}</p>}
+            className={cn(errors.estimatedArrival && 'border-urgent')} />
+          {errors.estimatedArrival && <p className="flex items-center gap-1 text-[12px] text-urgent"><AlertCircle className="h-3 w-3" />{errors.estimatedArrival}</p>}
         </div>
       </div>
     </div>
@@ -1943,7 +1946,7 @@ export default function ShipmentWizard() {
                 return (
                   <TabsTrigger key={idx} value={`hbl-${idx}`} className="text-xs">
                     HBL {idx + 1}: {hbl.length > 14 ? hbl.slice(0, 14) + '…' : hbl}
-                    {override && <span className="ml-1 text-amber-600 dark:text-amber-400">·{override.length}</span>}
+                    {override && <span className="ml-1 text-soon">·{override.length}</span>}
                   </TabsTrigger>
                 );
               })}
@@ -2059,19 +2062,19 @@ export default function ShipmentWizard() {
   const renderISF5FilerBookingParty = () => (
     <div className="space-y-6">
       {/* ISF Filer (carrier/NVOCC) */}
-      <Card className="border-blue-200 bg-blue-50/30 dark:bg-blue-950/10 dark:border-blue-900/40">
-        <CardHeader className="pb-3 pt-4 px-4">
+      <Card className={FLAT}>
+        <CardHeader className="px-0 pb-3 pt-5">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-              <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
             </div>
             <div>
-              <CardTitle className="text-sm font-semibold">ISF Filer (Carrier / NVOCC)</CardTitle>
+              <CardTitle className="text-[14px] font-semibold">ISF Filer (Carrier / NVOCC)</CardTitle>
               <CardDescription className="text-xs">The carrier or NVOCC filing the ISF-5. Uses EIN (XX-XXXXXXXXX) format.</CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="px-4 pb-4 space-y-3">
+        <CardContent className="space-y-3 px-0 pb-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <TextField label="Filer Name" required value={form.isf5.ISFFilerName}
               onChange={v => setISF5('ISFFilerName', v)} maxLength={25} error={errors['isf5.ISFFilerName']}
@@ -2092,19 +2095,19 @@ export default function ShipmentWizard() {
       </Card>
 
       {/* Booking Party */}
-      <Card className="border-green-200 bg-green-50/30 dark:bg-green-950/10 dark:border-green-900/40">
-        <CardHeader className="pb-3 pt-4 px-4">
+      <Card className={FLAT}>
+        <CardHeader className="px-0 pb-3 pt-5">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
-              <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+              <Users className="h-4 w-4 text-muted-foreground" />
             </div>
             <div>
-              <CardTitle className="text-sm font-semibold">Booking Party</CardTitle>
+              <CardTitle className="text-[14px] font-semibold">Booking Party</CardTitle>
               <CardDescription className="text-xs">The party that booked the cargo space with the carrier.</CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="px-4 pb-4 space-y-3">
+        <CardContent className="space-y-3 px-0 pb-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <TextField label="Booking Party Name" required value={form.isf5.bookingPartyName}
               onChange={v => setISF5('bookingPartyName', v)} maxLength={35} error={errors['isf5.bookingPartyName']}
@@ -2135,13 +2138,13 @@ export default function ShipmentWizard() {
       </Card>
 
       {/* Estimated Arrival & Transport basics for ISF-5 */}
-      <Card>
-        <CardHeader className="pb-3 pt-4 px-4">
+      <Card className={FLAT}>
+        <CardHeader className="px-0 pb-3 pt-5">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <Ship className="h-4 w-4 text-primary" /> Shipment Details
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-4 pb-4 space-y-4">
+        <CardContent className="space-y-4 px-0 pb-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <HintLabel label="Est. Arrival Date" required hint="When the shipment arrives at the US port" htmlFor="isf5-est-arrival" />
@@ -2169,7 +2172,7 @@ export default function ShipmentWizard() {
   const renderReview = () => {
     const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
       <div>
-        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">{title}</h4>
+        <h4 className="text-[13px] font-semibold mb-2">{title}</h4>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-sm">{children}</div>
       </div>
     );
@@ -2181,7 +2184,7 @@ export default function ShipmentWizard() {
     );
     const PartyReview = ({ title, p }: { title: string; p: PartyFormData }) => (
       <div className="rounded-lg border p-3 space-y-1">
-        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</p>
+        <p className="text-[13px] font-semibold">{title}</p>
         <p className="text-sm font-semibold">{p.name || <span className="italic text-muted-foreground">Not set</span>}</p>
         {p.address1 && <p className="text-xs text-muted-foreground">{p.address1}{p.address2 ? `, ${p.address2}` : ''}</p>}
         {(p.city || p.state || p.zip) && <p className="text-xs text-muted-foreground">{[p.city, p.state, p.zip].filter(Boolean).join(', ')}</p>}
@@ -2191,12 +2194,9 @@ export default function ShipmentWizard() {
 
     return (
       <div className="space-y-6">
-        <div className="rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 p-4 flex items-center gap-3">
-          <Sparkles className="h-5 w-5 text-primary shrink-0" />
-          <div>
-            <p className="text-sm font-semibold">Ready to create your ISF filing</p>
-            <p className="text-xs text-muted-foreground">Review all details below. After creating, go to the filing list and click "Submit" to send to CBP.</p>
-          </div>
+        <div className="rounded-lg bg-info-tint px-4 py-3">
+          <p className="text-[13.5px] font-semibold">{isEdit ? 'Check your changes.' : 'Check the details, then create the filing.'}</p>
+          <p className="mt-0.5 text-[12.5px] text-foreground/75">Nothing goes to CBP at this step. You send the ISF from its shipment page, after one more check.</p>
         </div>
 
         <Section title="Filing & BOL">
@@ -2234,7 +2234,7 @@ export default function ShipmentWizard() {
             <Separator />
 
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Trade Parties</h4>
+              <h4 className="text-[13px] font-semibold mb-2">Trade Parties</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 <PartyReview title="Buyer" p={form.buyer} />
                 <PartyReview title="Seller" p={form.seller} />
@@ -2279,7 +2279,7 @@ export default function ShipmentWizard() {
             <Separator />
 
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Parties</h4>
+              <h4 className="text-[13px] font-semibold mb-2">Parties</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <PartyReview title="Ship-To" p={form.shipToParty} />
                 <PartyReview title="Manufacturer" p={form.manufacturer} />
@@ -2291,7 +2291,7 @@ export default function ShipmentWizard() {
         <Separator />
 
         <div>
-          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Commodities</h4>
+          <h4 className="text-[13px] font-semibold mb-2">Commodities</h4>
           {form.commodities.filter(c => c.htsCode).map((c, i) => (
             <div key={i} className="rounded-lg border p-3 flex flex-wrap gap-x-6 gap-y-1 text-sm mb-2">
               <Item label="HTS" value={c.htsCode} /><Item label="Description" value={c.description} />
@@ -2303,7 +2303,7 @@ export default function ShipmentWizard() {
 
         {form.containers.some(c => c.number) && <>
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Containers</h4>
+            <h4 className="text-[13px] font-semibold mb-2">Containers</h4>
             <div className="flex flex-wrap gap-2">
               {form.containers.filter(c => c.number).map((c, i) => (
                 <Badge key={i} variant="outline" className="text-sm py-1 px-3 font-mono">{c.number} ({c.type})</Badge>
@@ -2322,70 +2322,50 @@ export default function ShipmentWizard() {
 
   // ─── Render ────────────────────────
   return (
-    <div className="space-y-5 max-w-[1200px] w-full mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild className="shrink-0">
-          <Link to="/shipments" aria-label="Back to shipments"><ArrowLeft className="h-4 w-4" /></Link>
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">{isEdit ? 'Edit ISF Filing' : 'New ISF Filing'}</h1>
-            {/* Autosave indicator (audit Phase 8.2) — only in edit mode. */}
-            {isEdit && autosave.isSaving && (
-              <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Saving…
-              </span>
-            )}
-            {isEdit && !autosave.isSaving && savedRecentlyAt && (
-              <span className="text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1.5">
-                <Check className="h-3 w-3" />
-                Saved
-              </span>
-            )}
-            {isEdit && autosave.error && (
-              <span className="text-xs text-red-600 dark:text-red-400 inline-flex items-center gap-1.5">
-                <AlertCircle className="h-3 w-3" />
-                Save failed
-              </span>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Step {step + 1} of {STEPS.length} — {STEPS[step].desc}
-          </p>
+    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 pb-10">
+      <header>
+        <Link to="/shipments" className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors duration-150 hover:text-foreground">
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />Shipments
+        </Link>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.015em]">{isEdit ? 'Edit ISF filing' : 'New ISF filing'}</h1>
+          {/* Autosave indicator (audit Phase 8.2), only in edit mode. */}
+          {isEdit && autosave.isSaving && (
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" />
+              Saving…
+            </span>
+          )}
+          {isEdit && !autosave.isSaving && savedRecentlyAt && (
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] text-done">
+              <Check className="h-3 w-3" />
+              Saved
+            </span>
+          )}
+          {isEdit && autosave.error && (
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] text-urgent">
+              <AlertCircle className="h-3 w-3" />
+              Save failed
+            </span>
+          )}
         </div>
-        <div className="hidden sm:flex items-center gap-2 shrink-0">
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Completion</p>
-            <p className="text-lg font-bold text-primary">{progress}%</p>
-          </div>
-          <div className="w-20">
-            <Progress value={progress} className="h-2" aria-label="Form completion" />
-          </div>
-        </div>
-      </div>
+      </header>
 
-      {/* Pre-fill banner — copy varies by source kind. */}
+      {/* Pre-fill banner: copy varies by source kind. */}
       {sourceProvenance && !isEdit && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.04] p-4 flex items-start gap-3">
-          <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-600">
-            <Sparkles className="h-4 w-4" />
-          </div>
-          <div className="flex-1 min-w-0">
+        <div className="flex items-start gap-3 rounded-xl bg-info-tint p-4">
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-info" aria-hidden />
+          <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium text-foreground">
               Started from {sourceProvenance.kind === 'filing' ? 'filing' : 'manifest query'}{' '}
-              <Link
-                to={sourceProvenance.url}
-                className="font-mono text-foreground underline-offset-2 hover:underline"
-              >
+              <Link to={sourceProvenance.url} className="font-mono underline-offset-2 hover:underline">
                 {sourceProvenance.label}
               </Link>
             </p>
-            <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
+            <p className="mt-0.5 text-[12.5px] leading-snug text-foreground/75">
               {sourceProvenance.kind === 'filing'
-                ? 'We carried over parties, bond, vessel, and the first commodity. BOL, voyage, dates, and containers are blanked — those must be unique per shipment.'
-                : 'We carried over the BOL, carrier, port of unlading, and arrival date. Importer, consignee, parties, bond, vessel, and commodities still need to be filled in.'}
+                ? 'We carried over parties, bond, vessel and the first commodity. Bills, voyage, dates and containers are blank, because they must be unique to each shipment.'
+                : 'We carried over the bill, carrier, port of unlading and arrival date. Importer, consignee, parties, bond, vessel and commodities still need to be filled in.'}
             </p>
           </div>
           <Button
@@ -2400,89 +2380,83 @@ export default function ShipmentWizard() {
               }, { replace: true });
               setForm(initialForm());
             }}
-            className="text-xs h-7 text-muted-foreground hover:text-foreground shrink-0"
+            className="h-7 shrink-0 text-[12.5px] text-foreground/75 hover:text-foreground"
           >
-            <X className="h-3.5 w-3.5 mr-1" /> Clear
+            <X className="mr-1 h-3.5 w-3.5" /> Clear
           </Button>
         </div>
       )}
 
-      {/* Step Progress Bar */}
-      <div className="bg-card border rounded-xl p-3">
-        <div className="flex items-center gap-0">
-          {STEPS.map((s, i) => {
-            const Icon = s.icon;
-            const isActive = i === step;
-            const isDone = i < step;
-            return (
-              <div key={s.id} className="flex items-center flex-1 min-w-0">
-                <button onClick={() => { if (i <= step) setStep(i); }}
-                  disabled={i > step}
-                  className={cn(
-                    'flex items-center gap-2 transition-all rounded-lg px-2 py-1.5 text-left min-w-0',
-                    isActive && 'bg-primary/10',
-                    isDone && 'cursor-pointer hover:bg-muted',
-                    i > step && 'opacity-40 cursor-not-allowed',
-                  )}
-                >
-                  <span className={cn(
-                    'h-8 w-8 rounded-full flex items-center justify-center shrink-0 transition-all',
-                    isDone ? 'bg-primary text-primary-foreground' :
-                    isActive ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30' :
-                    'bg-muted text-muted-foreground',
-                  )}>
-                    {isDone ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-                  </span>
-                  <span className={cn('text-xs font-medium truncate hidden lg:block', isActive && 'text-primary')}>{s.label}</span>
-                </button>
-                {i < STEPS.length - 1 && (
-                  <div className={cn('h-0.5 flex-1 mx-1 rounded-full min-w-2', isDone ? 'bg-primary' : 'bg-border')} />
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {/* Mobile progress */}
-        <div className="sm:hidden mt-2">
-          <Progress value={progress} className="h-1.5" aria-label="Form completion" />
-          <p className="text-xs text-muted-foreground mt-1 text-center">{progress}% complete</p>
-        </div>
-      </div>
-
-      {/* Step Content */}
-      <Card className="shadow-sm">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            {(() => { const Icon = STEPS[step].icon; return <Icon className="h-5 w-5 text-primary" />; })()}
-            <CardTitle className="text-lg">{STEPS[step].label}</CardTitle>
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
+        {/* Where you are: every step, which are done, and how much is filled in. */}
+        <nav aria-label="Steps" className="min-w-0 rounded-xl border border-border/70 bg-card p-3 shadow-card lg:sticky lg:top-4">
+          <ol className="flex gap-1 overflow-x-auto [scrollbar-width:none] lg:flex-col lg:overflow-visible">
+            {STEPS.map((s, i) => {
+              const isActive = i === step;
+              const isDone = i < step;
+              return (
+                <li key={s.id} className="shrink-0 lg:shrink">
+                  <button
+                    type="button"
+                    onClick={() => { if (i <= step) setStep(i); }}
+                    disabled={i > step}
+                    aria-current={isActive ? 'step' : undefined}
+                    className={cn(
+                      'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring',
+                      isActive && 'bg-primary/[0.07]',
+                      isDone && 'can-hover:hover:bg-muted',
+                      i > step && 'cursor-not-allowed',
+                    )}
+                  >
+                    <span className={cn(
+                      'grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-semibold tabular-nums',
+                      isDone ? 'bg-done-tint text-done' : isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                    )}>
+                      {isDone ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> : i + 1}
+                    </span>
+                    <span className={cn('whitespace-nowrap text-[13px] lg:whitespace-normal', isActive ? 'font-semibold text-foreground' : isDone ? 'font-medium text-foreground' : 'text-muted-foreground', !isActive && 'max-lg:hidden')}>{s.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <div className="mt-3 border-t border-border/70 px-2.5 pt-3">
+            <div className="flex items-baseline justify-between text-[12.5px]">
+              <span className="text-muted-foreground">Filled in</span>
+              <span className="font-medium tabular-nums">{progress}%</span>
+            </div>
+            <Progress value={progress} className="mt-1.5 h-1.5" aria-label="Form completion" />
           </div>
-          <CardDescription>{STEPS[step].desc}</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-4">
-          {stepContent[step]()}
-        </CardContent>
-      </Card>
+        </nav>
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between pb-6">
-        <Button variant="outline" onClick={goBack} disabled={step === 0} size="lg">
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back
-        </Button>
-        <div className="flex items-center gap-2">
-          {step < STEPS.length - 1 ? (
-            <Button onClick={goNext} size="lg">
-              Next <ArrowRight className="h-4 w-4 ml-2" />
+        <section aria-labelledby="step-title" className="min-w-0 rounded-xl border border-border/70 bg-card shadow-card">
+          <div className="border-b border-border/70 px-5 py-4 sm:px-6">
+            <p className="text-[12.5px] tabular-nums text-muted-foreground">Step {step + 1} of {STEPS.length}</p>
+            <h2 id="step-title" className="text-[18px] font-semibold leading-7">{STEPS[step].label}</h2>
+            <p className="text-[13px] text-muted-foreground">{STEPS[step].desc}</p>
+          </div>
+          <div className="px-5 py-5 sm:px-6">
+            {stepContent[step]()}
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-border/70 px-5 py-4 sm:px-6">
+            <Button variant="outline" onClick={goBack} disabled={step === 0}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back
             </Button>
-          ) : (
-            <Button onClick={handleSubmit} disabled={isSaving} size="lg" className="min-w-[200px]">
-              {isSaving ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
-              ) : (
-                <><CheckCircle2 className="h-4 w-4 mr-2" /> {isEdit ? 'Save Changes' : 'Create ISF Filing'}</>
-              )}
-            </Button>
-          )}
-        </div>
+            {step < STEPS.length - 1 ? (
+              <Button onClick={goNext}>
+                Next <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button onClick={handleSubmit} disabled={isSaving} className="min-w-[180px]">
+                {isSaving ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+                ) : (
+                  <><CheckCircle2 className="mr-2 h-4 w-4" /> {isEdit ? 'Save Changes' : 'Create ISF Filing'}</>
+                )}
+              </Button>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
