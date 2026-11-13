@@ -1,39 +1,71 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+/**
+ * Settings: a section list on the left (profile, organization, billing, CBP
+ * identity, notifications, audit log) and the open section beside it.
+ */
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
+import { BillingSettings } from '@/components/billing/BillingSettings';
+import { TINT, type Tone } from '@/components/dashboard/tones';
+import { Activity, Bell, Building2, CreditCard, Key, Loader2, User, type IconType } from '@/components/icons';
+import { CbpIdentityCard } from '@/components/settings/CbpIdentityCard';
+import { ChangePasswordCard } from '@/components/settings/ChangePasswordCard';
+import { EntryNumberBlocksCard } from '@/components/settings/EntryNumberBlocksCard';
+import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
+import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
+import { stamp } from '@/components/shipment-detail/summary';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  useProfile, useUpdateProfile,
-  useOrganization, useUpdateOrganization, useAuditLog,
-} from '@/hooks/useFilings';
-import {
-  User, Building2, Shield, Key, Activity, CheckCircle2, XCircle,
-  Loader2, Clock, Users, FileText, Save, ChevronRight,
-  Mail, CalendarDays, BadgeCheck, Plus, Trash2, Copy, ShieldCheck, Bell, CreditCard,
-} from '@/components/icons';
-import { useSearchParams } from 'react-router-dom';
-import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
-import { EntryNumberBlocksCard } from '@/components/settings/EntryNumberBlocksCard';
-import { CbpIdentityCard } from '@/components/settings/CbpIdentityCard';
-import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
-import { ChangePasswordCard } from '@/components/settings/ChangePasswordCard';
-import { BillingSettings } from '@/components/billing/BillingSettings';
+import { useAuditLog, useOrganization, useProfile, useUpdateOrganization, useUpdateProfile } from '@/hooks/useFilings';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+
+const PAGE = 'mx-auto flex max-w-[1360px] flex-col gap-5 -mx-2 sm:mx-auto pb-24 sm:pb-12';
+const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
+
+function Panel({ title, description, aside, children }: { title: string; description?: string; aside?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className={PANEL}>
+      <div className="flex items-start justify-between gap-3 px-5 py-3.5">
+        <div>
+          <h2 className="text-[14px] font-semibold">{title}</h2>
+          {description && <p className="text-[13px] text-muted-foreground">{description}</p>}
+        </div>
+        {aside}
+      </div>
+      <div className="border-t border-border/70 px-5 py-4">{children}</div>
+    </section>
+  );
+}
+
+function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-sm font-medium">{label}</Label>
+      {children}
+      {hint && <p id={`${id}-hint`} className="text-[12px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+/** What kind of action an audit entry records, for its colour. */
+function actionTone(action: string): Tone {
+  if (action.includes('create')) return 'done';
+  if (action.includes('delete') || action.includes('cancel')) return 'urgent';
+  if (action.includes('submit')) return 'info';
+  return 'calm';
+}
 
 type SettingsTab = 'profile' | 'organization' | 'billing' | 'api' | 'notifications' | 'activity';
 
-const tabs: { id: SettingsTab; label: string; desc: string; icon: React.ElementType }[] = [
-  { id: 'profile',       label: 'Profile',           desc: 'Personal info & security',  icon: User },
-  { id: 'organization',  label: 'Organization',      desc: 'Company & IOR details',     icon: Building2 },
-  { id: 'billing',       label: 'Billing',           desc: 'Plan, card & charges',      icon: CreditCard },
-  { id: 'api',           label: 'CBP identity',      desc: 'Filer code & service center', icon: Key },
-  { id: 'notifications', label: 'Notifications',     desc: 'Per-event delivery channels', icon: Bell },
-  { id: 'activity',      label: 'Audit Log',         desc: 'Recent activity',           icon: Activity },
+const tabs: { id: SettingsTab; label: string; desc: string; icon: IconType }[] = [
+  { id: 'profile', label: 'Profile', desc: 'Your name, password and sign-in', icon: User },
+  { id: 'organization', label: 'Organization', desc: 'Company and importer details', icon: Building2 },
+  { id: 'billing', label: 'Billing', desc: 'Plan, card and charges', icon: CreditCard },
+  { id: 'api', label: 'CBP identity', desc: 'Filer code and service center', icon: Key },
+  { id: 'notifications', label: 'Notifications', desc: 'What reaches you, and how', icon: Bell },
+  { id: 'activity', label: 'Audit log', desc: 'Recent activity', icon: Activity },
 ];
 
 export default function SettingsPage() {
@@ -43,11 +75,11 @@ export default function SettingsPage() {
   const updateProfile = useUpdateProfile();
   const updateOrganization = useUpdateOrganization();
 
-  const [searchParams] = useSearchParams();
+  // The open section lives in the address, so it can be linked to and survives a reload.
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<SettingsTab>(
-    tabs.some((t) => t.id === requestedTab) ? (requestedTab as SettingsTab) : 'profile',
-  );
+  const activeTab: SettingsTab = tabs.some((t) => t.id === requestedTab) ? (requestedTab as SettingsTab) : 'profile';
+  const setActiveTab = (tab: SettingsTab) => setSearchParams(tab === 'profile' ? {} : { tab }, { replace: true });
 
   // Profile form
   const [firstName, setFirstName] = useState('');
@@ -59,8 +91,6 @@ export default function SettingsPage() {
   const [iorNumber, setIorNumber] = useState('');
   const [einNumber, setEinNumber] = useState('');
   const [orgPhone, setOrgPhone] = useState('');
-
-  // Connection test
 
   useEffect(() => {
     if (profile) {
@@ -104,366 +134,184 @@ export default function SettingsPage() {
 
 
   const initials = ((profile?.firstName?.[0] || '') + (profile?.lastName?.[0] || '')).toUpperCase() || 'U';
+  const canEdit = profile?.role === 'owner' || profile?.role === 'admin';
 
   if (profileLoading || orgLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64 rounded-xl" />
-        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <Skeleton className="h-[400px] rounded-2xl" />
-          <Skeleton className="h-[600px] rounded-2xl" />
+      <div className={PAGE}>
+        <Skeleton className="h-10 w-48 rounded-lg" />
+        <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+          <Skeleton className="h-[380px] rounded-xl" />
+          <Skeleton className="h-[520px] rounded-xl" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto">
-      {/* ─── Header ─────────────────────────────────────── */}
-      <div className="flex items-center justify-between opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
+    <div className={PAGE}>
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-[28px] font-bold tracking-tight text-foreground">Settings</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage your account, organization, and platform integrations
-          </p>
+          <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.015em]">Settings</h1>
+          <p className="text-[13px] text-muted-foreground">Your account, your organization, and how the app reaches you.</p>
         </div>
-        <Badge variant="secondary" className="gap-1.5 px-3 py-1 text-xs font-medium">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          {profile?.role?.toUpperCase() || 'USER'}
-        </Badge>
-      </div>
+        {profile?.role && <p className="text-[12.5px] text-muted-foreground">Signed in as <span className="font-medium capitalize text-foreground">{profile.role}</span></p>}
+      </header>
 
-      {/* ─── Two-column Layout: Sidebar Nav + Content ─────────── */}
-      <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-        {/* ── Left: Profile card + nav (sticky) ── */}
-        <aside className="space-y-4 lg:sticky lg:top-[92px] lg:self-start opacity-0 animate-fade-in-up" style={{ animationDelay: '80ms', animationFillMode: 'forwards' }}>
-          {/* Profile summary card */}
-          <Card className="overflow-hidden">
-            <div className="h-16 bg-gradient-to-br from-amber-400/80 via-amber-500/70 to-amber-600/80 relative">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.2),transparent_60%)]" />
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className={PANEL}>
+          <div className="flex items-center gap-3 px-4 py-4">
+            <span aria-hidden className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-[14px] font-semibold text-primary-foreground">{initials}</span>
+            <div className="min-w-0">
+              <p className="truncate text-[14px] font-semibold">{profile?.firstName} {profile?.lastName}</p>
+              <p className="truncate text-[12.5px] text-muted-foreground">{profile?.email}</p>
             </div>
-            <CardContent className="px-5 pb-5 -mt-8 relative">
-              <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-950 ring-4 ring-background flex items-center justify-center text-white font-bold text-xl tracking-tight shadow-lg">
-                {initials}
-              </div>
-              <div className="mt-3">
-                <p className="font-semibold text-foreground tracking-tight truncate">
-                  {profile?.firstName} {profile?.lastName}
-                </p>
-                <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
-                  <Mail className="h-3 w-3 shrink-0" />
-                  {profile?.email}
-                </p>
-              </div>
-              {profile?.createdAt && (
-                <div className="mt-3 pt-3 border-t flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <CalendarDays className="h-3 w-3" />
-                  Joined {new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Vertical tab nav */}
-          <nav className="space-y-1">
+          </div>
+          <nav aria-label="Settings sections" className="flex gap-1 overflow-x-auto border-t border-border/70 p-2 [scrollbar-width:none] lg:flex-col">
             {tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
+              const on = activeTab === tab.id;
               return (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} aria-current={on ? 'page' : undefined}
                   className={cn(
-                    'group w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all cursor-pointer',
-                    'hover:bg-muted/60',
-                    isActive && 'bg-gradient-to-r from-amber-500/10 to-amber-500/5 ring-1 ring-amber-500/20',
+                    'flex shrink-0 items-center gap-3 rounded-lg px-3 py-2 text-left outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring',
+                    on ? 'bg-muted text-foreground' : 'text-muted-foreground can-hover:hover:bg-muted/60 can-hover:hover:text-foreground',
                   )}
                 >
-                  <div
-                    className={cn(
-                      'h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors',
-                      isActive
-                        ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-amber-950 shadow-sm shadow-amber-500/30'
-                        : 'bg-muted text-muted-foreground group-hover:bg-muted-foreground/10',
-                    )}
-                  >
-                    <tab.icon className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={cn('text-[13px] font-semibold', isActive ? 'text-foreground' : 'text-foreground/80')}>
-                      {tab.label}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground truncate">{tab.desc}</p>
-                  </div>
-                  <ChevronRight
-                    className={cn(
-                      'h-4 w-4 text-muted-foreground shrink-0 transition-transform',
-                      isActive && 'translate-x-0.5 text-amber-600',
-                    )}
-                  />
+                  <tab.icon weight={on ? 'duotone' : 'regular'} className={cn('h-5 w-5 shrink-0', on && 'text-primary')} aria-hidden />
+                  <span className="min-w-0">
+                    <span className="block whitespace-nowrap text-[13px] font-medium">{tab.label}</span>
+                    <span className="block truncate text-[12px] text-muted-foreground max-lg:hidden">{tab.desc}</span>
+                  </span>
                 </button>
               );
             })}
           </nav>
+          {profile?.createdAt && (
+            <p className="border-t border-border/70 px-4 py-2.5 text-[12px] text-muted-foreground max-lg:hidden">
+              Joined {new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+            </p>
+          )}
         </aside>
 
-        {/* ── Right: Content panel ── */}
-        <section className="space-y-6 min-w-0 opacity-0 animate-fade-in-up" style={{ animationDelay: '160ms', animationFillMode: 'forwards' }}>
-          {/* ── PROFILE ── */}
+        <div className="flex min-w-0 flex-col gap-5">
           {activeTab === 'profile' && (
             <>
-              <Card>
-                <CardHeader className="border-b">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <User className="h-4 w-4 text-amber-600" />
-                    Personal Information
-                  </CardTitle>
-                  <CardDescription>Update your display name and email address</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6 space-y-5">
-                  <div className="grid gap-5 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="settings-first-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">First Name</Label>
-                      <Input id="settings-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="settings-last-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Last Name</Label>
-                      <Input id="settings-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="settings-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email Address</Label>
-                    {/* Email changes aren't supported here yet (server refuses them). */}
-                    <Input id="settings-email" value={email} readOnly aria-describedby="settings-email-hint" type="email" className="bg-muted/40" />
-                    <p id="settings-email-hint" className="text-xs text-muted-foreground">To change your email, contact support.</p>
-                  </div>
-                  <div className="flex items-center justify-between pt-2">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                      <BadgeCheck className="h-3.5 w-3.5 text-emerald-500" />
-                      Email verified
-                    </p>
-                    <Button onClick={handleSaveProfile} disabled={updateProfile.isPending} className="cursor-pointer">
-                      {updateProfile.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                      Save Changes
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
+              <Panel title="Personal information" description="The name shown on your filings and to your team.">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field id="settings-first-name" label="First name">
+                    <Input id="settings-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" />
+                  </Field>
+                  <Field id="settings-last-name" label="Last name">
+                    <Input id="settings-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
+                  </Field>
+                  <Field id="settings-email" label="Email address" hint="To change your email, contact support.">
+                    {/* The server refuses email changes from here. */}
+                    <Input id="settings-email" value={email} readOnly aria-describedby="settings-email-hint" type="email" className="bg-muted/50" />
+                  </Field>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={handleSaveProfile} disabled={updateProfile.isPending}>
+                    {updateProfile.isPending && <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />}Save changes
+                  </Button>
+                </div>
+              </Panel>
               <ChangePasswordCard email={email} />
-
               <TwoFactorSettings />
             </>
           )}
 
-          {/* ── ORGANIZATION ── */}
           {activeTab === 'organization' && (
             <>
-              <Card>
-                <CardHeader className="border-b">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-amber-600" />
-                    Company Details
-                  </CardTitle>
-                  <CardDescription>Your Importer of Record information used on filings</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6 space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="settings-org-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Company Name</Label>
-                    <Input id="settings-org-name" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="Legal company name" />
+              <Panel title="Company details" description="Your importer of record information, used on filings.">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <Field id="settings-org-name" label="Company name">
+                      <Input id="settings-org-name" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="Legal company name" autoComplete="organization" />
+                    </Field>
                   </div>
-                  <div className="grid gap-5 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="settings-ior" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">IOR Number</Label>
-                      <Input id="settings-ior" value={iorNumber} onChange={(e) => setIorNumber(e.target.value)} placeholder="XX-XXXXXXXXX" className="font-mono" />
-                      <p className="text-[11px] text-muted-foreground">Importer of Record — used on all ISF filings</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="settings-ein" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">EIN / Tax ID</Label>
-                      <Input id="settings-ein" value={einNumber} onChange={(e) => setEinNumber(e.target.value)} placeholder="XX-XXXXXXX" className="font-mono" />
-                      <p className="text-[11px] text-muted-foreground">Employer Identification Number</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="settings-org-phone" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</Label>
-                    <Input id="settings-org-phone" type="tel" autoComplete="tel" value={orgPhone} onChange={(e) => setOrgPhone(e.target.value)}
-                      placeholder="(310) 555-0100" aria-describedby="settings-org-phone-hint" className="sm:max-w-xs" />
-                    <p id="settings-org-phone-hint" className="text-[11px] text-muted-foreground">10 digits. CBP needs a contact phone to release cargo on your entries.</p>
-                  </div>
-                  <div className="flex justify-end pt-2">
-                    <Button onClick={handleSaveOrg} disabled={updateOrganization.isPending} className="cursor-pointer">
-                      {updateOrganization.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Save className="h-4 w-4 mr-2" />
-                      )}
-                      Save Organization
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                  <Field id="settings-ior" label="IOR number" hint="Importer of record number, used on every ISF.">
+                    <Input id="settings-ior" value={iorNumber} onChange={(e) => setIorNumber(e.target.value)} placeholder="XX-XXXXXXXXX" aria-describedby="settings-ior-hint" className="font-mono" />
+                  </Field>
+                  <Field id="settings-ein" label="EIN / Tax ID" hint="Employer identification number.">
+                    <Input id="settings-ein" value={einNumber} onChange={(e) => setEinNumber(e.target.value)} placeholder="XX-XXXXXXX" aria-describedby="settings-ein-hint" className="font-mono" />
+                  </Field>
+                  <Field id="settings-org-phone" label="Phone" hint="10 digits. CBP requires a contact phone on entries.">
+                    <Input id="settings-org-phone" type="tel" autoComplete="tel" value={orgPhone} onChange={(e) => setOrgPhone(e.target.value)} placeholder="(310) 555-0100" aria-describedby="settings-org-phone-hint" />
+                  </Field>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={handleSaveOrg} disabled={updateOrganization.isPending}>
+                    {updateOrganization.isPending && <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />}Save organization
+                  </Button>
+                </div>
+              </Panel>
 
-              <EntryNumberBlocksCard
-                canEdit={profile?.role === 'owner' || profile?.role === 'admin'}
-              />
+              <EntryNumberBlocksCard canEdit={canEdit} />
 
               {org && (
-                <Card>
-                  <CardHeader className="border-b">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Activity className="h-4 w-4 text-amber-600" />
-                      Organization Overview
-                    </CardTitle>
-                    <CardDescription>Resources provisioned on your account</CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="relative rounded-xl border bg-gradient-to-br from-slate-50 to-slate-50/50 dark:from-slate-900/50 dark:to-slate-950/30 p-5 overflow-hidden">
-                        <Users className="h-5 w-5 text-slate-500 mb-3" />
-                        <p className="text-3xl font-bold tabular-nums tracking-tight">{org._count.users}</p>
-                        <p className="text-xs text-muted-foreground font-medium mt-1">Active Users</p>
+                <Panel title="On this account">
+                  <dl className="grid grid-cols-3 gap-x-6">
+                    {[['People', org._count.users], ['Filings', org._count.filings], ['Templates', org._count.filingTemplates]].map(([label, count]) => (
+                      <div key={label as string}>
+                        <dt className="text-[12px] text-muted-foreground">{label}</dt>
+                        <dd className="mt-0.5 text-[20px] font-semibold leading-7 tabular-nums">{Number(count).toLocaleString()}</dd>
                       </div>
-                      <div className="relative rounded-xl border bg-gradient-to-br from-amber-50 to-amber-50/50 dark:from-amber-950/30 dark:to-amber-950/10 p-5 overflow-hidden">
-                        <FileText className="h-5 w-5 text-amber-600 mb-3" />
-                        <p className="text-3xl font-bold tabular-nums tracking-tight">{org._count.filings}</p>
-                        <p className="text-xs text-muted-foreground font-medium mt-1">Total Filings</p>
-                      </div>
-                      <div className="relative rounded-xl border bg-gradient-to-br from-blue-50 to-blue-50/50 dark:from-blue-950/30 dark:to-blue-950/10 p-5 overflow-hidden">
-                        <FileText className="h-5 w-5 text-blue-600 mb-3" />
-                        <p className="text-3xl font-bold tabular-nums tracking-tight">{org._count.filingTemplates}</p>
-                        <p className="text-xs text-muted-foreground font-medium mt-1">Templates</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    ))}
+                  </dl>
+                </Panel>
               )}
             </>
           )}
 
-          {/* ── API ── */}
           {activeTab === 'billing' && <BillingSettings />}
 
-          {activeTab === 'api' && (
-            <CbpIdentityCard canEdit={profile?.role === 'owner' || profile?.role === 'admin'} />
-          )}
+          {activeTab === 'api' && <CbpIdentityCard canEdit={canEdit} />}
 
-          {/* ── NOTIFICATIONS ── */}
           {activeTab === 'notifications' && (
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-amber-600" />
-                  Notifications
-                </CardTitle>
-                <CardDescription>
-                  Choose which events you receive in-app and via email. Defaults: everything on.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <NotificationPreferencesPanel />
-              </CardContent>
-            </Card>
+            <Panel title="Notifications" description="Choose what reaches you in the app and by email. Everything is on to start with.">
+              <NotificationPreferencesPanel />
+            </Panel>
           )}
 
-          {/* ── ACTIVITY ── */}
           {activeTab === 'activity' && (
-            <Card>
-              <CardHeader className="border-b">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Activity className="h-4 w-4 text-amber-600" />
-                      Audit Log
-                    </CardTitle>
-                    <CardDescription className="mt-1">Immutable record of recent actions across your organization</CardDescription>
-                  </div>
-                  {auditData?.data?.length ? (
-                    <Badge variant="secondary" className="text-[11px]">{auditData.data.length} events</Badge>
-                  ) : null}
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6">
-                {auditLoading ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
-                  </div>
-                ) : !auditData?.data?.length ? (
-                  <div className="text-center py-16">
-                    <div className="h-12 w-12 rounded-2xl bg-muted mx-auto flex items-center justify-center mb-3">
-                      <Activity className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <p className="text-sm font-medium">No activity yet</p>
-                    <p className="text-xs text-muted-foreground mt-1">Activity will appear here as you use the platform</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {auditData.data.map((log: any) => {
-                      const actionType = log.action.includes('create') ? 'create'
-                        : log.action.includes('delete') || log.action.includes('cancel') ? 'delete'
-                        : log.action.includes('submit') ? 'submit'
-                        : 'other';
-                      const ActionIcon = actionType === 'create' ? Plus
-                        : actionType === 'delete' ? Trash2
-                        : actionType === 'submit' ? Copy
-                        : Activity;
-                      return (
-                        <div
-                          key={log.id}
-                          className="flex items-start gap-3 p-3 rounded-xl hover:bg-muted/40 transition-colors border border-transparent hover:border-border/60 cursor-default"
-                        >
-                          <div
-                            className={cn(
-                              'h-9 w-9 rounded-xl flex items-center justify-center shrink-0',
-                              actionType === 'create' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-                              actionType === 'delete' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                              actionType === 'submit' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-                              actionType === 'other' && 'bg-muted text-muted-foreground',
-                            )}
-                          >
-                            <ActionIcon className="h-4 w-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold truncate">{formatAction(log.action)}</p>
-                              {log.entityType && (
-                                <Badge variant="outline" className="text-[9px] shrink-0 font-mono">
-                                  {log.entityType}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <p className="text-xs text-muted-foreground truncate">
-                                {log.user
-                                  ? `${log.user.firstName || ''} ${log.user.lastName || ''}`.trim() || log.user.email
-                                  : 'System'}
-                              </p>
-                              <span className="text-xs text-muted-foreground">•</span>
-                              <p className="text-xs text-muted-foreground tabular-nums shrink-0">
-                                {new Date(log.createdAt).toLocaleString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: 'numeric',
-                                  minute: '2-digit',
-                                })}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <section className={PANEL}>
+              <div className="px-5 py-3.5">
+                <h2 className="text-[14px] font-semibold">
+                  Audit log {auditData?.data?.length ? <span className="font-normal tabular-nums text-muted-foreground">{auditData.data.length}</span> : null}
+                </h2>
+                <p className="text-[13px] text-muted-foreground">The most recent actions across your organization. Entries cannot be edited.</p>
+              </div>
+              {auditLoading ? (
+                <div className="space-y-2 border-t border-border/70 p-4">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-10" />)}</div>
+              ) : !auditData?.data?.length ? (
+                <p className="border-t border-border/70 px-5 py-10 text-center text-[13px] text-muted-foreground">Nothing recorded yet. Actions taken in the app are listed here.</p>
+              ) : (
+                <ul className="divide-y divide-border/60 border-t border-border/70">
+                  {auditData.data.map((log: any) => (
+                    <li key={log.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-0.5 px-5 py-2.5 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]">
+                      <p className="flex min-w-0 items-center gap-2 text-[13px] font-medium">
+                        <span className="truncate">{formatAction(log.action)}</span>
+                        {log.entityType && <span className={cn('shrink-0 rounded-md px-1.5 py-px font-mono text-[11.5px] font-normal', TINT[actionTone(log.action)])}>{log.entityType}</span>}
+                      </p>
+                      <p className="truncate text-[13px] text-muted-foreground max-sm:order-last max-sm:col-span-2">
+                        {log.user ? `${log.user.firstName || ''} ${log.user.lastName || ''}`.trim() || log.user.email : 'System'}
+                      </p>
+                      <time dateTime={log.createdAt} className="whitespace-nowrap text-[12.5px] tabular-nums text-muted-foreground">{stamp(log.createdAt)}</time>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           )}
-        </section>
+        </div>
       </div>
     </div>
   );
 }
 
+/** "filing.status_changed" reads as "Filing: status changed". */
 function formatAction(action: string): string {
-  return action
-    .replace(/\./g, ' › ')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  const text = action.replace(/\./g, ': ').replace(/_/g, ' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }

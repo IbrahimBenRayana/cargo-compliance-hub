@@ -1,11 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  ShieldCheck, ShieldAlert, Loader2, Eye, EyeOff, RefreshCw, ShieldX,
-} from '@/components/icons';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Loader2, Eye, EyeOff } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -16,6 +12,8 @@ import { useMfaDisable, useMfaRecoveryCodes } from '@/hooks/useFilings';
 import { MfaEnrollment } from '@/components/settings/MfaEnrollment';
 import { RecoveryCodesPanel } from '@/components/settings/RecoveryCodesPanel';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { FILL, TINT, type Tone } from '@/components/dashboard/tones';
 
 /**
  * Two-factor authentication management — lives in the Settings › Profile tab,
@@ -35,84 +33,61 @@ export function TwoFactorSettings() {
   const refreshUser = () =>
     queryClient.invalidateQueries({ queryKey: ['currentUser'] });
 
+  const tone: Tone = enabled ? 'done' : 'calm';
+
   return (
-    <Card>
-      <CardHeader className="border-b">
-        <CardTitle className="text-base flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-amber-600" />
-          Two-Factor Authentication
-        </CardTitle>
-        <CardDescription>Add a second step at sign-in with an authenticator app</CardDescription>
-      </CardHeader>
-      <CardContent className="pt-6 space-y-5">
+    <section aria-labelledby="two-factor-title" className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-card">
+      <div className="px-5 py-3.5">
+        <h2 id="two-factor-title" className="text-[14px] font-semibold">Two-factor authentication</h2>
+        <p className="text-[13px] text-muted-foreground">Add a second step at sign-in with an authenticator app.</p>
+      </div>
+      <div className="space-y-4 border-t border-border/70 px-5 py-4">
         {/* Status row */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div
-              className={
-                enabled
-                  ? 'h-9 w-9 rounded-full bg-emerald-100 dark:bg-emerald-500/15 ring-1 ring-emerald-200 dark:ring-emerald-500/30 flex items-center justify-center'
-                  : 'h-9 w-9 rounded-full bg-amber-100 dark:bg-amber-500/15 ring-1 ring-amber-200 dark:ring-amber-500/30 flex items-center justify-center'
-              }
-            >
-              {enabled ? (
-                <ShieldCheck className="h-[18px] w-[18px] text-emerald-600 dark:text-emerald-400" />
-              ) : (
-                <ShieldAlert className="h-[18px] w-[18px] text-amber-600 dark:text-amber-400" />
-              )}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-foreground">Authenticator app</span>
-                {enabled ? (
-                  <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 border-transparent">
-                    Enabled
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary">Not enabled</Badge>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {enabled
-                  ? 'A code from your authenticator app is required to sign in.'
-                  : 'Protect your account with a time-based one-time code.'}
-              </p>
-            </div>
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[13px] font-medium text-foreground">Authenticator app</span>
+            <span className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[12px] font-medium', TINT[tone])}>
+              <span aria-hidden="true" className={cn('h-1.5 w-1.5 rounded-full', FILL[tone])} />
+              {enabled ? 'On' : 'Off'}
+            </span>
           </div>
+          <p className="mt-1 text-[12.5px] text-muted-foreground">
+            {enabled
+              ? 'A code from your authenticator app is required to sign in.'
+              : 'Protect your account with a time-based one-time code.'}
+          </p>
         </div>
 
         {/* Actions */}
         {enabled ? (
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button variant="outline" className="cursor-pointer" onClick={() => setRegenOpen(true)}>
-              <RefreshCw className="h-4 w-4 mr-2" />
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" className="cursor-pointer" onClick={() => setRegenOpen(true)}>
               Regenerate recovery codes
             </Button>
             <Button
               variant="outline"
-              className="cursor-pointer text-red-700 hover:text-red-700 dark:text-red-400 dark:hover:text-red-400 border-destructive/30 hover:bg-destructive/5"
+              size="sm"
+              className="cursor-pointer text-urgent can-hover:hover:bg-urgent-tint can-hover:hover:text-urgent"
               onClick={() => setDisableOpen(true)}
             >
-              <ShieldX className="h-4 w-4 mr-2" />
               Disable two-factor
             </Button>
           </div>
         ) : (
-          <div className="pt-1">
-            <Button className="cursor-pointer" onClick={() => setEnrollOpen(true)}>
-              <ShieldCheck className="h-4 w-4 mr-2" />
+          <div>
+            <Button size="sm" className="cursor-pointer" onClick={() => setEnrollOpen(true)}>
               Set up authenticator app
             </Button>
           </div>
         )}
-      </CardContent>
+      </div>
 
       {/* ── Enroll dialog ── */}
       <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Set up two-factor authentication</DialogTitle>
-            <DialogDescription>Secure your account with an authenticator app.</DialogDescription>
+            <DialogDescription>You will need your password and an authenticator app.</DialogDescription>
           </DialogHeader>
           <MfaEnrollment
             onComplete={() => {
@@ -136,7 +111,7 @@ export function TwoFactorSettings() {
           toast.success('Two-factor authentication turned off.');
         }}
       />
-    </Card>
+    </section>
   );
 }
 
@@ -167,7 +142,7 @@ function RegenerateDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
         <DialogHeader>
           <DialogTitle>Regenerate recovery codes</DialogTitle>
           <DialogDescription>
-            This creates a new set and invalidates your old codes.
+            This creates a new set of codes. Your old codes stop working.
           </DialogDescription>
         </DialogHeader>
         {codes ? (
@@ -175,7 +150,7 @@ function RegenerateDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="regen-password">Confirm your password</Label>
+              <Label htmlFor="regen-password" className="text-sm font-medium">Confirm your password</Label>
               <div className="relative">
                 <Input
                   id="regen-password"
@@ -189,7 +164,7 @@ function RegenerateDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
                 <button
                   type="button"
                   onClick={() => setShow((p) => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded-sm text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring can-hover:hover:text-foreground"
                   aria-label={show ? 'Hide password' : 'Show password'}
                 >
                   {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -197,7 +172,7 @@ function RegenerateDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
               </div>
             </div>
             {error && (
-              <div className="rounded-lg border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3.5 py-2.5 text-[12.5px] text-rose-700 dark:text-rose-300">
+              <div className="rounded-lg bg-urgent-tint px-4 py-3 text-[13px] text-urgent">
                 {error}
               </div>
             )}
@@ -233,7 +208,7 @@ function DisableDialog({
       reset();
       onDisabled();
     } catch (err: any) {
-      setError(err?.body?.error || 'Could not disable — check your password and code.');
+      setError(err?.body?.error || 'Could not disable two-factor. Check your password and code.');
     }
   };
 
@@ -241,17 +216,14 @@ function DisableDialog({
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) reset(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-destructive">
-            <ShieldX className="h-5 w-5" />
-            Disable two-factor authentication
-          </DialogTitle>
+          <DialogTitle>Disable two-factor authentication</DialogTitle>
           <DialogDescription>
-            Your account will be less secure. Confirm your password and a current code to continue.
+            Your account will be less secure. Enter your password and a current code to continue.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="disable-password">Password</Label>
+            <Label htmlFor="disable-password" className="text-sm font-medium">Password</Label>
             <div className="relative">
               <Input
                 id="disable-password"
@@ -265,7 +237,7 @@ function DisableDialog({
               <button
                 type="button"
                 onClick={() => setShow((p) => !p)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded-sm text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring can-hover:hover:text-foreground"
                 aria-label={show ? 'Hide password' : 'Show password'}
               >
                 {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -273,18 +245,18 @@ function DisableDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="disable-code">Authenticator or recovery code</Label>
+            <Label htmlFor="disable-code" className="text-sm font-medium">Authenticator or recovery code</Label>
             <Input
               id="disable-code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="123456 or XXXXX-XXXXX"
               autoComplete="one-time-code"
-              className="font-mono tracking-wide"
+              className="font-mono tracking-wide tabular-nums"
             />
           </div>
           {error && (
-            <div className="rounded-lg border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3.5 py-2.5 text-[12.5px] text-rose-700 dark:text-rose-300">
+            <div className="rounded-lg bg-urgent-tint px-4 py-3 text-[13px] text-urgent">
               {error}
             </div>
           )}

@@ -36,21 +36,21 @@ test('SET-01 profile: a name change saves, survives a reload, and is reverted', 
 
 test('SET-01 notification preferences save and survive a reload', async ({ page }) => {
   await gotoAuthed(page, '/settings?tab=notifications');
-  const box = page.getByRole('checkbox', { name: 'Amended — email' });
+  const box = page.getByRole('checkbox', { name: 'Amended, email' });
   const was = await box.isChecked();
   await box.click();
   await saveAndWait(page, 'Save preferences', '/notification');
   await page.reload();
-  await expect(page.getByRole('checkbox', { name: 'Amended — email' })).toBeChecked({ checked: !was, timeout: 15_000 });
-  await page.getByRole('checkbox', { name: 'Amended — email' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Amended, email' })).toBeChecked({ checked: !was, timeout: 15_000 });
+  await page.getByRole('checkbox', { name: 'Amended, email' }).click();
   await saveAndWait(page, 'Save preferences', '/notification');
   await page.reload();
-  await expect(page.getByRole('checkbox', { name: 'Amended — email' })).toBeChecked({ checked: was, timeout: 15_000 });
+  await expect(page.getByRole('checkbox', { name: 'Amended, email' })).toBeChecked({ checked: was, timeout: 15_000 });
 });
 
 test('SET-01 audit log lists recent actions', async ({ page }) => {
   await gotoAuthed(page, '/settings?tab=activity');
-  await expect(page.getByText(/Audit Log/).first()).toBeVisible();
+  await expect(page.getByText(/Audit log/i).first()).toBeVisible();
   await expect(page.locator('main')).toContainText(/updated|created|removed|saved|sign|login|invit/i, { timeout: 15_000 });
 });
 

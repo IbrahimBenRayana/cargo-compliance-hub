@@ -111,7 +111,7 @@ export function MfaEnrollment({
       toast.success('Secret key copied');
       setTimeout(() => setSecretCopied(false), 2000);
     } catch {
-      toast.error('Could not copy — select the key manually');
+      toast.error('Could not copy. Select the key and copy it manually.');
     }
   };
 
@@ -125,12 +125,12 @@ export function MfaEnrollment({
   if (step === 'password') {
     return (
       <form onSubmit={handleSetup} className="space-y-5">
-        <p className="text-[13.5px] leading-relaxed text-slate-600 dark:text-slate-400">
-          Confirm your password to begin setting up an authenticator app (Google Authenticator,
-          1Password, Authy, etc.).
+        <p className="text-[13px] leading-relaxed text-muted-foreground">
+          Confirm your password to start setting up an authenticator app, such as Google
+          Authenticator, 1Password or Authy.
         </p>
         <div className="space-y-2">
-          <Label htmlFor="mfa-setup-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <Label htmlFor="mfa-setup-password" className="text-sm font-medium">
             Password
           </Label>
           <div className="relative">
@@ -146,7 +146,7 @@ export function MfaEnrollment({
             <button
               type="button"
               onClick={() => setShowPassword((p) => !p)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded-sm text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring can-hover:hover:text-foreground"
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -154,11 +154,11 @@ export function MfaEnrollment({
           </div>
         </div>
         {inlineError && (
-          <div className="rounded-lg border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3.5 py-2.5 text-[12.5px] text-rose-700 dark:text-rose-300">
+          <div className="rounded-lg bg-urgent-tint px-4 py-3 text-[13px] text-urgent">
             {inlineError}
           </div>
         )}
-        <Button type="submit" size="lg" className="w-full font-semibold cursor-pointer" disabled={setup.isPending || !password}>
+        <Button type="submit" size="lg" className="w-full cursor-pointer" disabled={setup.isPending || !password}>
           {setup.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
           Continue
         </Button>
@@ -173,23 +173,23 @@ export function MfaEnrollment({
         <button
           type="button"
           onClick={() => { setStep('password'); setCode(''); setInlineError(null); }}
-          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-sm text-[12px] font-medium text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring can-hover:hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Back
         </button>
 
         <div>
-          <p className="text-[13.5px] leading-relaxed text-slate-600 dark:text-slate-400 mb-4">
+          <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
             Scan this QR code with your authenticator app, then enter the 6-digit code it shows.
           </p>
           <div className="flex justify-center">
-            <div className="rounded-xl bg-white p-4 ring-1 ring-slate-200 dark:ring-slate-700 shadow-sm">
+            <div className="rounded-lg border border-border/70 bg-white p-4">
               {otpauthUri ? (
                 <QRCodeSVG value={otpauthUri} size={168} level="M" />
               ) : (
                 <div className="h-[168px] w-[168px] flex items-center justify-center">
-                  <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               )}
             </div>
@@ -197,55 +197,55 @@ export function MfaEnrollment({
         </div>
 
         {/* Manual entry fallback */}
-        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 px-3.5 py-3">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-            Can't scan? Enter this key
+        <div className="rounded-lg bg-muted/50 px-4 py-3">
+          <div className="mb-1.5 text-[12px] text-muted-foreground">
+            Can't scan? Enter this key in the app instead.
           </div>
           <div className="flex items-center gap-2">
-            <code className="flex-1 font-mono text-[12.5px] tracking-wide text-slate-800 dark:text-slate-200 break-all">
+            <code className="flex-1 break-all font-mono text-[12.5px] tracking-wide text-foreground">
               {prettySecret}
             </code>
             <button
               type="button"
               onClick={copySecret}
-              className="shrink-0 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="shrink-0 cursor-pointer rounded-sm text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring can-hover:hover:text-foreground"
               aria-label="Copy secret key"
             >
-              {secretCopied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+              {secretCopied ? <Check weight="bold" className="h-4 w-4 text-done" /> : <Copy className="h-4 w-4" />}
             </button>
           </div>
         </div>
 
         {/* 6-digit confirm */}
         <div className="space-y-3">
-          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <Label className="text-sm font-medium">
             Verification code
           </Label>
           <div className="flex justify-center">
             <InputOTP maxLength={6} value={code} onChange={handleCodeChange} disabled={enable.isPending} autoFocus>
               <InputOTPGroup>
-                <InputOTPSlot index={0} className="h-12 w-11 text-lg font-semibold" />
-                <InputOTPSlot index={1} className="h-12 w-11 text-lg font-semibold" />
-                <InputOTPSlot index={2} className="h-12 w-11 text-lg font-semibold" />
+                <InputOTPSlot index={0} className="h-12 w-11 text-lg font-semibold tabular-nums" />
+                <InputOTPSlot index={1} className="h-12 w-11 text-lg font-semibold tabular-nums" />
+                <InputOTPSlot index={2} className="h-12 w-11 text-lg font-semibold tabular-nums" />
               </InputOTPGroup>
               <InputOTPSeparator />
               <InputOTPGroup>
-                <InputOTPSlot index={3} className="h-12 w-11 text-lg font-semibold" />
-                <InputOTPSlot index={4} className="h-12 w-11 text-lg font-semibold" />
-                <InputOTPSlot index={5} className="h-12 w-11 text-lg font-semibold" />
+                <InputOTPSlot index={3} className="h-12 w-11 text-lg font-semibold tabular-nums" />
+                <InputOTPSlot index={4} className="h-12 w-11 text-lg font-semibold tabular-nums" />
+                <InputOTPSlot index={5} className="h-12 w-11 text-lg font-semibold tabular-nums" />
               </InputOTPGroup>
             </InputOTP>
           </div>
 
           {enable.isPending && (
-            <div className="flex items-center justify-center gap-2 text-[12.5px] text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-center gap-2 text-[12.5px] text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Verifying…
             </div>
           )}
 
           {inlineError && !enable.isPending && (
-            <div className="rounded-lg border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3.5 py-2.5 text-[12.5px] text-rose-700 dark:text-rose-300">
+            <div className="rounded-lg bg-urgent-tint px-4 py-3 text-[13px] text-urgent">
               {inlineError}
             </div>
           )}

@@ -1,11 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Landmark, Loader2, CheckCircle2, Clock } from '@/components/icons';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2 } from '@/components/icons';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { organizationApi } from '@/api/client';
+import { FILL, TINT, type Tone } from '@/components/dashboard/tones';
+import { cn } from '@/lib/utils';
+
+const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
+const LABEL = 'text-[12px] text-muted-foreground';
+const VALUE = 'mt-0.5 text-[14px] font-medium';
+
+function StatusPill({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+  return (
+    <span className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[12px] font-medium', TINT[tone])}>
+      <span aria-hidden className={cn('h-1.5 w-1.5 shrink-0 rounded-full', FILL[tone])} />
+      {children}
+    </span>
+  );
+}
 
 /**
  * The org's CBP identity (native go-live Phase 2): who files their ISF and
@@ -33,86 +46,81 @@ export function CbpIdentityCard({ canEdit }: { canEdit: boolean }) {
   });
 
   return (
-    <Card>
-      <CardHeader className="border-b">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Landmark className="h-4 w-4 text-primary" />
-          CBP identity
-        </CardTitle>
-        <CardDescription>Who files your ISF and entries with US Customs and Border Protection.</CardDescription>
-      </CardHeader>
-      <CardContent className="pt-5 space-y-5">
+    <section aria-labelledby="cbp-identity-title" className={PANEL}>
+      <div className="px-5 py-3.5">
+        <h2 id="cbp-identity-title" className="text-[14px] font-semibold">CBP identity</h2>
+        <p className="text-[13px] text-muted-foreground">Who files your ISF and entries with US Customs and Border Protection.</p>
+      </div>
+      <div className="space-y-5 border-t border-border/70 px-5 py-4 text-[13px]">
         {isLoading || !cbp ? (
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground motion-reduce:animate-none" aria-label="Loading" />
         ) : (
           <>
-            <dl className="grid gap-4 sm:grid-cols-3 text-sm">
+            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-3">
               <div>
-                <dt className="text-xs text-muted-foreground">Your filer code</dt>
-                <dd className="mt-1 font-mono font-semibold">{cbp.filerCode ?? 'Not assigned yet'}</dd>
+                <dt className={LABEL}>Your filer code</dt>
+                <dd className={cn(VALUE, cbp.filerCode ? 'font-mono' : 'text-muted-foreground')}>{cbp.filerCode ?? 'Not assigned yet'}</dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">MyCargoLens as your service center</dt>
+                <dt className={LABEL}>MyCargoLens as your service center</dt>
                 <dd className="mt-1">
                   {approved ? (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      <CheckCircle2 className="mr-1 h-3 w-3" />
-                      Approved {new Date(cbp.serviceCenterApprovedAt!).toLocaleDateString()}
-                    </Badge>
+                    <StatusPill tone="done">
+                      Approved <span className="tabular-nums">{new Date(cbp.serviceCenterApprovedAt!).toLocaleDateString()}</span>
+                    </StatusPill>
                   ) : (
-                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                      <Clock className="mr-1 h-3 w-3" />
-                      Awaiting CBP approval
-                    </Badge>
+                    <StatusPill tone="soon">Awaiting CBP approval</StatusPill>
                   )}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Connection</dt>
-                <dd className="mt-1">{cbp.gateway === 'NATIVE' ? 'MyCargoLens ABI' : 'Fallback gateway'}</dd>
+                <dt className={LABEL}>Connection</dt>
+                <dd className={VALUE}>{cbp.gateway === 'NATIVE' ? 'MyCargoLens ABI' : 'Not on MyCargoLens ABI yet'}</dd>
               </div>
             </dl>
 
             {!approved && (
-              <p className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+              <p className="rounded-lg bg-soon-tint px-4 py-3 text-[13px]">
                 To file entries, or ISF under your own filer code, ask your CBP client representative to add
                 MyCargoLens (Sigma Technology Partners, LLC) as your service center. Until then, MyCargoLens can
-                file your ISF as ISF filer under {cbp.sigmaFilerCode}.
+                file your ISF as ISF filer under <span className="font-mono">{cbp.sigmaFilerCode}</span>.
               </p>
             )}
 
-            <div className="space-y-2">
-              <div className="text-sm font-medium">Default ISF filer</div>
+            <div>
+              <h3 className="text-[13px] font-medium">Default ISF filer</h3>
               <RadioGroup
                 value={cbp.isfFilerModeDefault}
                 onValueChange={(v) => setDefault.mutate(v as 'SIGMA' | 'CLIENT')}
                 disabled={!canEdit || setDefault.isPending}
-                className="gap-2"
+                className="mt-1 gap-0 divide-y divide-border/60"
               >
-                <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
+                <label className="flex cursor-pointer items-start gap-3 py-2.5">
                   <RadioGroupItem value="SIGMA" id="isf-sigma" className="mt-0.5" />
                   <span>
-                    <Label htmlFor="isf-sigma" className="cursor-pointer">MyCargoLens files as ISF filer ({cbp.sigmaFilerCode})</Label>
-                    <span className="block text-xs text-muted-foreground">No filer code of your own needed.</span>
+                    <Label htmlFor="isf-sigma" className="cursor-pointer text-[13px]">
+                      MyCargoLens files as ISF filer (<span className="font-mono">{cbp.sigmaFilerCode}</span>)
+                    </Label>
+                    <span className="mt-0.5 block text-[12.5px] text-muted-foreground">No filer code of your own needed.</span>
                   </span>
                 </label>
-                <label className={`flex items-start gap-3 rounded-md border p-3 ${clientReady ? 'cursor-pointer' : 'opacity-60'}`}>
+                <label className={cn('flex items-start gap-3 py-2.5', clientReady ? 'cursor-pointer' : 'opacity-60')}>
                   <RadioGroupItem value="CLIENT" id="isf-client" className="mt-0.5" disabled={!clientReady} />
                   <span>
-                    <Label htmlFor="isf-client" className={clientReady ? 'cursor-pointer' : ''}>
-                      We file under our own code{cbp.filerCode ? ` (${cbp.filerCode})` : ''}
+                    <Label htmlFor="isf-client" className={cn('text-[13px]', clientReady && 'cursor-pointer')}>
+                      We file under our own code{cbp.filerCode ? <> (<span className="font-mono">{cbp.filerCode}</span>)</> : ''}
                     </Label>
-                    <span className="block text-xs text-muted-foreground">
+                    <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
                       {clientReady ? 'Uses your filer code through our approved service-center queue.' : 'Available once your filer code is set up and CBP approves our queue.'}
                     </span>
                   </span>
                 </label>
               </RadioGroup>
-              <p className="text-xs text-muted-foreground">You can still choose per filing.</p>
+              <p className="mt-1 text-[12px] text-muted-foreground">You can still choose per filing.</p>
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

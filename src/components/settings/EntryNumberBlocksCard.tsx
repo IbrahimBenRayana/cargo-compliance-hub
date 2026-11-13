@@ -1,27 +1,28 @@
 /**
- * Entry number blocks — Settings › Organization card.
+ * Entry number blocks, the Settings › Organization card.
  *
  * A filer's pre-issued entry-number ranges. The "Assign next number"
  * button in the entry wizard draws from the oldest active block here;
  * this card is where owners/admins register ranges, watch usage, and
- * retire blocks. Overlap rejection happens server-side (409) — a range
+ * retire blocks. Overlap rejection happens server-side (409): a range
  * issued twice is a CBP duplicate-entry incident.
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Hash, Loader2, Plus } from '@/components/icons';
+import { Loader2, Plus } from '@/components/icons';
 import { toast } from 'sonner';
 import { settingsApi, organizationApi, type EntryNumberBlock } from '@/api/client';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
-} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { FILL, TINT, type Tone } from '@/components/dashboard/tones';
+import { cn } from '@/lib/utils';
+
+const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
+const FIELD_LABEL = 'text-[12px] font-normal text-muted-foreground';
 
 const QUERY_KEY = ['settings', 'entry-blocks'];
 
@@ -77,30 +78,27 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
     Number(rangeEnd) <= 9_999_999;
 
   return (
-    <Card>
-      <CardHeader className="border-b">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Hash className="h-4 w-4 text-amber-600" />
-          Entry Number Blocks
-        </CardTitle>
-        <CardDescription>
+    <section aria-labelledby="entry-blocks-title" className={PANEL}>
+      <div className="px-5 py-3.5">
+        <h2 id="entry-blocks-title" className="text-[14px] font-semibold">Entry number blocks</h2>
+        <p className="text-[13px] text-muted-foreground">
           Your filer-assigned number ranges. The entry wizard&apos;s
           &ldquo;Assign next number&rdquo; draws from the oldest active block.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-6 space-y-4">
+        </p>
+      </div>
+      <div className="space-y-4 border-t border-border/70 px-5 py-4 text-[13px]">
         {blocks.isLoading ? (
           <div className="space-y-2">
-            <Skeleton className="h-14 w-full" />
-            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
           </div>
         ) : (blocks.data?.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-[13px] text-muted-foreground">
             No blocks yet. Add the entry-number range CBP issued to your filer
             code so filings can draw numbers automatically.
           </p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="-my-1 divide-y divide-border/60">
             {blocks.data!.map((block) => (
               <BlockRow
                 key={block.id}
@@ -115,10 +113,10 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
         {canEdit && !showForm && (
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => setShowForm(true)} disabled={!filerCode}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> Add block
+              <Plus aria-hidden />Add block
             </Button>
             {!filerCode && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[12.5px] text-muted-foreground">
                 Entry numbers use your own CBP filer code, which MyCargoLens sets up with you first.
               </span>
             )}
@@ -126,17 +124,17 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
         )}
 
         {canEdit && showForm && (
-          <div className="rounded-lg border bg-muted/20 p-4 space-y-4">
+          <div className="space-y-4 rounded-lg bg-muted/50 p-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="blk-filer" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Filer Code
+              <div className="space-y-1.5">
+                <Label htmlFor="blk-filer" className={FIELD_LABEL}>
+                  Filer code
                 </Label>
                 <Input id="blk-filer" value={filerCode ?? ''} readOnly disabled className="font-mono" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="blk-label" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Label <span className="normal-case font-normal">(optional)</span>
+              <div className="space-y-1.5">
+                <Label htmlFor="blk-label" className={FIELD_LABEL}>
+                  Label (optional)
                 </Label>
                 <Input
                   id="blk-label"
@@ -146,9 +144,9 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
                   maxLength={100}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="blk-start" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Range Start
+              <div className="space-y-1.5">
+                <Label htmlFor="blk-start" className={FIELD_LABEL}>
+                  Range start
                 </Label>
                 <Input
                   id="blk-start"
@@ -159,9 +157,9 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
                   className="font-mono"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="blk-end" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Range End
+              <div className="space-y-1.5">
+                <Label htmlFor="blk-end" className={FIELD_LABEL}>
+                  Range end
                 </Label>
                 <Input
                   id="blk-end"
@@ -173,8 +171,8 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
                 />
               </div>
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              7-digit sequence bounds, check digits are computed automatically.
+            <p className="text-[12px] text-muted-foreground">
+              7-digit sequence bounds. Check digits are computed automatically.
               Ranges for the same filer code must never overlap.
             </p>
             <div className="flex items-center gap-2">
@@ -183,17 +181,17 @@ export function EntryNumberBlocksCard({ canEdit }: { canEdit: boolean }) {
                 onClick={() => createBlock.mutate()}
                 disabled={!formValid || createBlock.isPending}
               >
-                {createBlock.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                {createBlock.isPending && <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />}
                 Save block
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>
+              <Button variant="outline" size="sm" onClick={() => setShowForm(false)}>
                 Cancel
               </Button>
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -209,24 +207,29 @@ function BlockRow({
   const capacity = block.rangeEnd - block.rangeStart + 1;
   const usedPct = capacity > 0 ? Math.round((block.used / capacity) * 100) : 0;
 
+  const status: { tone: Tone; word: string } | null = block.exhausted
+    ? { tone: 'urgent', word: 'Exhausted' }
+    : !block.active
+      ? { tone: 'calm', word: 'Inactive' }
+      : null;
+
   return (
-    <li className="rounded-lg border p-3 space-y-2">
+    <li className="space-y-2 py-3">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="font-mono text-sm font-semibold">{block.filerCode}</span>
-          <span className="font-mono text-xs text-muted-foreground">
-            {String(block.rangeStart).padStart(7, '0')}–{String(block.rangeEnd).padStart(7, '0')}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-mono text-[13px] font-semibold">{block.filerCode}</span>
+          <span className="font-mono text-[12.5px] text-muted-foreground">
+            {String(block.rangeStart).padStart(7, '0')} to {String(block.rangeEnd).padStart(7, '0')}
           </span>
           {block.label && (
-            <span className="text-xs text-muted-foreground truncate">· {block.label}</span>
+            <span className="truncate text-[12.5px] text-muted-foreground">{block.label}</span>
           )}
-          {block.exhausted ? (
-            <Badge variant="outline" className="text-[10px] border-rose-500/40 text-rose-600 dark:text-rose-400">
-              Exhausted
-            </Badge>
-          ) : !block.active ? (
-            <Badge variant="outline" className="text-[10px]">Inactive</Badge>
-          ) : null}
+          {status && (
+            <span className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[12px] font-medium', TINT[status.tone])}>
+              <span aria-hidden className={cn('h-1.5 w-1.5 shrink-0 rounded-full', FILL[status.tone])} />
+              {status.word}
+            </span>
+          )}
         </div>
         {canEdit && (
           <Switch
@@ -237,9 +240,9 @@ function BlockRow({
         )}
       </div>
       <div className="flex items-center gap-3">
-        <Progress value={usedPct} className="h-1.5 flex-1" aria-label="Entry numbers used" />
-        <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-          {block.used.toLocaleString('en-US')} used · {block.remaining.toLocaleString('en-US')} left
+        <Progress value={usedPct} className="h-1.5 flex-1 bg-muted" aria-label="Entry numbers used" />
+        <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
+          {block.used.toLocaleString('en-US')} used, {block.remaining.toLocaleString('en-US')} left
         </span>
       </div>
     </li>

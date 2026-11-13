@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Check, Download, KeyRound } from '@/components/icons';
+import { Copy, Check, Download } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
@@ -36,7 +36,7 @@ export function RecoveryCodesPanel({
       toast.success('Recovery codes copied');
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('Could not copy — select and copy manually');
+      toast.error('Could not copy. Select the codes and copy them manually.');
     }
   };
 
@@ -61,20 +61,14 @@ export function RecoveryCodesPanel({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start gap-3 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-3.5 py-3">
-        <KeyRound className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-        <p className="text-[12.5px] leading-relaxed text-amber-800 dark:text-amber-200">
-          Save these recovery codes somewhere safe. Each one works <strong>once</strong> if you lose
-          access to your authenticator app. This is the only time they'll be shown.
-        </p>
-      </div>
+      <p className="rounded-lg bg-soon-tint px-4 py-3 text-[13px] leading-relaxed text-soon">
+        Save these recovery codes somewhere safe. Each one works <strong>once</strong> if you lose
+        access to your authenticator app. This is the only time they will be shown.
+      </p>
 
-      <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-3">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-muted/50 px-4 py-3">
         {codes.map((c) => (
-          <div
-            key={c}
-            className="font-mono text-[13px] tracking-wide text-slate-800 dark:text-slate-200 text-center py-1.5 rounded bg-white dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800"
-          >
+          <div key={c} className="py-1 text-center font-mono text-[13px] tracking-wide tabular-nums text-foreground">
             {c}
           </div>
         ))}
@@ -82,7 +76,7 @@ export function RecoveryCodesPanel({
 
       <div className="flex gap-2">
         <Button type="button" variant="outline" size="sm" className="flex-1 cursor-pointer" onClick={handleCopy}>
-          {copied ? <Check className="h-3.5 w-3.5 mr-1.5" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
+          {copied ? <Check weight="bold" className="h-3.5 w-3.5 mr-1.5" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
           {copied ? 'Copied' : 'Copy all'}
         </Button>
         <Button type="button" variant="outline" size="sm" className="flex-1 cursor-pointer" onClick={handleDownload}>
@@ -98,7 +92,7 @@ export function RecoveryCodesPanel({
             onCheckedChange={(v) => setSaved(v === true)}
             className="mt-0.5"
           />
-          <span className="text-[13px] text-slate-700 dark:text-slate-300">
+          <span className="text-[13px] text-foreground">
             I have saved these recovery codes somewhere safe.
           </span>
         </label>
@@ -108,7 +102,7 @@ export function RecoveryCodesPanel({
         <Button
           type="button"
           size="lg"
-          className="w-full font-semibold cursor-pointer"
+          className="w-full cursor-pointer"
           disabled={requireConfirm && !saved}
           onClick={onDone}
         >
