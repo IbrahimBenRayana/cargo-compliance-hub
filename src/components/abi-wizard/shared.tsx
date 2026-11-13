@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { matchesEveryWord } from '@/components/wizard/optionSearch';
+import { OptionText } from '@/components/wizard/OptionText';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   Tooltip,
@@ -64,7 +66,7 @@ export const HintLabel = memo(function HintLabel({
     <div className="flex items-center gap-1.5">
       <Label htmlFor={htmlFor} className="text-sm font-medium">
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+        {required && <span className="text-urgent ml-0.5">*</span>}
       </Label>
       {hint && (
         <TooltipProvider delayDuration={200}>
@@ -126,10 +128,10 @@ export const TextField = memo(function TextField({
         placeholder={placeholder}
         maxLength={maxLength}
         disabled={disabled}
-        className={cn(error && 'border-red-500 focus-visible:ring-red-500')}
+        className={cn(error && 'border-urgent focus-visible:ring-red-500')}
       />
       {error && (
-        <p id={errorId} className="text-xs text-red-500 flex items-center gap-1">
+        <p id={errorId} className="text-xs text-urgent flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
           {error}
         </p>
@@ -184,7 +186,7 @@ export const SelectField = memo(function SelectField({
           id={fieldId}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className={cn(error && 'border-red-500')}
+          className={cn(error && 'border-urgent')}
         >
           <SelectValue placeholder={placeholder || 'Select...'} />
         </SelectTrigger>
@@ -201,7 +203,7 @@ export const SelectField = memo(function SelectField({
         </SelectContent>
       </Select>
       {error && (
-        <p id={errorId} className="text-xs text-red-500 flex items-center gap-1">
+        <p id={errorId} className="text-xs text-urgent flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
           {error}
         </p>
@@ -253,22 +255,22 @@ export const ComboboxField = memo(function ComboboxField({
             role="combobox"
             aria-expanded={open}
             className={cn(
-              'w-full justify-between font-normal h-9 px-3',
-              !selected && 'text-muted-foreground',
-              error && 'border-red-500',
+              'h-9 w-full justify-between px-3 font-normal hover:bg-muted/60 hover:text-foreground data-[state=open]:border-ring data-[state=open]:bg-card',
+              !selected && 'text-muted-foreground hover:text-muted-foreground',
+              error && 'border-urgent',
             )}
           >
-            <span className="truncate">
-              {selected ? selected.label : placeholder || 'Select…'}
+            <span className="flex min-w-0 items-baseline gap-2">
+              {selected ? <OptionText label={selected.label} oneLine /> : placeholder || 'Select…'}
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-[--radix-popover-trigger-width] p-0"
+          className="w-[max(var(--radix-popover-trigger-width),24rem)] max-w-[calc(100vw-2rem)] p-0"
           align="start"
         >
-          <Command>
+          <Command filter={matchesEveryWord}>
             <CommandInput
               placeholder={searchPlaceholder || 'Search…'}
             />
@@ -287,14 +289,10 @@ export const ComboboxField = memo(function ComboboxField({
                       onChange(o.value);
                       setOpen(false);
                     }}
+                    className="items-start gap-2.5 rounded-md px-2.5 py-2 data-[selected='true']:bg-muted data-[selected=true]:text-foreground"
                   >
-                    <Check
-                      className={cn(
-                        'mr-2 h-4 w-4',
-                        value === o.value ? 'opacity-100' : 'opacity-0',
-                      )}
-                    />
-                    {o.label}
+                    <OptionText label={o.label} />
+                    <Check className={cn('mt-0.5 h-4 w-4 shrink-0 text-primary', value === o.value ? 'opacity-100' : 'opacity-0')} />
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -303,7 +301,7 @@ export const ComboboxField = memo(function ComboboxField({
         </PopoverContent>
       </Popover>
       {error && (
-        <p id={errorId} className="text-xs text-red-500 flex items-center gap-1">
+        <p id={errorId} className="text-xs text-urgent flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
           {error}
         </p>
@@ -348,10 +346,10 @@ export const DateField = memo(function DateField({
         value={iso}
         disabled={disabled}
         onChange={(e) => onChange(uiToYYYYMMDD(e.target.value))}
-        className={cn(error && 'border-red-500 focus-visible:ring-red-500')}
+        className={cn(error && 'border-urgent focus-visible:ring-red-500')}
       />
       {error && (
-        <p id={errorId} className="text-xs text-red-500 flex items-center gap-1">
+        <p id={errorId} className="text-xs text-urgent flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
           {error}
         </p>

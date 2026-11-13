@@ -1,17 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Pencil, Trash2, Send, RefreshCw, Loader2, AlertTriangle, FileText,
-  Ship, User, MapPin, Package, ChevronDown, ChevronRight, ExternalLink, CheckCircle2,
-  Hash, Calendar, Building2, Search,
+  ArrowLeft, ArrowRight, Pencil, Trash2, Send, RefreshCw, Loader2, AlertTriangle, FileText,
+  ChevronDown, ChevronRight, CheckCircle2,
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
@@ -32,12 +26,10 @@ import {
 import { abiDocumentsApi } from '@/api/client';
 import type {
   AbiDocument,
-  AbiDocumentStatus,
   ABIInvoice,
   ABIItem,
 } from '@/api/client';
 import {
-  ABI_DOCUMENT_STATUS_MAP,
   ENTRY_TYPES,
   MODES_OF_TRANSPORT,
   BOND_TYPES,
@@ -47,23 +39,32 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { EntryCbpTimeline } from '@/components/CbpTimeline';
 import { isNativeResendable, isOnFileAtCbp } from '@/lib/entryLifecycle';
+import { BAND, FILL } from '@/components/dashboard/tones';
+import { EntryStatusPill } from '@/components/entries/EntryStatus';
+import { entryStatusOf } from '@/components/entries/status';
+import { summarizeEntry } from '@/components/entries/summary';
+import { CopyButton } from '@/components/shipment-detail/CopyButton';
+import { stamp } from '@/components/shipment-detail/summary';
+import { usePortName } from '@/components/shipment-detail/usePortName';
 
 function lookupLabel(options: { value: string; label: string }[], value: string | null | undefined) {
-  if (!value) return '—';
+  if (!value) return '';
   const found = options.find((o) => o.value === value);
   return found ? found.label : value;
 }
 
+/** CBP's stored answer, "ACCEPTED", as a word. */
+const sentenceCase = (v: string | null | undefined) => (v ? v.charAt(0) + v.slice(1).toLowerCase().replace(/_/g, ' ') : '');
+
 function formatYYYYMMDD(raw: string | null | undefined): string {
-  if (!raw) return '—';
-  if (raw.length === 8) {
-    return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
-  }
-  return raw;
+  if (!raw) return '';
+  const iso = raw.length === 8 ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}` : raw.slice(0, 10);
+  const d = new Date(`${iso}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? raw : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function formatDateTime(iso: string | null | undefined): string {
-  if (!iso) return '—';
+  if (!iso) return '';
   try {
     return new Date(iso).toLocaleString('en-US', {
       month: 'short',
@@ -77,45 +78,40 @@ function formatDateTime(iso: string | null | undefined): string {
   }
 }
 
-function StatusPill({ status }: { status: AbiDocumentStatus }) {
-  const cfg = ABI_DOCUMENT_STATUS_MAP[status];
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium',
-        cfg.className,
-      )}
-    >
-      <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-      {cfg.label}
-    </span>
-  );
-}
+const PANEL = 'rounded-xl border border-border/70 bg-card shadow-card';
+const H3 = 'text-[13px] font-semibold';
+const GRID = 'mt-3 grid grid-cols-2 gap-x-6 gap-y-4 xl:grid-cols-3';
 
 function LabeledValue({
   label,
   value,
   mono,
+  sub,
 }: {
   label: string;
   value: React.ReactNode;
   mono?: boolean;
+  sub?: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
-      <p className={cn('text-sm', mono && 'font-mono')}>
-        {value ?? <span className="text-muted-foreground">—</span>}
-      </p>
+    <div className="min-w-0">
+      <dt className="text-[12px] text-muted-foreground">{label}</dt>
+      <dd className={cn('mt-0.5 truncate text-[13.5px] font-medium', mono && 'font-mono text-[13px]')}>
+        {value || <span className="font-sans text-[13.5px] font-normal text-muted-foreground">Not provided</span>}
+      </dd>
+      {sub && <dd className="truncate text-[12.5px] text-muted-foreground">{sub}</dd>}
     </div>
   );
 }
 
+function PortValue({ label, code }: { label: string; code: string | null | undefined }) {
+  const name = usePortName(code);
+  return <LabeledValue label={label} value={code} mono sub={name} />;
+}
+
 function ItemsTable({ items }: { items: ABIItem[] }) {
   if (!items?.length) {
-    return <p className="text-xs text-muted-foreground italic">No line items.</p>;
+    return <p className="text-[13px] text-muted-foreground">No line items.</p>;
   }
   return (
     <div className="rounded-lg border overflow-hidden">
@@ -134,26 +130,26 @@ function ItemsTable({ items }: { items: ABIItem[] }) {
         <TableBody>
           {items.map((item, i) => (
             <TableRow key={i}>
-              <TableCell className="font-mono text-xs">{item.sku ?? '—'}</TableCell>
-              <TableCell className="font-mono text-xs">{item.htsNumber ?? '—'}</TableCell>
+              <TableCell className="font-mono text-xs">{item.sku ?? ''}</TableCell>
+              <TableCell className="font-mono text-xs">{item.htsNumber ?? ''}</TableCell>
               <TableCell className="text-xs max-w-[240px]">
                 <span className="block truncate" title={item.description}>
-                  {item.description ?? '—'}
+                  {item.description ?? ''}
                 </span>
               </TableCell>
-              <TableCell className="text-xs">{item.origin?.country ?? '—'}</TableCell>
+              <TableCell className="text-xs">{item.origin?.country ?? ''}</TableCell>
               <TableCell className="text-xs text-right tabular-nums">
                 {item.values?.totalValueOfGoods != null
                   ? `${item.values.currency ?? ''} ${item.values.totalValueOfGoods.toLocaleString()}`
-                  : '—'}
+                  : ''}
               </TableCell>
               <TableCell className="text-xs text-right tabular-nums">
-                {item.quantity1 ?? '—'}
+                {item.quantity1 ?? ''}
               </TableCell>
               <TableCell className="text-xs text-right tabular-nums">
                 {item.weight?.gross
                   ? `${item.weight.gross} ${item.weight.uom ?? ''}`.trim()
-                  : '—'}
+                  : ''}
               </TableCell>
             </TableRow>
           ))}
@@ -168,62 +164,48 @@ function InvoiceCard({ invoice, index }: { invoice: ABIInvoice; index: number })
   const itemCount = invoice.items?.length ?? 0;
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <Card className="overflow-hidden">
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="w-full text-left hover:bg-muted/40 transition-colors"
-          >
-            <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
-              <div className="flex items-center gap-3">
-                {open ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
-                <div>
-                  <CardTitle className="text-sm font-semibold">
-                    Invoice {invoice.invoiceNumber || <span className="text-muted-foreground italic">—</span>}
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    PO {invoice.purchaseOrder || '—'} · {itemCount} item{itemCount === 1 ? '' : 's'}
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground tabular-nums">
-                {invoice.currency ?? ''}{' '}
-                {invoice.exchangeRate != null ? `@ ${invoice.exchangeRate}` : ''}
-              </div>
-            </CardHeader>
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <CardContent className="pt-0 space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <LabeledValue label="Export Date" value={formatYYYYMMDD(invoice.exportDate)} />
-              <LabeledValue label="Country of Export" value={invoice.countryOfExport} />
-              <LabeledValue label="Related Parties" value={invoice.relatedParties} />
-              <LabeledValue label="Currency" value={invoice.currency} />
-            </div>
-            <Separator />
-            <ItemsTable items={invoice.items ?? []} />
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
+    <Collapsible open={open} onOpenChange={setOpen} className="border-t border-border/70 first:border-t-0">
+      <CollapsibleTrigger asChild>
+        <button type="button" className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left outline-none transition-colors duration-150 can-hover:hover:bg-muted/40 focus-visible:bg-muted/40">
+          <span className="flex min-w-0 items-center gap-2.5">
+            {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+            <span className="min-w-0">
+              <span className="block truncate text-[13.5px] font-semibold">Invoice <span className="font-mono">{invoice.invoiceNumber || 'without a number'}</span></span>
+              <span className="block text-[12.5px] text-muted-foreground">
+                {invoice.purchaseOrder ? `PO ${invoice.purchaseOrder} · ` : ''}{itemCount} item{itemCount === 1 ? '' : 's'}
+              </span>
+            </span>
+          </span>
+          <span className="shrink-0 text-[12.5px] tabular-nums text-muted-foreground">
+            {invoice.currency ?? ''}{invoice.exchangeRate != null ? ` @ ${invoice.exchangeRate}` : ''}
+          </span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="space-y-4 px-5 pb-5">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+            <LabeledValue label="Export date" value={formatYYYYMMDD(invoice.exportDate)} />
+            <LabeledValue label="Country of export" value={invoice.countryOfExport} />
+            <LabeledValue label="Related parties" value={invoice.relatedParties} />
+            <LabeledValue label="Currency" value={invoice.currency} />
+          </dl>
+          <ItemsTable items={invoice.items ?? []} />
+        </div>
+      </CollapsibleContent>
     </Collapsible>
   );
 }
 
 function DetailSkeleton() {
   return (
-    <div className="space-y-6 max-w-[1200px] mx-auto">
-      <Skeleton className="h-8 w-64" />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-40 w-full" />
+    <div role="status" aria-busy="true" aria-label="Loading entry" className="mx-auto flex max-w-[1200px] flex-col gap-5">
+      <div className="dash-sk h-4 w-28" />
+      <div className="space-y-2"><div className="dash-sk h-7 w-56" /><div className="dash-sk h-4 w-72" /></div>
+      <div className="dash-sk h-36 w-full rounded-xl" />
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="dash-sk h-80 rounded-xl" />
+        <div className="dash-sk h-48 rounded-xl" />
       </div>
-      <Skeleton className="h-60 w-full" />
     </div>
   );
 }
@@ -248,20 +230,14 @@ export default function ABIDocumentDetailPage() {
 
   if (isError || !data?.data) {
     return (
-      <div className="max-w-[1200px] mx-auto space-y-4">
-        <Button variant="ghost" size="sm" asChild className="gap-1.5">
-          <Link to="/abi-documents">
-            <ArrowLeft className="h-4 w-4" />
-            Back to entries
-          </Link>
-        </Button>
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Could not load entry</AlertTitle>
-          <AlertDescription>
-            {(error as any)?.message ?? 'The requested entry could not be loaded.'}
-          </AlertDescription>
-        </Alert>
+      <div className="mx-auto max-w-[1200px] py-16 text-center">
+        <span className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-urgent-tint text-urgent"><AlertTriangle className="h-5 w-5" aria-hidden /></span>
+        <p className="mt-3 text-[13px] font-medium">We could not load this entry.</p>
+        <p className="mt-1 text-[13px] text-muted-foreground">{(error as any)?.message ?? 'It may have been deleted, or it belongs to another account.'}</p>
+        <div className="mt-4 flex justify-center gap-2">
+          <Button size="sm" onClick={() => refetch()}>Try again</Button>
+          <Button size="sm" variant="outline" asChild><Link to="/abi-documents">Entry documents</Link></Button>
+        </div>
       </div>
     );
   }
@@ -370,51 +346,36 @@ export default function ABIDocumentDetailPage() {
     }
   };
 
+  const summary = summarizeEntry(doc);
+  const { icon: StatusIcon } = entryStatusOf(doc.status);
+  const typeLabel = lookupLabel(ENTRY_TYPES, doc.entryType);
+
   return (
-    <div className="space-y-6 max-w-[1200px] mx-auto">
-      {/* Back link */}
-      <div
-        className="opacity-0 animate-fade-in-up"
-        style={{ animationFillMode: 'forwards' }}
-      >
-        <Button variant="ghost" size="sm" asChild className="gap-1.5 -ml-2">
-          <Link to="/abi-documents">
-            <ArrowLeft className="h-4 w-4" />
-            Back to entries
-          </Link>
-        </Button>
-      </div>
+    <div className="dash-enter mx-auto flex max-w-[1200px] flex-col gap-5 pb-16">
+      <Link to="/abi-documents" className="inline-flex w-fit items-center gap-1.5 text-[13px] text-muted-foreground transition-colors duration-150 hover:text-foreground">
+        <ArrowLeft className="h-3.5 w-3.5" aria-hidden />Entry documents
+      </Link>
 
-      {/* Header + action bar */}
-      <div
-        className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 opacity-0 animate-fade-in-up"
-        style={{ animationFillMode: 'forwards', animationDelay: '20ms' }}
-      >
-        <div className="flex items-start gap-3">
-          <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-            <FileText className="h-5 w-5 text-blue-500" />
+      <div className="-mt-2 flex flex-wrap items-start gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className={cn('break-all text-[24px] font-semibold leading-8 tracking-[-0.01em]', doc.entryNumber && 'font-mono')}>
+              {doc.entryNumber ?? 'Draft entry'}
+            </h1>
+            <EntryStatusPill status={doc.status} />
           </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-black tracking-tight">
-                {doc.entryNumber ? `Entry #${doc.entryNumber}` : 'Draft Entry'}
-              </h1>
-              <StatusPill status={doc.status} />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Created {formatDistanceToNow(new Date(doc.createdAt), { addSuffix: true })}
-              {doc.updatedAt !== doc.createdAt &&
-                ` · updated ${formatDistanceToNow(new Date(doc.updatedAt), { addSuffix: true })}`}
-            </p>
-          </div>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            {[typeLabel, doc.iorName ?? ior?.name].filter(Boolean).join(' \u00b7 ') || 'Entry summary'}
+            {' \u00b7 '}Created {new Date(doc.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </p>
         </div>
-
         {/* Actions */}
         <div className="flex items-center gap-2 flex-wrap">
           {isDraft && (
             <>
               <Button
                 variant="outline"
+                size="sm"
                 className="gap-1.5"
                 onClick={() => navigate(`/abi-documents/${doc.id}/edit`)}
               >
@@ -423,13 +384,14 @@ export default function ABIDocumentDetailPage() {
               </Button>
               <Button
                 variant="outline"
+                size="sm"
                 className="gap-1.5 text-destructive hover:text-destructive"
                 onClick={() => setShowDeleteConfirm(true)}
               >
                 <Trash2 className="h-4 w-4" />
                 Delete
               </Button>
-              <Button className="gap-1.5" onClick={() => setShowTransmitConfirm(true)}>
+              <Button size="sm" className="gap-1.5" onClick={() => setShowTransmitConfirm(true)}>
                 <Send className="h-4 w-4" />
                 Transmit to CBP
               </Button>
@@ -438,12 +400,13 @@ export default function ABIDocumentDetailPage() {
 
           {isSending && (
             <>
-              <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+              <div className="flex items-center gap-2 text-[13px] text-info">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Transmitting…
               </div>
               <Button
                 variant="outline"
+                size="sm"
                 className="gap-1.5"
                 onClick={handleRefresh}
                 disabled={pollDoc.isPending}
@@ -461,6 +424,7 @@ export default function ABIDocumentDetailPage() {
           {isTerminal && (
             <Button
               variant="outline"
+              size="sm"
               className="gap-1.5"
               onClick={handleRefresh}
               disabled={pollDoc.isPending}
@@ -478,13 +442,14 @@ export default function ABIDocumentDetailPage() {
             <>
               <Button
                 variant="outline"
+                size="sm"
                 className="gap-1.5"
                 onClick={() => navigate(`/abi-documents/${doc.id}/edit`)}
               >
                 <Pencil className="h-4 w-4" />
                 Correct
               </Button>
-              <Button className="gap-1.5" onClick={() => setShowTransmitConfirm(true)}>
+              <Button size="sm" className="gap-1.5" onClick={() => setShowTransmitConfirm(true)}>
                 <Send className="h-4 w-4" />
                 Send again
               </Button>
@@ -495,6 +460,7 @@ export default function ABIDocumentDetailPage() {
             <>
               <Button
                 variant="outline"
+                size="sm"
                 className="gap-1.5"
                 onClick={() => navigate(`/abi-documents/${doc.id}/edit`)}
               >
@@ -503,6 +469,7 @@ export default function ABIDocumentDetailPage() {
               </Button>
               <Button
                 variant="outline"
+                size="sm"
                 className="gap-1.5 text-destructive hover:text-destructive"
                 onClick={() => setCbpAction('DELETE')}
               >
@@ -519,17 +486,13 @@ export default function ABIDocumentDetailPage() {
             </div>
           )}
 
-          {isCancelled && (
-            <span className="text-xs text-muted-foreground italic">
-              This entry has been cancelled.
-            </span>
-          )}
 
           {/* 7501 PDF — available for every status except cancelled;
               non-accepted copies come out watermarked. */}
           {!isCancelled && (
             <Button
               variant="outline"
+              size="sm"
               className="gap-1.5"
               onClick={handleDownloadPdf}
               disabled={downloadingPdf}
@@ -545,313 +508,174 @@ export default function ABIDocumentDetailPage() {
         </div>
       </div>
 
-      {/* Idempotent send note */}
-      {note && (
-        <Alert>
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertDescription>{note}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Last error warning */}
-      {doc.lastError && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Last error</AlertTitle>
-          <AlertDescription className="whitespace-pre-wrap">
-            {doc.lastError}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Native entries: every transmission and CBP's answers, decoded. */}
-      {isNative && <EntryCbpTimeline entryId={doc.id} />}
-
-      {/* CustomsCity-era transmission details (non-DRAFT only) */}
-      {!isDraft && !isNative && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Transmission</CardTitle>
-            <CardDescription>Current CBP response details</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-              <LabeledValue label="Sent" value={formatDateTime(doc.sentAt)} />
-              <LabeledValue label="Responded" value={formatDateTime(doc.respondedAt)} />
-              <LabeledValue
-                label="Entry Summary"
-                value={doc.entrySummaryStatus ?? '—'}
-              />
-              <LabeledValue
-                label="Cargo Release"
-                value={doc.cargoReleaseStatus ?? '—'}
-              />
-              {/* Legacy-route entries only; native entries have neither. */}
-              {doc.ccDocumentId && (
-                <>
-                  <LabeledValue label="Legacy document ID" value={doc.ccDocumentId ?? '—'} mono />
-                  <LabeledValue label="Poll Attempts" value={String(doc.pollAttempts ?? 0)} />
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Linked sources — ISF filing and / or manifest query the entry
-          was prefilled from. Cross-links so the user can hop between the
-          three views without losing context. */}
-      {(doc.filingId || doc.manifestQueryId) && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Linked sources</CardTitle>
-            <CardDescription>
-              This entry was created from existing records — open them to verify the prefilled data.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {doc.filingId && (
-              <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                <Link to={`/shipments/${doc.filingId}`}>
-                  <Ship className="h-3.5 w-3.5" />
-                  Linked ISF Filing
-                  <ExternalLink className="h-3 w-3 opacity-60" />
-                </Link>
-              </Button>
-            )}
-            {doc.manifestQueryId && (
-              <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                <Link to={`/manifest-query?queryId=${doc.manifestQueryId}`}>
-                  <Search className="h-3.5 w-3.5" />
-                  Linked Manifest Query
-                  <ExternalLink className="h-3 w-3 opacity-60" />
-                </Link>
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Summary grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Entry Info */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Hash className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Entry Info</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <LabeledValue
-              label="Entry Type"
-              value={lookupLabel(ENTRY_TYPES, doc.entryType)}
-            />
-            <LabeledValue
-              label="Mode of Transport"
-              value={lookupLabel(MODES_OF_TRANSPORT, doc.modeOfTransport)}
-            />
-            <LabeledValue label="Entry Date" value={formatYYYYMMDD(doc.entryDate)} />
-            <LabeledValue label="Import Date" value={formatYYYYMMDD(doc.importDate)} />
-            <LabeledValue label="Arrival Date" value={formatYYYYMMDD(doc.arrivalDate)} />
-            <LabeledValue
-              label="Port of Entry"
-              value={doc.portOfEntry ? <span className="font-mono">{doc.portOfEntry}</span> : null}
-            />
-            <LabeledValue
-              label="Destination State"
-              value={doc.destinationStateUS}
-            />
-            <LabeledValue
-              label="FIRMS Code"
-              value={payload.firms ? <span className="font-mono">{payload.firms}</span> : null}
-            />
-          </CardContent>
-        </Card>
-
-        {/* IOR / Bond / Payment */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Importer of Record</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <LabeledValue
-              label="IOR Number"
-              value={doc.iorNumber ? <span className="font-mono">{doc.iorNumber}</span> : null}
-            />
-            <LabeledValue label="IOR Name" value={doc.iorName ?? ior?.name} />
-            <LabeledValue
-              label="Bond Type"
-              value={bond?.type ? lookupLabel(BOND_TYPES, bond.type) : null}
-            />
-            <LabeledValue
-              label="Bond Tax ID"
-              value={bond?.taxId ? <span className="font-mono">{bond.taxId}</span> : null}
-            />
-            <LabeledValue
-              label="Payment Type"
-              value={
-                payment?.typeCode != null
-                  ? lookupLabel(PAYMENT_TYPE_CODES, String(payment.typeCode))
-                  : null
-              }
-            />
-            {payment?.preliminaryStatementDate && (
-              <LabeledValue
-                label="Prelim. Statement Date"
-                value={formatYYYYMMDD(payment.preliminaryStatementDate)}
-              />
-            )}
-            {payment?.periodicStatementMonth && (
-              <LabeledValue label="Statement Month" value={payment.periodicStatementMonth} />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Consignee */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Consignee</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <LabeledValue label="Name" value={doc.consigneeName ?? consignee?.name} />
-            <LabeledValue label="Address" value={consignee?.address} />
-            <div className="grid grid-cols-3 gap-3">
-              <LabeledValue label="City" value={consignee?.city} />
-              <LabeledValue label="State" value={consignee?.state} />
-              <LabeledValue label="Postal Code" value={consignee?.postalCode} />
-            </div>
-            <LabeledValue label="Country" value={consignee?.country} />
-          </CardContent>
-        </Card>
-
-        {/* Manifest */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Ship className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Manifest</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <LabeledValue
-              label="Bill Type"
-              value={manifest0?.bill?.type ? lookupLabel(BILL_TYPES, manifest0.bill.type) : null}
-            />
-            <LabeledValue
-              label="Carrier Code"
-              value={
-                manifest0?.carrier?.code ? (
-                  <span className="font-mono">{manifest0.carrier.code}</span>
-                ) : null
-              }
-            />
-            <LabeledValue
-              label="Master BOL"
-              value={
-                doc.mbolNumber ? <span className="font-mono text-xs">{doc.mbolNumber}</span> : null
-              }
-            />
-            <LabeledValue
-              label="House BOL"
-              value={
-                doc.hbolNumber ? <span className="font-mono text-xs">{doc.hbolNumber}</span> : null
-              }
-            />
-            <LabeledValue
-              label="Port of Unlading"
-              value={
-                manifest0?.ports?.portOfUnlading ? (
-                  <span className="font-mono">{manifest0.ports.portOfUnlading}</span>
-                ) : null
-              }
-            />
-            <LabeledValue
-              label="Quantity"
-              value={
-                manifest0?.quantity
-                  ? `${manifest0.quantity} ${manifest0.quantityUOM ?? ''}`.trim()
-                  : null
-              }
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Invoices & items */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-base font-semibold">
-            Invoices &amp; Items
-            <span className="ml-2 text-xs font-normal text-muted-foreground">
-              ({invoices.length})
-            </span>
-          </h2>
-        </div>
-        {invoices.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 flex flex-col items-center gap-2 text-center">
-              <Package className="h-5 w-5 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No invoices added yet.</p>
-              {isDraft && (
-                <Button
-                  variant="link"
-                  size="sm"
-                  onClick={() => navigate(`/abi-documents/${doc.id}/edit`)}
-                >
-                  Add invoices in the wizard
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {invoices.map((inv, i) => (
-              <InvoiceCard key={i} invoice={inv} index={i} />
-            ))}
+      <section aria-label="Status" className={cn(PANEL, 'overflow-hidden')}>
+        <div className={cn('flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4', BAND[summary.tone])}>
+          <span aria-hidden className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-full text-white dark:text-background', FILL[summary.tone])}>
+            <StatusIcon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1 basis-64">
+            <p className="text-[16px] font-semibold leading-6">{summary.title}</p>
+            {summary.detail && <p className="mt-0.5 text-[13px] text-foreground/75">{summary.detail}</p>}
           </div>
-        )}
-      </div>
-
-      {/* Submission log placeholder */}
-      {!isDraft && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Submission Log</CardTitle>
-            <CardDescription>
-              Full audit log available via Submission Logs
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                <FileText className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span>
-                  Every CBP request and response for this entry is recorded against
-                  correlation ID{' '}
-                  <code className="font-mono bg-muted px-1 py-0.5 rounded">
-                    {doc.id}
-                  </code>
-                  .
-                </span>
-              </div>
-              <Button variant="outline" size="sm" asChild className="gap-1.5">
-                <Link to={`/integrations/logs?correlationId=${doc.id}`}>
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  View submission logs
-                </Link>
-              </Button>
+          {doc.entryNumber && (
+            <div className="sm:text-right">
+              <p className="text-[12px] text-foreground/70">Entry number</p>
+              <p className="flex items-center gap-1 sm:justify-end">
+                <span className="font-mono text-[15px] font-semibold">{doc.entryNumber}</span>
+                <CopyButton value={doc.entryNumber} label="entry number" />
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-3 lg:grid-cols-5">
+          <LabeledValue label="Entry type" value={typeLabel} />
+          <PortValue label="Port of entry" code={doc.portOfEntry} />
+          <LabeledValue label="Entry date" value={formatYYYYMMDD(doc.entryDate)} />
+          <LabeledValue label="Import date" value={formatYYYYMMDD(doc.importDate)} />
+          <LabeledValue label="Arrival date" value={formatYYYYMMDD(doc.arrivalDate)} />
+        </dl>
+      </section>
+
+      {/* A second send of the same entry answers with a note instead of sending twice. */}
+      {note && (
+        <p className="flex items-start gap-2 rounded-xl bg-info-tint px-4 py-3 text-[13px]">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-info" aria-hidden />{note}
+        </p>
       )}
+
+      {doc.lastError && (
+        <div role="alert" className="rounded-xl bg-urgent-tint px-4 py-3">
+          <p className="flex items-center gap-2 text-[13.5px] font-semibold text-urgent"><AlertTriangle className="h-4 w-4" aria-hidden />Last error</p>
+          <p className="mt-1 whitespace-pre-wrap text-[13px] text-foreground">{doc.lastError}</p>
+        </div>
+      )}
+
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-5">
+          {/* Every message sent to CBP and CBP's answers. */}
+          {isNative && <EntryCbpTimeline entryId={doc.id} />}
+
+          {/* Entries sent before the native connection keep their stored answers. */}
+          {!isDraft && !isNative && (
+            <section aria-labelledby="transmission-title" className={cn(PANEL, 'p-5')}>
+              <h2 id="transmission-title" className="text-[15px] font-semibold">Transmission</h2>
+              <dl className={GRID}>
+                <LabeledValue label="Sent" value={formatDateTime(doc.sentAt)} />
+                <LabeledValue label="Responded" value={formatDateTime(doc.respondedAt)} />
+                <LabeledValue label="Entry summary" value={sentenceCase(doc.entrySummaryStatus)} />
+                <LabeledValue label="Cargo release request" value={sentenceCase(doc.cargoReleaseStatus)} />
+                {doc.ccDocumentId && (
+                  <>
+                    <LabeledValue label="Legacy document ID" value={doc.ccDocumentId} mono />
+                    <LabeledValue label="Poll attempts" value={String(doc.pollAttempts ?? 0)} />
+                  </>
+                )}
+              </dl>
+            </section>
+          )}
+
+          <section aria-labelledby="filed-title" className={PANEL}>
+            <div className="px-5 pt-4">
+              <h2 id="filed-title" className="text-[15px] font-semibold">{isDraft ? 'What will be filed' : 'What was filed'}</h2>
+            </div>
+            <div className="px-5 pb-5 pt-4">
+              <h3 className={H3}>Entry</h3>
+              <dl className={GRID}>
+                <LabeledValue label="Mode of transport" value={lookupLabel(MODES_OF_TRANSPORT, doc.modeOfTransport)} />
+                <LabeledValue label="Destination state" value={doc.destinationStateUS} />
+                <LabeledValue label="FIRMS code" value={payload.firms} mono />
+              </dl>
+            </div>
+            <div className="border-t border-border/70 px-5 py-5">
+              <h3 className={H3}>Importer and bond</h3>
+              <dl className={GRID}>
+                <LabeledValue label="Importer of record" value={doc.iorName ?? ior?.name} sub={doc.iorNumber ? <span className="font-mono">{doc.iorNumber}</span> : undefined} />
+                <LabeledValue label="Bond type" value={bond?.type ? lookupLabel(BOND_TYPES, bond.type) : null} />
+                <LabeledValue label="Bond tax ID" value={bond?.taxId} mono />
+                <LabeledValue label="Payment type" value={payment?.typeCode != null ? lookupLabel(PAYMENT_TYPE_CODES, String(payment.typeCode)) : null} />
+                {payment?.preliminaryStatementDate && <LabeledValue label="Prelim. statement date" value={formatYYYYMMDD(payment.preliminaryStatementDate)} />}
+                {payment?.periodicStatementMonth && <LabeledValue label="Statement month" value={payment.periodicStatementMonth} />}
+              </dl>
+            </div>
+            <div className="border-t border-border/70 px-5 py-5">
+              <h3 className={H3}>Consignee</h3>
+              <dl className={GRID}>
+                <LabeledValue label="Name" value={doc.consigneeName ?? consignee?.name} />
+                <LabeledValue label="Address" value={consignee?.address} />
+                <LabeledValue label="City, state, postal code" value={[consignee?.city, consignee?.state, consignee?.postalCode].filter(Boolean).join(', ')} />
+                <LabeledValue label="Country" value={consignee?.country} />
+              </dl>
+            </div>
+            <div className="border-t border-border/70 px-5 py-5">
+              <h3 className={H3}>Manifest</h3>
+              <dl className={GRID}>
+                <LabeledValue label="Master bill" value={doc.mbolNumber} mono />
+                <LabeledValue label="House bill" value={doc.hbolNumber} mono />
+                <LabeledValue label="Bill type" value={manifest0?.bill?.type ? lookupLabel(BILL_TYPES, manifest0.bill.type) : null} />
+                <LabeledValue label="Carrier code" value={manifest0?.carrier?.code} mono />
+                <PortValue label="Port of unlading" code={manifest0?.ports?.portOfUnlading} />
+                <LabeledValue label="Quantity" value={manifest0?.quantity ? `${manifest0.quantity} ${manifest0.quantityUOM ?? ''}`.trim() : null} />
+              </dl>
+            </div>
+          </section>
+
+          <section aria-labelledby="invoices-title" className={PANEL}>
+            <h2 id="invoices-title" className="flex items-center gap-2 px-5 pb-3 pt-4 text-[15px] font-semibold">
+              Invoices and items
+              <span className="rounded-md bg-muted px-1.5 py-px text-[11.5px] font-medium tabular-nums text-muted-foreground">{invoices.length}</span>
+            </h2>
+            {invoices.length === 0 ? (
+              <div className="border-t border-border/70 px-5 py-8 text-center">
+                <p className="text-[13px] font-medium">No invoices yet.</p>
+                {isDraft && <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate(`/abi-documents/${doc.id}/edit`)}>Add invoices</Button>}
+              </div>
+            ) : (
+              <div className="border-t border-border/70">{invoices.map((inv, i) => <InvoiceCard key={i} invoice={inv} index={i} />)}</div>
+            )}
+          </section>
+        </div>
+
+        <aside aria-label="Related and dates" className={cn(PANEL, 'divide-y divide-border/70 lg:sticky lg:top-4')}>
+          {(doc.filingId || doc.manifestQueryId || !isDraft) && (
+            <section aria-labelledby="related-title" className="p-5">
+              <h2 id="related-title" className={H3}>Related</h2>
+              <ul className="mt-3 space-y-3">
+                {doc.filingId && (
+                  <li className="flex items-center justify-between gap-3">
+                    <div className="min-w-0"><p className="text-[13px] font-medium">ISF</p><p className="text-[12.5px] text-muted-foreground">This entry was made from it</p></div>
+                    <Button asChild size="sm" variant="outline" className="h-7 shrink-0 gap-1 px-2.5 text-[12px]"><Link to={`/shipments/${doc.filingId}`}>Open shipment<ArrowRight className="h-3 w-3" aria-hidden /></Link></Button>
+                  </li>
+                )}
+                {doc.manifestQueryId && (
+                  <li className="flex items-center justify-between gap-3">
+                    <div className="min-w-0"><p className="text-[13px] font-medium">Manifest query</p><p className="text-[12.5px] text-muted-foreground">Prefilled this entry</p></div>
+                    <Button asChild size="sm" variant="outline" className="h-7 shrink-0 gap-1 px-2.5 text-[12px]"><Link to={`/manifest-query?queryId=${doc.manifestQueryId}`}>Open<ArrowRight className="h-3 w-3" aria-hidden /></Link></Button>
+                  </li>
+                )}
+                {!isDraft && (
+                  <li className="flex items-center justify-between gap-3">
+                    <div className="min-w-0"><p className="text-[13px] font-medium">Submission logs</p><p className="text-[12.5px] text-muted-foreground">Every request and response</p></div>
+                    <Button asChild size="sm" variant="outline" className="h-7 shrink-0 gap-1 px-2.5 text-[12px]"><Link to={`/integrations/logs?correlationId=${doc.id}`}>View logs<ArrowRight className="h-3 w-3" aria-hidden /></Link></Button>
+                  </li>
+                )}
+              </ul>
+            </section>
+          )}
+          <section aria-labelledby="dates-title" className="p-5">
+            <h2 id="dates-title" className={H3}>Dates</h2>
+            <dl className="mt-3 space-y-2 text-[13px]">
+              {([['Created', doc.createdAt], ['Last changed', doc.updatedAt !== doc.createdAt ? doc.updatedAt : null], ['Sent', doc.sentAt], ['CBP answered', doc.respondedAt]] as const)
+                .filter(([, at]) => at)
+                .map(([label, at]) => (
+                  <div key={label} className="flex items-baseline justify-between gap-3">
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="tabular-nums">{stamp(at!)}</dd>
+                  </div>
+                ))}
+            </dl>
+          </section>
+        </aside>
+      </div>
 
       {/* Transmit confirmation */}
       <AlertDialog open={showTransmitConfirm} onOpenChange={setShowTransmitConfirm}>

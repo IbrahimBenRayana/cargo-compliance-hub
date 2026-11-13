@@ -2238,7 +2238,8 @@ export interface AbiDocument {
 }
 
 export interface AbiDocumentListParams {
-  status?: AbiDocumentStatus;
+  /** One status, or several joined with commas. */
+  status?: AbiDocumentStatus | string;
   mbolNumber?: string;
   entryNumber?: string;
   skip?: number;
@@ -2352,6 +2353,16 @@ export const abiDocumentsApi = {
     return apiFetch<AbiDocumentListResponse>(
       `/api/v1/abi-documents${qs ? `?${qs}` : ''}`,
     );
+  },
+
+  /** Status counts for the list's tabs, under the same search. */
+  facets(params?: Pick<AbiDocumentListParams, 'mbolNumber' | 'entryNumber'>) {
+    const query = new URLSearchParams();
+    Object.entries(params ?? {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') query.set(k, String(v));
+    });
+    const qs = query.toString();
+    return apiFetch<{ status: Record<string, number> }>(`/api/v1/abi-documents/facets${qs ? `?${qs}` : ''}`);
   },
 
   get(id: string) {

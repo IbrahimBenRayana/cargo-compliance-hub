@@ -273,9 +273,9 @@ export default function Step6Review({ value, doc }: Props) {
       {/* Validation block */}
       {validation.valid ? (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-start gap-3">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
+          <CheckCircle2 className="h-5 w-5 text-done mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+            <p className="text-sm font-semibold text-done">
               Ready to transmit
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -288,9 +288,9 @@ export default function Step6Review({ value, doc }: Props) {
       ) : (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
           <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <AlertCircle className="h-5 w-5 text-soon mt-0.5 shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+              <p className="text-sm font-semibold text-soon">
                 {validation.missing.length} field{validation.missing.length === 1 ? '' : 's'} still required
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">

@@ -19,3 +19,8 @@ export const FILL: Record<Tone, string> = {
   done: 'bg-[hsl(var(--done-fill))]',
   calm: 'bg-muted-foreground',
 };
+
+/** A soft band behind a status sentence. */
+export const BAND: Record<Tone, string> = {
+  urgent: 'bg-urgent-tint', soon: 'bg-soon-tint', info: 'bg-info-tint', entry: 'bg-entry-tint', done: 'bg-done-tint', calm: 'bg-muted/60',
+};

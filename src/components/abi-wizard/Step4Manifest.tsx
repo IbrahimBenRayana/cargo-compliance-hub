@@ -45,7 +45,7 @@ export default function Step4Manifest({ value, onChange, doc, errors = {} }: Pro
   return (
     <div className="space-y-6">
       {prefilled && (
-        <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-900/40 text-xs text-blue-800 dark:text-blue-300 px-3 py-2">
+        <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-900/40 text-xs text-info px-3 py-2">
           Pre-populated from Manifest Query {doc?.manifestQueryId}
         </div>
       )}

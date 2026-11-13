@@ -209,7 +209,7 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
         <div className="text-sm text-muted-foreground">
           No invoices yet. Add the first invoice to begin entering line items.
         </div>
-        {errors.invoices && <p role="alert" className="text-xs text-red-500">{errors.invoices}</p>}
+        {errors.invoices && <p role="alert" className="text-xs text-urgent">{errors.invoices}</p>}
         <Button onClick={addInvoice}>
           <Plus className="h-4 w-4 mr-1.5" /> Add invoice
         </Button>
@@ -334,7 +334,7 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
               {/* Items */}
               <div className="border-t pt-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <h4 className="text-[13px] font-semibold text-muted-foreground">
                     Line Items ({(inv.items || []).length})
                   </h4>
                   <div className="flex items-center gap-2">
@@ -360,7 +360,7 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                   </div>
                 </div>
                 {errors[`invoices.${invIdx}.items`] && (
-                  <p role="alert" className="text-xs text-red-500">{errors[`invoices.${invIdx}.items`]}</p>
+                  <p role="alert" className="text-xs text-urgent">{errors[`invoices.${invIdx}.items`]}</p>
                 )}
                 <div className="space-y-4">
                   {((inv.items || []) as PartialItem[]).map((item, itemIdx) => {
@@ -586,7 +586,7 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                             </Button>
                           </div>
                           {errors[`${itemPath}.parties`] && (
-                            <p role="alert" className="text-xs text-red-500 mb-2">{errors[`${itemPath}.parties`]}</p>
+                            <p role="alert" className="text-xs text-urgent mb-2">{errors[`${itemPath}.parties`]}</p>
                           )}
                           <div className="space-y-3">
                             {((item.parties || []) as PartialParty[]).map(
@@ -730,7 +730,7 @@ export default function Step5Invoices({ value, onChange, doc, errors = {} }: Pro
                           className="border-t pt-2"
                         >
                           <AccordionItem value="advanced" className="border-0">
-                            <AccordionTrigger className="text-xs font-semibold uppercase tracking-wider text-muted-foreground py-2 hover:no-underline">
+                            <AccordionTrigger className="text-[13px] font-semibold text-muted-foreground py-2 hover:no-underline">
                               Advanced — trade compliance
                             </AccordionTrigger>
                             <AccordionContent>

@@ -36,6 +36,7 @@ import {
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { StepProgress } from '@/components/wizard/StepProgress';
 
 import { abiDocumentsApi } from '@/api/client';
 import type {
@@ -51,10 +52,8 @@ import {
 } from '@/hooks/useAbiDocument';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,12 +79,12 @@ import { isEntryEditable, isNativeResendable, isOnFileAtCbp } from '@/lib/entryL
 // ─── Step definitions ────────────────────────────────────────
 
 const STEPS = [
-  { id: 'entry',     label: 'Entry',     desc: 'Entry type & shipment info',        icon: Ship },
-  { id: 'importer',  label: 'Importer',  desc: 'Importer of record, bond & payment', icon: Building2 },
-  { id: 'consignee', label: 'Consignee', desc: 'Entry consignee details',            icon: MapPin },
-  { id: 'manifest',  label: 'Manifest',  desc: 'Bill of lading, carrier & ports',    icon: Package },
-  { id: 'invoices',  label: 'Invoices',  desc: 'Invoices, items & parties',          icon: Receipt },
-  { id: 'review',    label: 'Review',    desc: 'Review & transmit',                  icon: FileCheck },
+  { id: 'entry',     label: 'Entry',     desc: 'Entry type and shipment',        icon: Ship },
+  { id: 'importer',  label: 'Importer',  desc: 'Importer of record, bond and payment', icon: Building2 },
+  { id: 'consignee', label: 'Consignee', desc: 'Who the goods are for',            icon: MapPin },
+  { id: 'manifest',  label: 'Manifest',  desc: 'Bills of lading, carrier and ports',    icon: Package },
+  { id: 'invoices',  label: 'Invoices',  desc: 'Invoices, line items and parties',          icon: Receipt },
+  { id: 'review',    label: 'Review',    desc: 'Check everything, then send to CBP',                  icon: FileCheck },
 ] as const;
 
 type StepComponent = (p: {
@@ -322,7 +321,6 @@ export default function ABIDocumentWizard() {
     }
   };
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
-  const progress = Math.round(((step + 1) / STEPS.length) * 100);
 
   // ── Loading skeleton (edit-mode only while the existing draft loads)
   if (isEdit && query.isLoading && !doc) {
@@ -354,143 +352,50 @@ export default function ABIDocumentWizard() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/abi-documents" aria-label="Back to list">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight">
-              {isEdit ? 'Edit Entry Summary' : 'New Entry Summary'}
-            </h1>
-            {autosave.isSaving ? (
-              <Badge variant="outline" className="gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin" /> Saving…
-              </Badge>
-            ) : autosave.error ? (
-              <button type="button" onClick={() => autosave.flush().catch(() => undefined)}>
-                <Badge variant="outline" className="gap-1.5 border-destructive/40 text-destructive">
-                  <AlertCircle className="h-3 w-3" /> Not saved, retry
-                </Badge>
-              </button>
-            ) : docId ? (
-              <Badge variant="outline" className="gap-1.5 text-muted-foreground">
-                <Check className="h-3 w-3" /> Saved
-              </Badge>
-            ) : null}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Step {step + 1} of {STEPS.length} — {STEPS[step].desc}
-          </p>
+    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 pb-10">
+      <header>
+        <Link to="/abi-documents" className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors duration-150 hover:text-foreground">
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />Entry documents
+        </Link>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.015em]">{isEdit ? 'Edit entry summary' : 'New entry summary'}</h1>
+          {autosave.isSaving ? (
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" /> Saving…
+            </span>
+          ) : autosave.error ? (
+            <button type="button" onClick={() => autosave.flush().catch(() => undefined)} className="inline-flex items-center gap-1.5 rounded-md bg-urgent-tint px-2 py-0.5 text-[12.5px] font-medium text-urgent">
+              <AlertCircle className="h-3 w-3" aria-hidden />Not saved, retry
+            </button>
+          ) : docId ? (
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] text-done">
+              <Check className="h-3 w-3" aria-hidden />Saved
+            </span>
+          ) : null}
         </div>
-        <div className="hidden sm:flex items-center gap-2 shrink-0">
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Completion</p>
-            <p className="text-lg font-bold text-primary">{progress}%</p>
-          </div>
-          <div className="w-20">
-            <Progress value={progress} className="h-2" aria-label="Form completion" />
-          </div>
-        </div>
-      </div>
+      </header>
 
-      {/* Manifest-query prefill banner */}
       {doc?.manifestQueryId && (
-        <div className="rounded-md border border-blue-500/30 bg-blue-500/5 text-xs text-blue-700 dark:text-blue-300 px-3 py-2 flex items-center gap-2">
-          <Users className="h-3.5 w-3.5" />
-          <span>
-            Shipment data was pre-populated from a Manifest Query. Double-check MBOL,
-            HBOL, carrier code and port of unlading in step 4.
-          </span>
-        </div>
+        <p className="flex items-start gap-2 rounded-xl bg-info-tint px-4 py-3 text-[13px]">
+          <Users className="mt-0.5 h-4 w-4 shrink-0 text-info" aria-hidden />
+          Shipment data was filled in from a manifest query. Check the master bill, house bill, carrier code and port of unlading in step 4.
+        </p>
       )}
 
-      {/* Stepper */}
-      <div className="bg-card border rounded-xl p-3">
-        <div className="flex items-center gap-0">
-          {STEPS.map((s, i) => {
-            const Icon = s.icon;
-            const isActive = i === step;
-            const isDone = i < step;
-            return (
-              <div key={s.id} className="flex items-center flex-1 min-w-0">
-                <button
-                  onClick={() => {
-                    if (i <= step) setStep(i);
-                  }}
-                  disabled={i > step}
-                  className={cn(
-                    'flex items-center gap-2 transition-all rounded-lg px-2 py-1.5 text-left min-w-0',
-                    isActive && 'bg-primary/10',
-                    isDone && 'cursor-pointer hover:bg-muted',
-                    i > step && 'opacity-40 cursor-not-allowed',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'h-8 w-8 rounded-full flex items-center justify-center shrink-0 transition-all',
-                      isDone
-                        ? 'bg-primary text-primary-foreground'
-                        : isActive
-                          ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30'
-                          : 'bg-muted text-muted-foreground',
-                    )}
-                  >
-                    {isDone ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-                  </span>
-                  <span
-                    className={cn(
-                      'text-xs font-medium truncate hidden lg:block',
-                      isActive && 'text-primary',
-                    )}
-                  >
-                    {s.label}
-                  </span>
-                </button>
-                {i < STEPS.length - 1 && (
-                  <div
-                    className={cn(
-                      'h-0.5 flex-1 mx-1 rounded-full min-w-2',
-                      isDone ? 'bg-primary' : 'bg-border',
-                    )}
-                  />
-                )}
-              </div>
-            );
-          })}
+      <section aria-labelledby="step-title" className="min-w-0 rounded-xl border border-border/70 bg-card shadow-card">
+        <StepProgress steps={STEPS} current={step} onSelect={setStep} />
+        <div className="border-b border-border/70 px-5 pb-4 pt-5 sm:px-6">
+          <p className="text-[12.5px] tabular-nums text-muted-foreground md:hidden">Step {step + 1} of {STEPS.length}</p>
+          <h2 id="step-title" className="text-[20px] font-semibold leading-7 tracking-[-0.01em]">{STEPS[step].label}</h2>
+          <p className="text-[13.5px] text-muted-foreground">{STEPS[step].desc}</p>
         </div>
-        <div className="sm:hidden mt-2">
-          <Progress value={progress} className="h-1.5" aria-label="Form completion" />
-          <p className="text-xs text-muted-foreground mt-1 text-center">
-            {progress}% complete
-          </p>
-        </div>
-      </div>
-
-      {/* Step content */}
-      <Card className="shadow-sm">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            {(() => {
-              const Icon = STEPS[step].icon;
-              return <Icon className="h-5 w-5 text-primary" />;
-            })()}
-            <CardTitle className="text-lg">{STEPS[step].label}</CardTitle>
-          </div>
-          <CardDescription>{STEPS[step].desc}</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-4">
+        <div className="px-5 py-6 sm:px-6">
           <StepComponent value={draft} onChange={onChange} doc={doc} errors={visibleStepErrors} />
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Nav bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-6">
-        <Button variant="outline" onClick={goBack} disabled={step === 0} size="lg">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 px-5 py-4 sm:px-6">
+        <Button variant="outline" onClick={goBack} disabled={step === 0}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
 
@@ -498,26 +403,26 @@ export default function ABIDocumentWizard() {
           {step < STEPS.length - 1 ? (
             <>
               {showErrorsForCurrentStep && !canAdvance && (
-                <span className="text-xs text-amber-600 dark:text-amber-400 hidden sm:inline">
+                <span className="hidden text-[12.5px] text-soon sm:inline">
                   Fix {stepErrorCount} {stepErrorCount === 1 ? 'issue' : 'issues'} above to continue
                 </span>
               )}
-              <Button variant="outline" size="lg" onClick={handleSaveDraft}>
+              <Button variant="outline" onClick={handleSaveDraft}>
                 Save Draft
               </Button>
-              <Button onClick={goNext} size="lg">
+              <Button onClick={goNext}>
                 Next <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </>
           ) : (
             <>
-              <Button variant="outline" size="lg" onClick={handleSaveDraft}>
+              <Button variant="outline" onClick={handleSaveDraft}>
                 Save Draft
               </Button>
               <AlertDialog open={transmitOpen} onOpenChange={setTransmitOpen}>
                 <AlertDialogTrigger asChild>
                   <Button
-                    size="lg"
+                   
                     disabled={!validation.valid || !docId || sendMut.isPending || replacePending || autosave.isSaving}
                     className="min-w-[200px]"
                   >
@@ -570,6 +475,7 @@ export default function ABIDocumentWizard() {
           )}
         </div>
       </div>
+      </section>
     </div>
   );
 }

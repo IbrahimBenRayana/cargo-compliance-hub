@@ -310,7 +310,11 @@ export const updateABIDocumentSchema = z.object({
 });
 
 export const listABIDocumentsQuerySchema = z.object({
-  status: z.enum(['DRAFT', 'SENDING', 'SENT', 'ACCEPTED', 'REJECTED', 'CANCELLED']).optional(),
+  /** One status, or several joined with commas. */
+  status: z.string()
+    .transform((s) => s.split(',').map((v) => v.trim()).filter(Boolean))
+    .pipe(z.array(z.enum(['DRAFT', 'SENDING', 'SENT', 'ACCEPTED', 'REJECTED', 'CANCELLED'])).min(1).max(6))
+    .optional(),
   mbolNumber: z.string().optional(),
   entryNumber: z.string().optional(),
   skip: z.coerce.number().int().nonnegative().default(0),
