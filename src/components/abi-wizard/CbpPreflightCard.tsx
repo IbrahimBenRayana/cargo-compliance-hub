@@ -23,9 +23,9 @@ export function CbpPreflightCard({ docId }: { docId: string }) {
           {isFetching ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           ) : data?.ready ? (
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <CheckCircle2 className="h-4 w-4 text-done" />
           ) : (
-            <XCircle className="h-4 w-4 text-amber-600" />
+            <XCircle className="h-4 w-4 text-soon" />
           )}
           <span className="text-sm font-medium">
             {isFetching ? 'Checking against CBP rules…' : data?.ready ? 'Ready for CBP' : 'Fix these before sending to CBP'}

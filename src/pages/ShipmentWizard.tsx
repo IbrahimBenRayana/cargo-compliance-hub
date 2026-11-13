@@ -23,6 +23,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { matchesEveryWord } from '@/components/wizard/optionSearch';
+import { OptionText } from '@/components/wizard/OptionText';
+import { StepProgress } from '@/components/wizard/StepProgress';
 // Every country dropdown in this wizard now uses the full ISO 3166-1
 // list from src/data/geo.ts (~250 entries) via ComboboxField below.
 import { COUNTRIES as ALL_COUNTRIES } from '@/data/geo';
@@ -363,36 +366,6 @@ const SelectField = memo(function SelectField({
 // visible label when matching the user's query. `searchPlaceholder` and
 // `emptyMessage` are optional so a country field can show "No country
 // found." instead of "No port found."
-/**
- * A port matches when every word typed appears in its code, name or aliases.
- * The default fuzzy match put "Cobb County" above "New York" for "new".
- * Names that start with what was typed come first.
- */
-function matchesEveryWord(value: string, search: string, keywords?: string[]): number {
-  const hay = `${value} ${(keywords ?? []).join(' ')}`.toLowerCase();
-  const words = search.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words.every((w) => hay.includes(w))) return 0;
-  const name = value.toLowerCase().split(' — ').pop() ?? '';
-  return value.toLowerCase().startsWith(words[0]) || name.startsWith(words[0]) ? 1 : 0.5;
-}
-
-/**
- * "2704 — Los Angeles, California" as a code column and a name. Long names
- * wrap onto their own lines in the list, and cut off with the full text on
- * hover in the closed field. Options without a code show as they are.
- */
-function OptionText({ label, oneLine }: { label: string; oneLine?: boolean }) {
-  const cut = label.indexOf(' — ');
-  if (cut < 0) return <span className={cn('min-w-0 flex-1 text-[13.5px] leading-5', oneLine && 'truncate')} title={oneLine ? label : undefined}>{label}</span>;
-  const name = label.slice(cut + 3);
-  return (
-    <>
-      <span className="w-12 shrink-0 font-mono text-[12.5px] leading-5 text-muted-foreground">{label.slice(0, cut)}</span>
-      <span className={cn('min-w-0 flex-1 text-[13.5px] leading-5', oneLine ? 'truncate' : 'break-words')} title={oneLine ? name : undefined}>{name}</span>
-    </>
-  );
-}
-
 const PortSelectField = memo(function PortSelectField({
   label, hint, required, value, onChange, options, placeholder, error, className: cls,
   searchPlaceholder, emptyMessage,
@@ -2423,35 +2396,7 @@ export default function ShipmentWizard() {
       )}
 
       <section aria-labelledby="step-title" className="min-w-0 rounded-xl border border-border/70 bg-card shadow-card">
-        {/* Progress across the top: one segment a step, so the form below keeps the full width. */}
-        <nav aria-label="Steps" className="px-5 pt-5 sm:px-6">
-          <ol className="grid gap-1.5 sm:gap-2" style={{ gridTemplateColumns: `repeat(${STEPS.length}, minmax(0, 1fr))` }}>
-            {STEPS.map((s, i) => {
-              const isActive = i === step;
-              const isDone = i < step;
-              return (
-                <li key={s.id} className="min-w-0">
-                  <button
-                    type="button"
-                    onClick={() => { if (i <= step) setStep(i); }}
-                    disabled={i > step}
-                    aria-current={isActive ? 'step' : undefined}
-                    aria-label={`Step ${i + 1}: ${s.label}${isDone ? ', done' : ''}`}
-                    className={cn('group block w-full rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', i > step && 'cursor-not-allowed')}
-                  >
-                    <span aria-hidden className={cn('block h-1 rounded-full transition-colors duration-200', isDone ? 'bg-[hsl(var(--done-fill))]' : isActive ? 'bg-primary' : 'bg-border')} />
-                    <span aria-hidden className="mt-2 flex min-w-0 items-center gap-1.5 text-[12.5px] max-md:hidden">
-                      <span className={cn('grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[11px] font-semibold tabular-nums', isDone ? 'bg-done-tint text-done' : isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
-                        {isDone ? <Check className="h-3 w-3" strokeWidth={3} /> : i + 1}
-                      </span>
-                      <span className={cn('truncate', isActive ? 'font-semibold text-foreground' : isDone ? 'font-medium text-foreground can-hover:group-hover:underline' : 'text-muted-foreground')}>{s.label}</span>
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-        </nav>
+        <StepProgress steps={STEPS} current={step} onSelect={setStep} />
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-1 border-b border-border/70 px-5 pb-4 pt-5 sm:px-6">
           <div className="min-w-0">
             <p className="text-[12.5px] tabular-nums text-muted-foreground md:hidden">Step {step + 1} of {STEPS.length}</p>
