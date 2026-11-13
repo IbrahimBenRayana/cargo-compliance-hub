@@ -1,474 +1,335 @@
-import { useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Loader2, RefreshCw, Package, Ship, Plane, MapPin, Hash, Calendar, AlertCircle, FileCheck, ArrowRight } from '@/components/icons';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+/**
+ * Manifest query: ask what CBP has on file for a bill, read the answer, and
+ * start an ISF or an entry from it. The open answer lives in the address
+ * (?id=), so other pages can link straight to one.
+ */
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
+import type { ManifestQueryRecord } from '@/api/client';
+import { AlertCircle, ArrowRight, CheckCircle2, ChevronRight, Hourglass, Loader2, RefreshCw, Search, ShieldAlert } from '@/components/icons';
+import type { IconType } from '@/components/icons';
+import { Pagination } from '@/components/dashboard/Pagination';
+import { BAND, FILL, TINT, type Tone } from '@/components/dashboard/tones';
+import { stamp } from '@/components/shipment-detail/summary';
+import { isUsPort, usePortName } from '@/components/shipment-detail/usePortName';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Label } from '@/components/ui/label';
-import { useManifestQuery, useManifestQueries, useCreateManifestQuery, usePollManifestQuery } from '@/hooks/useManifestQuery';
+import { getDispositionInfo, type DispositionInfo } from '@/data/dispositionCodes';
 import { useCapabilities } from '@/hooks/useBilling';
+import { useCreateManifestQuery, useManifestQueries, useManifestQuery, usePollManifestQuery } from '@/hooks/useManifestQuery';
 import { CAPABILITIES } from '@/lib/planMeta';
-import { getDispositionInfo, getDispositionBadgeColor } from '@/data/dispositionCodes';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-// ── Date helper ────────────────────────────────────────────────
-function parseCCDate(mmddyy: string | undefined): string {
-  if (!mmddyy || mmddyy.length !== 6) return mmddyy || '—';
-  const mm = mmddyy.slice(0, 2);
-  const dd = mmddyy.slice(2, 4);
-  const yy = mmddyy.slice(4, 6);
-  const year = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`;
-  return `${year}-${mm}-${dd}`;
+const PAGE_SIZE = 10;
+const PAGE = 'mx-auto flex max-w-[1360px] flex-col gap-5 -mx-2 sm:mx-auto pb-24 sm:pb-12';
+const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
+const TH = 'px-4 py-2.5 text-left text-[12px] font-medium text-muted-foreground';
+
+type BillType = 'BOLNUMBER' | 'AWBNUMBER';
+
+interface Disposition { dispositionCode: string; entryNumber?: string }
+interface House {
+  hawbNumber?: string; awbNumber?: string; flightNumber?: string; importingCarrierCode?: string;
+  scheduledArrivalDate?: string; manifestQty?: string | number; manifestedPort?: string; dispositionMsg?: Disposition[];
+}
+interface Manifest {
+  errorMessage?: string; carrierCode?: string; conveyanceName?: string; voyageFlightTripNo?: string;
+  scheduledArrivalDate?: string; modeOfTransport?: string; manifestedPortOfUnlading?: string; houses?: House[];
+}
+type QueryRecord = ManifestQueryRecord;
+
+const SEVERITY_TONE: Record<DispositionInfo['severity'], Tone> = { success: 'done', info: 'info', warning: 'soon', error: 'urgent' };
+
+/** The answer's body, whichever of its two shapes it arrived in. */
+function manifestOf(q: QueryRecord): Manifest | null {
+  const raw = (q.response as { data?: { response?: Manifest | Manifest[] } } | null)?.data?.response;
+  return (Array.isArray(raw) ? raw[0] : raw) ?? null;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const classes: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-    completed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
-    failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    timeout: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400',
-  };
-  return (
-    <span className={cn('inline-flex items-center px-2 py-0.5 rounded text-xs font-medium', classes[status] ?? classes['timeout'])}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  );
+/** The answer's dates are MMDDYY. */
+function manifestDay(mmddyy: string | undefined): string | null {
+  if (!mmddyy || !/^\d{6}$/.test(mmddyy)) return mmddyy || null;
+  const d = new Date(2000 + Number(mmddyy.slice(4)), Number(mmddyy.slice(0, 2)) - 1, Number(mmddyy.slice(2, 4)));
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// ── Result display ─────────────────────────────────────────────
-function ManifestResult({ queryData }: { queryData: any }) {
-  const response = queryData?.response;
-  const { can } = useCapabilities();
-  // CC returns `response` as either an array (multi-result) or a single
-  // object (single BOL — including the "BILL NBR NOT ON FILE" case where
-  // the only meaningful field is `errorMessage`). Normalise to an object.
-  const raw = response?.data?.response;
-  const manifest = Array.isArray(raw) ? raw[0] : raw;
-  const ccErrorMessage: string | undefined = manifest?.errorMessage;
+interface Outcome { tone: Tone; icon: IconType; word: string; title: string; detail?: string }
 
-  // CBP-side error: BOL not on file, formatting issue, etc. Surface the
-  // raw CC code+text rather than hiding behind a generic empty state.
-  if (ccErrorMessage) {
-    return (
-      <div className="flex items-start gap-3 py-4 px-4 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40">
-        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-        <div className="space-y-0.5">
-          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
-            CBP responded but had no manifest data
-          </p>
-          <p className="text-xs text-amber-800 dark:text-amber-300/90">
-            {ccErrorMessage}
-          </p>
-          {(manifest?.carrierCode || manifest?.masterBLNumber) && (
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Carrier {manifest.carrierCode || '—'} · BOL {manifest.masterBLNumber || '—'}
-            </p>
-          )}
-        </div>
-      </div>
-    );
+/** One query in a sentence: still waiting, not on file, on file, or no answer. */
+function outcomeOf(q: QueryRecord): Outcome {
+  if (q.status === 'pending' || q.status === 'polling') {
+    return { tone: 'info', icon: Hourglass, word: 'Checking', title: 'Checking the manifest.', detail: 'The answer shows here as soon as it arrives.' };
   }
-
-  if (!manifest || (Array.isArray(manifest.houses) && manifest.houses.length === 0 && !manifest.carrierCode)) {
-    return (
-      <div className="flex items-center gap-2 text-muted-foreground py-4">
-        <AlertCircle className="h-4 w-4" />
-        <span className="text-sm">No manifest data found in the CBP response.</span>
-      </div>
-    );
+  if (q.status !== 'completed') {
+    return { tone: 'urgent', icon: AlertCircle, word: 'No answer', title: 'No answer came back.', detail: q.errorMessage ?? 'Ask again to retry.' };
   }
+  const m = manifestOf(q);
+  if (m?.errorMessage) {
+    return { tone: 'soon', icon: AlertCircle, word: 'Not on file', title: 'CBP has no manifest on file for this bill.', detail: `CBP answered: ${m.errorMessage}` };
+  }
+  const houses = m?.houses ?? [];
+  if (!m || (!houses.length && !m.carrierCode)) {
+    return { tone: 'calm', icon: AlertCircle, word: 'Empty', title: 'The answer had no manifest details.' };
+  }
+  const held = houses.filter((h) => (h.dispositionMsg ?? []).some((d) => ['warning', 'error'].includes(getDispositionInfo(d.dispositionCode).severity))).length;
+  const count = houses.length === 1 ? '1 house bill' : `${houses.length} house bills`;
+  if (held) return { tone: 'soon', icon: ShieldAlert, word: 'Hold', title: 'On file with CBP, with a hold.', detail: `${count}, ${held} with a hold or exam code.` };
+  return { tone: 'done', icon: CheckCircle2, word: 'On file', title: 'On file with CBP.', detail: houses.length ? `${count}.` : undefined };
+}
 
-  const houses: any[] = manifest.houses ?? [];
-  const modeIcon = manifest.modeOfTransport === 'AIR' ? <Plane className="h-4 w-4" /> : <Ship className="h-4 w-4" />;
-
+function Fact({ label, sub, mono, children }: { label: string; sub?: string | null; mono?: boolean; children: React.ReactNode }) {
   return (
-    <div className="space-y-4">
-      {/* Summary card */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {[
-          { icon: <Hash className="h-3.5 w-3.5" />, label: 'BOL', value: queryData.bolNumber },
-          { icon: modeIcon, label: 'Mode', value: manifest.modeOfTransport ?? '—' },
-          { icon: <Ship className="h-3.5 w-3.5" />, label: 'Carrier', value: manifest.carrierCode ?? '—' },
-          { icon: <Package className="h-3.5 w-3.5" />, label: 'Conveyance', value: manifest.conveyanceName ?? '—' },
-          { icon: <Calendar className="h-3.5 w-3.5" />, label: 'Arrival', value: parseCCDate(manifest.scheduledArrivalDate) },
-          { icon: <MapPin className="h-3.5 w-3.5" />, label: 'Port', value: manifest.manifestedPortOfUnlading ?? '—' },
-        ].map((item) => (
-          <div key={item.label} className="bg-muted/40 rounded-lg p-3 space-y-1">
-            <div className="flex items-center gap-1 text-muted-foreground">{item.icon}<span className="text-[10px] font-semibold uppercase tracking-wider">{item.label}</span></div>
-            <p className="text-sm font-medium truncate" title={item.value}>{item.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Houses table */}
-      {houses.length > 0 && (
-        <div className="rounded-lg border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="text-xs">HAWB / AWB</TableHead>
-                <TableHead className="text-xs">Flight / Vessel</TableHead>
-                <TableHead className="text-xs">Carrier</TableHead>
-                <TableHead className="text-xs">Arrival Date</TableHead>
-                <TableHead className="text-xs">Qty</TableHead>
-                <TableHead className="text-xs">Port</TableHead>
-                <TableHead className="text-xs">Dispositions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {houses.map((house: any, i: number) => (
-                <TableRow key={i}>
-                  <TableCell className="font-mono text-xs">{house.hawbNumber ?? house.awbNumber ?? '—'}</TableCell>
-                  <TableCell className="text-xs">{house.flightNumber ?? '—'}</TableCell>
-                  <TableCell className="text-xs">{house.importingCarrierCode ?? '—'}</TableCell>
-                  <TableCell className="text-xs">{parseCCDate(house.scheduledArrivalDate)}</TableCell>
-                  <TableCell className="text-xs">{house.manifestQty ?? '—'}</TableCell>
-                  <TableCell className="text-xs">{house.manifestedPort ?? '—'}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {(house.dispositionMsg ?? []).map((d: any, j: number) => {
-                        const info = getDispositionInfo(d.dispositionCode);
-                        const color = getDispositionBadgeColor(info.severity);
-                        return (
-                          <span
-                            key={j}
-                            title={`${info.description}${d.entryNumber ? ` — Entry: ${d.entryNumber}` : ''}`}
-                            className={cn('inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium cursor-default', color)}
-                          >
-                            {d.dispositionCode} {info.label}
-                          </span>
-                        );
-                      })}
-                      {(!house.dispositionMsg || house.dispositionMsg.length === 0) && (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      {houses.length === 0 && (
-        <p className="text-sm text-muted-foreground py-2">No house entries returned for this BOL.</p>
-      )}
-
-      {/* Next-step CTAs: turn this manifest into either an ISF filing
-          or an Entry Summary. ISF is upstream (before arrival), Entry
-          comes later — both pre-fill the BOL/carrier/port fields. */}
-      {queryData?.id && (
-        <div className="space-y-2">
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <Ship className="h-4 w-4 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">File an ISF (10+2)</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  Start a new ISF filing pre-populated with this manifest's BOL, carrier,
-                  port of unlading, and arrival date. Parties and bond still need entry.
-                </p>
-              </div>
-            </div>
-            <Button asChild size="sm" variant="outline" className="shrink-0">
-              <Link to={`/shipments/new?fromManifestQuery=${queryData.id}`}>
-                File ISF <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-              </Link>
-            </Button>
-          </div>
-
-          {can(CAPABILITIES.ABI_ENTRY) && (
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <FileCheck className="h-4 w-4 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">File an Entry Summary (7501)</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  Start a new ABI entry pre-populated with this manifest's MBOL, carrier,
-                  and port data.
-                </p>
-              </div>
-            </div>
-            <Button asChild size="sm" className="shrink-0">
-              <Link to={`/abi-documents/new?fromManifest=${queryData.id}`}>
-                Create Entry <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-              </Link>
-            </Button>
-          </div>
-          )}
-        </div>
-      )}
+    <div className="min-w-0">
+      <dt className="text-[12px] text-muted-foreground">{label}</dt>
+      <dd className={cn('mt-0.5 truncate text-[14px] font-medium', mono && 'font-mono text-[13.5px]')}>
+        {children || <span className="font-sans font-normal text-muted-foreground">Not in the answer</span>}
+      </dd>
+      {sub && <dd className="truncate text-[12px] text-muted-foreground">{sub}</dd>}
     </div>
   );
 }
 
-// ── Active query panel ─────────────────────────────────────────
-function ActiveQueryPanel({ queryId, onClose }: { queryId: string; onClose: () => void }) {
-  const { data, isLoading } = useManifestQuery(queryId);
-  const pollQuery = usePollManifestQuery();
+function PortFact({ code }: { code: string | undefined }) {
+  const name = usePortName(code);
+  return <Fact label={isUsPort(code) ? 'US port' : 'Port of unlading'} sub={name} mono>{code}</Fact>;
+}
 
-  const queryData = data?.data;
-  const status = queryData?.status;
-
-  const handleRetry = () => {
-    pollQuery.mutate(queryId, {
-      onSuccess: () => toast.success('Query re-polled'),
-      onError: (err: any) => toast.error(err.message ?? 'Poll failed'),
-    });
-  };
-
+function Dispositions({ items }: { items: Disposition[] }) {
+  if (!items.length) return <span className="text-[13px] text-muted-foreground">None yet</span>;
   return (
-    <Card className="opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards', animationDelay: '50ms' }}>
-      <CardHeader className="flex flex-row items-start justify-between pb-3">
-        <div>
-          <CardTitle className="text-base">Query Result</CardTitle>
-          {queryData && (
-            <CardDescription className="font-mono text-xs mt-0.5">{queryData.bolNumber}</CardDescription>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {queryData && <StatusBadge status={queryData.status} />}
-          <Button variant="ghost" size="sm" className="text-xs h-7" onClick={onClose}>Dismiss</Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {(isLoading || status === 'pending') && (
-          <div className="flex items-center gap-3 py-4">
-            <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
-            <span className="text-sm text-muted-foreground">Querying CBP manifest data… this may take up to 30 seconds.</span>
-          </div>
-        )}
-        {status === 'completed' && queryData && (
-          <ManifestResult queryData={queryData} />
-        )}
-        {(status === 'failed' || status === 'timeout') && (
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <div>
-                <p className="text-sm font-medium text-destructive">Query {status}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{queryData?.errorMessage ?? 'CBP did not return a result within the timeout window.'}</p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" className="gap-1.5 ml-4" onClick={handleRetry} disabled={pollQuery.isPending}>
-              {pollQuery.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              Retry
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <ul className="flex flex-wrap gap-1.5">
+      {items.map((d, i) => {
+        const info = getDispositionInfo(d.dispositionCode);
+        return (
+          <li key={i} title={info.description} className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[12px] font-medium', TINT[SEVERITY_TONE[info.severity]])}>
+            <span className="font-mono text-[11.5px]">{d.dispositionCode}</span>
+            {info.label}
+            {d.entryNumber && <span className="font-mono text-[11.5px] opacity-80">{d.entryNumber}</span>}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
-// ── Main page ──────────────────────────────────────────────────
-export default function ManifestQueryPage() {
-  const [searchParams] = useSearchParams();
-  const initialBol = searchParams.get('bol') ?? '';
+function Houses({ houses }: { houses: House[] }) {
+  return (
+    <div className="overflow-x-auto border-t border-border/70">
+      <table className="w-full min-w-[640px] text-[13px]">
+        <thead>
+          <tr className="border-b border-border/70">
+            <th scope="col" className={TH}>House bill</th>
+            <th scope="col" className={TH}>Carrier</th>
+            <th scope="col" className={TH}>Arrival</th>
+            <th scope="col" className={cn(TH, 'text-right')}>Quantity</th>
+            <th scope="col" className={TH}>Port</th>
+            <th scope="col" className={TH}>CBP status codes</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/60">
+          {houses.map((h, i) => (
+            <tr key={i}>
+              <td className="px-4 py-2.5 font-mono font-medium">{h.hawbNumber ?? h.awbNumber ?? ''}</td>
+              <td className="px-4 py-2.5 font-mono">{h.importingCarrierCode ?? ''}</td>
+              <td className="whitespace-nowrap px-4 py-2.5 tabular-nums">{manifestDay(h.scheduledArrivalDate) ?? ''}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums">{h.manifestQty != null ? Number(h.manifestQty).toLocaleString() : ''}</td>
+              <td className="px-4 py-2.5 font-mono">{h.manifestedPort ?? ''}</td>
+              <td className="px-4 py-2.5"><Dispositions items={h.dispositionMsg ?? []} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
-  const [bolInput, setBolInput] = useState(initialBol);
-  const [bolType, setBolType] = useState<'BOLNUMBER' | 'AWBNUMBER'>('BOLNUMBER');
-  const [activeQueryId, setActiveQueryId] = useState<string | undefined>(undefined);
+function Answer({ id, onAskAgain, asking }: { id: string; onAskAgain: (q: QueryRecord) => void; asking: boolean }) {
+  const { data, isLoading, isError } = useManifestQuery(id);
+  const poll = usePollManifestQuery();
+  const { can } = useCapabilities();
+  const q = data?.data;
+
+  if (isLoading) return <Skeleton className="h-[72px] rounded-xl" />;
+  if (isError || !q) {
+    return <p role="alert" className={cn(PANEL, 'px-5 py-4 text-[13px] text-muted-foreground')}>That query could not be opened. Pick one from the list below.</p>;
+  }
+
+  const o = outcomeOf(q);
+  const m = manifestOf(q);
+  const waiting = o.word === 'Checking';
+  const found = q.status === 'completed' && !!m && !m.errorMessage && o.tone !== 'calm';
+  const houses = m?.houses ?? [];
+
+  return (
+    <section aria-label="Answer" aria-live="polite" className={PANEL}>
+      <div className={cn('flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4', BAND[o.tone])}>
+        <span aria-hidden className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-full text-white dark:text-background', FILL[o.tone])}>
+          {waiting ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" /> : <o.icon weight="duotone" className="h-5 w-5" />}
+        </span>
+        <div className="min-w-0 flex-1 basis-64">
+          <p className="text-[16px] font-semibold leading-6">{o.title}</p>
+          <p className="mt-0.5 text-[13px] text-foreground/75">
+            <span className="font-mono">{q.bolNumber}</span>, asked {stamp(q.createdAt)}.{o.detail && ` ${o.detail}`}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {found && (
+            <>
+              <Button asChild size="sm" variant="outline" className="bg-card"><Link to={`/shipments/new?fromManifestQuery=${q.id}`}>Start ISF<ArrowRight aria-hidden /></Link></Button>
+              {can(CAPABILITIES.ABI_ENTRY) && (
+                <Button asChild size="sm"><Link to={`/abi-documents/new?fromManifest=${q.id}`}>Start entry<ArrowRight aria-hidden /></Link></Button>
+              )}
+            </>
+          )}
+          {(q.status === 'failed' || q.status === 'timeout') && (
+            <Button
+              size="sm" variant="outline" className="bg-card" disabled={poll.isPending}
+              onClick={() => poll.mutate(q.id, { onError: (err: Error) => toast.error(err.message || 'Could not check again.') })}
+            >
+              {poll.isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw aria-hidden />}Check again
+            </Button>
+          )}
+          {q.status === 'completed' && !found && (
+            <Button size="sm" variant="outline" className="bg-card" disabled={asking} onClick={() => onAskAgain(q)}>
+              {asking ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw aria-hidden />}Ask again
+            </Button>
+          )}
+        </div>
+      </div>
+      {found && m && (
+        <>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-3 lg:grid-cols-5">
+            <Fact label="Carrier" mono>{m.carrierCode}</Fact>
+            <Fact label={m.modeOfTransport === 'AIR' ? 'Flight' : 'Vessel'} sub={m.voyageFlightTripNo ? `Voyage ${m.voyageFlightTripNo}` : null}>{m.conveyanceName}</Fact>
+            <Fact label="Scheduled arrival">{manifestDay(m.scheduledArrivalDate ?? houses[0]?.scheduledArrivalDate)}</Fact>
+            <PortFact code={m.manifestedPortOfUnlading ?? houses[0]?.manifestedPort} />
+            <Fact label="House bills">{houses.length ? String(houses.length) : null}</Fact>
+          </dl>
+          {houses.length > 0 && <Houses houses={houses} />}
+        </>
+      )}
+    </section>
+  );
+}
+
+function History({ openId, onOpen }: { openId: string | null; onOpen: (id: string) => void }) {
   const [page, setPage] = useState(1);
+  const { data, isLoading, isError, refetch } = useManifestQueries({ page, limit: PAGE_SIZE });
+  const rows = data?.data ?? [];
+  const total = data?.pagination?.total ?? 0;
 
-  const createQuery = useCreateManifestQuery();
-  const { data: historyData, isLoading: historyLoading } = useManifestQueries({ page, limit: 10 });
+  return (
+    <section aria-labelledby="history-title" className={PANEL}>
+      <h2 id="history-title" className="px-5 py-3.5 text-[14px] font-semibold">Earlier queries</h2>
+      {isLoading ? (
+        <div className="space-y-2 border-t border-border/70 p-4">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-9" />)}</div>
+      ) : isError ? (
+        <p role="alert" className="border-t border-border/70 px-5 py-6 text-[13px] text-muted-foreground">
+          The list could not load. <button type="button" onClick={() => refetch()} className="text-foreground underline underline-offset-2">Retry</button>
+        </p>
+      ) : rows.length === 0 ? (
+        <p className="border-t border-border/70 px-5 py-8 text-center text-[13px] text-muted-foreground">Nothing asked yet. Each bill you check is kept here with its answer.</p>
+      ) : (
+        <>
+          <ul className="divide-y divide-border/60 border-t border-border/70">
+            {rows.map((q) => {
+              const o = outcomeOf(q);
+              return (
+                <li key={q.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpen(q.id)}
+                    aria-current={q.id === openId ? 'true' : undefined}
+                    className={cn(
+                      'grid w-full grid-cols-[minmax(0,1fr)_6.5rem_1rem] items-center gap-x-4 px-4 py-2.5 text-left outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_8rem_9.5rem_1rem]',
+                      q.id === openId ? 'bg-muted/70' : 'can-hover:hover:bg-muted/50',
+                    )}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-mono text-[13px] font-medium">{q.bolNumber}</span>
+                      <span className="block text-[12px] text-muted-foreground">{q.bolType === 'AWBNUMBER' ? 'Air waybill' : 'Ocean bill'}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[13px]">
+                      <span aria-hidden className={cn('h-1.5 w-1.5 shrink-0 rounded-full', FILL[o.tone])} />{o.word}
+                    </span>
+                    <time dateTime={q.createdAt} className="text-[12.5px] tabular-nums text-muted-foreground max-sm:hidden">{stamp(q.createdAt)}</time>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / PAGE_SIZE))} total={total} pageSize={PAGE_SIZE} onChange={setPage} label="Earlier queries pages" layoutId="manifest-page" />
+        </>
+      )}
+    </section>
+  );
+}
 
-  const history = historyData?.data ?? [];
-  const pagination = historyData?.pagination;
+export default function ManifestQueryPage() {
+  const [params, setParams] = useSearchParams();
+  const openId = params.get('id') ?? params.get('queryId');
+  const [bill, setBill] = useState(params.get('bol') ?? '');
+  const [type, setType] = useState<BillType>('BOLNUMBER');
+  const create = useCreateManifestQuery();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bolInput.trim()) return;
+  const open = (id: string) => setParams({ id }, { replace: true });
+  useEffect(() => {
+    if (openId) window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [openId]);
+
+  const ask = async (bolNumber: string, bolType: BillType) => {
     try {
-      const result = await createQuery.mutateAsync({ bolNumber: bolInput.trim(), bolType });
-      setActiveQueryId(result.data.id);
-      toast.success('Manifest query submitted');
-    } catch (err: any) {
-      toast.error(err.message ?? 'Failed to submit query');
+      const result = await create.mutateAsync({ bolNumber, bolType });
+      open(result.data.id);
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'The query could not be sent. Try again.');
     }
   };
 
-  const handleHistoryRowClick = (id: string) => {
-    setActiveQueryId(id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   return (
-    <div className="space-y-6 max-w-[1100px] mx-auto">
-      {/* Page header */}
-      <header className="space-y-4 opacity-0 animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100" style={{ animationFillMode: 'forwards' }}>
-        <div className="flex items-center gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/70 shrink-0 inline-flex items-center gap-2">
-            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-500/60" aria-hidden />
-            Lookups · CBP
-          </p>
-          <span className="h-px flex-1 bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground inline-flex items-center gap-3">
-            <Search className="h-7 w-7 text-amber-500 shrink-0" />
-            Manifest Query
-          </h1>
-          <p className="text-[14px] text-muted-foreground mt-2">Look up cargo status at CBP by BOL number</p>
-        </div>
+    <div className={PAGE}>
+      <header>
+        <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.015em]">Manifest query</h1>
+        <p className="text-[13px] text-muted-foreground">See what CBP has on file for a bill before you file against it.</p>
       </header>
 
-      {/* Search section */}
-      <Card className="opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards', animationDelay: '30ms' }}>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">New Query</CardTitle>
-          <CardDescription>Enter a Bill of Lading number to retrieve manifest status from CBP</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1 space-y-1.5">
-              <Label htmlFor="bol-input" className="text-xs font-medium">BOL Number</Label>
-              <Input
-                id="bol-input"
-                placeholder="e.g. MAEU123456789"
-                value={bolInput}
-                onChange={(e) => setBolInput(e.target.value)}
-                className="font-mono"
-                required
-              />
-            </div>
-            <div className="sm:w-44 space-y-1.5">
-              <Label className="text-xs font-medium">BOL Type</Label>
-              <Select value={bolType} onValueChange={(v) => setBolType(v as 'BOLNUMBER' | 'AWBNUMBER')}>
-                <SelectTrigger aria-label="BOL type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BOLNUMBER">Bill of Lading</SelectItem>
-                  <SelectItem value="AWBNUMBER">Air Waybill</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="sm:self-end space-y-1.5">
-              <div className="hidden sm:block text-xs opacity-0 select-none">x</div>
-              <Button
-                type="submit"
-                disabled={createQuery.isPending || !bolInput.trim()}
-                className="w-full sm:w-auto gap-2 bg-amber-500 hover:bg-amber-600 text-amber-950 font-semibold"
-              >
-                {createQuery.isPending ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" />Querying…</>
-                ) : (
-                  <><Search className="h-4 w-4" />Query Manifest</>
-                )}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      <form
+        onSubmit={(e) => { e.preventDefault(); if (bill.trim()) ask(bill.trim(), type); }}
+        className={cn(PANEL, 'flex flex-col gap-3 p-4 sm:flex-row sm:items-center')}
+      >
+        <div role="radiogroup" aria-label="Bill type" className="flex shrink-0 rounded-lg bg-muted p-0.5">
+          {([['BOLNUMBER', 'Ocean bill'], ['AWBNUMBER', 'Air waybill']] as const).map(([value, label]) => (
+            <button
+              key={value} type="button" role="radio" aria-checked={type === value} onClick={() => setType(value)}
+              className={cn(
+                'flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-[13px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring',
+                type === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground can-hover:hover:text-foreground',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input
+            id="manifest-bill" aria-label={type === 'AWBNUMBER' ? 'Air waybill number' : 'Master bill of lading number'}
+            value={bill} onChange={(e) => setBill(e.target.value.toUpperCase())}
+            placeholder={type === 'AWBNUMBER' ? 'Air waybill number' : 'Master bill number, with the carrier code, like MAEU123456789'}
+            autoComplete="off" spellCheck={false} className="h-10 pl-9 font-mono placeholder:font-sans"
+          />
+        </div>
+        <Button type="submit" disabled={create.isPending || !bill.trim()} className="h-10 shrink-0">
+          {create.isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Search aria-hidden />}Check manifest
+        </Button>
+      </form>
 
-      {/* Active query result */}
-      {activeQueryId && (
-        <ActiveQueryPanel
-          key={activeQueryId}
-          queryId={activeQueryId}
-          onClose={() => setActiveQueryId(undefined)}
-        />
-      )}
+      {openId && <Answer key={openId} id={openId} asking={create.isPending} onAskAgain={(q) => ask(q.bolNumber, q.bolType === 'AWBNUMBER' ? 'AWBNUMBER' : 'BOLNUMBER')} />}
 
-      {/* Query history */}
-      <Card className="opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards', animationDelay: '80ms' }}>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Query History</CardTitle>
-          <CardDescription>Previous manifest queries — click a row to view results</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="rounded-b-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs pl-4">BOL Number</TableHead>
-                  <TableHead className="text-xs">Type</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Submitted</TableHead>
-                  <TableHead className="text-xs">Completed</TableHead>
-                  <TableHead className="text-xs text-right pr-4">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {historyLoading && (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 6 }).map((__, j) => (
-                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                )}
-                {!historyLoading && history.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
-                      No queries yet — submit a BOL number above to get started.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!historyLoading && history.map((q: any) => (
-                  <TableRow
-                    key={q.id}
-                    className="cursor-pointer hover:bg-muted/40 transition-colors"
-                    onClick={() => handleHistoryRowClick(q.id)}
-                  >
-                    <TableCell className="font-mono text-xs pl-4">{q.bolNumber}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{q.bolType}</TableCell>
-                    <TableCell><StatusBadge status={q.status} /></TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(q.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {q.completedAt
-                        ? new Date(q.completedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                        : '—'}
-                    </TableCell>
-                    <TableCell className="text-right pr-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={(e) => { e.stopPropagation(); handleHistoryRowClick(q.id); }}
-                      >
-                        View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Pagination */}
-          {pagination && pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t">
-              <p className="text-xs text-muted-foreground">
-                Page {pagination.page} of {pagination.totalPages} &mdash; {pagination.total} total
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-                  Previous
-                </Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= pagination.totalPages} onClick={() => setPage(p => p + 1)}>
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <History openId={openId} onOpen={open} />
     </div>
   );
 }
