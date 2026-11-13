@@ -1200,21 +1200,25 @@ export default function ShipmentDetails() {
 
       {/* What was filed: parties, shipment and goods */}
       <div className="grid gap-5 md:grid-cols-2">
-        {sections.map((section) => (
-          <section key={section.title} aria-label={section.title} className={PANEL}>
-            <PanelTitle icon={section.icon}>{section.title}</PanelTitle>
-            <dl className="mt-3 divide-y divide-border/60">
-              {section.items.map(([label, value]) => (
-                <div key={label as string} className="flex justify-between gap-4 py-2 text-[13px] first:pt-0 last:pb-0">
-                  <dt className="shrink-0 text-muted-foreground">{label as string}</dt>
-                  <dd className="min-w-0 truncate text-right font-medium" title={(value as string) || undefined}>
-                    {(value as string) || <span className="font-normal text-muted-foreground">Not provided</span>}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        ))}
+        {sections.map((section, i) => {
+          // An odd panel out takes the whole row, its facts in two columns, so no gap is left beside it.
+          const wide = sections.length % 2 === 1 && i === sections.length - 1;
+          return (
+            <section key={section.title} aria-label={section.title} className={cn(PANEL, wide && 'md:col-span-2')}>
+              <PanelTitle icon={section.icon}>{section.title}</PanelTitle>
+              <dl className={cn('mt-3', wide ? 'grid md:grid-cols-2 md:gap-x-10' : 'divide-y divide-border/60')}>
+                {section.items.map(([label, value]) => (
+                  <div key={label as string} className={cn('flex justify-between gap-4 py-2 text-[13px]', wide ? 'border-b border-border/60' : 'first:pt-0 last:pb-0')}>
+                    <dt className="shrink-0 text-muted-foreground">{label as string}</dt>
+                    <dd className="min-w-0 truncate text-right font-medium" title={(value as string) || undefined}>
+                      {(value as string) || <span className="font-normal text-muted-foreground">Not provided</span>}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          );
+        })}
       </div>
 
       {filing.commodities && filing.commodities.length > 0 && (
