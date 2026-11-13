@@ -1,14 +1,14 @@
 /**
  * Duty calculator: estimate duties, added tariffs and fees for a set of
  * goods. Two ways in: by HTS code, or by description, where each line is
- * classified first. The form runs the full width and the estimate follows it.
+ * classified first. The form is on the left and the estimate stays beside it.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { AbiDocument, DutyCalcAIResponse, DutyCalcItem, DutyCalcRequest, DutyCalcResponse } from '@/api/client';
 import { ComboboxField, DateField, SelectField } from '@/components/abi-wizard/shared';
 import { ItemRow } from '@/components/duty-calc/ItemRow';
-import { Results } from '@/components/duty-calc/Results';
+import { Results, ResultsPlaceholder } from '@/components/duty-calc/Results';
 import { ProvenanceChip, SourcePicker } from '@/components/duty-calc/SourcePicker';
 import { emptyItem, MAX_ITEMS, type ItemDraft, type Mode } from '@/components/duty-calc/types';
 import { AlertCircle, Calculator, Loader2, Plus } from '@/components/icons';
@@ -26,6 +26,11 @@ const PANEL = 'rounded-xl border border-border/70 bg-card shadow-card';
 function yyyymmddToMMDDYYYY(v: string): string {
   if (!v || v.length !== 8) return '';
   return `${v.slice(4, 6)}/${v.slice(6, 8)}/${v.slice(0, 4)}`;
+}
+
+/** The calculation's own field names, in the page's words. */
+function plainMessage(message: string): string {
+  return message.replace(/quantity1/g, 'quantity').replace(/quantity2/g, 'second quantity').replace(/ \(as number\)/g, '');
 }
 
 function toNumberOrUndef(s: string): number | undefined {
@@ -365,7 +370,7 @@ export default function DutyCalculatorPage() {
         const next: Record<string, string> = {};
         for (const issue of body.issues) {
           const key = pathToKey(issue.path);
-          if (key && !next[key]) next[key] = issue.message;
+          if (key && !next[key]) next[key] = plainMessage(issue.message);
         }
         setServerErrors(next);
         const count = Object.keys(next).length;
@@ -425,6 +430,8 @@ export default function DutyCalculatorPage() {
     } as Record<string, string>)[key] ?? key;
   }
 
+  // The button is at the foot of the form and the estimate starts beside its
+  // head (or under it on a phone), so a new estimate is brought into view.
   const resultRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (result) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -441,92 +448,95 @@ export default function DutyCalculatorPage() {
         <ModeToggle mode={mode} onChange={handleModeChange} />
       </header>
 
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
-        <SourcePicker source={source} onPickFiling={applyFilingPrefill} onPickAbiDocument={applyAbiPrefill} onClear={clearPrefill} />
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <form onSubmit={handleSubmit} noValidate className="flex min-w-0 flex-col gap-5">
+          <SourcePicker source={source} onPickFiling={applyFilingPrefill} onPickAbiDocument={applyAbiPrefill} onClear={clearPrefill} />
 
-        <section aria-labelledby="shipment-title" className={cn(PANEL, 'p-5')}>
-          <h2 id="shipment-title" className="text-[14px] font-semibold">Shipment</h2>
-          <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
-            <ComboboxField
-              label="Country of origin" required value={countryOfOrigin} options={COUNTRIES} placeholder="Select a country"
-              onChange={(v) => { setCountryOfOrigin(v); markFieldEdited('countryOfOrigin'); clearServerError('countryOfOrigin'); }}
-              labelExtra={<ProvenanceChip source={provenanceFor('countryOfOrigin')} />} error={visibleErrors.countryOfOrigin}
-            />
-            <SelectField
-              label="Transport" required value={modeOfTransportation}
-              onChange={(v) => { setModeOfTransportation(v as DutyCalcRequest['modeOfTransportation']); markFieldEdited('modeOfTransportation'); clearServerError('modeOfTransportation'); }}
-              options={[{ value: 'ocean', label: 'Ocean' }, { value: 'air', label: 'Air' }, { value: 'truck', label: 'Truck' }, { value: 'rail', label: 'Rail' }]}
-              labelExtra={<ProvenanceChip source={provenanceFor('modeOfTransportation')} />} error={visibleErrors.modeOfTransportation}
-            />
-            <SelectField
-              label="Entry type" required value={entryType}
-              onChange={(v) => { setEntryType(v as DutyCalcRequest['entryType']); clearServerError('entryType'); }}
-              options={[{ value: 'formal', label: 'Formal' }, { value: 'informal', label: 'Informal' }]} error={visibleErrors.entryType}
-            />
-            <SelectField
-              label="Currency" required value={currency} options={CURRENCIES}
-              onChange={(v) => { setCurrency(v); markFieldEdited('currency'); clearServerError('currency'); }}
-              labelExtra={<ProvenanceChip source={provenanceFor('currency')} />} error={visibleErrors.currency}
-            />
-            <DateField
-              label="Estimated entry date" required value={estimatedEntryDateYYYYMMDD}
-              onChange={(v) => { setEstimatedEntryDateYYYYMMDD(v); clearServerError('entryDate'); clearServerError('estimatedEntryDate'); }}
-              error={visibleErrors.entryDate || visibleErrors.estimatedEntryDate}
-            />
-          </div>
-        </section>
-
-        <section aria-labelledby="goods-title" className={PANEL}>
-          <div className="px-5 py-3.5">
-            <h2 id="goods-title" className="text-[14px] font-semibold">Goods <span className="font-normal tabular-nums text-muted-foreground">{items.length}</span></h2>
-            <p className="text-[13px] text-muted-foreground">
-              {mode === 'standard' ? 'One line per HTS code.' : 'Describe each line. It is classified first, then the duty is worked out.'}
-            </p>
-          </div>
-          <ul className="divide-y divide-border/60 border-t border-border/70">
-            {items.map((item, idx) => (
-              <ItemRow
-                key={idx} index={idx} mode={mode} item={item}
-                onChange={(patch) => updateItem(idx, patch)}
-                onRemove={items.length > 1 ? () => removeItem(idx) : undefined}
-                provenanceFor={(key) => provenanceFor(`item.${idx}.${key}`)}
-                errors={itemErrorsAt(idx)}
+          <section aria-labelledby="shipment-title" className={cn(PANEL, 'p-5')}>
+            <h2 id="shipment-title" className="text-[14px] font-semibold">Shipment</h2>
+            <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+              <ComboboxField
+                label="Country of origin" required value={countryOfOrigin} options={COUNTRIES} placeholder="Select a country"
+                onChange={(v) => { setCountryOfOrigin(v); markFieldEdited('countryOfOrigin'); clearServerError('countryOfOrigin'); }}
+                labelExtra={<ProvenanceChip source={provenanceFor('countryOfOrigin')} />} error={visibleErrors.countryOfOrigin}
               />
-            ))}
-          </ul>
-          <div className="border-t border-border/70 px-5 py-3">
-            <Button type="button" variant="outline" size="sm" onClick={addItem} disabled={items.length >= MAX_ITEMS}><Plus aria-hidden />Add a line</Button>
-          </div>
-        </section>
+              <DateField
+                label="Estimated entry date" required value={estimatedEntryDateYYYYMMDD}
+                onChange={(v) => { setEstimatedEntryDateYYYYMMDD(v); clearServerError('entryDate'); clearServerError('estimatedEntryDate'); }}
+                error={visibleErrors.entryDate || visibleErrors.estimatedEntryDate}
+              />
+              <SelectField
+                label="Transport" required value={modeOfTransportation}
+                onChange={(v) => { setModeOfTransportation(v as DutyCalcRequest['modeOfTransportation']); markFieldEdited('modeOfTransportation'); clearServerError('modeOfTransportation'); }}
+                options={[{ value: 'ocean', label: 'Ocean' }, { value: 'air', label: 'Air' }, { value: 'truck', label: 'Truck' }, { value: 'rail', label: 'Rail' }]}
+                labelExtra={<ProvenanceChip source={provenanceFor('modeOfTransportation')} />} error={visibleErrors.modeOfTransportation}
+              />
+              <SelectField
+                label="Entry type" required value={entryType}
+                onChange={(v) => { setEntryType(v as DutyCalcRequest['entryType']); clearServerError('entryType'); }}
+                options={[{ value: 'formal', label: 'Formal' }, { value: 'informal', label: 'Informal' }]} error={visibleErrors.entryType}
+              />
+              <SelectField
+                label="Currency" required value={currency} options={CURRENCIES}
+                onChange={(v) => { setCurrency(v); markFieldEdited('currency'); clearServerError('currency'); }}
+                labelExtra={<ProvenanceChip source={provenanceFor('currency')} />} error={visibleErrors.currency}
+              />
+            </div>
+          </section>
 
-        {visibleErrorCount > 0 && (
-          <div role="alert" className="rounded-xl bg-urgent-tint px-5 py-3.5">
-            <p className="flex items-center gap-2 text-[13px] font-semibold text-urgent">
-              <AlertCircle className="h-4 w-4" aria-hidden />
-              {visibleErrorCount === 1 ? '1 field to fix' : `${visibleErrorCount} fields to fix`} before this can be calculated
-            </p>
-            <ul className="mt-1.5 space-y-0.5 pl-6 text-[13px]">
-              {Object.entries(visibleErrors).slice(0, 6).map(([key, msg]) => (
-                <li key={key}><span className="font-medium">{humanKey(key)}:</span> {msg}</li>
+          <section aria-labelledby="goods-title" className={PANEL}>
+            <div className="flex items-start justify-between gap-3 px-5 py-3.5">
+              <div>
+                <h2 id="goods-title" className="text-[14px] font-semibold">Goods <span className="font-normal tabular-nums text-muted-foreground">{items.length}</span></h2>
+                <p className="text-[13px] text-muted-foreground">
+                  {mode === 'standard' ? 'One line per HTS code.' : 'Describe each line. It is classified first, then the duty is worked out.'}
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addItem} disabled={items.length >= MAX_ITEMS}><Plus aria-hidden />Add a line</Button>
+            </div>
+            <ul className="divide-y divide-border/60 border-t border-border/70">
+              {items.map((item, idx) => (
+                <ItemRow
+                  key={idx} index={idx} mode={mode} item={item}
+                  onChange={(patch) => updateItem(idx, patch)}
+                  onRemove={items.length > 1 ? () => removeItem(idx) : undefined}
+                  provenanceFor={(key) => provenanceFor(`item.${idx}.${key}`)}
+                  errors={itemErrorsAt(idx)}
+                />
               ))}
-              {visibleErrorCount > 6 && <li className="text-foreground/70">And {visibleErrorCount - 6} more, each marked on its field.</li>}
             </ul>
+          </section>
+
+          {visibleErrorCount > 0 && (
+            <div role="alert" className="rounded-xl bg-urgent-tint px-5 py-3.5">
+              <p className="flex items-center gap-2 text-[13px] font-semibold text-urgent">
+                <AlertCircle className="h-4 w-4" aria-hidden />
+                {visibleErrorCount === 1 ? '1 field to fix' : `${visibleErrorCount} fields to fix`} before this can be calculated
+              </p>
+              <ul className="mt-1.5 space-y-0.5 pl-6 text-[13px]">
+                {Object.entries(visibleErrors).slice(0, 6).map(([key, msg]) => (
+                  <li key={key}><span className="font-medium">{humanKey(key)}:</span> {msg}</li>
+                ))}
+                {visibleErrorCount > 6 && <li className="text-foreground/70">And {visibleErrorCount - 6} more, each marked on its field.</li>}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card px-4 py-2.5 shadow-card">
+            <p className="text-[13px] tabular-nums text-muted-foreground">
+              {items.length === 1 ? '1 line' : `${items.length} lines`}, {COUNTRIES.find((c) => c.value === countryOfOrigin)?.label ?? 'no country yet'}
+            </p>
+            <Button type="submit" disabled={isPending} className="h-10">
+              {isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Calculator aria-hidden />}
+              {isPending ? 'Calculating' : 'Calculate duties'}
+            </Button>
           </div>
-        )}
+        </form>
 
-        <div className="flex justify-end">
-          <Button type="submit" disabled={isPending} className="h-10 max-sm:w-full">
-            {isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Calculator aria-hidden />}
-            {isPending ? 'Calculating' : 'Calculate duties'}
-          </Button>
+        <div ref={resultRef} aria-live="polite" className="flex min-w-0 scroll-mt-20 flex-col gap-5">
+          {result ? <Results result={result} /> : <ResultsPlaceholder mode={mode} />}
         </div>
-      </form>
-
-      {result && (
-        <div ref={resultRef} className="flex scroll-mt-4 flex-col gap-5">
-          <Results result={result} />
-        </div>
-      )}
+      </div>
     </div>
   );
 }
