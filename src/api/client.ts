@@ -1809,8 +1809,13 @@ export interface DutyCalcSubheading {
   hts: string;
   name: string;
   duty: number;
-  /** AI mode only: 'section301', 'fentanylCN', 'reciprocal', 'steel', etc. */
+  /** 'section301', 'section301ForcedLabor', 'reciprocal', 'auto-parts', 'steel', etc. */
   section?: string;
+  /** The program in words, e.g. "Section 232 - Automobiles and Auto Parts". */
+  program?: string;
+  dutyPercentage?: number;
+  /** 'DUTY', or 'EXCEPTION' for a tariff that was considered and does not apply. */
+  kind?: string;
 }
 
 export interface DutyCalcItemResult {
@@ -1828,7 +1833,8 @@ export interface DutyCalcItemResult {
   totalDutiable: number;
   charges: number;
   duty: number;
-  userFee: number;
+  /** A plain amount, or the fees by class code with their total. */
+  userFee: number | { total: number; [feeClass: string]: number };
   irTax: number;
   adcvdAmount: number;
   subheadingDuties: number;
@@ -1874,10 +1880,10 @@ export interface DutyCalcResponse {
   modeOfTransportation: string;
   estimatedEntryDate: string;
   currency: string;
-  entryFee: { entryProcessingFee: number; portProcessingFee: number };
+  entryFee?: { entryProcessingFee: number; portProcessingFee: number };
   summary: DutyCalcSummary;
   /** AI endpoint sometimes returns null — UI must guard. */
-  dutiesBreakdown: DutyCalcDutiesBreakdown | null;
+  dutiesBreakdown?: DutyCalcDutiesBreakdown | null;
   ddpBreakdown: {
     ddpIncluded: boolean;
     ddp: number;
