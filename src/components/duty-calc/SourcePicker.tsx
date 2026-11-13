@@ -51,16 +51,14 @@ function AppliedSourceBanner({
   return (
     <div
       className={cn(
-        'rounded-xl border p-4 flex items-start gap-3',
-        stale
-          ? 'border-amber-500/40 bg-amber-500/[0.05]'
-          : 'border-emerald-500/30 bg-emerald-500/[0.04]',
+        'flex items-start gap-3 rounded-xl px-5 py-3.5',
+        stale ? 'bg-soon-tint' : 'bg-done-tint',
       )}
     >
       <div
         className={cn(
-          'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
-          stale ? 'bg-amber-500/15 text-amber-600' : 'bg-emerald-500/15 text-emerald-600',
+          'mt-0.5 shrink-0',
+          stale ? 'text-soon' : 'text-done',
         )}
       >
         {stale ? <AlertTriangle className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
@@ -79,13 +77,13 @@ function AppliedSourceBanner({
         <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
           {stale ? (
             <>
-              Filed <span className="tabular-nums font-medium text-amber-700 dark:text-amber-400">{days} days ago</span>.
-              Verify the details below before calculating — HTS classifications, values, or programs may have changed since.
+              Filed <span className="tabular-nums font-medium text-soon">{days} days ago</span>.
+              Check the details below before calculating: HTS codes, values or programs may have changed since.
             </>
           ) : (
             <>
               Filed <span className="tabular-nums font-medium">{days === 0 ? 'today' : `${days} ${days === 1 ? 'day' : 'days'} ago`}</span>.
-              Edit any field to override — your edits replace the pre-fill.
+              Change any field you need to; your edits replace what was filled in.
             </>
           )}
         </p>
@@ -120,11 +118,11 @@ function PickSourceButton({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className="gap-2 h-10 rounded-lg w-full justify-start text-muted-foreground hover:text-foreground"
+          className="h-10 w-full justify-start gap-2 rounded-xl border-border/70 bg-card font-normal text-muted-foreground shadow-card hover:bg-muted/60 hover:text-foreground"
         >
-          <Sparkles className="h-4 w-4 text-amber-500" />
-          <span className="font-medium">Pre-fill from a shipment</span>
-          <span className="text-[12px] text-muted-foreground ml-auto">Optional</span>
+          <Sparkles className="h-4 w-4" />
+          <span className="font-medium text-foreground">Fill in from an entry or ISF</span>
+          <span className="ml-auto text-[12.5px]">Optional</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
