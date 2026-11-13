@@ -29,7 +29,8 @@ import { toast } from 'sonner';
 import { COUNTRIES as ALL_COUNTRIES } from '@/data/geo';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { SCHEDULE_D_PORTS, CBP_PORTS_4DIGIT } from '@/data/schedule-d-ports';
+import { CBP_PORTS_4DIGIT } from '@/data/schedule-d-ports';
+import { SCHEDULE_K_PORTS } from '@/data/schedule-k-ports';
 import { HTSAutocomplete } from '@/components/HTSAutocomplete';
 import { useQuery } from '@tanstack/react-query';
 import { organizationApi } from '@/api/client';
@@ -2147,8 +2148,8 @@ export default function ShipmentWizard() {
               <Input id="isf5-est-arrival" type="date" value={form.estimatedArrival} onChange={e => set('estimatedArrival', e.target.value)} />
             </div>
             <PortSelectField label="Foreign Port of Unlading" value={form.foreignPortOfUnlading}
-              onChange={v => set('foreignPortOfUnlading', v)} options={SCHEDULE_D_PORTS}
-              placeholder="Search ports…" hint="5-digit Schedule D code for the foreign port where cargo is unladen" />
+              onChange={v => set('foreignPortOfUnlading', v)} options={SCHEDULE_K_PORTS}
+              placeholder="Search ports…" hint="5-digit CBP Schedule K code for the foreign port where the cargo is unladen" />
           </div>
         </CardContent>
       </Card>
@@ -2263,7 +2264,7 @@ export default function ShipmentWizard() {
               <Item label="Filer EIN" value={form.isf5.ISFFilerNumber} />
               <Item label="Bond Holder ID" value={form.isf5.bondHolderID || form.isf5.ISFFilerNumber} />
               <Item label="US Port" value={CBP_PORTS_4DIGIT.find(p => p.value === (form.isf5.USPortOfArrival || form.foreignPortOfUnlading))?.label || form.isf5.USPortOfArrival || form.foreignPortOfUnlading} />
-              <Item label="Foreign Port" value={SCHEDULE_D_PORTS.find(p => p.value === form.foreignPortOfUnlading)?.label || form.foreignPortOfUnlading || 'Not set'} />
+              <Item label="Foreign Port" value={SCHEDULE_K_PORTS.find(p => p.value === form.foreignPortOfUnlading)?.label || form.foreignPortOfUnlading || 'Not set'} />
               <Item label="Arrival" value={form.estimatedArrival} />
             </Section>
 

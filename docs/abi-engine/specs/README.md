@@ -24,6 +24,8 @@ T. Morishita's answer to our Aug 4 versions question before Phase 1 coding.
 | `statements/daily-statement.pdf`, `statements/periodic-monthly-statement.pdf`, `statements/statement-update-ig-2025-04.pdf`, `statements/statement-request-reroute-mo-mq-2017-08.pdf`, `statements/ach-debit-authorization-rev6.pdf` | Statement chapters | Scenario 082; "all summaries on statement" rule; Phase 5 payments |
 | `reference-data/currency-exchange-rates.pdf` + `currency-exchange-rates-update-v3.pdf` | Currency Exchange Rates (%R) | Scenario 045; duty engine |
 | `reference-data/hts-query-2023-03.pdf` | HTS Query | Duty engine reference data |
+| `reference-data/ace-appendix-e-schedule-d-2026-02.pdf` | ACE M1 Appendix E, Schedule D (US port codes), Feb 3 2026 | `src/data/schedule-d-ports.ts` via `server/scripts/gen-port-codes.py` (downloaded 2026-11-11) |
+| `reference-data/camir-appendix-f-schedule-k-2026-07.pdf` + `-2026-04.pdf` | CAMIR Ocean Appendix F, Schedule K (foreign port codes), Jul 23 + Apr 2 2026 | `src/data/schedule-k-ports.ts`; the April edition supplies five codes the July one drops without a deletion note (Shanghai, Laem Chabang, ...) |
 | `queries/mid-create-v3-2023-03.pdf`, `queries/manufacturer-file-query.pdf` | MID create/query | MID fields (scenarios 049, 076, 078) |
 | `queries/importer-query-v7.pdf`, `reference-data/importer-5106-create-update-v12.pdf` | Importer query / 5106 | IOR data, bond-on-file checks |
 | `queries/cargo-manifest-entry-release-query-v21-2025-09.pdf` | Cargo Manifest/Entry Release Query V21 | Native replacement for CC manifest query |
