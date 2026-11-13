@@ -48,6 +48,7 @@ import { VoyageStrip } from '@/components/shipment-detail/VoyageStrip';
 import { countryName } from '@/components/shipments/countries';
 import { statusOf } from '@/components/shipments/status';
 import { StatusPill, StatusTile } from '@/components/shipments/StatusPill';
+import { lastListView } from '@/components/shipments/useListState';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -882,10 +883,9 @@ export default function ShipmentDetails() {
         </DialogContent>
       </Dialog>
 
-      {/* Back keeps the list's tab, filters and page when the list is where we came from. */}
+      {/* Back to the list as it was last left: same tab, filters, sort and page. */}
       <Link
-        to="/shipments"
-        onClick={(e) => { if ((window.history.state?.idx ?? 0) > 0) { e.preventDefault(); navigate(-1); } }}
+        to={`/shipments${lastListView()}`}
         className="inline-flex w-fit items-center gap-1.5 text-[13px] text-muted-foreground transition-colors duration-150 hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden />Shipments

@@ -186,3 +186,14 @@ describe('ShipmentsHome', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 });
+
+describe('the link back from a shipment', () => {
+  it('remembers the list view it came from', async () => {
+    const { lastListView } = await import('../useListState');
+    api.list.mockResolvedValue(page([filing()], 60, 2));
+    api.facets.mockResolvedValue(FACETS);
+    show('/shipments?tab=rejected&page=2');
+    await screen.findByRole('table');
+    expect(lastListView()).toBe('?tab=rejected&page=2');
+  });
+});
