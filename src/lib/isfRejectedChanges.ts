@@ -2,8 +2,8 @@ import type { FilingCbpActivity } from '@/api/client';
 
 /**
  * When CBP rejects an ISF replace, it keeps the version it accepted before,
- * but the shipment record holds the rejected edits (so they can be fixed and
- * resent). Returns what the user must be told, or null when nothing differs.
+ * and so does the shipment record; the rejected edits are kept apart in
+ * rejectedChanges. Returns what the user must be told, or null if no rejection.
  */
 export function rejectedChanges(activity: FilingCbpActivity | undefined): { rejectedAt: string | null; reasons: string[] } | null {
   if (!activity || activity.filing.cbpState !== 'ON_FILE') return null;

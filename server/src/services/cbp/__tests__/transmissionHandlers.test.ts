@@ -58,10 +58,17 @@ describe('businessKeyHandler', () => {
     prisma.cbpTransmission.findFirst.mockResolvedValue(TX);
     const m = await businessKeyHandler(row(null, 'SA'));
     expect(prisma.cbpTransmission.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: { isfTransactionNumber: 'S7P-1', environment: 'PROD' },
+      where: { isfTransactionNumber: 'S7P-1', environment: 'PROD', status: { not: 'FAILED' } },
     }));
     expect(prisma.cbpTransmission.update).not.toHaveBeenCalled();
     expect(m).toMatchObject({ entityType: 'filing', entityId: 'f1', transmissionId: 't1' });
+  });
+
+  it('never matches a transmission that provably never reached CBP', async () => {
+    summary.mockReturnValue({ application: 'SX', verdict: 'ACCEPTED', conditions: [], keys: { entryNumber: 'ABC12345676' } });
+    prisma.cbpTransmission.findFirst.mockResolvedValue(null);
+    await businessKeyHandler(row(null, 'SX'));
+    expect(prisma.cbpTransmission.findFirst.mock.calls[0][0].where).toEqual({ entryNumber: 'ABC12345676', environment: 'PROD', status: { not: 'FAILED' } });
   });
 
   it('leaves a message with no known keys unmatched', async () => {
