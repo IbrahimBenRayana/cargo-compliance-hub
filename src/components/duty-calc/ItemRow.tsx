@@ -64,7 +64,7 @@ export function ItemRow({ index, mode, item, onChange, onRemove, provenanceFor, 
         />
         <TextField
           className="lg:col-span-3" label="Quantity" type="number" value={item.quantity1} onChange={(v) => onChange({ quantity1: v })}
-          placeholder="1500" hint="In the unit the HTS line reports in (kilograms, pieces, dozens). Leave blank if you do not know it."
+          placeholder="1500" hint="In the unit the HTS line reports in (kilograms, pieces, dozens). Most codes need it."
           labelExtra={<ProvenanceChip source={provenanceFor('quantity1')} />} error={errors.quantity1}
         />
         <TextField

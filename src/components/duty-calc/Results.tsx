@@ -12,13 +12,15 @@ const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow
 const TH = 'px-4 py-2.5 text-left text-[12px] font-medium text-muted-foreground';
 const NUM = 'px-4 py-2.5 text-right tabular-nums';
 
-const SECTION: Record<string, { label: string; tone: Tone }> = {
-  section301: { label: 'Section 301', tone: 'soon' },
-  reciprocal: { label: 'Reciprocal', tone: 'entry' },
-  fentanylCN: { label: 'IEEPA fentanyl', tone: 'urgent' },
-  steel: { label: 'Steel', tone: 'calm' },
-  aluminum: { label: 'Aluminum', tone: 'calm' },
-};
+/** The tariff family a Chapter 99 line belongs to, from the answer's section key. */
+function family(section: string): { label: string; tone: Tone } {
+  if (section.startsWith('section301')) return { label: 'Section 301', tone: 'soon' };
+  if (section.startsWith('reciprocal')) return { label: 'Reciprocal', tone: 'entry' };
+  if (section.startsWith('fentanyl')) return { label: 'IEEPA', tone: 'urgent' };
+  return { label: 'Section 232', tone: 'calm' };
+}
+
+const feeOf = (r: DutyCalcItemResult) => (typeof r.userFee === 'number' ? r.userFee : r.userFee?.total) || 0;
 
 function money(n: number | undefined | null, currency: string): string {
   if (n === undefined || n === null || !Number.isFinite(n)) return '';
@@ -29,15 +31,15 @@ function money(n: number | undefined | null, currency: string): string {
   }
 }
 
-const lineTotal = (r: DutyCalcItemResult) => (r.duty || 0) + (r.subheadingDuties || 0) + (r.userFee || 0) + (r.irTax || 0) + (r.adcvdAmount || 0);
+const lineTotal = (r: DutyCalcItemResult) => (r.duty || 0) + (r.subheadingDuties || 0) + feeOf(r) + (r.irTax || 0) + (r.adcvdAmount || 0);
 
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+/** A figure from the answer; absent or zero ones are left out rather than shown empty. */
+function Fact({ label, amount, currency }: { label: string; amount: number | undefined | null; currency: string }) {
+  if (!amount) return null;
   return (
     <div className="min-w-0">
       <dt className="text-[12px] text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 truncate text-[14px] font-medium tabular-nums">
-        {children || <span className="font-normal text-muted-foreground">Not given</span>}
-      </dd>
+      <dd className="mt-0.5 truncate text-[14px] font-medium tabular-nums">{money(amount, currency)}</dd>
     </div>
   );
 }
@@ -69,21 +71,23 @@ function Lines({ items, currency }: { items: DutyCalcItemResult[]; currency: str
               <td className={NUM}>{money(r.totalDutiable, currency)}</td>
               <td className={NUM}>{money(r.duty, currency)}</td>
               <td className={NUM}>{money(r.subheadingDuties, currency)}</td>
-              <td className={NUM}>{money(r.userFee, currency)}</td>
+              <td className={NUM}>{money(feeOf(r), currency)}</td>
               <td className={cn(NUM, 'font-semibold')}>{money(lineTotal(r), currency)}</td>
             </tr>
             {(r.subheadings ?? []).map((s, j) => {
-              const section = s.section ? SECTION[s.section] ?? { label: s.section, tone: 'calm' as Tone } : null;
+              const section = s.section ? family(s.section) : null;
+              const excepted = s.kind === 'EXCEPTION';
               return (
                 <tr key={j} className="text-[12.5px] text-muted-foreground">
                   <td colSpan={3} className="py-1.5 pl-[34px] pr-4">
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="font-mono text-foreground/80">{s.hts}</span>
                       {section && <span className={cn('rounded-full px-2 py-px text-[11.5px] font-medium', TINT[section.tone])}>{section.label}</span>}
-                      <span className="min-w-0">{s.name}</span>
+                      <span className="min-w-0">{s.program || s.name}</span>
+                      {excepted ? <span>Does not apply</span> : s.dutyPercentage ? <span className="tabular-nums">{s.dutyPercentage}%</span> : null}
                     </span>
                   </td>
-                  <td className="px-4 py-1.5 text-right tabular-nums text-foreground/80">{money(s.duty, currency)}</td>
+                  <td className="px-4 py-1.5 text-right tabular-nums text-foreground/80">{excepted ? '' : money(s.duty, currency)}</td>
                   <td colSpan={2} />
                 </tr>
               );
@@ -142,12 +146,12 @@ export function Results({ result }: { result: DutyCalcResponse | DutyCalcAIRespo
   const currency = result.currency || 'USD';
   const items = result.items ?? [];
 
-  // The standard answer's `summary.totalDutiesTaxes` is often 0 when duties
-  // exist, so the breakdown's total comes first and the per-line sum last.
-  const total =
-    result.dutiesBreakdown?.totalDuties ?? summary.totalDuties ?? summary.totalDutiesFees ?? summary.totalDutiesTaxes
-    ?? items.reduce((s, it) => s + (it.duty || 0) + (it.subheadingDuties || 0), 0);
-  const rate = summary.totalDutyPercentage ?? (summary.totalDutiableValue ? (total / summary.totalDutiableValue) * 100 : undefined);
+  const lineSum = items.reduce((sum, it) => sum + (it.duty || 0) + (it.subheadingDuties || 0), 0);
+  // `summary.totalDutiesTaxes` can be 0 when duties exist, so it comes after the others.
+  const duties = result.dutiesBreakdown?.totalDuties || summary.totalDuties || summary.totalDutiesTaxes || lineSum;
+  const userFees = summary.totalUserFee ?? result.dutiesBreakdown?.totalUserFee ?? items.reduce((sum, it) => sum + feeOf(it), 0);
+  const total = summary.totalDutiesFees || duties + userFees;
+  const rate = summary.totalDutyPercentage ?? (summary.totalDutiableValue ? (duties / summary.totalDutiableValue) * 100 : undefined);
   const ai = 'aiRecommendations' in result && result.aiRecommendations?.length ? result : null;
 
   return (
@@ -158,20 +162,21 @@ export function Results({ result }: { result: DutyCalcResponse | DutyCalcAIRespo
             <Calculator weight="duotone" className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1 basis-64">
-            <p className="text-[16px] font-semibold leading-6">Estimated duties: <span className="tabular-nums">{money(total, currency)}</span></p>
+            <p className="text-[16px] font-semibold leading-6">Estimated duties and fees: <span className="tabular-nums">{money(total, currency)}</span></p>
             <p className="mt-0.5 text-[13px] text-foreground/75">
-              {rate !== undefined && Number.isFinite(rate) && <>{rate.toFixed(2)}% of the dutiable value. </>}
+              {rate !== undefined && Number.isFinite(rate) && <>Duties are {rate.toFixed(2)}% of the dutiable value. </>}
               An estimate to plan with. CBP sets the amount owed when the entry is filed.
             </p>
           </div>
         </div>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-3 lg:grid-cols-6">
-          <Fact label="Goods value">{money(summary.totalValue, currency)}</Fact>
-          <Fact label="Dutiable value">{money(summary.totalDutiableValue, currency)}</Fact>
-          <Fact label="User fees">{money(summary.totalUserFee ?? result.dutiesBreakdown?.totalUserFee, currency)}</Fact>
-          <Fact label="Entry processing fee">{money(result.entryFee?.entryProcessingFee, currency)}</Fact>
-          <Fact label="Port processing fee">{money(result.entryFee?.portProcessingFee, currency)}</Fact>
-          <Fact label="Landed cost (DDP)">{money(summary.ddp, currency)}</Fact>
+          <Fact label="Goods value" amount={summary.totalValue} currency={currency} />
+          <Fact label="Dutiable value" amount={summary.totalDutiableValue} currency={currency} />
+          <Fact label="Duties" amount={duties} currency={currency} />
+          <Fact label="User fees" amount={userFees} currency={currency} />
+          <Fact label="Entry processing fee" amount={result.entryFee?.entryProcessingFee} currency={currency} />
+          <Fact label="Port processing fee" amount={result.entryFee?.portProcessingFee} currency={currency} />
+          <Fact label="Landed cost (DDP)" amount={summary.ddp} currency={currency} />
         </dl>
         {items.length > 0 && <Lines items={items} currency={currency} />}
       </section>
