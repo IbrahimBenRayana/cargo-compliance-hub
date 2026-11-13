@@ -1,119 +1,31 @@
 /**
- * Duty Calculator — standalone /duty-calculator page.
- *
- * Two modes:
- *   • Standard (HTS) — POST /api/v1/duty-calculation, deterministic
- *   • AI-assisted   — POST /api/v1/duty-calculation/ai, AI classifies
- *
- * Layout follows the unified list-page hero pattern (tag strip + 32px
- * headline + amber primary), with a left-column input form and a
- * right-column results panel that materialises after a successful call.
+ * Duty calculator: estimate duties, added tariffs and fees for a set of
+ * goods. Two ways in: by HTS code, or by description, where each line is
+ * classified first. The form runs the full width and the estimate follows it.
  */
-import { useEffect, useMemo, useState } from 'react';
-import {
-  Calculator,
-  Loader2,
-  Plus,
-  Trash2,
-  Sparkles,
-  Hash,
-  AlertCircle,
-  ChevronRight,
-} from '@/components/icons';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import type { AbiDocument, DutyCalcAIResponse, DutyCalcItem, DutyCalcRequest, DutyCalcResponse } from '@/api/client';
+import { ComboboxField, DateField, SelectField } from '@/components/abi-wizard/shared';
+import { ItemRow } from '@/components/duty-calc/ItemRow';
+import { Results } from '@/components/duty-calc/Results';
+import { ProvenanceChip, SourcePicker } from '@/components/duty-calc/SourcePicker';
+import { emptyItem, MAX_ITEMS, type ItemDraft, type Mode } from '@/components/duty-calc/types';
+import { AlertCircle, Calculator, Loader2, Plus } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-
 import { COUNTRIES, CURRENCIES } from '@/data/geo';
-import {
-  ComboboxField,
-  DateField,
-  SelectField,
-  TextField,
-  yyyymmddToISO,
-} from '@/components/abi-wizard/shared';
-
 import { useAIDutyCalculate, useDutyCalculate } from '@/hooks/useDutyCalculation';
-import type {
-  DutyCalcAIResponse,
-  DutyCalcItem,
-  DutyCalcItemResult,
-  DutyCalcRequest,
-  DutyCalcResponse,
-  DutyCalcSubheading,
-} from '@/api/client';
-import { filingToDutyCalc, abiDocumentToDutyCalc, type SourceProvenance } from '@/lib/duty-calc-prefill';
-import { SourcePicker, ProvenanceChip } from '@/components/duty-calc/SourcePicker';
+import { abiDocumentToDutyCalc, filingToDutyCalc, type SourceProvenance } from '@/lib/duty-calc-prefill';
+import { cn } from '@/lib/utils';
 import type { Filing } from '@/types/shipment';
-import type { AbiDocument } from '@/api/client';
 
-// ─── Mode + form types ─────────────────────────────────────
-type Mode = 'standard' | 'ai';
+const PAGE = 'mx-auto flex max-w-[1360px] flex-col gap-5 -mx-2 sm:mx-auto pb-24 sm:pb-12';
+const PANEL = 'rounded-xl border border-border/70 bg-card shadow-card';
 
-const MAX_ITEMS = 50;
-
-interface ItemDraft {
-  hts: string;
-  description: string;
-  totalValue: string;
-  quantity1: string;
-  quantity2: string;
-  spi: string;
-  aluminumPercentage: string;
-  steelPercentage: string;
-  copperPercentage: string;
-  isCottonExempt: boolean;
-  isAutoPartExempt: boolean;
-  kitchenPartNotComplete: boolean;
-  isInformationalMaterialExempt: boolean;
-}
-
-const emptyItem = (): ItemDraft => ({
-  hts: '',
-  description: '',
-  totalValue: '',
-  quantity1: '',
-  quantity2: '',
-  spi: '',
-  aluminumPercentage: '',
-  steelPercentage: '',
-  copperPercentage: '',
-  isCottonExempt: false,
-  isAutoPartExempt: false,
-  kitchenPartNotComplete: false,
-  isInformationalMaterialExempt: false,
-});
-
-// ─── Helpers ───────────────────────────────────────────────
-
-/** YYYYMMDD (DateField storage) → MM/DD/YYYY (CC payload). */
+/** YYYYMMDD (DateField storage) to MM/DD/YYYY (what the calculation takes). */
 function yyyymmddToMMDDYYYY(v: string): string {
   if (!v || v.length !== 8) return '';
-  const yyyy = v.slice(0, 4);
-  const mm = v.slice(4, 6);
-  const dd = v.slice(6, 8);
-  return `${mm}/${dd}/${yyyy}`;
+  return `${v.slice(4, 6)}/${v.slice(6, 8)}/${v.slice(0, 4)}`;
 }
 
 function toNumberOrUndef(s: string): number | undefined {
@@ -122,704 +34,20 @@ function toNumberOrUndef(s: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-function fmtUSD(n: number | undefined | null, currency = 'USD') {
-  if (n === undefined || n === null || !Number.isFinite(n)) return '—';
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 2,
-    }).format(n);
-  } catch {
-    return `$${n.toFixed(2)}`;
-  }
-}
-
-function fmtPct(n: number | undefined | null) {
-  if (n === undefined || n === null || !Number.isFinite(n)) return '—';
-  return `${n.toFixed(2)}%`;
-}
-
-/** Subheading section → tile severity tint. */
-function subheadingTint(section?: string): string {
-  switch (section) {
-    case 'section301':
-      return 'bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-900/50';
-    case 'reciprocal':
-      return 'bg-violet-50 dark:bg-violet-950/30 text-violet-900 dark:text-violet-200 border-violet-200 dark:border-violet-900/50';
-    case 'fentanylCN':
-      return 'bg-rose-50 dark:bg-rose-950/30 text-rose-900 dark:text-rose-200 border-rose-200 dark:border-rose-900/50';
-    case 'steel':
-    case 'aluminum':
-      return 'bg-slate-100 dark:bg-slate-800/50 text-slate-900 dark:text-slate-200 border-slate-300 dark:border-slate-700';
-    default:
-      return 'bg-muted/40 text-foreground/80 border-border';
-  }
-}
-
-function sectionLabel(section?: string): string | null {
-  if (!section) return null;
-  const map: Record<string, string> = {
-    section301: 'Section 301',
-    reciprocal: 'Reciprocal',
-    fentanylCN: 'IEEPA / Fentanyl',
-    steel: 'Steel',
-    aluminum: 'Aluminum',
-  };
-  return map[section] ?? section;
-}
-
-// ─── Mode toggle (segmented control) ───────────────────────
-
-function ModeToggle({
-  mode,
-  onChange,
-}: {
-  mode: Mode;
-  onChange: (m: Mode) => void;
-}) {
-  const opts: { value: Mode; label: string; icon?: React.ReactNode }[] = [
-    { value: 'standard', label: 'Standard (HTS)', icon: <Hash className="h-3.5 w-3.5" /> },
-    { value: 'ai', label: 'AI-assisted', icon: <Sparkles className="h-3.5 w-3.5" /> },
-  ];
+function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
   return (
-    <div className="inline-flex items-center rounded-lg border bg-muted/30 p-0.5 text-xs">
-      {opts.map((o) => {
-        const active = mode === o.value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            onClick={() => onChange(o.value)}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-all',
-              active
-                ? 'bg-background shadow-sm text-foreground ring-1 ring-amber-500/30'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-            aria-pressed={active}
-          >
-            {o.icon}
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Item card ──────────────────────────────────────────────
-
-function ItemCard({
-  index,
-  mode,
-  item,
-  onChange,
-  onRemove,
-  canRemove,
-  provenanceFor,
-  errors,
-}: {
-  index: number;
-  mode: Mode;
-  item: ItemDraft;
-  onChange: (patch: Partial<ItemDraft>) => void;
-  onRemove: () => void;
-  canRemove: boolean;
-  /** Returns the source object (or null) for `item.${index}.${key}`. */
-  provenanceFor?: (key: string) => SourceProvenance | null;
-  /** Per-field error map keyed by ItemDraft field name (e.g., 'hts', 'totalValue'). */
-  errors?: Partial<Record<keyof ItemDraft, string>>;
-}) {
-  return (
-    <div className="rounded-lg border bg-muted/10 p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <Badge variant="outline" className="text-xs">
-          Item {index + 1}
-        </Badge>
-        {canRemove && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive h-7 px-2"
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Remove item {index + 1}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This item will be deleted from the calculation request.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={onRemove}>Remove</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {mode === 'standard' && (
-          <TextField
-            label="HTS Number"
-            required
-            value={item.hts}
-            onChange={(v) => onChange({ hts: v })}
-            placeholder="7320.20.1000 or 7320201000"
-            hint="10-digit HTS code. Dots are optional."
-            labelExtra={<ProvenanceChip source={provenanceFor?.('hts') ?? null} />}
-            error={errors?.hts}
-          />
-        )}
-        <TextField
-          label="Description"
-          required
-          value={item.description}
-          onChange={(v) => onChange({ description: v })}
-          placeholder={
-            mode === 'ai'
-              ? 'e.g. Stainless steel kitchen sink, single bowl, brushed finish'
-              : 'Goods description'
-          }
-          maxLength={300}
-          hint={
-            mode === 'ai'
-              ? 'The richer the description, the better the AI classification.'
-              : undefined
-          }
-          labelExtra={<ProvenanceChip source={provenanceFor?.('description') ?? null} />}
-          error={errors?.description}
-        />
-        <TextField
-          label="Total Value"
-          required
-          type="number"
-          value={item.totalValue}
-          onChange={(v) => onChange({ totalValue: v })}
-          placeholder="0.00"
-          hint="Customs value of the merchandise in the currency selected above."
-          labelExtra={<ProvenanceChip source={provenanceFor?.('totalValue') ?? null} />}
-          error={errors?.totalValue}
-        />
-        <TextField
-          label="SPI Code"
-          value={item.spi}
-          onChange={(v) => onChange({ spi: v.toUpperCase() })}
-          placeholder="MX, JP, KR…"
-          maxLength={4}
-          hint="Special Programs Indicator (e.g. MX for USMCA). Optional."
-          error={errors?.spi}
-        />
-        <TextField
-          label="Quantity 1 (HTS primary unit)"
-          type="number"
-          value={item.quantity1}
-          onChange={(v) => onChange({ quantity1: v })}
-          placeholder="e.g. 1500"
-          hint={
-            'Reportable quantity in the HTS primary unit of measure. ' +
-            'The unit (kilograms, meters, pieces, dozens, etc.) is set by the HTS line itself — ' +
-            'check the HTS chapter for the required UOM. Leave blank if unknown; CC will use 0.'
-          }
-          labelExtra={<ProvenanceChip source={provenanceFor?.('quantity1') ?? null} />}
-          error={errors?.quantity1}
-        />
-        <TextField
-          label="Quantity 2 (HTS secondary unit, if any)"
-          type="number"
-          value={item.quantity2}
-          onChange={(v) => onChange({ quantity2: v })}
-          placeholder="e.g. 12"
-          hint={
-            'Some HTS lines require a SECOND reportable unit alongside Q1 (e.g. kg + pieces). ' +
-            'Most HTS codes do not — leave blank when not applicable. ' +
-            'If your HTS line shows two unit columns, the second one goes here.'
-          }
-          error={errors?.quantity2}
-        />
-      </div>
-
-      <Accordion type="single" collapsible>
-        <AccordionItem value="trade-compliance" className="border rounded-md">
-          <AccordionTrigger className="px-3 py-2 text-xs font-medium text-muted-foreground hover:no-underline">
-            Trade compliance (materials & exemptions)
-          </AccordionTrigger>
-          <AccordionContent className="px-3 pb-4 pt-1 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <TextField
-                label="Aluminum %"
-                type="number"
-                value={item.aluminumPercentage}
-                onChange={(v) => onChange({ aluminumPercentage: v })}
-                placeholder="0"
-              />
-              <TextField
-                label="Steel %"
-                type="number"
-                value={item.steelPercentage}
-                onChange={(v) => onChange({ steelPercentage: v })}
-                placeholder="0"
-              />
-              <TextField
-                label="Copper %"
-                type="number"
-                value={item.copperPercentage}
-                onChange={(v) => onChange({ copperPercentage: v })}
-                placeholder="0"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Exemptions
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                {[
-                  ['isCottonExempt', 'Cotton fee exempt'],
-                  ['isAutoPartExempt', 'Auto parts exempt'],
-                  ['kitchenPartNotComplete', 'Kitchen part not complete'],
-                  ['isInformationalMaterialExempt', 'Informational materials exempt'],
-                ].map(([k, label]) => {
-                  const key = k as keyof ItemDraft;
-                  const checked = Boolean(item[key]);
-                  return (
-                    <label
-                      key={k}
-                      className="inline-flex items-center gap-2 cursor-pointer rounded-md border px-2.5 py-1.5 hover:bg-muted/30"
-                    >
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 rounded accent-amber-500"
-                        checked={checked}
-                        onChange={(e) =>
-                          onChange({ [key]: e.target.checked } as Partial<ItemDraft>)
-                        }
-                      />
-                      <span>{label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
-    </div>
-  );
-}
-
-// ─── Results sub-components ─────────────────────────────────
-
-function HeroStat({
-  total,
-  effectivePct,
-  currency,
-}: {
-  total: number | undefined;
-  effectivePct: number | undefined;
-  currency: string;
-}) {
-  return (
-    <div
-      className={cn(
-        'relative overflow-hidden rounded-2xl border ring-1 ring-amber-500/15 px-6 py-7',
-        'bg-gradient-to-br from-amber-500/[0.06] via-card to-card',
-      )}
-    >
-      <div className="flex items-center gap-1.5 mb-2">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Total estimated duties
-        </p>
-      </div>
-      <p className="text-[40px] leading-none font-semibold tabular-nums tracking-[-0.02em] text-gradient-stage-manifest">
-        {fmtUSD(total, currency)}
-      </p>
-      <p className="mt-3 text-[12px] text-muted-foreground">
-        Effective rate{' '}
-        <span className="font-semibold text-foreground">{fmtPct(effectivePct)}</span>
-      </p>
-    </div>
-  );
-}
-
-function SubheadingsTable({ rows }: { rows: DutyCalcSubheading[] }) {
-  if (!rows.length) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        No additional subheadings (Chapter 99 add-ons).
-      </p>
-    );
-  }
-  return (
-    <div className="rounded-md border overflow-hidden">
-      <table className="w-full text-xs">
-        <thead className="bg-muted/50">
-          <tr>
-            <th className="text-left font-medium px-3 py-2">HTS</th>
-            <th className="text-left font-medium px-3 py-2">Name</th>
-            <th className="text-left font-medium px-3 py-2">Section</th>
-            <th className="text-right font-medium px-3 py-2">Duty</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => {
-            const tint = subheadingTint(r.section);
-            const label = sectionLabel(r.section);
-            return (
-              <tr key={`${r.hts}-${i}`} className="border-t">
-                <td className="px-3 py-2 font-mono">{r.hts}</td>
-                <td className="px-3 py-2">{r.name}</td>
-                <td className="px-3 py-2">
-                  {label ? (
-                    <span
-                      className={cn(
-                        'inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-medium',
-                        tint,
-                      )}
-                    >
-                      {label}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-right font-mono">
-                  {fmtUSD(r.duty)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ItemBreakdownCard({
-  index,
-  result,
-  currency,
-}: {
-  index: number;
-  result: DutyCalcItemResult;
-  currency: string;
-}) {
-  const itemTotal =
-    (result.duty || 0) +
-    (result.subheadingDuties || 0) +
-    (result.userFee || 0) +
-    (result.irTax || 0) +
-    (result.adcvdAmount || 0);
-
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <CardTitle className="text-sm">
-              Item {index + 1}
-              <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
-                {result.classification.hts}
-              </span>
-            </CardTitle>
-            <CardDescription className="mt-0.5">
-              {result.classification.name || result.description}
-            </CardDescription>
-          </div>
-          <div className="text-right shrink-0">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Item duty
-            </p>
-            <p className="text-base font-semibold font-mono">
-              {fmtUSD(itemTotal, currency)}
-            </p>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          {[
-            { label: 'Dutiable', value: fmtUSD(result.totalDutiable, currency) },
-            { label: 'Base duty', value: fmtUSD(result.duty, currency) },
-            { label: 'Subheadings', value: fmtUSD(result.subheadingDuties, currency) },
-            { label: 'User fee', value: fmtUSD(result.userFee, currency) },
-          ].map((c) => (
-            <div key={c.label} className="bg-muted/40 rounded-lg p-2.5 space-y-0.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {c.label}
-              </p>
-              <p className="text-[13px] font-medium font-mono">{c.value}</p>
-            </div>
-          ))}
-        </div>
-
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            Subheadings (Chapter 99 add-ons)
-          </p>
-          <SubheadingsTable rows={result.subheadings || []} />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function FeesCard({
-  entryFee,
-  currency,
-}: {
-  entryFee: { entryProcessingFee: number; portProcessingFee: number };
-  currency: string;
-}) {
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">Processing fees</CardTitle>
-      </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-3 text-xs">
-        <div className="bg-muted/40 rounded-lg p-3 space-y-0.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Entry processing
-          </p>
-          <p className="text-base font-medium font-mono">
-            {fmtUSD(entryFee?.entryProcessingFee, currency)}
-          </p>
-        </div>
-        <div className="bg-muted/40 rounded-lg p-3 space-y-0.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Port processing
-          </p>
-          <p className="text-base font-medium font-mono">
-            {fmtUSD(entryFee?.portProcessingFee, currency)}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function AIRecommendationsCard({ data }: { data: DutyCalcAIResponse }) {
-  if (!data.aiRecommendations?.length) return null;
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-amber-500" /> AI Classification
-        </CardTitle>
-        <CardDescription>
-          GRI reasoning and ranked HTS alternatives chosen for each item.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        {data.aiRecommendations.map((rec) => {
-          const top = rec.recommendations?.[0];
-          return (
-            <div key={rec.itemIndex} className="rounded-lg border p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Item {rec.itemIndex + 1}
-                  </p>
-                  <p className="font-mono text-base font-semibold mt-1">
-                    {rec.selectedHts}
-                  </p>
-                  {top?.naturalized_description && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {top.naturalized_description}
-                    </p>
-                  )}
-                </div>
-                <Badge variant="outline" className="text-[10px] shrink-0">
-                  Original: {rec.originalDescription.slice(0, 40)}
-                  {rec.originalDescription.length > 40 ? '…' : ''}
-                </Badge>
-              </div>
-
-              {rec.explanation && (
-                <p className="text-xs text-foreground/90">{rec.explanation}</p>
-              )}
-
-              {rec.specializedExplanation && (
-                <Accordion type="single" collapsible>
-                  <AccordionItem value="gri" className="border-none">
-                    <AccordionTrigger className="py-1 text-xs font-medium text-muted-foreground hover:no-underline">
-                      Show GRI reasoning
-                    </AccordionTrigger>
-                    <AccordionContent className="text-xs text-foreground/80 whitespace-pre-wrap">
-                      {rec.specializedExplanation}
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              )}
-
-              {rec.recommendations?.length > 1 && (
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                    Alternatives
-                  </p>
-                  <div className="space-y-2">
-                    {rec.recommendations.slice(1, 5).map((alt, i) => (
-                      <div
-                        key={`${alt.hts}-${i}`}
-                        className="rounded-md border bg-muted/20 p-2.5 text-xs"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono font-semibold">
-                            {alt.hts}
-                          </span>
-                          <span className="text-muted-foreground">
-                            score {alt.score.toFixed(2)}
-                          </span>
-                        </div>
-                        {alt.naturalized_description && (
-                          <p className="mt-1 text-foreground/80">
-                            {alt.naturalized_description}
-                          </p>
-                        )}
-                        {alt.construction?.indent_hierarchy?.length ? (
-                          <p className="mt-1.5 text-[11px] text-muted-foreground inline-flex flex-wrap items-center gap-1">
-                            {alt.construction.indent_hierarchy.map((h, j) => (
-                              <span
-                                key={`${h.htsno}-${j}`}
-                                className="inline-flex items-center gap-1"
-                              >
-                                {j > 0 && (
-                                  <ChevronRight className="h-3 w-3 opacity-50" />
-                                )}
-                                <span className="font-mono">{h.htsno}</span>
-                                <span className="text-muted-foreground/80">
-                                  {h.description}
-                                </span>
-                              </span>
-                            ))}
-                          </p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ResultsPanel({
-  result,
-  mode,
-}: {
-  result: DutyCalcResponse | DutyCalcAIResponse;
-  mode: Mode;
-}) {
-  const summary = result.summary || ({} as DutyCalcResponse['summary']);
-  const currency = result.currency || 'USD';
-
-  // Total duties — CC's standard endpoint sets `summary.totalDutiesTaxes` to 0
-  // even when real duties exist (it's a category-specific field, not the grand
-  // total), so we MUST prefer `dutiesBreakdown.totalDuties` over it. `??` treats
-  // 0 as a real value and would short-circuit there, hiding the actual number.
-  //
-  // Precedence:
-  //   1. dutiesBreakdown.totalDuties  — authoritative, both endpoints
-  //   2. summary.totalDuties           — AI endpoint
-  //   3. summary.totalDutiesFees       — AI endpoint legacy
-  //   4. summary.totalDutiesTaxes      — standard endpoint (often 0, last resort)
-  //   5. sum of items[i].duty + subheadingDuties — final defense
-  const itemSum = Array.isArray(result.items)
-    ? result.items.reduce((s, it) => s + (it.duty || 0) + (it.subheadingDuties || 0), 0)
-    : undefined;
-  const totalDuties =
-    result.dutiesBreakdown?.totalDuties ??
-    summary.totalDuties ??
-    summary.totalDutiesFees ??
-    summary.totalDutiesTaxes ??
-    itemSum;
-
-  // Effective rate — AI sends totalDutyPercentage; otherwise compute.
-  const effectivePct =
-    summary.totalDutyPercentage ??
-    (totalDuties !== undefined && summary.totalDutiableValue
-      ? (totalDuties / summary.totalDutiableValue) * 100
-      : undefined);
-
-  const aiData = mode === 'ai' ? (result as DutyCalcAIResponse) : null;
-
-  return (
-    <div className="space-y-4">
-      <HeroStat
-        total={totalDuties}
-        effectivePct={effectivePct}
-        currency={currency}
-      />
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-          {[
-            { label: 'Total value', value: fmtUSD(summary.totalValue, currency) },
-            { label: 'Dutiable value', value: fmtUSD(summary.totalDutiableValue, currency) },
-            { label: 'DDP', value: fmtUSD(summary.ddp, currency) },
-            { label: 'User fee', value: fmtUSD(summary.totalUserFee ?? result.dutiesBreakdown?.totalUserFee, currency) },
-            { label: 'Country', value: result.countryOfOriginName || result.countryOfOrigin || '—' },
-            { label: 'Mode', value: result.modeOfTransportation || '—' },
-          ].map((c) => (
-            <div key={c.label} className="bg-muted/40 rounded-lg p-2.5 space-y-0.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {c.label}
-              </p>
-              <p className="text-[13px] font-medium font-mono truncate" title={String(c.value)}>
-                {c.value}
-              </p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/70 shrink-0">
-            Per-item breakdown
-          </p>
-          <span className="h-px flex-1 bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
-        </div>
-        {(result.items || []).map((it, i) => (
-          <ItemBreakdownCard key={i} index={i} result={it} currency={currency} />
-        ))}
-      </div>
-
-      {result.entryFee && (
-        <FeesCard entryFee={result.entryFee} currency={currency} />
-      )}
-
-      {aiData && <AIRecommendationsCard data={aiData} />}
-    </div>
-  );
-}
-
-function EmptyResults() {
-  return (
-    <div className="rounded-2xl border border-dashed bg-muted/10 px-6 py-16 text-center">
-      <div className="mx-auto h-12 w-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
-        <Calculator className="h-6 w-6 text-amber-500" />
-      </div>
-      <p className="text-sm font-medium">No calculation yet</p>
-      <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-        Fill out the shipment metadata and at least one item, then click
-        <span className="font-medium"> Calculate duties </span>
-        to estimate Section 301 / steel / reciprocal tariffs and processing fees.
-      </p>
+    <div role="radiogroup" aria-label="How to classify the goods" className="flex rounded-lg bg-muted p-0.5">
+      {([['standard', 'I have HTS codes'], ['ai', 'Classify from descriptions']] as const).map(([value, label]) => (
+        <button
+          key={value} type="button" role="radio" aria-checked={mode === value} onClick={() => onChange(value)}
+          className={cn(
+            'flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-[13px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring',
+            mode === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground can-hover:hover:text-foreground',
+          )}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -951,7 +179,7 @@ export default function DutyCalculatorPage() {
 
   const addItem = () => {
     if (items.length >= MAX_ITEMS) {
-      toast.error(`Maximum ${MAX_ITEMS} items per calculation`);
+      toast.error(`A calculation takes up to ${MAX_ITEMS} lines.`);
       return;
     }
     setItems((prev) => [...prev, emptyItem()]);
@@ -983,19 +211,19 @@ export default function DutyCalculatorPage() {
       items.forEach((it, i) => {
         if (!it.description.trim()) errs[`item.${i}.description`] = 'Description is required';
         if (mode === 'standard' && !it.hts.trim()) {
-          errs[`item.${i}.hts`] = 'HTS code is required in Standard mode';
+          errs[`item.${i}.hts`] = 'HTS code is required';
         } else if (mode === 'standard' && it.hts.trim()) {
           // HTS_FORMAT regex: 6-10 digits, optional dots between groups.
           const stripped = it.hts.replace(/\./g, '');
           if (!/^\d{6,10}$/.test(stripped)) {
-            errs[`item.${i}.hts`] = 'HTS must be 6–10 digits (dots optional)';
+            errs[`item.${i}.hts`] = 'HTS code must be 6 to 10 digits (dots optional)';
           }
         }
         const v = Number(it.totalValue);
         if (it.totalValue === '' || !Number.isFinite(v)) {
-          errs[`item.${i}.totalValue`] = 'Total value is required';
+          errs[`item.${i}.totalValue`] = 'Value is required';
         } else if (v <= 0) {
-          errs[`item.${i}.totalValue`] = 'Total value must be greater than 0';
+          errs[`item.${i}.totalValue`] = 'Value must be greater than 0';
         }
         // Quantity sanity: if filled, must be a non-negative number.
         if (it.quantity1 !== '' && (!Number.isFinite(Number(it.quantity1)) || Number(it.quantity1) < 0)) {
@@ -1075,11 +303,8 @@ export default function DutyCalculatorPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitAttempted(true);
+    // The list above the button names each one; no toast on top of it.
     if (hasErrors) {
-      const first = Object.values(allErrors)[0];
-      toast.error(`${errorCount} ${errorCount === 1 ? 'field needs' : 'fields need'} attention`, {
-        description: first,
-      });
       return;
     }
     // Clear any stale server errors from a previous submit.
@@ -1127,7 +352,6 @@ export default function DutyCalculatorPage() {
         await aiCalc.mutateAsync(body);
         setResultMode('ai');
       }
-      toast.success('Duty calculation complete');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Duty calculation failed';
       const body = (err as any)?.body as { issues?: Array<{ path: (string | number)[]; message: string }> } | undefined;
@@ -1150,9 +374,9 @@ export default function DutyCalculatorPage() {
         toast.error(`${count} ${count === 1 ? 'field' : 'fields'} need attention`, {
           description: first
             ? (count > 1
-                ? `${firstFieldLabel}: ${first[1]} (and ${count - 1} more — see below)`
+                ? `${firstFieldLabel}: ${first[1]} (and ${count - 1} more, listed below)`
                 : `${firstFieldLabel}: ${first[1]}`)
-            : 'Scroll down — issues are highlighted in red.',
+            : 'Each is marked on its field.',
         });
         return;
       }
@@ -1185,10 +409,10 @@ export default function DutyCalculatorPage() {
     if (key.startsWith('item.')) {
       const [, idx, field] = key.split('.');
       const friendly = ({
-        hts: 'HTS', description: 'Description', totalValue: 'Total value',
-        quantity1: 'Quantity 1', quantity2: 'Quantity 2', spi: 'SPI',
+        hts: 'HTS code', description: 'Description', totalValue: 'Value',
+        quantity1: 'Quantity', quantity2: 'Second quantity', spi: 'Special program',
       } as Record<string, string>)[field] ?? field;
-      return `Item ${Number(idx) + 1} · ${friendly}`;
+      return `Line ${Number(idx) + 1}, ${friendly}`;
     }
     return ({
       countryOfOrigin:      'Country of origin',
@@ -1201,230 +425,108 @@ export default function DutyCalculatorPage() {
     } as Record<string, string>)[key] ?? key;
   }
 
+  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [result]);
+
   // ─── Render ───────────────────────────────────────────────
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto">
-      {/* Hero */}
-      <header
-        className="space-y-4 animate-fade-in-up motion-reduce:animate-none"
-        style={{ animationFillMode: 'forwards' }}
-      >
-        <div className="flex items-center gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/70 shrink-0 inline-flex items-center gap-2">
-            <span
-              className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-500/60"
-              aria-hidden
-            />
-            Lookups · Duty
-          </p>
-          <span className="h-px flex-1 bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
+    <div className={PAGE}>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.015em]">Duty calculator</h1>
+          <p className="text-[13px] text-muted-foreground">Estimate duties, added tariffs and fees before you file.</p>
         </div>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground inline-flex items-center gap-3">
-              <Calculator
-                className="h-7 w-7 text-amber-500 shrink-0"
-                strokeWidth={2}
-              />
-              Duty Calculator
-            </h1>
-            <p className="text-[14px] text-muted-foreground mt-2">
-              Estimate U.S. customs duties, fees, and Section 301 / steel /
-              reciprocal tariffs.
-            </p>
-          </div>
-          <ModeToggle mode={mode} onChange={handleModeChange} />
-        </div>
+        <ModeToggle mode={mode} onChange={handleModeChange} />
       </header>
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6">
-        {/* ── Input form ── */}
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 animate-fade-in-up motion-reduce:animate-none"
-          style={{ animationDelay: '40ms', animationFillMode: 'forwards' }}
-        >
-          {/* Source picker — pre-fill from an existing ISF filing.
-              Optional shortcut; the form below works fine without it. */}
-          <SourcePicker
-            source={source}
-            onPickFiling={applyFilingPrefill}
-            onPickAbiDocument={applyAbiPrefill}
-            onClear={clearPrefill}
-          />
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+        <SourcePicker source={source} onPickFiling={applyFilingPrefill} onPickAbiDocument={applyAbiPrefill} onClear={clearPrefill} />
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Shipment metadata</CardTitle>
-              <CardDescription>
-                Required for both calculator modes.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <ComboboxField
-                label="Country of Origin"
-                required
-                value={countryOfOrigin}
-                onChange={(v) => {
-                  setCountryOfOrigin(v);
-                  markFieldEdited('countryOfOrigin');
-                  clearServerError('countryOfOrigin');
-                }}
-                options={COUNTRIES}
-                placeholder="Select country…"
-                labelExtra={<ProvenanceChip source={provenanceFor('countryOfOrigin')} />}
-                error={visibleErrors.countryOfOrigin}
-              />
-              <SelectField
-                label="Mode of Transportation"
-                required
-                value={modeOfTransportation}
-                onChange={(v) => {
-                  setModeOfTransportation(v as DutyCalcRequest['modeOfTransportation']);
-                  markFieldEdited('modeOfTransportation');
-                  clearServerError('modeOfTransportation');
-                }}
-                options={[
-                  { value: 'ocean', label: 'Ocean' },
-                  { value: 'air', label: 'Air' },
-                  { value: 'truck', label: 'Truck' },
-                  { value: 'rail', label: 'Rail' },
-                ]}
-                labelExtra={<ProvenanceChip source={provenanceFor('modeOfTransportation')} />}
-                error={visibleErrors.modeOfTransportation}
-              />
-              <SelectField
-                label="Entry Type"
-                required
-                value={entryType}
-                onChange={(v) => {
-                  setEntryType(v as DutyCalcRequest['entryType']);
-                  clearServerError('entryType');
-                }}
-                options={[
-                  { value: 'formal', label: 'Formal' },
-                  { value: 'informal', label: 'Informal' },
-                ]}
-                error={visibleErrors.entryType}
-              />
-              <SelectField
-                label="Currency"
-                required
-                value={currency}
-                onChange={(v) => { setCurrency(v); markFieldEdited('currency'); clearServerError('currency'); }}
-                options={CURRENCIES}
-                labelExtra={<ProvenanceChip source={provenanceFor('currency')} />}
-                error={visibleErrors.currency}
-              />
-              <DateField
-                label="Estimated Entry Date"
-                required
-                value={estimatedEntryDateYYYYMMDD}
-                onChange={(v) => { setEstimatedEntryDateYYYYMMDD(v); clearServerError('entryDate'); clearServerError('estimatedEntryDate'); }}
-                hint={`UI: ${yyyymmddToISO(estimatedEntryDateYYYYMMDD) || '—'}`}
-                error={visibleErrors.entryDate || visibleErrors.estimatedEntryDate}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">
-                    Items ({items.length})
-                  </CardTitle>
-                  <CardDescription>
-                    {mode === 'standard'
-                      ? 'HTS code is required for each item.'
-                      : 'AI will classify each item from its description.'}
-                  </CardDescription>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addItem}
-                  disabled={items.length >= MAX_ITEMS}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add item
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {items.map((item, idx) => (
-                <ItemCard
-                  key={idx}
-                  index={idx}
-                  mode={mode}
-                  item={item}
-                  onChange={(patch) => updateItem(idx, patch)}
-                  onRemove={() => removeItem(idx)}
-                  canRemove={items.length > 1}
-                  provenanceFor={(key) => provenanceFor(`item.${idx}.${key}`)}
-                  errors={itemErrorsAt(idx)}
-                />
-              ))}
-            </CardContent>
-          </Card>
-
-          {visibleErrorCount > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40 px-3 py-2.5">
-              <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 text-[12.5px] font-medium">
-                <AlertCircle className="h-3.5 w-3.5" />
-                {visibleErrorCount} {visibleErrorCount === 1 ? 'issue' : 'issues'} to fix before calculating
-              </div>
-              <ul className="mt-1.5 space-y-0.5 text-[12px] text-amber-900/85 dark:text-amber-200/85 leading-snug pl-5 list-disc">
-                {Object.entries(visibleErrors).slice(0, 6).map(([key, msg]) => (
-                  <li key={key}>
-                    <span className="font-mono text-[11px] text-amber-900/70 dark:text-amber-200/70 mr-1">
-                      {humanKey(key)}
-                    </span>
-                    {msg}
-                  </li>
-                ))}
-                {visibleErrorCount > 6 && (
-                  <li className="text-amber-900/70 dark:text-amber-200/70 italic">
-                    + {visibleErrorCount - 6} more — each highlighted in red below
-                  </li>
-                )}
-              </ul>
-            </div>
-          )}
-
-          <div className="sticky bottom-0 -mx-1 px-1 pb-1">
-            <Separator className="mb-3" />
-            <Button
-              type="submit"
-              disabled={isPending || hasErrors}
-              className="w-full sm:w-auto gap-2 bg-amber-500 hover:bg-amber-600 text-amber-950 font-semibold"
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Calculating…
-                </>
-              ) : (
-                <>
-                  <Calculator className="h-4 w-4" /> Calculate duties
-                </>
-              )}
-            </Button>
+        <section aria-labelledby="shipment-title" className={cn(PANEL, 'p-5')}>
+          <h2 id="shipment-title" className="text-[14px] font-semibold">Shipment</h2>
+          <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
+            <ComboboxField
+              label="Country of origin" required value={countryOfOrigin} options={COUNTRIES} placeholder="Select a country"
+              onChange={(v) => { setCountryOfOrigin(v); markFieldEdited('countryOfOrigin'); clearServerError('countryOfOrigin'); }}
+              labelExtra={<ProvenanceChip source={provenanceFor('countryOfOrigin')} />} error={visibleErrors.countryOfOrigin}
+            />
+            <SelectField
+              label="Transport" required value={modeOfTransportation}
+              onChange={(v) => { setModeOfTransportation(v as DutyCalcRequest['modeOfTransportation']); markFieldEdited('modeOfTransportation'); clearServerError('modeOfTransportation'); }}
+              options={[{ value: 'ocean', label: 'Ocean' }, { value: 'air', label: 'Air' }, { value: 'truck', label: 'Truck' }, { value: 'rail', label: 'Rail' }]}
+              labelExtra={<ProvenanceChip source={provenanceFor('modeOfTransportation')} />} error={visibleErrors.modeOfTransportation}
+            />
+            <SelectField
+              label="Entry type" required value={entryType}
+              onChange={(v) => { setEntryType(v as DutyCalcRequest['entryType']); clearServerError('entryType'); }}
+              options={[{ value: 'formal', label: 'Formal' }, { value: 'informal', label: 'Informal' }]} error={visibleErrors.entryType}
+            />
+            <SelectField
+              label="Currency" required value={currency} options={CURRENCIES}
+              onChange={(v) => { setCurrency(v); markFieldEdited('currency'); clearServerError('currency'); }}
+              labelExtra={<ProvenanceChip source={provenanceFor('currency')} />} error={visibleErrors.currency}
+            />
+            <DateField
+              label="Estimated entry date" required value={estimatedEntryDateYYYYMMDD}
+              onChange={(v) => { setEstimatedEntryDateYYYYMMDD(v); clearServerError('entryDate'); clearServerError('estimatedEntryDate'); }}
+              error={visibleErrors.entryDate || visibleErrors.estimatedEntryDate}
+            />
           </div>
-        </form>
+        </section>
 
-        {/* ── Results panel ── */}
-        <div
-          className="space-y-4 animate-fade-in-up motion-reduce:animate-none"
-          style={{ animationDelay: '80ms', animationFillMode: 'forwards' }}
-        >
-          {result ? (
-            <ResultsPanel result={result} mode={resultMode ?? mode} />
-          ) : (
-            <EmptyResults />
-          )}
+        <section aria-labelledby="goods-title" className={PANEL}>
+          <div className="px-5 py-3.5">
+            <h2 id="goods-title" className="text-[14px] font-semibold">Goods <span className="font-normal tabular-nums text-muted-foreground">{items.length}</span></h2>
+            <p className="text-[13px] text-muted-foreground">
+              {mode === 'standard' ? 'One line per HTS code.' : 'Describe each line. It is classified first, then the duty is worked out.'}
+            </p>
+          </div>
+          <ul className="divide-y divide-border/60 border-t border-border/70">
+            {items.map((item, idx) => (
+              <ItemRow
+                key={idx} index={idx} mode={mode} item={item}
+                onChange={(patch) => updateItem(idx, patch)}
+                onRemove={items.length > 1 ? () => removeItem(idx) : undefined}
+                provenanceFor={(key) => provenanceFor(`item.${idx}.${key}`)}
+                errors={itemErrorsAt(idx)}
+              />
+            ))}
+          </ul>
+          <div className="border-t border-border/70 px-5 py-3">
+            <Button type="button" variant="outline" size="sm" onClick={addItem} disabled={items.length >= MAX_ITEMS}><Plus aria-hidden />Add a line</Button>
+          </div>
+        </section>
+
+        {visibleErrorCount > 0 && (
+          <div role="alert" className="rounded-xl bg-urgent-tint px-5 py-3.5">
+            <p className="flex items-center gap-2 text-[13px] font-semibold text-urgent">
+              <AlertCircle className="h-4 w-4" aria-hidden />
+              {visibleErrorCount === 1 ? '1 field to fix' : `${visibleErrorCount} fields to fix`} before this can be calculated
+            </p>
+            <ul className="mt-1.5 space-y-0.5 pl-6 text-[13px]">
+              {Object.entries(visibleErrors).slice(0, 6).map(([key, msg]) => (
+                <li key={key}><span className="font-medium">{humanKey(key)}:</span> {msg}</li>
+              ))}
+              {visibleErrorCount > 6 && <li className="text-foreground/70">And {visibleErrorCount - 6} more, each marked on its field.</li>}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <Button type="submit" disabled={isPending} className="h-10 max-sm:w-full">
+            {isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Calculator aria-hidden />}
+            {isPending ? 'Calculating' : 'Calculate duties'}
+          </Button>
         </div>
-      </div>
+      </form>
+
+      {result && (
+        <div ref={resultRef} className="flex scroll-mt-4 flex-col gap-5">
+          <Results result={result} />
+        </div>
+      )}
     </div>
   );
 }
