@@ -8,6 +8,9 @@ import { ccApiLimiter } from '../middleware/rateLimiter.js';
 import { notify } from '../services/notifications.js';
 import logger from '../config/logger.js';
 import { CC_POLL_INTERVAL_MS } from '../config/schedules.js';
+import { ManifestQueryInputError, manifestQueryRequestFor } from '../services/cbp/manifestQueryAnswer.js';
+import { awaitManifestAnswer, cbpConnected, startNativeManifestQuery, usesNativeManifestQuery } from '../services/cbp/nativeManifestQuery.js';
+import { processInbound } from '../services/cbp/inboundJob.js';
 
 const router = Router();
 
@@ -65,6 +68,18 @@ router.post('/', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<
   }
 
   const { bolNumber, bolType, houseBOLNumber, limitOutputOption, requestRelatedBOL, requestBOLAndEntryInformation, filingId } = parsed.data;
+
+  // Our own engine asks CBP directly; the gateway below is the fallback.
+  try {
+    if (await usesNativeManifestQuery(req.user!)) {
+      await createNativeQuery(req, res, { bolNumber, bolType, houseBOLNumber, filingId });
+      return;
+    }
+  } catch (err) {
+    logger.error({ err }, 'Failed to create native manifest query');
+    res.status(502).json({ error: 'The manifest query could not be sent. Please try again.' });
+    return;
+  }
 
   // Build CC payload
   const ccPayload: CCManifestQueryPayload = {
@@ -134,9 +149,70 @@ router.post('/', ccApiLimiter, async (req: AuthRequest, res: Response): Promise<
     });
   } catch (err: any) {
     logger.error({ err }, 'Failed to create manifest query');
-    res.status(502).json({ error: err.message || 'Failed to create manifest query at CustomsCity' });
+    res.status(502).json({ error: err.message || 'The manifest query could not be sent. Please try again.' });
   }
 });
+
+// ── Native path: one CQ transmission, answered on our own queue ──
+
+async function createNativeQuery(
+  req: AuthRequest,
+  res: Response,
+  input: { bolNumber: string; bolType: 'BOLNUMBER' | 'AWBNUMBER'; houseBOLNumber: string | null; filingId?: string },
+): Promise<void> {
+  if (!cbpConnected()) {
+    res.status(503).json({ error: 'This server is not connected to CBP yet.', code: 'CBP_NOT_CONNECTED' });
+    return;
+  }
+
+  let request;
+  try {
+    request = manifestQueryRequestFor(input);
+  } catch (err) {
+    if (err instanceof ManifestQueryInputError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+
+  const query = await prisma.manifestQuery.create({
+    data: {
+      orgId: req.user!.orgId,
+      userId: req.user!.id,
+      bolNumber: input.bolNumber,
+      bolType: input.bolType,
+      status: 'pending',
+      filingId: input.filingId || null,
+    },
+  });
+
+  // FAILED means it provably never left; UNKNOWN may still be answered.
+  let lastError: string | undefined;
+  try {
+    const sent = await startNativeManifestQuery({ queryId: query.id, orgId: query.orgId, bolNumber: query.bolNumber, request });
+    if (sent.status === 'FAILED') lastError = sent.lastError ?? 'send failed';
+  } catch (err) {
+    lastError = err instanceof Error ? err.message : String(err);
+  }
+  if (lastError) {
+    logger.error({ queryId: query.id, lastError }, 'Native manifest query could not be sent');
+    await prisma.manifestQuery.update({
+      where: { id: query.id },
+      data: { status: 'failed', errorMessage: 'The query could not be sent to CBP. Nothing was transmitted.' },
+    });
+    res.status(502).json({ error: 'The query could not be sent to CBP. Nothing was transmitted; you can try again.' });
+    return;
+  }
+
+  awaitManifestAnswer(query.id, processInbound).catch(err => {
+    logger.error({ err, queryId: query.id }, 'Waiting for the manifest query answer failed');
+  });
+
+  res.status(201).json({
+    data: { id: query.id, ccRequestId: null, status: query.status, bolNumber: query.bolNumber },
+  });
+}
 
 // ── Background polling function ─────────────────────────
 
@@ -315,8 +391,17 @@ router.post('/:id/poll', ccApiLimiter, async (req: AuthRequest, res: Response): 
     return;
   }
 
+  // A native query has no gateway request to poll: read our CBP queue once,
+  // which settles the query if its answer has arrived since.
   if (!query.ccRequestId) {
-    res.status(400).json({ error: 'This query has no pending request to check.' });
+    try {
+      await processInbound();
+    } catch (err) {
+      logger.error({ err, queryId: query.id }, 'Manual manifest query check failed');
+      res.status(502).json({ error: 'Could not check for an answer. Please try again.' });
+      return;
+    }
+    res.json({ data: await prisma.manifestQuery.findUnique({ where: { id: query.id } }) });
     return;
   }
 
@@ -353,7 +438,7 @@ router.post('/:id/poll', ccApiLimiter, async (req: AuthRequest, res: Response): 
     res.json({ data: updated });
   } catch (err: any) {
     logger.error({ err, queryId: query.id }, 'Manual manifest query poll failed');
-    res.status(502).json({ error: err.message || 'Failed to poll CustomsCity' });
+    res.status(502).json({ error: err.message || 'Could not check for an answer. Please try again.' });
   }
 });
 

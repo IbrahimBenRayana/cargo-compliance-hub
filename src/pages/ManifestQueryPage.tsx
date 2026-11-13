@@ -29,7 +29,7 @@ const TH = 'px-4 py-2.5 text-left text-[12px] font-medium text-muted-foreground'
 
 type BillType = 'BOLNUMBER' | 'AWBNUMBER';
 
-interface Disposition { dispositionCode: string; entryNumber?: string }
+interface Disposition { dispositionCode: string; entryNumber?: string; narrative?: string }
 interface House {
   hawbNumber?: string; awbNumber?: string; flightNumber?: string; importingCarrierCode?: string;
   scheduledArrivalDate?: string; manifestQty?: string | number; manifestedPort?: string; dispositionMsg?: Disposition[];
@@ -37,6 +37,8 @@ interface House {
 interface Manifest {
   errorMessage?: string; carrierCode?: string; conveyanceName?: string; voyageFlightTripNo?: string;
   scheduledArrivalDate?: string; modeOfTransport?: string; manifestedPortOfUnlading?: string; houses?: House[];
+  /** The bill's own quantity and status codes, when the answer carries them. */
+  masterBOLNumber?: string; awbNumber?: string; manifestQty?: string | number; dispositionMsg?: Disposition[];
 }
 type QueryRecord = ManifestQueryRecord;
 
@@ -46,6 +48,17 @@ const SEVERITY_TONE: Record<DispositionInfo['severity'], Tone> = { success: 'don
 function manifestOf(q: QueryRecord): Manifest | null {
   const raw = (q.response as { data?: { response?: Manifest | Manifest[] } } | null)?.data?.response;
   return (Array.isArray(raw) ? raw[0] : raw) ?? null;
+}
+
+const isHold = (d: Disposition) => ['warning', 'error'].includes(getDispositionInfo(d.dispositionCode).severity);
+
+/** A bill with no house bills under it, as the one row of the table. */
+function ownRow(m: Manifest): House[] {
+  if (!m.dispositionMsg?.length) return [];
+  return [{
+    hawbNumber: m.masterBOLNumber ?? m.awbNumber, importingCarrierCode: m.carrierCode, scheduledArrivalDate: m.scheduledArrivalDate,
+    manifestQty: m.manifestQty, manifestedPort: m.manifestedPortOfUnlading, dispositionMsg: m.dispositionMsg,
+  }];
 }
 
 /** The answer's dates are MMDDYY. */
@@ -73,9 +86,12 @@ function outcomeOf(q: QueryRecord): Outcome {
   if (!m || (!houses.length && !m.carrierCode)) {
     return { tone: 'calm', icon: AlertCircle, word: 'Empty', title: 'The answer had no manifest details.' };
   }
-  const held = houses.filter((h) => (h.dispositionMsg ?? []).some((d) => ['warning', 'error'].includes(getDispositionInfo(d.dispositionCode).severity))).length;
+  const held = houses.filter((h) => (h.dispositionMsg ?? []).some(isHold)).length;
   const count = houses.length === 1 ? '1 house bill' : `${houses.length} house bills`;
   if (held) return { tone: 'soon', icon: ShieldAlert, word: 'Hold', title: 'On file with CBP, with a hold.', detail: `${count}, ${held} with a hold or exam code.` };
+  if ((m.dispositionMsg ?? []).some(isHold)) {
+    return { tone: 'soon', icon: ShieldAlert, word: 'Hold', title: 'On file with CBP, with a hold.', detail: 'The bill has a hold or exam code.' };
+  }
   return { tone: 'done', icon: CheckCircle2, word: 'On file', title: 'On file with CBP.', detail: houses.length ? `${count}.` : undefined };
 }
 
@@ -103,7 +119,7 @@ function Dispositions({ items }: { items: Disposition[] }) {
       {items.map((d, i) => {
         const info = getDispositionInfo(d.dispositionCode);
         return (
-          <li key={i} title={info.description} className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[12px] font-medium', TINT[SEVERITY_TONE[info.severity]])}>
+          <li key={i} title={d.narrative ?? info.description} className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[12px] font-medium', TINT[SEVERITY_TONE[info.severity]])}>
             <span className="font-mono text-[11.5px]">{d.dispositionCode}</span>
             {info.label}
             {d.entryNumber && <span className="font-mono text-[11.5px] opacity-80">{d.entryNumber}</span>}
@@ -114,13 +130,13 @@ function Dispositions({ items }: { items: Disposition[] }) {
   );
 }
 
-function Houses({ houses }: { houses: House[] }) {
+function Houses({ houses, own }: { houses: House[]; own?: boolean }) {
   return (
     <div className="overflow-x-auto border-t border-border/70">
       <table className="w-full min-w-[640px] text-[13px]">
         <thead>
           <tr className="border-b border-border/70">
-            <th scope="col" className={TH}>House bill</th>
+            <th scope="col" className={TH}>{own ? 'Bill' : 'House bill'}</th>
             <th scope="col" className={TH}>Carrier</th>
             <th scope="col" className={TH}>Arrival</th>
             <th scope="col" className={cn(TH, 'text-right')}>Quantity</th>
@@ -207,7 +223,7 @@ function Answer({ id, onAskAgain, asking }: { id: string; onAskAgain: (q: QueryR
             <PortFact code={m.manifestedPortOfUnlading ?? houses[0]?.manifestedPort} />
             <Fact label="House bills">{houses.length ? String(houses.length) : null}</Fact>
           </dl>
-          {houses.length > 0 && <Houses houses={houses} />}
+          {houses.length > 0 ? <Houses houses={houses} /> : ownRow(m).length > 0 && <Houses houses={ownRow(m)} own />}
         </>
       )}
     </section>
