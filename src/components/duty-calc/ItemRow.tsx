@@ -28,6 +28,16 @@ export function ItemRow({ index, mode, item, onChange, onRemove, provenanceFor, 
   const extras = [item.aluminumPercentage, item.steelPercentage, item.copperPercentage].filter(Boolean).length
     + EXEMPTIONS.filter(([k]) => item[k]).length;
 
+  const description = (
+    <TextField
+      className="sm:col-span-2" label="Description" required maxLength={300}
+      value={item.description} onChange={(v) => onChange({ description: v })}
+      placeholder={mode === 'ai' ? 'Stainless steel kitchen sink, single bowl, brushed finish' : 'What the goods are'}
+      hint={mode === 'ai' ? 'Material, use and form all help the classification.' : undefined}
+      labelExtra={<ProvenanceChip source={provenanceFor('description')} />} error={errors.description}
+    />
+  );
+
   return (
     <li className="px-5 py-4">
       <div className="flex items-center justify-between gap-3">
@@ -42,37 +52,32 @@ export function ItemRow({ index, mode, item, onChange, onRemove, provenanceFor, 
         )}
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-12">
+      <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+        {mode === 'ai' && description}
         {mode === 'standard' && (
           <TextField
-            className="lg:col-span-3" label="HTS code" required value={item.hts} onChange={(v) => onChange({ hts: v })}
+            label="HTS code" required value={item.hts} onChange={(v) => onChange({ hts: v })}
             placeholder="7320.20.1000" hint="Six to ten digits. Dots are optional."
             labelExtra={<ProvenanceChip source={provenanceFor('hts')} />} error={errors.hts}
           />
         )}
         <TextField
-          className={mode === 'standard' ? 'lg:col-span-6' : 'lg:col-span-9'} label="Description" required maxLength={300}
-          value={item.description} onChange={(v) => onChange({ description: v })}
-          placeholder={mode === 'ai' ? 'Stainless steel kitchen sink, single bowl, brushed finish' : 'What the goods are'}
-          hint={mode === 'ai' ? 'Material, use and form all help the classification.' : undefined}
-          labelExtra={<ProvenanceChip source={provenanceFor('description')} />} error={errors.description}
-        />
-        <TextField
-          className="lg:col-span-3" label="Value" required type="number" value={item.totalValue} onChange={(v) => onChange({ totalValue: v })}
+          label="Value" required type="number" value={item.totalValue} onChange={(v) => onChange({ totalValue: v })}
           placeholder="0.00" hint="Customs value of this line, in the currency chosen above."
           labelExtra={<ProvenanceChip source={provenanceFor('totalValue')} />} error={errors.totalValue}
         />
+        {mode === 'standard' && description}
         <TextField
-          className="lg:col-span-3" label="Quantity" type="number" value={item.quantity1} onChange={(v) => onChange({ quantity1: v })}
+          label="Quantity" type="number" value={item.quantity1} onChange={(v) => onChange({ quantity1: v })}
           placeholder="1500" hint="In the unit the HTS line reports in (kilograms, pieces, dozens). Most codes need it."
           labelExtra={<ProvenanceChip source={provenanceFor('quantity1')} />} error={errors.quantity1}
         />
         <TextField
-          className="lg:col-span-3" label="Second quantity" type="number" value={item.quantity2} onChange={(v) => onChange({ quantity2: v })}
+          label="Second quantity" type="number" value={item.quantity2} onChange={(v) => onChange({ quantity2: v })}
           placeholder="12" hint="Only for HTS lines that report in two units." error={errors.quantity2}
         />
         <TextField
-          className="lg:col-span-3" label="Special program" value={item.spi} onChange={(v) => onChange({ spi: v.toUpperCase() })}
+          label="Special program" value={item.spi} onChange={(v) => onChange({ spi: v.toUpperCase() })}
           placeholder="MX" maxLength={4} hint="The special program indicator, such as MX for USMCA." error={errors.spi}
         />
       </div>
@@ -83,11 +88,11 @@ export function ItemRow({ index, mode, item, onChange, onRemove, provenanceFor, 
           Metal content and exemptions
           {extras > 0 && <span className="rounded-full bg-muted px-1.5 text-[11.5px] tabular-nums text-foreground">{extras}</span>}
         </summary>
-        <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-12">
-          <TextField className="lg:col-span-2" label="Aluminum %" type="number" value={item.aluminumPercentage} onChange={(v) => onChange({ aluminumPercentage: v })} placeholder="0" />
-          <TextField className="lg:col-span-2" label="Steel %" type="number" value={item.steelPercentage} onChange={(v) => onChange({ steelPercentage: v })} placeholder="0" />
-          <TextField className="lg:col-span-2" label="Copper %" type="number" value={item.copperPercentage} onChange={(v) => onChange({ copperPercentage: v })} placeholder="0" />
-          <fieldset className="sm:col-span-3 lg:col-span-6">
+        <div className="mt-3 grid grid-cols-3 gap-x-4 gap-y-3">
+          <TextField label="Aluminum %" type="number" value={item.aluminumPercentage} onChange={(v) => onChange({ aluminumPercentage: v })} placeholder="0" />
+          <TextField label="Steel %" type="number" value={item.steelPercentage} onChange={(v) => onChange({ steelPercentage: v })} placeholder="0" />
+          <TextField label="Copper %" type="number" value={item.copperPercentage} onChange={(v) => onChange({ copperPercentage: v })} placeholder="0" />
+          <fieldset className="col-span-3">
             <legend className="text-sm font-medium">Exemptions</legend>
             <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
               {EXEMPTIONS.map(([key, label]) => (
