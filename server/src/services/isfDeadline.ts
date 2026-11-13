@@ -10,9 +10,12 @@ const HOUR = 60 * 60 * 1000;
 export const LADING_BUFFER_HOURS = 24;
 export const ISF_HOURS_BEFORE_LADING = 24;
 
-export function isfFilingDeadline(estimatedDeparture: Date | string, estimatedLading?: Date | string | null): Date {
+export function isfFilingDeadline(estimatedDeparture: Date | string, estimatedLading?: Date | string | null): Date;
+export function isfFilingDeadline(estimatedDeparture: Date | string | null | undefined, estimatedLading?: Date | string | null): Date | null;
+export function isfFilingDeadline(estimatedDeparture: Date | string | null | undefined, estimatedLading?: Date | string | null): Date | null {
   // Exact when the filer gave an estimated lading date: 24h before it.
   if (estimatedLading) return new Date(new Date(estimatedLading).getTime() - ISF_HOURS_BEFORE_LADING * HOUR);
+  if (!estimatedDeparture) return null;
   const etd = new Date(estimatedDeparture).getTime();
   return new Date(etd - (LADING_BUFFER_HOURS + ISF_HOURS_BEFORE_LADING) * HOUR);
 }

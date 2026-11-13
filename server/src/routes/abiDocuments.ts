@@ -27,7 +27,7 @@ import {
   extractDenormFromPayload,
 } from '../services/abiDocumentMapper.js';
 import { sanitizeErrorMessage } from '../services/errorTranslator.js';
-import { createAbiDocumentForOrg, sendAbiDocumentToCBP, isEntryEditable } from '../services/abiWrite.js';
+import { createAbiDocumentForOrg, sendAbiDocumentToCBP, isEntryEditable, reopenRejectedReplace } from '../services/abiWrite.js';
 import { transmitEntryNative } from '../services/cbp/nativeEntry.js';
 import { notify } from '../services/notifications.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
@@ -546,6 +546,12 @@ router.post('/:id/cbp-action', ccApiLimiter, requireVerifiedEmail, requireMfaEnr
     return;
   }
   const outcome = await transmitEntryNative({ docId: String(req.params.id), orgId: req.user!.orgId, userId: req.user!.id, action });
+  res.status(outcome.httpStatus).json(outcome.body);
+});
+
+// ── POST /:id/reopen-rejected — Edits from a rejected replace, back to fix ──
+router.post('/:id/reopen-rejected', async (req: AuthRequest, res: Response): Promise<void> => {
+  const outcome = await reopenRejectedReplace({ docId: String(req.params.id), orgId: req.user!.orgId });
   res.status(outcome.httpStatus).json(outcome.body);
 });
 
