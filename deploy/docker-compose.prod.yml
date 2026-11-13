@@ -107,6 +107,8 @@ services:
       # Which dashboard and Shipments page people see: off | staff | all. Setting off is the rollback.
       DASHBOARD_V2: ${DASHBOARD_V2:-off}
       SHIPMENTS_V2: ${SHIPMENTS_V2:-off}
+      # Manifest queries straight to CBP (CQ) instead of the gateway: off | staff | all.
+      MANIFEST_QUERY_NATIVE: ${MANIFEST_QUERY_NATIVE:-off}
 
       # AI — provider-agnostic. AI_PROVIDER chooses backend; AI_API_KEY is matching credential.
       AI_ASSESSMENT_ENABLED:    ${AI_ASSESSMENT_ENABLED:-false}

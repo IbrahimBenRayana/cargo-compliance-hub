@@ -62,6 +62,7 @@ services:
       # Which dashboard people see: off | staff | all (spec: dashboard-redesign).
       DASHBOARD_V2: ${DASHBOARD_V2:-off}
       SHIPMENTS_V2: ${SHIPMENTS_V2:-off}
+      MANIFEST_QUERY_NATIVE: ${MANIFEST_QUERY_NATIVE:-off}
       # Marketing leads: sales-lead notification recipients (comma-separated)
       # and the prospect confirmation email (off until the founder approves copy).
       LEADS_NOTIFY_TO: ${LEADS_NOTIFY_TO:-ibrahim.rayana@mycargolens.com}
