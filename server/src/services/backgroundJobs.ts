@@ -6,8 +6,8 @@
  * 1. STATUS POLLING — Every 5 min: Checks CustomsCity for CBP responses
  *    on all "submitted" filings, updates status, creates notifications
  * 
- * 2. DEADLINE ALERTS — Every hour: Scans all draft/submitted filings with
- *    approaching deadlines (72h, 48h, 24h) and creates warning notifications
+ * 2. DEADLINE ALERTS — Every hour: Scans all draft/rejected/submitted filings
+ *    with approaching deadlines (72h, 48h, 24h) and creates warning notifications
  * 
  * 3. STALE FILING CLEANUP — Every 6 hours: Flags filings that have been
  *    "submitted" for > 72 hours without a CBP response (possible issue)
@@ -260,7 +260,7 @@ async function pollSubmittedFilings(): Promise<void> {
 
 // ─── 2. DEADLINE ALERT JOB ────────────────────────────────
 
-const DEADLINE_THRESHOLDS = [72, 48, 24]; // hours
+const DEADLINE_THRESHOLDS = [24, 48, 72]; // hours, tightest first: the first match is the one sent
 
 async function checkDeadlines(): Promise<void> {
   if (isDeadlineCheckRunning) {
@@ -271,13 +271,14 @@ async function checkDeadlines(): Promise<void> {
   isDeadlineCheckRunning = true;
 
   try {
-    // Find all draft and submitted filings with deadlines in the next 72 hours
+    // Find every filing not yet accepted by CBP with a deadline in the next 72
+    // hours. A rejected ISF is not on file, so its clock is still running.
     const now = new Date();
     const cutoff72h = new Date(now.getTime() + 72 * 60 * 60 * 1000);
 
     const filingsWithDeadlines = await prisma.filing.findMany({
       where: {
-        status: { in: ['draft', 'submitted'] },
+        status: { in: ['draft', 'rejected', 'submitted'] },
         filingDeadline: {
           not: null,
           lte: cutoff72h, // Deadline is within 72 hours
@@ -293,12 +294,6 @@ async function checkDeadlines(): Promise<void> {
         status: true,
       },
     });
-
-    if (filingsWithDeadlines.length === 0) {
-      isDeadlineCheckRunning = false;
-      lastDeadlineCheck = new Date();
-      return;
-    }
 
     let alertsSent = 0;
 
@@ -320,10 +315,10 @@ async function checkDeadlines(): Promise<void> {
       }
     }
 
-    // Also check for OVERDUE filings (deadline passed but still draft)
+    // Also check for OVERDUE filings (deadline passed and still not with CBP)
     const overdueFilings = await prisma.filing.findMany({
       where: {
-        status: 'draft',
+        status: { in: ['draft', 'rejected'] },
         filingDeadline: {
           not: null,
           lt: now, // Deadline has passed
