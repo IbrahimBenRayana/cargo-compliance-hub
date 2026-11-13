@@ -3,7 +3,7 @@
  * number that matters beside it (time to the ISF cutoff, or the ISF number),
  * and the voyage facts a filer checks first underneath.
  */
-import { FILL, type Tone } from '@/components/dashboard/tones';
+import { BAND, FILL, type Tone } from '@/components/dashboard/tones';
 import { cutoffMatters, statusOf } from '@/components/shipments/status';
 import { formatDuration } from '@/lib/countdown';
 import { cn } from '@/lib/utils';
@@ -12,9 +12,6 @@ import { CopyButton } from './CopyButton';
 import { relDay, stamp, type Summary } from './summary';
 import { isUsPort, usePortName } from './usePortName';
 
-const BAND: Record<Tone, string> = {
-  urgent: 'bg-urgent-tint', soon: 'bg-soon-tint', info: 'bg-info-tint', entry: 'bg-entry-tint', done: 'bg-done-tint', calm: 'bg-muted/60',
-};
 const TEXT: Record<Tone, string> = {
   urgent: 'text-urgent', soon: 'text-soon', info: 'text-info', entry: 'text-entry', done: 'text-done', calm: 'text-foreground',
 };
