@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { complianceApi, type ScoreHistoryPoint } from '@/api/client';
 import { cn } from '@/lib/utils';
 import { statusOf } from '@/components/shipments/status';
@@ -21,10 +21,7 @@ const PANEL = 'rounded-xl border border-border/70 bg-card p-5 shadow-card';
 
 function Title() {
   return (
-    <h2 className="flex items-center gap-2.5 text-[14px] font-semibold">
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary"><Activity className="h-3.5 w-3.5" aria-hidden /></span>
-      Compliance score history
-    </h2>
+    <h2 className="text-[15px] font-semibold">Compliance score history</h2>
   );
 }
 

@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 
 const ACTION_LABEL: Record<string, string> = { A: 'Add', R: 'Replace', D: 'Delete' };
 
-const fmt = (ts: string | null) => (ts ? new Date(ts).toLocaleString() : '');
+const fmt = (ts: string | null) => (ts ? new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 
 /** Each answer in the app's colours: green accepted, red rejected, blue sent, amber unknown. */
 const STATUS_LOOK: Record<string, { icon: typeof Send; tone: Tone }> = {
@@ -79,7 +79,7 @@ function CbpActivityCard({
   return (
     <section aria-labelledby="cbp-activity-title" className="rounded-xl border border-border/70 bg-card p-5 shadow-card">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 id="cbp-activity-title" className="text-[14px] font-semibold">CBP activity</h2>
+        <h2 id="cbp-activity-title" className="text-[15px] font-semibold">CBP activity</h2>
         {badges}
         {pending && !noAnswer && (
           <span className={cn(PILL, TINT.info)}>
