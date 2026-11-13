@@ -1,38 +1,29 @@
+/**
+ * Overview: today's brief, the score with what feeds it, then the filings
+ * that need attention. Snoozing hides an item for a day (kept in this
+ * browser).
+ */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { motion, useReducedMotion } from 'framer-motion';
-import {
-  ArrowRight, ArrowUpRight, Sparkles, ChevronDown,
-  Clock, Inbox, ListChecks, ShieldCheck, Building2, RotateCcw, RefreshCw,
-} from '@/components/icons';
-import {
-  complianceApi,
-  type ActionItem,
-  type ActionQueueResponse,
-  type HealthNarrativeResponse,
-} from '@/api/client';
+import { ArrowRight, Building2, ChevronRight, Clock, ListChecks, RefreshCw, RotateCcw, ShieldCheck, Sparkles } from '@/components/icons';
+import { complianceApi, type ActionItem, type ActionQueueResponse, type HealthNarrativeResponse } from '@/api/client';
+import { FILL, TINT, type Tone } from '@/components/dashboard/tones';
+import { StatusPill } from '@/components/shipments/StatusPill';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-/**
- * "Overview" tab — replaces the old Health tab.
- *
- * Layout:
- *   1. ScoreHero  — left: large compliance-score number with delta; right:
- *                   3 contextual stats (Awaiting CBP, With issues, High
- *                   risk). All clickable into filtered shipment lists.
- *   2. ActionQueue — vertical list of action items grouped by severity.
- *                   Each row expandable inline. Per-row actions: Open,
- *                   AI coach (opens the existing drawer). Snooze persists
- *                   in localStorage so the same item doesn't keep showing.
- *
- * Deliberate omissions vs. the old design:
- *   • No rejection-trend area chart (retrospective; doesn't drive action)
- *   • No top-5 reasons bar chart (now folded into "bulk-fix" action items)
- *   • No equal-weight KPI grid (broken asymmetric hierarchy instead)
- */
+const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
+const TEXT: Record<Tone, string> = {
+  urgent: 'text-urgent', soon: 'text-soon', info: 'text-info', entry: 'text-entry', done: 'text-done', calm: 'text-foreground',
+};
+
+/** A score in the page's colours: 90 and up is good, 70 and up is watch, below is act. */
+const scoreTone = (score: number | null, good = 90, watch = 70): Tone =>
+  score === null ? 'calm' : score >= good ? 'done' : score >= watch ? 'soon' : 'urgent';
+
+const SEVERITY: Record<ActionItem['severity'], Tone> = { critical: 'urgent', high: 'urgent', medium: 'soon', low: 'calm' };
 
 const SNOOZE_LS_KEY = 'mcl_compliance_snoozed_v1';
 const SNOOZE_DURATION_MS = 24 * 60 * 60 * 1000;
@@ -111,7 +102,7 @@ export function OverviewTab({ onOpenAiCoach }: OverviewTabProps) {
   if (isLoading || !data) return <OverviewSkeleton />;
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-5">
       <HealthBrief />
       <ScoreHero data={data} />
       <ActionQueue items={visible} focusId={focusId} onSnooze={snooze} onOpenAiCoach={onOpenAiCoach} />
@@ -122,7 +113,7 @@ export function OverviewTab({ onOpenAiCoach }: OverviewTabProps) {
   );
 }
 
-// ─── Health Brief (AI 1-line summary) ────────────────────────────────
+// ─── Today's brief ───────────────────────────────────────────────────
 
 function HealthBrief() {
   const qc = useQueryClient();
@@ -131,587 +122,207 @@ function HealthBrief() {
     queryFn: () => complianceApi.healthNarrative(),
     staleTime: 5 * 60_000,
   });
-
-  if (isLoading) {
-    return <Skeleton className="h-[58px] rounded-2xl" />;
-  }
+  if (isLoading) return <Skeleton className="h-[58px] rounded-xl" />;
   if (!data) return null;
-
-  return <HealthBriefCard data={data} refreshing={isFetching} onRefresh={() => qc.invalidateQueries({ queryKey: ['compliance', 'health-narrative'] })} />;
+  return <Brief data={data} refreshing={isFetching} onRefresh={() => qc.invalidateQueries({ queryKey: ['compliance', 'health-narrative'] })} />;
 }
 
-function HealthBriefCard({
-  data, refreshing, onRefresh,
-}: {
-  data: HealthNarrativeResponse;
-  refreshing: boolean;
-  onRefresh: () => void;
-}) {
-  const isAi = !!data.model;
+function Brief({ data, refreshing, onRefresh }: { data: HealthNarrativeResponse; refreshing: boolean; onRefresh: () => void }) {
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
-      {/* Subtle gold→transparent wash from the right — the brief is AI-attributed, so we lean amber */}
-      <div
-        aria-hidden
-        className="absolute inset-y-0 right-0 w-[55%] pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse 75% 100% at 100% 50%, hsl(43 96% 56% / 0.07), transparent 70%)',
-        }}
-      />
-      <div className="relative px-5 py-3.5 flex items-center gap-4">
-        <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_8px_20px_-10px_rgba(245,158,11,0.5)] flex items-center justify-center shrink-0">
-          <Sparkles className="h-[18px] w-[18px] text-amber-950" weight="bold" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-amber-700 dark:text-amber-400 mb-0.5">
-            Today's brief
-            {isAi ? (
-              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 normal-case tracking-normal">· AI-generated</span>
-            ) : (
-              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 normal-case tracking-normal">· rules-based</span>
-            )}
-          </div>
-          <p className="text-[13.5px] text-slate-800 dark:text-slate-100 leading-relaxed truncate sm:whitespace-normal">
-            {data.narrative}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={refreshing}
-          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
-          aria-label="Regenerate today's brief"
-          title="Regenerate"
-        >
-          <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
-        </button>
-      </div>
-    </article>
-  );
-}
-
-// ─── Snoozed panel ──────────────────────────────────────────────────
-
-function SnoozedPanel({
-  count,
-  onUnsnoozeAll,
-}: {
-  count: number;
-  onUnsnoozeAll: () => void;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30 px-4 py-3 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-[12.5px]">
-        <Clock className="h-3.5 w-3.5 shrink-0" />
-        <span>
-          <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">{count}</span>{' '}
-          {count === 1 ? 'item' : 'items'} snoozed for 24h
-        </span>
+    <section aria-label="Today's brief" className={cn(PANEL, 'flex items-center gap-3 px-5 py-3.5')}>
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] text-muted-foreground">Today's brief, {data.model ? 'written by AI from your filings' : 'worked out from your filings'}</p>
+        <p className="mt-0.5 text-[14px] font-medium leading-6">{data.narrative}</p>
       </div>
       <button
-        type="button"
-        onClick={onUnsnoozeAll}
-        className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11.5px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors duration-200"
+        type="button" onClick={onRefresh} disabled={refreshing} aria-label="Refresh today's brief"
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 can-hover:hover:bg-muted can-hover:hover:text-foreground"
       >
-        <RotateCcw className="h-3 w-3" />
-        Un-snooze all
+        <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin motion-reduce:animate-none')} aria-hidden />
       </button>
-    </div>
-  );
-}
-
-// ─── ScoreHero ───────────────────────────────────────────────────────
-
-function ScoreHero({ data }: { data: ActionQueueResponse }) {
-  const reduceMotion = useReducedMotion();
-  const target = data.score ?? 0;
-  const [display, setDisplay] = useState(reduceMotion ? target : 0);
-  // Mount-only count-up. Skip on refetch — we only want the entrance to feel alive.
-  const hasAnimated = useRef(false);
-  useEffect(() => {
-    if (hasAnimated.current || reduceMotion) {
-      setDisplay(target);
-      return;
-    }
-    hasAnimated.current = true;
-    const duration = 900;
-    const start = performance.now();
-    let raf = 0;
-    const step = (t: number) => {
-      const p = Math.min(1, (t - start) / duration);
-      const eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
-      setDisplay(Math.round(target * eased));
-      if (p < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [target, reduceMotion]);
-
-  const tone =
-    data.score === null ? 'neutral'
-    : data.score >= 90 ? 'emerald'
-    : data.score >= 70 ? 'amber'
-    : 'rose';
-
-  return (
-    <section className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
-      {/* Subtle radial wash — Stripe-style. Confined to the hero, not page-wide,
-          so the rest of the tab content reads on a clean surface. */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none opacity-70"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 60% at 18% 0%, hsl(43 96% 56% / 0.10), transparent 70%), radial-gradient(ellipse 60% 60% at 95% 100%, hsl(222 47% 22% / 0.06), transparent 70%)',
-        }}
-      />
-      <div className="relative px-6 sm:px-7 py-7 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-        {/* Score number */}
-        <div className="lg:col-span-5">
-          <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-            Compliance score
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span
-              className={cn(
-                'text-[56px] font-semibold leading-none tabular-nums tracking-tight',
-                tone === 'emerald' && 'text-emerald-700 dark:text-emerald-300',
-                tone === 'amber'   && 'text-amber-700   dark:text-amber-300',
-                tone === 'rose'    && 'text-rose-700    dark:text-rose-300',
-                tone === 'neutral' && 'text-slate-900   dark:text-slate-50',
-              )}
-            >
-              {data.score === null ? '—' : display}
-            </span>
-            <span className="text-[20px] font-medium text-slate-500 dark:text-slate-400 tabular-nums">
-              / 100
-            </span>
-          </div>
-          <p className="mt-2 text-[13px] text-slate-600 dark:text-slate-400 max-w-sm leading-relaxed">
-            {data.score === null
-              ? 'Not enough recent filings to compute a score.'
-              : data.score >= 90
-                ? 'Strong — filings are clearing cleanly.'
-                : data.score >= 70
-                  ? 'Solid, but a few patterns are dragging it down. Check the action queue.'
-                  : 'Action needed. Multiple recent filings hit issues — see below.'}
-          </p>
-        </div>
-
-        {/* 3-stat strip */}
-        <div className="lg:col-span-7 grid grid-cols-3 gap-3">
-          <StatTile
-            icon={<Inbox className="h-3.5 w-3.5" />}
-            label="Awaiting CBP"
-            value={data.stats.awaitingCbp}
-            href="/shipments?status=submitted"
-          />
-          <StatTile
-            icon={<ListChecks className="h-3.5 w-3.5" />}
-            label="With issues"
-            value={data.stats.withIssues}
-            tone={data.stats.withIssues > 0 ? 'amber' : 'neutral'}
-            href="/shipments?status=rejected"
-          />
-          <StatTile
-            icon={<ShieldCheck className="h-3.5 w-3.5" />}
-            label="High risk"
-            value={data.stats.highRisk}
-            tone={data.stats.highRisk > 0 ? 'rose' : 'neutral'}
-            href="/compliance?tab=risk"
-          />
-        </div>
-      </div>
     </section>
   );
 }
 
-function StatTile({
-  icon, label, value, tone = 'neutral', href,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  tone?: 'neutral' | 'amber' | 'rose';
-  href: string;
-}) {
-  const navigate = useNavigate();
-  const colors =
-    tone === 'rose'  ? 'hover:bg-rose-50/60  dark:hover:bg-rose-500/[0.06]  text-rose-700  dark:text-rose-300'
-  : tone === 'amber' ? 'hover:bg-amber-50/60 dark:hover:bg-amber-500/[0.06] text-amber-700 dark:text-amber-300'
-  :                    'hover:bg-slate-50    dark:hover:bg-slate-900/60     text-slate-900 dark:text-slate-50';
+// ─── Score and what feeds it ─────────────────────────────────────────
+
+function ScoreHero({ data }: { data: ActionQueueResponse }) {
+  const tone = scoreTone(data.score);
+  const reading =
+    data.score === null ? 'Not enough recent filings to work out a score.'
+    : data.score >= 90 ? 'Strong. Recent filings are being accepted without issues.'
+    : data.score >= 70 ? 'Solid, with a few patterns pulling it down. They are listed below.'
+    : 'Needs work. Several recent filings ran into issues, listed below.';
+  const stats: Array<{ label: string; value: number; tone: Tone; to: string }> = [
+    { label: 'Sent, awaiting an answer', value: data.stats.awaitingCbp, tone: 'calm', to: '/shipments?tab=sent' },
+    { label: 'Rejected', value: data.stats.withIssues, tone: data.stats.withIssues > 0 ? 'soon' : 'calm', to: '/shipments?tab=rejected' },
+    { label: 'High risk', value: data.stats.highRisk, tone: data.stats.highRisk > 0 ? 'urgent' : 'calm', to: '/compliance?tab=risk' },
+  ];
   return (
-    <button
-      type="button"
-      onClick={() => navigate(href)}
-      className={cn(
-        'group rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 px-4 py-3 text-left transition-colors duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-        colors,
-      )}
-    >
-      <div className="flex items-center gap-1.5 mb-1.5">
-        {icon}
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] opacity-70">
-          {label}
-        </span>
+    <section aria-label="Compliance score" className={cn(PANEL, 'grid grid-cols-1 lg:grid-cols-12')}>
+      <div className="px-5 py-5 lg:col-span-5">
+        <p className="text-[13px] font-medium text-muted-foreground">Compliance score</p>
+        <p className="mt-1 flex items-baseline gap-1.5">
+          <span className={cn('text-[40px] font-semibold leading-none tracking-[-0.02em] tabular-nums', TEXT[tone])}>{data.score ?? 'None yet'}</span>
+          {data.score !== null && <span className="text-[16px] tabular-nums text-muted-foreground">out of 100</span>}
+        </p>
+        <p className="mt-2 max-w-sm text-[13px] text-foreground/75">{reading}</p>
       </div>
-      <div className="flex items-end justify-between">
-        <span className="text-[26px] font-semibold leading-none tabular-nums">{value}</span>
-        <ArrowUpRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity duration-200 mb-1" />
-      </div>
-    </button>
+      <ul className="grid grid-cols-3 divide-x divide-border/70 border-t border-border/70 lg:col-span-7 lg:border-l lg:border-t-0">
+        {stats.map((s) => (
+          <li key={s.label}>
+            <Link
+              to={s.to}
+              className="group flex h-full flex-col justify-center gap-1 px-5 py-4 outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring can-hover:hover:bg-muted/50"
+            >
+              <span className="text-[12px] text-muted-foreground">{s.label}</span>
+              <span className="flex items-center justify-between gap-2">
+                <span className={cn('text-[24px] font-semibold leading-8 tabular-nums', TEXT[s.tone])}>{s.value.toLocaleString()}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity duration-150 group-focus-visible:opacity-100 can-hover:group-hover:opacity-100" aria-hidden />
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
-// ─── ActionQueue (card grid) ─────────────────────────────────────────
+// ─── Filings needing attention ───────────────────────────────────────
 
-function ActionQueue({
-  items,
-  focusId,
-  onSnooze,
-  onOpenAiCoach,
-}: {
+function ActionQueue({ items, focusId, onSnooze, onOpenAiCoach }: {
   items: ActionItem[];
   focusId: string | null;
   onSnooze: (id: string) => void;
   onOpenAiCoach: (filingId: string, mode: 'rejection' | 'draft-review') => void;
 }) {
   if (items.length === 0) return <EmptyActionQueue />;
-
   return (
-    <section>
-      <header className="flex items-center justify-between gap-3 mb-3">
-        <div>
-          <h2 className="text-[14px] font-semibold text-slate-900 dark:text-slate-50">
-            Filings needing attention
-          </h2>
-          <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
-            Sorted by urgency. Click a card to expand · Snooze pushes it out 24 hours.
-          </p>
-        </div>
-        <Badge variant="outline" className="tabular-nums text-[11px] font-semibold shrink-0">
-          {items.length} {items.length === 1 ? 'item' : 'items'}
-        </Badge>
+    <section aria-labelledby="attention-title">
+      <header className="mb-3">
+        <h2 id="attention-title" className="text-[14px] font-semibold">
+          Filings needing attention <span className="font-normal tabular-nums text-muted-foreground">{items.length}</span>
+        </h2>
+        <p className="text-[13px] text-muted-foreground">Most urgent first. Snooze hides one for 24 hours.</p>
       </header>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {items.map((it, idx) => (
-          <ActionCard
-            key={it.id}
-            item={it}
-            index={idx}
-            isFocused={focusId === it.id}
-            onSnooze={onSnooze}
-            onOpenAiCoach={onOpenAiCoach}
-          />
+      <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {items.map((it) => (
+          <ActionCard key={it.id} item={it} isFocused={focusId === it.id} onSnooze={onSnooze} onOpenAiCoach={onOpenAiCoach} />
         ))}
-      </div>
+      </ul>
     </section>
   );
 }
 
-const SEV_STYLES: Record<ActionItem['severity'], { dot: string; ring: string; label: string }> = {
-  critical: { dot: 'bg-rose-500',   ring: 'ring-rose-500/30',   label: 'text-rose-700 dark:text-rose-300' },
-  high:     { dot: 'bg-rose-400',   ring: 'ring-rose-400/25',   label: 'text-rose-700 dark:text-rose-300' },
-  medium:   { dot: 'bg-amber-500',  ring: 'ring-amber-500/30',  label: 'text-amber-700 dark:text-amber-300' },
-  low:      { dot: 'bg-slate-400',  ring: 'ring-slate-400/30',  label: 'text-slate-700 dark:text-slate-300' },
-};
-
-function ActionCard({
-  item,
-  index,
-  isFocused,
-  onSnooze,
-  onOpenAiCoach,
-}: {
+function ActionCard({ item, isFocused, onSnooze, onOpenAiCoach }: {
   item: ActionItem;
-  index: number;
   isFocused: boolean;
   onSnooze: (id: string) => void;
   onOpenAiCoach: (filingId: string, mode: 'rejection' | 'draft-review') => void;
 }) {
-  const reduceMotion = useReducedMotion();
-  const sev = SEV_STYLES[item.severity];
-  const cardRef = useRef<HTMLElement | null>(null);
+  const cardRef = useRef<HTMLLIElement>(null);
 
-  // Notification deep-link: when this card matches ?focus=<id>, scroll it
-  // into view + apply a pulse class so the user immediately sees what
-  // their notification was about.
+  // A notification links here with ?focus=<id>: bring that card into view.
   useEffect(() => {
-    if (!isFocused || !cardRef.current) return;
-    // Schedule scroll on next frame so layout is settled.
-    const raf = requestAnimationFrame(() => {
-      cardRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
-    });
+    if (!isFocused) return;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const raf = requestAnimationFrame(() => cardRef.current?.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center' }));
     return () => cancelAnimationFrame(raf);
-  }, [isFocused, reduceMotion]);
+  }, [isFocused]);
 
-  // AI coach mode — rejected → rejection coach; everything else → pre-flight.
-  const coachMode: 'rejection' | 'draft-review' =
-    item.kind === 'rejection' ? 'rejection' : 'draft-review';
-
-  // Top-left accent line tone — visual signal of urgency without dominating
-  // the card. Sits flush with the left edge, 3px wide.
-  const accent =
-    item.severity === 'critical' ? 'bg-rose-500'
-    : item.severity === 'high'   ? 'bg-rose-400'
-    : item.severity === 'medium' ? 'bg-amber-500'
-    :                              'bg-slate-300';
+  const coachMode = item.kind === 'rejection' ? 'rejection' : 'draft-review';
+  const tone = SEVERITY[item.severity];
 
   return (
-    <motion.article
-      ref={cardRef as React.RefObject<HTMLElement>}
-      initial={reduceMotion ? false : { opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.3), ease: 'easeOut' }}
-      className={cn(
-        'group relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:border-slate-300 dark:hover:border-slate-700 transition-colors duration-200',
-        // ?focus=<id> pulse — fades in/out via Tailwind animate-mcl-focus-pulse
-        isFocused && 'mcl-focus-pulse',
-      )}
-    >
-      {/* Left accent bar */}
-      <span className={cn('absolute left-0 top-0 bottom-0 w-1', accent)} aria-hidden />
-
-      <div className="pl-5 pr-5 py-4">
-        {/* Top row: donut + title + status badge */}
-        <div className="flex items-start gap-4">
-          {item.score !== null ? (
-            <ScoreDonut score={item.score} pulse={item.isNew && !reduceMotion} />
-          ) : (
-            <BulkFixIcon />
-          )}
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-[13.5px] font-semibold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                {item.title}
-              </h3>
-              {item.isNew && (
-                <Badge variant="outline" className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10">
-                  New
-                </Badge>
-              )}
-            </div>
-            {item.status && <StatusPill status={item.status} className="mt-1.5" />}
-
-            {/* Origin row — company + country chip */}
-            {(item.originCompany || item.originCountry) && (
-              <div className="mt-2 flex items-center gap-2 flex-wrap text-[11.5px] text-slate-500 dark:text-slate-400">
-                {item.originCompany && (
-                  <span className="inline-flex items-center gap-1 max-w-full min-w-0">
-                    <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
-                    <span className="truncate">{item.originCompany}</span>
-                  </span>
-                )}
-                {item.originCountry && <CountryChip code={item.originCountry} />}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Context */}
-        <p className="mt-3 text-[12.5px] leading-relaxed text-slate-600 dark:text-slate-400">
-          {item.context}
-        </p>
-
-        {/* Actions footer */}
-        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2 flex-wrap">
-          {item.actions.map((a, i) => {
-            if (a.kind === 'open' && a.href) {
-              return (
-                <Link
-                  key={i}
-                  to={a.href}
-                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11.5px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors duration-200"
-                >
-                  {a.label} <ArrowRight className="h-3 w-3" />
-                </Link>
-              );
-            }
-            if (a.kind === 'coach' && item.filingId) {
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => onOpenAiCoach(item.filingId!, coachMode)}
-                  className="inline-flex items-center gap-1 rounded-md border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 text-[11.5px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/15 transition-colors duration-200"
-                >
-                  <Sparkles className="h-3 w-3" /> {a.label}
-                </button>
-              );
-            }
-            return null;
-          })}
-          <span className="flex-1" />
-          <button
-            type="button"
-            onClick={() => onSnooze(item.id)}
-            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11.5px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200"
-            title="Hide this card for 24 hours"
+    <li ref={cardRef} className={cn(PANEL, 'flex flex-col px-5 py-4', isFocused && 'mcl-focus-pulse')}>
+      <div className="flex items-start gap-3">
+        {item.score !== null ? (
+          <span
+            title={`This filing scores ${item.score} out of 100`}
+            className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-lg text-[15px] font-semibold tabular-nums', TINT[scoreTone(item.score, 80, 50)])}
           >
-            <Clock className="h-3 w-3" /> Snooze
-          </button>
+            {item.score}<span className="sr-only"> out of 100</span>
+          </span>
+        ) : (
+          <span aria-hidden className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-lg', TINT.urgent)}>
+            <ListChecks weight="duotone" className="h-5 w-5" />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <h3 className="flex items-start gap-2 text-[14px] font-semibold leading-5">
+            <span aria-hidden className={cn('mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full', FILL[tone])} />
+            <span className="min-w-0">{item.title}</span>
+          </h3>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground">
+            {item.status && <StatusPill status={item.status} />}
+            {item.isNew && <span className={cn('rounded-md px-2 py-0.5 text-[12px] font-medium', TINT.info)}>New</span>}
+            {item.originCompany && (
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden /><span className="truncate">{item.originCompany}</span>
+              </span>
+            )}
+            {item.originCountry && <span className="font-mono text-[12px]">{item.originCountry}</span>}
+          </div>
         </div>
       </div>
 
-      {/* Sev pulse echo — single pulse for new items, behind the accent bar */}
-      {item.isNew && !reduceMotion && (
-        <span className={cn('absolute left-0 top-0 bottom-0 w-1 opacity-60 animate-pulse', sev.dot)} aria-hidden />
-      )}
-    </motion.article>
+      <p className="mt-3 flex-1 text-[13px] text-foreground/80">{item.context}</p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+        {item.actions.map((a, i) => {
+          if (a.kind === 'open' && a.href) {
+            return <Button key={i} asChild size="sm" variant="outline" className="h-8"><Link to={a.href}>{a.label}<ArrowRight aria-hidden /></Link></Button>;
+          }
+          if (a.kind === 'coach' && item.filingId) {
+            return (
+              <Button key={i} type="button" size="sm" variant="outline" className="h-8" onClick={() => onOpenAiCoach(item.filingId!, coachMode)}>
+                <Sparkles aria-hidden />{a.label}
+              </Button>
+            );
+          }
+          return null;
+        })}
+        <Button type="button" size="sm" variant="ghost" className="ml-auto h-8 text-muted-foreground" onClick={() => onSnooze(item.id)}>
+          <Clock aria-hidden />Snooze
+        </Button>
+      </div>
+    </li>
   );
 }
-
-// ─── Status pill (filing status badge on the card) ──────────────────
-
-function StatusPill({ status, className }: { status: string; className?: string }) {
-  const map: Record<string, { label: string; bg: string; text: string; ring: string }> = {
-    rejected:    { label: 'Rejected',     bg: 'bg-rose-50 dark:bg-rose-500/10',       text: 'text-rose-700 dark:text-rose-300',       ring: 'ring-rose-200/60 dark:ring-rose-500/20' },
-    draft:       { label: 'Draft',        bg: 'bg-slate-50 dark:bg-slate-500/10',     text: 'text-slate-700 dark:text-slate-300',     ring: 'ring-slate-200 dark:ring-slate-700' },
-    submitted:   { label: 'Submitted',    bg: 'bg-blue-50 dark:bg-blue-500/10',       text: 'text-blue-700 dark:text-blue-300',       ring: 'ring-blue-200/60 dark:ring-blue-500/20' },
-    pending_cbp: { label: 'Pending CBP',  bg: 'bg-blue-50 dark:bg-blue-500/10',       text: 'text-blue-700 dark:text-blue-300',       ring: 'ring-blue-200/60 dark:ring-blue-500/20' },
-    on_hold:     { label: 'On Hold',      bg: 'bg-amber-50 dark:bg-amber-500/10',     text: 'text-amber-700 dark:text-amber-300',     ring: 'ring-amber-200/60 dark:ring-amber-500/20' },
-    accepted:    { label: 'Accepted',     bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-300', ring: 'ring-emerald-200/60 dark:ring-emerald-500/20' },
-    amended:     { label: 'Amended',      bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-300', ring: 'ring-emerald-200/60 dark:ring-emerald-500/20' },
-    cancelled:   { label: 'Cancelled',    bg: 'bg-slate-50 dark:bg-slate-500/10',     text: 'text-slate-500 dark:text-slate-400',     ring: 'ring-slate-200 dark:ring-slate-700' },
-  };
-  const cfg = map[status] ?? { label: status, bg: 'bg-slate-50 dark:bg-slate-500/10', text: 'text-slate-700 dark:text-slate-300', ring: 'ring-slate-200 dark:ring-slate-700' };
-  return (
-    <span className={cn(
-      'inline-flex items-center px-1.5 py-0.5 rounded ring-1',
-      'text-[10px] font-semibold uppercase tracking-[0.06em]',
-      cfg.bg, cfg.text, cfg.ring,
-      className,
-    )}>
-      {cfg.label}
-    </span>
-  );
-}
-
-// ─── BulkFixIcon (placeholder for items without a score, e.g. bulk-fix) ──
-
-function BulkFixIcon() {
-  return (
-    <div className="h-12 w-12 rounded-full bg-rose-50 dark:bg-rose-500/10 ring-1 ring-rose-200/60 dark:ring-rose-500/20 flex items-center justify-center shrink-0">
-      <ListChecks className="h-5 w-5 text-rose-600 dark:text-rose-400" />
-    </div>
-  );
-}
-
-// ─── Empty state ─────────────────────────────────────────────────────
 
 function EmptyActionQueue() {
   return (
-    <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-10 py-16 text-center">
-      <div className="mx-auto h-14 w-14 rounded-full bg-emerald-50 dark:bg-emerald-500/10 ring-1 ring-emerald-200/60 dark:ring-emerald-500/20 flex items-center justify-center mb-4">
-        <ShieldCheck className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+    <section className={cn(PANEL, 'flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-5')}>
+      <span aria-hidden className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-full text-white dark:text-background', FILL.done)}>
+        <ShieldCheck weight="duotone" className="h-5 w-5" />
+      </span>
+      <div className="min-w-0 flex-1 basis-64">
+        <h2 className="text-[16px] font-semibold leading-6">Nothing needs your attention.</h2>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">Cutoffs, rejections and forced-labor risks show here when they come up.</p>
       </div>
-      <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-50 mb-1.5">
-        Nothing needs your attention right now.
-      </h3>
-      <p className="text-[12.5px] text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-        New filings, deadlines, rejections, and UFLPA risks will show up here when they appear. Check back later, or
-        <Link to="/shipments/new" className="ml-1 underline text-primary hover:opacity-80">
-          start a new ISF
-        </Link>.
-      </p>
+      <Button asChild size="sm" variant="outline"><Link to="/shipments/new">New shipment<ArrowRight aria-hidden /></Link></Button>
     </section>
   );
 }
 
-// ─── Score donut + country chip ─────────────────────────────────────
-
-/**
- * Small SVG donut showing the compliance score 0–100 with the percentage
- * in the middle. Stroke is color-toned by score tier (emerald ≥80 / amber ≥50
- * / rose <50). Animates the arc on first mount only (skipped if
- * prefers-reduced-motion).
- */
-function ScoreDonut({ score, pulse = false }: { score: number; pulse?: boolean }) {
-  const reduceMotion = useReducedMotion();
-  // Animate stroke on mount only.
-  const [drawn, setDrawn] = useState(reduceMotion ? score : 0);
-  const hasAnimated = useRef(false);
-  useEffect(() => {
-    if (hasAnimated.current || reduceMotion) {
-      setDrawn(score);
-      return;
-    }
-    hasAnimated.current = true;
-    const duration = 700;
-    const start = performance.now();
-    let raf = 0;
-    const step = (t: number) => {
-      const p = Math.min(1, (t - start) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setDrawn(Math.round(score * eased));
-      if (p < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [score, reduceMotion]);
-
-  const size = 48;
-  const stroke = 5;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const offset = c - (Math.max(0, Math.min(100, drawn)) / 100) * c;
-
-  const tone =
-    score >= 80 ? { stroke: 'stroke-emerald-500 dark:stroke-emerald-400', text: 'text-emerald-700 dark:text-emerald-300' }
-    : score >= 50 ? { stroke: 'stroke-amber-500 dark:stroke-amber-400',  text: 'text-amber-700 dark:text-amber-300' }
-    :              { stroke: 'stroke-rose-500 dark:stroke-rose-400',    text: 'text-rose-700 dark:text-rose-300' };
-
+function SnoozedPanel({ count, onUnsnoozeAll }: { count: number; onUnsnoozeAll: () => void }) {
   return (
-    <div className={cn('relative shrink-0', pulse && 'animate-pulse')} title={`Compliance score: ${score}/100`}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
-        {/* Track */}
-        <circle
-          cx={size / 2} cy={size / 2} r={r}
-          className="stroke-slate-200 dark:stroke-slate-800"
-          strokeWidth={stroke}
-          fill="none"
-        />
-        {/* Progress */}
-        <circle
-          cx={size / 2} cy={size / 2} r={r}
-          className={cn(tone.stroke, 'transition-[stroke-dashoffset] duration-700 ease-out')}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-          fill="none"
-        />
-      </svg>
-      <div className={cn(
-        'absolute inset-0 flex items-center justify-center font-semibold tabular-nums leading-none',
-        'text-[12px]',
-        tone.text,
-      )}>
-        {drawn}
-        <span className="text-[8px] font-medium ml-0.5 opacity-60">%</span>
-      </div>
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/60 px-5 py-2.5">
+      <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
+        <Clock className="h-4 w-4 shrink-0" aria-hidden />
+        <span><span className="font-medium tabular-nums text-foreground">{count}</span> {count === 1 ? 'item' : 'items'} snoozed for 24 hours</span>
+      </p>
+      <Button type="button" size="sm" variant="ghost" className="h-8" onClick={onUnsnoozeAll}><RotateCcw aria-hidden />Show again</Button>
     </div>
   );
 }
 
-function CountryChip({ code }: { code: string }) {
-  // ISO-2 chip — small, restrained, monospace. No flag emoji (per app convention).
-  return (
-    <span className="inline-flex items-center font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/40 uppercase tracking-wider">
-      {code}
-    </span>
-  );
-}
-
-// ─── Skeleton ────────────────────────────────────────────────────────
-
 function OverviewSkeleton() {
   return (
-    <div className="space-y-6">
-      <Skeleton className="h-44 rounded-2xl" />
-      <Skeleton className="h-80 rounded-2xl" />
+    <div className="flex flex-col gap-5">
+      <Skeleton className="h-[58px] rounded-xl" />
+      <Skeleton className="h-36 rounded-xl" />
+      <Skeleton className="h-72 rounded-xl" />
     </div>
   );
 }

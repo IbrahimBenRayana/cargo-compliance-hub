@@ -1,26 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { motion, useReducedMotion } from 'framer-motion';
 import {
   Archive, Calendar, Clock, FileText, ArrowRight, Search,
   AlertTriangle, type IconType,
 } from '@/components/icons';
 import { complianceApi, type LiquidationTracked } from '@/api/client';
-import { Badge } from '@/components/ui/badge';
+import { FILL, TINT, type Tone } from '@/components/dashboard/tones';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 /**
- * Records & Liquidation tab — every accepted entry's 314-day liquidation
+ * Records & Liquidation tab: every accepted entry's 314-day liquidation
  * countdown plus 300-day PSC window. Three layout sections:
  *
  *   1. KPI strip (tracked / PSC open / awaiting / liquidated)
  *   2. Filter bar (search + status chips)
- *   3. Entry cards — each shows MBOL, entry date, status pill, days-to-
- *      deadline pills, and a horizontal progress bar showing position
- *      within the 314-day liquidation window. Urgent items rise to top.
+ *   3. Entry rows: each shows MBOL, entry date, status pill, days to each
+ *      deadline, and a horizontal progress bar showing position within the
+ *      314-day liquidation window. Urgent items rise to top.
  *
  * Regulatory references: 19 CFR § 159.11 (liquidation) and 19 USC § 1514
  * (protest), via the existing computeLiquidation server service.
@@ -37,13 +36,15 @@ export function RecordsTab() {
   return <RecordsContent tracked={data.tracked} />;
 }
 
+const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
+
 function RecordsSkeleton() {
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[112px] rounded-2xl" />)}
+    <div className="space-y-5" aria-busy="true" aria-label="Loading records">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[96px] rounded-xl" />)}
       </div>
-      <Skeleton className="h-[400px] rounded-2xl" />
+      <Skeleton className="h-[400px] rounded-xl" />
     </div>
   );
 }
@@ -104,7 +105,7 @@ function RecordsContent({ tracked }: { tracked: LiquidationTracked[] }) {
   );
 }
 
-// ─── KPI hero strip ─────────────────────────────────────────────────
+// ─── KPI strip ──────────────────────────────────────────────────────
 
 function RecordsKpiStrip({
   total, counts,
@@ -113,40 +114,42 @@ function RecordsKpiStrip({
   counts: { psc: number; awaiting: number; liquidated: number; pending: number };
 }) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <KpiTile
         label="Tracked"
         value={total}
-        sub="accepted entries"
-        tone="slate"
+        sub="Accepted entries"
+        tone="calm"
         Icon={FileText}
       />
       <KpiTile
         label="PSC open"
         value={counts.psc}
-        sub="≤ 300 days post-entry"
-        tone="amber"
+        sub="Within 300 days of entry"
+        tone="soon"
         Icon={Calendar}
       />
       <KpiTile
         label="Awaiting liquidation"
         value={counts.awaiting}
-        sub="300 – 314 days"
-        tone="blue"
+        sub="Days 300 to 314"
+        tone="info"
         Icon={Clock}
       />
       <KpiTile
         label="Liquidated"
         value={counts.liquidated}
-        sub="protest open 180d"
-        tone="emerald"
+        sub="Protest window open 180 days"
+        tone="done"
         Icon={Archive}
       />
     </div>
   );
 }
 
-type KpiTone = 'slate' | 'amber' | 'blue' | 'emerald';
+const TEXT: Record<Tone, string> = {
+  urgent: 'text-urgent', soon: 'text-soon', info: 'text-info', entry: 'text-entry', done: 'text-done', calm: 'text-muted-foreground',
+};
 
 function KpiTile({
   label, value, sub, tone, Icon,
@@ -154,81 +157,22 @@ function KpiTile({
   label: string;
   value: number;
   sub: string;
-  tone: KpiTone;
+  tone: Tone;
   Icon: IconType;
 }) {
-  const palette = TONE_PALETTE[tone];
-  const animated = useCountUp(value, 700);
-
   return (
-    <article
-      className={cn(
-        'relative overflow-hidden rounded-2xl border bg-white dark:bg-slate-950 px-5 py-4',
-        palette.border,
-      )}
-    >
-      <div
-        aria-hidden
-        className="absolute inset-y-0 right-0 w-[60%] pointer-events-none"
-        style={{ background: palette.wash }}
-      />
-      <div className="relative flex items-start gap-3">
-        <div
-          className={cn(
-            'h-9 w-9 rounded-xl ring-1 flex items-center justify-center shrink-0',
-            palette.iconBg,
-          )}
-        >
-          <Icon className={cn('h-[18px] w-[18px]', palette.iconFg)} weight="bold" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className={cn('text-[10.5px] font-semibold uppercase tracking-[0.1em]', palette.labelFg)}>
-            {label}
-          </p>
-          <p className="text-[28px] font-semibold tabular-nums leading-none mt-1 text-slate-900 dark:text-slate-50">
-            {animated.toLocaleString()}
-          </p>
-          <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-1">
-            {sub}
-          </p>
-        </div>
-      </div>
+    <article className={cn(PANEL, 'px-5 py-4')}>
+      <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+        <Icon aria-hidden weight="duotone" className={cn('h-4 w-4 shrink-0', TEXT[tone])} />
+        <span className="truncate">{label}</span>
+      </p>
+      <p className="mt-1.5 text-[24px] font-semibold leading-8 tabular-nums tracking-[-0.015em] text-foreground">
+        {value.toLocaleString()}
+      </p>
+      <p className="text-[12px] text-muted-foreground">{sub}</p>
     </article>
   );
 }
-
-const TONE_PALETTE: Record<KpiTone, {
-  border: string; wash: string; iconBg: string; iconFg: string; labelFg: string;
-}> = {
-  slate: {
-    border:  'border-slate-200 dark:border-slate-800',
-    wash:    'radial-gradient(ellipse 75% 100% at 100% 50%, hsl(215 16% 47% / 0.06), transparent 70%)',
-    iconBg:  'bg-slate-100 ring-slate-200/60 dark:bg-slate-800 dark:ring-slate-700/60',
-    iconFg:  'text-slate-600 dark:text-slate-300',
-    labelFg: 'text-slate-500 dark:text-slate-400',
-  },
-  amber: {
-    border:  'border-amber-200/70 dark:border-amber-500/25',
-    wash:    'radial-gradient(ellipse 75% 100% at 100% 50%, hsl(43 96% 56% / 0.10), transparent 70%)',
-    iconBg:  'bg-amber-100 ring-amber-200/60 dark:bg-amber-500/15 dark:ring-amber-500/30',
-    iconFg:  'text-amber-700 dark:text-amber-300',
-    labelFg: 'text-amber-700 dark:text-amber-300',
-  },
-  blue: {
-    border:  'border-blue-200/70 dark:border-blue-500/25',
-    wash:    'radial-gradient(ellipse 75% 100% at 100% 50%, hsl(217 91% 60% / 0.09), transparent 70%)',
-    iconBg:  'bg-blue-100 ring-blue-200/60 dark:bg-blue-500/15 dark:ring-blue-500/30',
-    iconFg:  'text-blue-700 dark:text-blue-300',
-    labelFg: 'text-blue-700 dark:text-blue-300',
-  },
-  emerald: {
-    border:  'border-emerald-200/70 dark:border-emerald-500/25',
-    wash:    'radial-gradient(ellipse 75% 100% at 100% 50%, hsl(160 70% 40% / 0.09), transparent 70%)',
-    iconBg:  'bg-emerald-100 ring-emerald-200/60 dark:bg-emerald-500/15 dark:ring-emerald-500/30',
-    iconFg:  'text-emerald-700 dark:text-emerald-300',
-    labelFg: 'text-emerald-700 dark:text-emerald-300',
-  },
-};
 
 // ─── Pipeline (filter + list) ───────────────────────────────────────
 
@@ -245,74 +189,52 @@ function PipelineCard({
 }) {
   if (all.length === 0) {
     return (
-      <article className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-10 text-center">
-        <div className="mx-auto h-12 w-12 rounded-2xl bg-gradient-to-br from-slate-400 to-slate-600 ring-1 ring-slate-300/60 dark:ring-slate-500/40 shadow-[0_8px_20px_-10px_rgba(71,85,105,0.5)] flex items-center justify-center mb-3">
-          <Archive className="h-6 w-6 text-slate-50" weight="bold" />
-        </div>
-        <p className="text-[14px] font-semibold text-slate-900 dark:text-slate-50 mb-1">
-          No accepted entries yet
-        </p>
-        <p className="text-[12px] text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+      <section aria-label="Liquidation pipeline" className={cn(PANEL, 'px-5 py-10 text-center')}>
+        <Archive aria-hidden weight="duotone" className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
+        <p className="text-[14px] font-semibold text-foreground">No accepted entries yet</p>
+        <p className="mx-auto mt-1 max-w-md text-[13px] text-muted-foreground">
           Once CBP accepts an entry, its 314-day liquidation countdown and 300-day PSC window will appear here.
         </p>
-      </article>
+      </section>
     );
   }
 
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-24 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 100% at 50% 0%, hsl(217 91% 60% / 0.06), transparent 70%)',
-        }}
-      />
-      <div className="relative p-6">
-        {/* Header */}
-        <div className="flex items-start gap-4 mb-5">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 dark:from-slate-600 dark:to-slate-800 ring-1 ring-slate-500/40 shadow-[0_8px_20px_-10px_rgba(15,23,42,0.5)] flex items-center justify-center shrink-0">
-            <Archive className="h-5 w-5 text-slate-50" weight="bold" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-50">
-              Liquidation pipeline
-            </h3>
-            <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Sorted by urgency. PSC = Post-Summary Correction (300d); liquidation = entry finalization (314d).
-            </p>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
-          <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-            <Input
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search entry number or type…"
-              className="pl-9 text-[13px]"
-            />
-          </div>
-          <StatusChips value={filter} onChange={onFilterChange} counts={counts} />
-        </div>
-
-        {/* List */}
-        {filtered.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 px-6 py-10 text-center">
-            <p className="text-[12.5px] text-slate-500 dark:text-slate-400">
-              No entries match the current filters.
-            </p>
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {filtered.map((t) => <PipelineRow key={t.id} t={t} />)}
-          </ul>
-        )}
+    <section aria-labelledby="pipeline-title" className={PANEL}>
+      {/* Header */}
+      <div className="px-5 pt-3.5">
+        <h2 id="pipeline-title" className="text-[14px] font-semibold text-foreground">Liquidation pipeline</h2>
+        <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+          Sorted by urgency. PSC is the Post-Summary Correction window (300 days). Liquidation is when the entry is finalized (314 days).
+        </p>
       </div>
-    </article>
+
+      {/* Filters */}
+      <div className="flex flex-col gap-2 px-5 py-3.5 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            aria-label="Search entries by bill number or entry type"
+            placeholder="Search by bill number or entry type"
+            className="pl-9 text-[13px]"
+          />
+        </div>
+        <StatusChips value={filter} onChange={onFilterChange} counts={counts} />
+      </div>
+
+      {/* List */}
+      {filtered.length === 0 ? (
+        <p className="border-t border-border/70 px-5 py-8 text-center text-[13px] text-muted-foreground">
+          No entries match the current filters.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border/60 border-t border-border/70">
+          {filtered.map((t) => <PipelineRow key={t.id} t={t} />)}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -323,36 +245,30 @@ function StatusChips({
   onChange: (v: StatusFilter) => void;
   counts: { psc: number; awaiting: number; liquidated: number; pending: number };
 }) {
-  const chips: Array<{ id: StatusFilter; label: string; count?: number; active: string }> = [
-    { id: 'all',                  label: 'All',         active: 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' },
-    { id: 'psc-window-open',      label: 'PSC',         count: counts.psc,        active: 'bg-amber-600 text-white dark:bg-amber-500 dark:text-amber-950' },
-    { id: 'awaiting-liquidation', label: 'Awaiting',    count: counts.awaiting,   active: 'bg-blue-600 text-white dark:bg-blue-500 dark:text-blue-50' },
-    { id: 'liquidated',           label: 'Liquidated',  count: counts.liquidated, active: 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-emerald-50' },
+  const chips: Array<{ id: StatusFilter; label: string; count?: number }> = [
+    { id: 'all',                  label: 'All' },
+    { id: 'psc-window-open',      label: 'PSC',        count: counts.psc },
+    { id: 'awaiting-liquidation', label: 'Awaiting',   count: counts.awaiting },
+    { id: 'liquidated',           label: 'Liquidated', count: counts.liquidated },
   ];
   return (
-    <div className="flex gap-1.5 shrink-0 flex-wrap">
+    <div role="group" aria-label="Filter by status" className="flex shrink-0 flex-wrap rounded-lg bg-muted p-0.5">
       {chips.map((c) => {
         const isActive = value === c.id;
         return (
           <button
             key={c.id}
             type="button"
+            aria-pressed={isActive}
             onClick={() => onChange(c.id)}
             className={cn(
-              'inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-[12px] font-semibold transition-colors cursor-pointer',
-              isActive
-                ? c.active
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700',
+              'inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[13px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring',
+              isActive ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground can-hover:hover:text-foreground',
             )}
           >
             {c.label}
             {c.count !== undefined && (
-              <span className={cn(
-                'tabular-nums text-[11px] font-semibold',
-                isActive ? 'opacity-90' : 'opacity-60',
-              )}>
-                {c.count}
-              </span>
+              <span className="text-[12px] tabular-nums text-muted-foreground">{c.count}</span>
             )}
           </button>
         );
@@ -361,9 +277,22 @@ function StatusChips({
   );
 }
 
+/** Colour by days remaining: past, two weeks, two months, or further out. */
+function urgencyOf(days: number): Tone | null {
+  if (days < 0) return 'calm';
+  if (days <= 14) return 'urgent';
+  if (days <= 60) return 'soon';
+  return null;
+}
+
+const DAYS_TEXT: Record<Tone, string> = {
+  ...TEXT,
+  urgent: 'text-urgent font-semibold',
+  soon: 'text-soon font-medium',
+};
+
 function PipelineRow({ t }: { t: LiquidationTracked }) {
-  const reducedMotion = useReducedMotion();
-  const tone = STATUS_TONE[t.status];
+  const status = STATUS_TONE[t.status];
 
   // Position within the 314-day liquidation window (0% = entry, 100% = liquidation).
   const TOTAL = 314;
@@ -371,150 +300,96 @@ function PipelineRow({ t }: { t: LiquidationTracked }) {
   const pct = Math.max(0, Math.min(100, (elapsed / TOTAL) * 100));
   const pscMarker = (300 / TOTAL) * 100; // PSC deadline at 300d
   // Bar fill colour by remaining-days urgency, not status.
-  const barFill =
-    t.daysUntilLiquidation < 0 ? 'bg-slate-300 dark:bg-slate-700'
-    : t.daysUntilLiquidation <= 14 ? 'bg-gradient-to-r from-rose-400 to-rose-600'
-    : t.daysUntilLiquidation <= 60 ? 'bg-gradient-to-r from-amber-300 to-amber-500'
-    : 'bg-gradient-to-r from-blue-300 to-blue-500';
-
-  const pscColor =
-    t.daysUntilPscDeadline < 0 ? 'text-slate-400'
-    : t.daysUntilPscDeadline <= 14 ? 'text-rose-600 dark:text-rose-400 font-semibold'
-    : t.daysUntilPscDeadline <= 60 ? 'text-amber-700 dark:text-amber-400 font-medium'
-    : 'text-slate-600 dark:text-slate-400';
-  const liqColor =
-    t.daysUntilLiquidation < 0 ? 'text-slate-400'
-    : t.daysUntilLiquidation <= 14 ? 'text-rose-600 dark:text-rose-400 font-semibold'
-    : t.daysUntilLiquidation <= 60 ? 'text-amber-700 dark:text-amber-400 font-medium'
-    : 'text-slate-600 dark:text-slate-400';
+  const liqUrgency = urgencyOf(t.daysUntilLiquidation);
+  const pscUrgency = urgencyOf(t.daysUntilPscDeadline);
+  const barFill = liqUrgency === 'calm' ? 'bg-muted-foreground/40' : FILL[liqUrgency ?? 'info'];
 
   return (
-    <motion.li
-      layout={reducedMotion ? false : true}
-      initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18 }}
-    >
+    <li>
       <Link
         to={t.linkUrl}
-        className={cn(
-          'group relative block rounded-xl border bg-white dark:bg-slate-900/40 transition-colors',
-          tone.ring,
-          'hover:border-slate-300 dark:hover:border-slate-700',
-        )}
+        className="group block px-5 py-3.5 outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring can-hover:hover:bg-muted/50"
       >
-        <div className={cn('absolute left-0 top-0 bottom-0 w-1 rounded-l-xl', tone.rail)} />
-        <div className="pl-5 pr-4 py-3">
-          {/* Top row */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-[13px] font-mono font-semibold text-slate-900 dark:text-slate-50">
-              {t.bol}
-            </span>
-            <Badge variant="outline" className={cn('text-[10px] font-bold uppercase tracking-[0.06em]', tone.badge)}>
-              {tone.label}
-            </Badge>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-[0.06em]">
-              {t.filingType}
-            </span>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
-              entered {fmtDate(t.entryDate)}
-            </span>
-            <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-primary transition-opacity can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:group-focus-visible:opacity-100">
-              Open <ArrowRight className="h-3 w-3" />
-            </span>
-          </div>
+        {/* Top row */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="font-mono text-[13px] font-semibold text-foreground">{t.bol}</span>
+          <span className={cn('rounded-full px-2 py-px text-[11.5px] font-medium', TINT[status.tone])}>
+            {status.label}
+          </span>
+          <span className="text-[12px] text-muted-foreground">{t.filingType}</span>
+          <span className="text-[12px] tabular-nums text-muted-foreground">Entered {fmtDate(t.entryDate)}</span>
+          <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-foreground transition-opacity can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:group-focus-visible:opacity-100">
+            Open <ArrowRight aria-hidden className="h-3 w-3" />
+          </span>
+        </div>
 
-          {/* Deadline tiles */}
-          <div className="flex flex-wrap gap-2 mt-2">
-            <DeadlineTile
-              label="PSC deadline"
-              color={pscColor}
-              value={t.daysUntilPscDeadline < 0 ? 'expired' : `${t.daysUntilPscDeadline}d`}
-              sub={fmtDate(t.pscDeadline)}
-            />
-            <DeadlineTile
-              label="Liquidation"
-              color={liqColor}
-              value={t.daysUntilLiquidation < 0 ? 'liquidated' : `${t.daysUntilLiquidation}d`}
-              sub={fmtDate(t.estimatedLiquidationAt)}
-            />
-            {t.daysUntilPscDeadline >= 0 && t.daysUntilPscDeadline <= 14 && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-500/15 px-2 py-1 rounded">
-                <AlertTriangle className="h-3 w-3" />
-                File PSC corrections this week
-              </span>
-            )}
-          </div>
+        {/* Deadlines */}
+        <div className="mt-2 flex flex-wrap items-end gap-x-8 gap-y-2">
+          <Deadline
+            label="PSC deadline"
+            color={pscUrgency ? DAYS_TEXT[pscUrgency] : 'text-foreground'}
+            value={t.daysUntilPscDeadline < 0 ? 'Expired' : `${t.daysUntilPscDeadline}d`}
+            sub={fmtDate(t.pscDeadline)}
+          />
+          <Deadline
+            label="Liquidation"
+            color={liqUrgency ? DAYS_TEXT[liqUrgency] : 'text-foreground'}
+            value={t.daysUntilLiquidation < 0 ? 'Liquidated' : `${t.daysUntilLiquidation}d`}
+            sub={fmtDate(t.estimatedLiquidationAt)}
+          />
+          {t.daysUntilPscDeadline >= 0 && t.daysUntilPscDeadline <= 14 && (
+            <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium', TINT.urgent)}>
+              <AlertTriangle aria-hidden className="h-3.5 w-3.5" />
+              File PSC corrections this week
+            </span>
+          )}
+        </div>
 
-          {/* Progress through 314-day window */}
-          <div className="mt-3 relative">
-            <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800/60 overflow-hidden">
-              <div
-                className={cn('h-full rounded-full', barFill)}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            {/* PSC marker */}
+        {/* Progress through 314-day window */}
+        <div className="relative mt-3">
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div
-              aria-hidden
-              className="absolute top-[-2px] h-[10px] w-px bg-slate-400 dark:bg-slate-500"
-              style={{ left: `${pscMarker}%` }}
-              title="PSC deadline (300d)"
+              className={cn('h-full rounded-full', barFill)}
+              style={{ width: `${pct}%` }}
             />
-            <div className="flex justify-between text-[10px] tabular-nums text-slate-500 dark:text-slate-400 mt-1">
-              <span>entry</span>
-              {/* PSC (300d) sits too close to liquidation (314d) for its own floating label. */}
-              <span>PSC 300d · liquidation 314d</span>
-            </div>
+          </div>
+          {/* PSC marker */}
+          <div
+            aria-hidden
+            className="absolute top-[-2px] h-[10px] w-px bg-muted-foreground"
+            style={{ left: `${pscMarker}%` }}
+            title="PSC deadline (300 days)"
+          />
+          <div className="mt-1 flex justify-between text-[12px] tabular-nums text-muted-foreground">
+            <span>Entry</span>
+            {/* PSC (300d) sits too close to liquidation (314d) for its own floating label. */}
+            <span>PSC at 300 days, liquidation at 314</span>
           </div>
         </div>
       </Link>
-    </motion.li>
+    </li>
   );
 }
 
-const STATUS_TONE: Record<LiquidationTracked['status'], {
-  label: string; ring: string; rail: string; badge: string;
-}> = {
-  'psc-window-open': {
-    label: 'PSC open',
-    ring:  'border-amber-200/70 dark:border-amber-500/25',
-    rail:  'bg-gradient-to-b from-amber-300 to-amber-500',
-    badge: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30',
-  },
-  'awaiting-liquidation': {
-    label: 'Awaiting liq.',
-    ring:  'border-blue-200/70 dark:border-blue-500/25',
-    rail:  'bg-gradient-to-b from-blue-300 to-blue-500',
-    badge: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30',
-  },
-  'liquidated': {
-    label: 'Liquidated',
-    ring:  'border-emerald-200/70 dark:border-emerald-500/25',
-    rail:  'bg-gradient-to-b from-emerald-300 to-emerald-500',
-    badge: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30',
-  },
-  'pending': {
-    label: 'Pending',
-    ring:  'border-slate-200 dark:border-slate-800',
-    rail:  'bg-gradient-to-b from-slate-300 to-slate-500',
-    badge: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-500/15 dark:text-slate-300 dark:border-slate-500/30',
-  },
+const STATUS_TONE: Record<LiquidationTracked['status'], { label: string; tone: Tone }> = {
+  'psc-window-open':      { label: 'PSC open',             tone: 'soon' },
+  'awaiting-liquidation': { label: 'Awaiting liquidation', tone: 'info' },
+  'liquidated':           { label: 'Liquidated',           tone: 'done' },
+  'pending':              { label: 'Pending',              tone: 'calm' },
 };
 
-function DeadlineTile({
+function Deadline({
   label, value, sub, color,
 }: {
   label: string; value: string; sub: string; color: string;
 }) {
   return (
-    <div className="inline-flex flex-col rounded-md ring-1 ring-slate-200 dark:ring-slate-800 px-2.5 py-1.5 bg-slate-50/60 dark:bg-slate-900/40">
-      <span className="text-[9.5px] font-semibold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
-        {label}
-      </span>
-      <span className={cn('text-[12.5px] tabular-nums leading-tight', color)}>
-        {value} <span className="text-slate-500 dark:text-slate-400 font-normal">· {sub}</span>
-      </span>
+    <div className="min-w-0">
+      <p className="text-[12px] text-muted-foreground">{label}</p>
+      <p className="text-[13px] tabular-nums">
+        <span className={color}>{value}</span>
+        <span className="text-muted-foreground">, {sub}</span>
+      </p>
     </div>
   );
 }
@@ -527,34 +402,4 @@ function fmtDate(iso: string): string {
   } catch {
     return iso;
   }
-}
-
-function useCountUp(target: number, durationMs: number): number {
-  const [value, setValue] = useState(target);
-  const startRef = useRef<number | null>(null);
-  const startValueRef = useRef(target);
-  const reducedMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (reducedMotion) {
-      setValue(target);
-      return;
-    }
-    startRef.current = null;
-    startValueRef.current = value;
-    let raf = 0;
-    const tick = (ts: number) => {
-      if (startRef.current === null) startRef.current = ts;
-      const t = Math.min(1, (ts - startRef.current) / durationMs);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const next = Math.round(startValueRef.current + (target - startValueRef.current) * eased);
-      setValue(next);
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, durationMs, reducedMotion]);
-
-  return value;
 }
