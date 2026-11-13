@@ -23,7 +23,7 @@ import {
 import {
   Loader2, ChevronDown, Copy, Radio, Settings2, AlertTriangle,
   Zap, FileWarning, Save,
-} from 'lucide-react';
+} from '@/components/icons';
 import { certApi } from '@/api/client';
 import type {
   CertParamsInput, CertScenario, CertTransmission, CertTransmissionStatus,

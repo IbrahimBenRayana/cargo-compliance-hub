@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight } from '@/components/icons';
 import type { ChatDeeplink } from '@/api/client';
 import { cn } from '@/lib/utils';
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Check, Download, KeyRound } from 'lucide-react';
+import { Copy, Check, Download, KeyRound } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';

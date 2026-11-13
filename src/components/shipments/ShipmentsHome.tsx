@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
-import { AlertTriangle, Plus, Search, Ship } from 'lucide-react';
+import { AlertTriangle, Plus, Search, Ship } from '@/components/icons';
 import { toast } from 'sonner';
 import { FilterTabs } from '@/components/dashboard/FilterTabs';
 import { Pagination } from '@/components/dashboard/Pagination';

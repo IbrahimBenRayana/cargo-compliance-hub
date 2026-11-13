@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { PageLoading } from '@/components/PageLoading';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
-import { LogOut, Settings } from 'lucide-react';
+import { LogOut, Settings } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,

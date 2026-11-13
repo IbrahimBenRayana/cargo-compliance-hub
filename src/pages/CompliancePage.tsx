@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Sparkles, ShieldCheck, BookOpen, Archive, Activity } from 'lucide-react';
+import { Sparkles, ShieldCheck, BookOpen, Archive, Activity } from '@/components/icons';
 import { complianceApi } from '@/api/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';

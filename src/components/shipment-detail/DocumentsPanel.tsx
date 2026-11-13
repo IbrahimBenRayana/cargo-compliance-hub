@@ -1,6 +1,6 @@
 /** Paperwork kept with the shipment: bills of lading, invoices, packing lists. */
 import { useState } from 'react';
-import { ArrowDownToLine, FileText, Loader2, Trash2, Upload } from 'lucide-react';
+import { ArrowDownToLine, FileText, Loader2, Trash2, Upload } from '@/components/icons';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,

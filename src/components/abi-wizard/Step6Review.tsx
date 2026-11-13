@@ -9,7 +9,7 @@
 import {
   CheckCircle2, AlertCircle, FileCheck, Package, Receipt, Scale, Users,
   Landmark, Loader2, RefreshCw,
-} from 'lucide-react';
+} from '@/components/icons';
 import type { ABIDocumentDraft, AbiDocument, DutyEstimateResult } from '@/api/client';
 import { useDutyEstimate } from '@/hooks/useAbiDocument';
 import { Card, CardContent } from '@/components/ui/card';

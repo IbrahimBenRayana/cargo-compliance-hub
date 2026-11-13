@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { X, ExternalLink } from 'lucide-react';
+import { X, ExternalLink } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 
 const PRICING_URL = 'https://mycargolens.com/pricing';
@@ -16,7 +16,7 @@ export default function UpgradeCancelPage() {
       >
         {/* Icon */}
         <div className="h-20 w-20 rounded-full bg-muted/60 border border-border flex items-center justify-center mx-auto mb-8">
-          <X className="h-9 w-9 text-muted-foreground" strokeWidth={2} />
+          <X className="h-9 w-9 text-muted-foreground" />
         </div>
 
         <h1 className="text-2xl font-bold text-foreground mb-3">Checkout canceled</h1>

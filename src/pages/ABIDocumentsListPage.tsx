@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
-import { AlertTriangle, FilePlus, Loader2, MoreHorizontal, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, FilePlus, Loader2, MoreHorizontal, Pencil, Plus, Search, Trash2, X } from '@/components/icons';
 import { toast } from 'sonner';
 import type { AbiDocument } from '@/api/client';
 import { FilterTabs } from '@/components/dashboard/FilterTabs';

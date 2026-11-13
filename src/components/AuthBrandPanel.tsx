@@ -1,4 +1,4 @@
-import { KeyRound, Lock, UserCheck } from 'lucide-react';
+import { KeyRound, Lock, UserCheck } from '@/components/icons';
 import { LogoMark } from '@/components/LogoMark';
 import { AuthScene } from '@/components/auth3d/AuthScene';
 import type { AuthSceneState } from '@/components/auth3d/state';

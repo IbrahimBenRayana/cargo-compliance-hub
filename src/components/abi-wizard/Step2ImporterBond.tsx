@@ -1,7 +1,7 @@
 /**
  * Step 2 — Importer of Record, Bond, and Payment.
  */
-import { Building2, Landmark } from 'lucide-react';
+import { Building2, Landmark } from '@/components/icons';
 import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
 import { BOND_TYPES, PAYMENT_TYPE_CODES, STATEMENT_MONTHS } from '@/data/abiEnums';
 import {

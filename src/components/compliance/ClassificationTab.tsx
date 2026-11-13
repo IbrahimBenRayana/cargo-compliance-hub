@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
   Sparkles, Search, Globe, BookOpen, ArrowUpRight, Loader2, Hash, ChevronRight,
-} from 'lucide-react';
+} from '@/components/icons';
 import {
   complianceApi,
   type AddCvdLookupResponse,
@@ -83,7 +83,7 @@ function HtsClassifierCard() {
       <div className="relative p-6">
         <div className="flex items-start gap-4">
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_8px_20px_-10px_rgba(245,158,11,0.5)] flex items-center justify-center shrink-0">
-            <Sparkles className="h-5 w-5 text-amber-950" strokeWidth={2.5} />
+            <Sparkles className="h-5 w-5 text-amber-950" weight="bold" />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-50">

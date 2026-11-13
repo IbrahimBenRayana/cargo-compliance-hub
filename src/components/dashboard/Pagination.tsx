@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from '@/components/icons';
 import { cn } from '@/lib/utils';
 
 /** 1 … 4 5 6 … 12: always the ends, and the pages around this one. */

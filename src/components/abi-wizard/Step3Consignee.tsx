@@ -5,7 +5,7 @@
  * single consignee at entry-summary level (distinct from trade-party-level
  * ship-to on individual items).
  */
-import { MapPin } from 'lucide-react';
+import { MapPin } from '@/components/icons';
 import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
 import {
   COUNTRIES,

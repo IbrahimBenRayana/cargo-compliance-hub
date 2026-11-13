@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Send } from '@/components/icons';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -54,7 +54,7 @@ export function TransmitConfirmDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={(e) => { e.preventDefault(); onConfirm(); }} disabled={pending}>
-            {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+            {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="icon-send mr-2 h-4 w-4" />}
             Send to CBP
           </AlertDialogAction>
         </AlertDialogFooter>

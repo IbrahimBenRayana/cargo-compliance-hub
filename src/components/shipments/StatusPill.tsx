@@ -18,7 +18,7 @@ export function StatusTile({ status, className }: { status: string; className?: 
   const { icon: Icon, tone } = statusOf(status);
   return (
     <span aria-hidden className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', TINT[tone], className)}>
-      <Icon className="h-3.5 w-3.5" />
+      <Icon weight="duotone" className="h-4 w-4" />
     </span>
   );
 }

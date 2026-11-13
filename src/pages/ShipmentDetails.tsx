@@ -36,7 +36,7 @@ import {
   FileEdit, Ban, Shield, FileText, Clock, Zap, Activity,
   RefreshCw, Radio, Inbox, ArrowDownToLine, Copy, Bookmark, MoreHorizontal,
   Search, FileCheck, Sparkles,
-} from 'lucide-react';
+} from '@/components/icons';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useNow } from '@/hooks/useDashboard';
@@ -261,7 +261,7 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
             {isRunning ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Send className="h-4 w-4" />
+              <Send className="icon-send h-4 w-4" />
             )}
             {isRunning ? 'Working…' : 'Start submission'}
           </Button>

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, Lock, ShieldCheck, Receipt, Loader2, ArrowRight, Star, CreditCard } from 'lucide-react';
+import { Check, Lock, ShieldCheck, Receipt, Loader2, ArrowRight, Star, CreditCard } from '@/components/icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useSubscription, useSelectTier } from '@/hooks/useBilling';
@@ -143,7 +143,7 @@ export default function UpgradePage() {
               <ul className="space-y-2 mb-6 flex-1">
                 {tier.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-2">
-                    <Check className="h-3.5 w-3.5 text-gold shrink-0 mt-0.5" strokeWidth={2.5} />
+                    <Check className="h-3.5 w-3.5 text-gold shrink-0 mt-0.5" weight="bold" />
                     <span className="text-xs text-foreground/85 leading-relaxed">{feature}</span>
                   </li>
                 ))}
@@ -178,7 +178,7 @@ export default function UpgradePage() {
           <ul className="space-y-2 mb-6 flex-1">
             {['ABI Entry Summary (7501) & Cargo Release (3461)', 'Volume pricing for NVOCCs and forwarders', 'Monthly invoice by ACH'].map((feature) => (
               <li key={feature} className="flex items-start gap-2">
-                <Check className="h-3.5 w-3.5 text-gold shrink-0 mt-0.5" strokeWidth={2.5} />
+                <Check className="h-3.5 w-3.5 text-gold shrink-0 mt-0.5" weight="bold" />
                 <span className="text-xs text-foreground/85 leading-relaxed">{feature}</span>
               </li>
             ))}

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Pencil, Trash2, Send, RefreshCw, Loader2, AlertTriangle, FileText,
   ChevronDown, ChevronRight, CheckCircle2,
-} from 'lucide-react';
+} from '@/components/icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -392,7 +392,7 @@ export default function ABIDocumentDetailPage() {
                 Delete
               </Button>
               <Button size="sm" className="gap-1.5" onClick={() => setShowTransmitConfirm(true)}>
-                <Send className="h-4 w-4" />
+                <Send className="icon-send h-4 w-4" />
                 Transmit to CBP
               </Button>
             </>
@@ -450,7 +450,7 @@ export default function ABIDocumentDetailPage() {
                 Correct
               </Button>
               <Button size="sm" className="gap-1.5" onClick={() => setShowTransmitConfirm(true)}>
-                <Send className="h-4 w-4" />
+                <Send className="icon-send h-4 w-4" />
                 Send again
               </Button>
             </>
@@ -511,7 +511,7 @@ export default function ABIDocumentDetailPage() {
       <section aria-label="Status" className={cn(PANEL, 'overflow-hidden')}>
         <div className={cn('flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4', BAND[summary.tone])}>
           <span aria-hidden className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-full text-white dark:text-background', FILL[summary.tone])}>
-            <StatusIcon className="h-5 w-5" />
+            <StatusIcon weight="duotone" className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1 basis-64">
             <p className="text-[16px] font-semibold leading-6">{summary.title}</p>
@@ -702,7 +702,7 @@ export default function ABIDocumentDetailPage() {
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4 mr-2" />
+                  <Send className="icon-send h-4 w-4 mr-2" />
                   Transmit
                 </>
               )}

@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react';
+import { Check } from '@/components/icons';
 import { cn } from '@/lib/utils';
 
 /**
@@ -27,7 +27,7 @@ export function StepProgress({ steps, current, onSelect }: {
                 <span aria-hidden className={cn('block h-1 rounded-full transition-colors duration-200', isDone ? 'bg-[hsl(var(--done-fill))]' : isActive ? 'bg-primary' : 'bg-border')} />
                 <span aria-hidden className="mt-2 flex min-w-0 items-center gap-1.5 text-[12.5px] max-md:hidden">
                   <span className={cn('grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[11px] font-semibold tabular-nums', isDone ? 'bg-done-tint text-done' : isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
-                    {isDone ? <Check className="h-3 w-3" strokeWidth={3} /> : i + 1}
+                    {isDone ? <Check className="h-3 w-3" weight="bold" /> : i + 1}
                   </span>
                   <span className={cn('truncate', isActive ? 'font-semibold text-foreground' : isDone ? 'font-medium text-foreground can-hover:group-hover:underline' : 'text-muted-foreground')}>{s.label}</span>
                 </span>

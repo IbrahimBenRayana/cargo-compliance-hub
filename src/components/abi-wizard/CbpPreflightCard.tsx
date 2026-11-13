@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, XCircle, Loader2, RefreshCw } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, RefreshCw } from '@/components/icons';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { abiDocumentsApi } from '@/api/client';

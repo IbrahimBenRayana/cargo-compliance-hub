@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowRight, ArrowUpRight, Sparkles, ChevronDown,
   Clock, Inbox, ListChecks, ShieldCheck, Building2, RotateCcw, RefreshCw,
-} from 'lucide-react';
+} from '@/components/icons';
 import {
   complianceApi,
   type ActionItem,
@@ -161,7 +161,7 @@ function HealthBriefCard({
       />
       <div className="relative px-5 py-3.5 flex items-center gap-4">
         <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_8px_20px_-10px_rgba(245,158,11,0.5)] flex items-center justify-center shrink-0">
-          <Sparkles className="h-[18px] w-[18px] text-amber-950" strokeWidth={2.5} />
+          <Sparkles className="h-[18px] w-[18px] text-amber-950" weight="bold" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-amber-700 dark:text-amber-400 mb-0.5">

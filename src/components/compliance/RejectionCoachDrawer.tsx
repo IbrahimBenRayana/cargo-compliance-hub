@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, Loader2, AlertCircle, RefreshCw, Plane } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, RefreshCw, Plane } from '@/components/icons';
 import { complianceApi } from '@/api/client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -130,7 +130,7 @@ export function RejectionCoachDrawer({
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-b from-amber-50/60 to-transparent dark:from-amber-400/[0.06]">
           <div className="flex items-center gap-2 mb-1">
             <div className="h-7 w-7 rounded-md bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 flex items-center justify-center">
-              <HeroIcon className="h-3.5 w-3.5 text-amber-950" strokeWidth={2.5} />
+              <HeroIcon className="h-3.5 w-3.5 text-amber-950" weight="bold" />
             </div>
             <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-400">
               {cfg.eyebrow}

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, XCircle, Clock, Loader2, Send, AlertTriangle, Info } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Loader2, Send, AlertTriangle, Info } from '@/components/icons';
 import { TINT, type Tone } from '@/components/dashboard/tones';
 import { abiDocumentsApi, filingsApi } from '@/api/client';
 import type { CbpConditionView, CbpTransmissionView, EntryCbpActivity, FilingCbpActivity } from '@/api/client';

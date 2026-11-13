@@ -14,7 +14,7 @@ import {
   User, Building2, Shield, Key, Activity, CheckCircle2, XCircle,
   Loader2, Clock, Users, FileText, Save, ChevronRight,
   Mail, CalendarDays, BadgeCheck, Plus, Trash2, Copy, ShieldCheck, Bell, CreditCard,
-} from 'lucide-react';
+} from '@/components/icons';
 import { useSearchParams } from 'react-router-dom';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { EntryNumberBlocksCard } from '@/components/settings/EntryNumberBlocksCard';

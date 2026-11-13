@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from '@/components/icons';
 import type { Blocker } from '@/types/dashboard';
 
 /** Why filing is stopped, and the fix if this person can make it. Shows the first; the rest are counted. */

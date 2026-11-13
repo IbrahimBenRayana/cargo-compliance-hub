@@ -73,7 +73,7 @@ export function SummaryCard({ filing, summary, now }: { filing: Filing; summary:
     <section aria-label="Status" className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-card">
       <div className={cn('flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4', BAND[summary.tone])}>
         <span aria-hidden className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-full text-white dark:text-background', FILL[summary.tone])}>
-          <Icon className="h-5 w-5" />
+          <Icon weight="duotone" className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1 basis-64">
           <p className="text-[16px] font-semibold leading-6">{summary.title}</p>

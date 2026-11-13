@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
-import { AlertTriangle, Loader2, Plus } from 'lucide-react';
+import { AlertTriangle, Loader2, Plus } from '@/components/icons';
 import { CelebrationModal } from '@/components/CelebrationModal';
 import { Button } from '@/components/ui/button';
 import { useCurrentUser } from '@/hooks/useAuth';

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Info } from 'lucide-react';
+import { Info } from '@/components/icons';
 import { complianceApi, type ScoreHistoryPoint } from '@/api/client';
 import { cn } from '@/lib/utils';
 import { statusOf } from '@/components/shipments/status';

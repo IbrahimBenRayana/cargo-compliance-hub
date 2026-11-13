@@ -15,7 +15,7 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from '@/components/ui/input-otp';
-import { Loader2, ArrowLeft, ShieldCheck, KeyRound, Mail, RotateCw } from 'lucide-react';
+import { Loader2, ArrowLeft, ShieldCheck, KeyRound, Mail, RotateCw } from '@/components/icons';
 import { toast } from 'sonner';
 import { AuthBrandPanel } from '@/components/AuthBrandPanel';
 import { waitForAuthScene } from '@/components/auth3d/success';
@@ -364,11 +364,11 @@ export default function LoginPage() {
                 <div>
                   <div className="mx-auto h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-500/15 ring-1 ring-amber-200 dark:ring-amber-500/30 flex items-center justify-center mb-4">
                     {mode === 'recovery' ? (
-                      <KeyRound className="h-6 w-6 text-amber-600 dark:text-amber-400" strokeWidth={2} />
+                      <KeyRound className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                     ) : mode === 'email' ? (
-                      <Mail className="h-6 w-6 text-amber-600 dark:text-amber-400" strokeWidth={2} />
+                      <Mail className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                     ) : (
-                      <ShieldCheck className="h-6 w-6 text-amber-600 dark:text-amber-400" strokeWidth={2} />
+                      <ShieldCheck className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                     )}
                   </div>
                   <h1 className="text-2xl font-semibold tracking-tight text-foreground text-center">
