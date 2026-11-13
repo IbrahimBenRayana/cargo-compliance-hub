@@ -31,11 +31,11 @@ function Related({ items, now }: { items: RelatedItem[]; now: number }) {
             <li key={item.key} className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[13px] font-medium">{item.title}</p>
-                <p className="flex items-center gap-1.5 text-[12.5px]">
-                  <span aria-hidden className={cn('h-1.5 w-1.5 shrink-0 rounded-full', FILL[item.tone])} />
-                  <span className={cn('truncate', TEXT[item.tone])}>{item.text}</span>
-                  {when && <span className="shrink-0 text-muted-foreground">{when}</span>}
+                <p className="flex items-start gap-1.5 text-[12.5px]">
+                  <span aria-hidden className={cn('mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full', FILL[item.tone])} />
+                  <span className={TEXT[item.tone]}>{item.text}</span>
                 </p>
+                {when && <p className="pl-3 text-[12px] tabular-nums text-muted-foreground">{when}</p>}
               </div>
               {item.action && (
                 <Button asChild size="sm" variant="outline" className="h-7 shrink-0 gap-1 px-2.5 text-[12px]">
