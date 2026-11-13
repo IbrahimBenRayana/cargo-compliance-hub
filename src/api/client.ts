@@ -552,7 +552,7 @@ export interface SubmissionLogEntry {
 }
 
 export const submissionLogsApi = {
-  list(params?: { filingId?: string; page?: number; limit?: number }) {
+  list(params?: { filingId?: string; page?: number; limit?: number; sends?: '1' }) {
     const query = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
