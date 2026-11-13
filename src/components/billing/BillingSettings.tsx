@@ -1,15 +1,16 @@
 import * as React from 'react';
 import { Link } from 'react-router-dom';
-import { CreditCard, Loader2, AlertTriangle, ExternalLink, Receipt, Pencil } from '@/components/icons';
+import { Loader2, ExternalLink } from '@/components/icons';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { useSubscription, useCreatePortalSession } from '@/hooks/useBilling';
 import { useAuthStore } from '@/hooks/useAuth';
 import { CardCapture } from '@/components/billing/CardCapture';
 import { InvoicedBilling } from '@/components/billing/InvoicedBilling';
 import { money, pricingLines } from '@/lib/pricing';
+
+const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
+const TEXT_BUTTON = 'mt-3 w-full rounded-md text-center text-[12px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring can-hover:hover:text-foreground';
 
 export function BillingSettings() {
   const { data, isLoading } = useSubscription();
@@ -29,8 +30,8 @@ export function BillingSettings() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-16 text-muted-foreground">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading billing…
+      <div className="flex items-center justify-center py-16 text-[13px] text-muted-foreground">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> Loading billing…
       </div>
     );
   }
@@ -44,34 +45,32 @@ export function BillingSettings() {
   return (
     <div className="space-y-6">
       {data?.delinquent && (
-        <div className="flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
-          <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="font-semibold text-destructive">A recent charge failed</p>
-            <p className="text-muted-foreground">{canManage ? 'Update your card below to settle it and keep filing.' : 'Ask an owner or admin to update the card to settle it and keep filing.'} We retry automatically once a working card is on file.</p>
-          </div>
+        <div role="alert" className="rounded-lg bg-urgent-tint px-4 py-3 text-[13px]">
+          <p className="font-semibold text-urgent">A recent charge failed</p>
+          <p className="mt-0.5 text-foreground/80">{canManage ? 'Update your card below to settle it and keep filing.' : 'Ask an owner or admin to update the card to settle it and keep filing.'} We retry automatically once a working card is on file.</p>
         </div>
       )}
 
       {!canManage && (
-        <p className="text-sm text-muted-foreground">Only owners and admins can change billing.</p>
+        <p className="text-[13px] text-muted-foreground">Only owners and admins can change billing.</p>
       )}
 
       {/* Plan */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2"><Receipt className="h-4 w-4" /> Plan</CardTitle>
-          <CardDescription>No subscription, no monthly fee — you're charged per shipment, only when CBP accepts it.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <section aria-labelledby="billing-plan-title" className={PANEL}>
+        <div className="px-5 py-3.5">
+          <h2 id="billing-plan-title" className="text-[14px] font-semibold">Plan</h2>
+          <p className="text-[13px] text-muted-foreground">No subscription, no monthly fee. You're charged per shipment, only when CBP accepts it.</p>
+        </div>
+        <div className="border-t border-border/70 px-5 py-4">
           {plan ? (
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <div className="text-lg font-semibold">{plan.name}</div>
-                <ul className="text-sm text-muted-foreground">
-                  {pricingLines(data?.pricing).map((line) => <li key={line}>{line}</li>)}
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1 basis-64">
+                <p className="text-[12px] text-muted-foreground">Current plan</p>
+                <p className="mt-0.5 text-[14px] font-medium">{plan.name}</p>
+                <ul className="mt-3 divide-y divide-border/60 text-[13px] tabular-nums">
+                  {pricingLines(data?.pricing).map((line) => <li key={line} className="py-2">{line}</li>)}
                 </ul>
-                {plan.isPublic && <p className="mt-1 text-xs text-muted-foreground">Customs entries or volume pricing: talk to us.</p>}
+                {plan.isPublic && <p className="mt-2 text-[12px] text-muted-foreground">Customs entries or volume pricing: talk to us.</p>}
               </div>
               {canManage && plan.isPublic && (
                 <Button variant="outline" size="sm" asChild>
@@ -81,88 +80,83 @@ export function BillingSettings() {
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">No plan selected yet.</p>
+              <p className="text-[13px] text-muted-foreground">No plan selected yet.</p>
               {canManage && <Button size="sm" asChild><Link to="/upgrade">Choose a plan</Link></Button>}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {/* Payment method */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2"><CreditCard className="h-4 w-4" /> Payment method</CardTitle>
-          <CardDescription>The card we charge for each accepted shipment.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <section aria-labelledby="billing-card-title" className={PANEL}>
+        <div className="px-5 py-3.5">
+          <h2 id="billing-card-title" className="text-[14px] font-semibold">Payment method</h2>
+          <p className="text-[13px] text-muted-foreground">The card we charge for each accepted shipment.</p>
+        </div>
+        <div className="space-y-3 border-t border-border/70 px-5 py-4">
           {editingCard ? (
             <div>
               <CardCapture
                 submitLabel={card ? 'Update card' : 'Save card'}
                 onSaved={() => { setEditingCard(false); toast.success(card ? 'Card updated.' : 'Card saved.'); }}
               />
-              <button type="button" onClick={() => setEditingCard(false)} className="mt-3 w-full text-center text-xs text-muted-foreground hover:text-foreground">
+              <button type="button" onClick={() => setEditingCard(false)} className={TEXT_BUTTON}>
                 Cancel
               </button>
             </div>
           ) : card ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="grid size-10 place-items-center rounded-lg bg-muted"><CreditCard className="h-5 w-5" /></div>
-                <div className="text-sm">
-                  <div className="font-medium capitalize">{card.brand} •••• {card.last4}</div>
-                  {card.expMonth && card.expYear && (
-                    <div className="text-muted-foreground">Expires {String(card.expMonth).padStart(2, '0')}/{card.expYear}</div>
-                  )}
-                </div>
-              </div>
+              <dl className="min-w-0">
+                <dt className="text-[12px] text-muted-foreground">Card on file</dt>
+                <dd className="mt-0.5 text-[14px] font-medium capitalize tabular-nums">{card.brand} •••• {card.last4}</dd>
+                {card.expMonth && card.expYear && (
+                  <dd className="text-[12.5px] tabular-nums text-muted-foreground">Expires {String(card.expMonth).padStart(2, '0')}/{card.expYear}</dd>
+                )}
+              </dl>
               {canManage && (
                 <Button variant="outline" size="sm" onClick={() => setEditingCard(true)} disabled={!plan}>
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" /> Update
+                  Update
                 </Button>
               )}
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">No card on file. Add one to start filing.</p>
+              <p className="text-[13px] text-muted-foreground">No card on file. Add one to start filing.</p>
               {canManage && (
                 <Button size="sm" onClick={() => setEditingCard(true)} disabled={!plan}>
-                  <CreditCard className="h-3.5 w-3.5 mr-1.5" /> Add card
+                  Add card
                 </Button>
               )}
             </div>
           )}
           {canManage && !plan && !editingCard && (
-            <p className="text-xs text-muted-foreground">Choose a plan first, then add a card.</p>
+            <p className="text-[12px] text-muted-foreground">Choose a plan first, then add a card.</p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {/* Usage + Stripe portal */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">This month</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Shipments charged</span>
-            <span className="font-medium tabular-nums">{data?.usage.filingsBilled ?? 0}</span>
+      <section aria-labelledby="billing-month-title" className={PANEL}>
+        <h2 id="billing-month-title" className="px-5 py-3.5 text-[14px] font-semibold">This month</h2>
+        <dl className="divide-y divide-border/60 border-t border-border/70 px-5 text-[13px]">
+          <div className="flex items-center justify-between gap-4 py-2.5">
+            <dt className="text-muted-foreground">Shipments charged</dt>
+            <dd className="font-medium tabular-nums">{data?.usage.filingsBilled ?? 0}</dd>
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Total charged</span>
-            <span className="font-medium tabular-nums">{money(data?.usage.amountCents ?? 0)}</span>
+          <div className="flex items-center justify-between gap-4 py-2.5">
+            <dt className="text-muted-foreground">Total charged</dt>
+            <dd className="font-medium tabular-nums">{money(data?.usage.amountCents ?? 0)}</dd>
           </div>
-          {canManage && (
-            <>
-              <Separator />
-              <Button variant="ghost" size="sm" onClick={openPortal} disabled={portal.isPending || !card} className="px-0">
-                {portal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ExternalLink className="h-4 w-4 mr-2" />}
-                Manage cards &amp; receipts in Stripe
-              </Button>
-            </>
-          )}
-        </CardContent>
-      </Card>
+        </dl>
+        {canManage && (
+          <div className="border-t border-border/70 px-5 py-3.5">
+            <Button variant="outline" size="sm" onClick={openPortal} disabled={portal.isPending || !card}>
+              {portal.isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <ExternalLink aria-hidden />}
+              Manage cards and receipts in Stripe
+            </Button>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

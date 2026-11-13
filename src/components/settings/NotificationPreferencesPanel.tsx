@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bell, Mail, Save, Loader2 } from '@/components/icons';
+import { Save, Loader2 } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,6 +9,7 @@ import {
 } from '@/hooks/useFilings';
 import type { NotificationPreference } from '@/types/notification';
 import { cn } from '@/lib/utils';
+import { FILL, TINT } from '@/components/dashboard/tones';
 import { toast } from 'sonner';
 
 // ─── Friendly labels + grouping for the matrix ───────────────────────
@@ -21,7 +22,7 @@ interface KindMeta {
   label: string;
   /** One-line description so the user knows when this fires. */
   desc: string;
-  /** When critical: render the row with a subtle rose tint to call out
+  /** When critical: render the row with the urgent tint to call out
    *  that turning it off is risky (filing rejected, payment failed). */
   critical?: boolean;
 }
@@ -36,16 +37,16 @@ interface Group {
 const GROUPS: Group[] = [
   {
     id: 'filings',
-    title: 'ISF Filings',
+    title: 'ISF filings',
     desc: 'Lifecycle events for ISF filings you create.',
     kinds: [
-      { kind: 'filing_submitted', label: 'Submitted',          desc: 'A filing you started has been transmitted to CBP.' },
+      { kind: 'filing_submitted', label: 'Sent',               desc: 'A filing you started has been transmitted to CBP.' },
       { kind: 'filing_accepted',  label: 'Accepted by CBP',    desc: 'CBP accepted the filing.' },
-      { kind: 'filing_rejected',  label: 'Rejected by CBP',    desc: 'CBP rejected the filing — needs your attention.', critical: true },
+      { kind: 'filing_rejected',  label: 'Rejected by CBP',    desc: 'CBP rejected the filing. It needs your attention.', critical: true },
       { kind: 'filing_on_hold',   label: 'On hold',            desc: 'CBP placed the filing on hold.', critical: true },
-      { kind: 'filing_amended',   label: 'Amended',            desc: 'An amendment for a filing was submitted.' },
+      { kind: 'filing_amended',   label: 'Amended',            desc: 'An amendment for a filing was sent.' },
       { kind: 'filing_cancelled', label: 'Cancelled',          desc: 'A filing was cancelled.' },
-      { kind: 'filing_stale',     label: 'No CBP response',    desc: 'No CBP response after 72h on a submitted filing.' },
+      { kind: 'filing_stale',     label: 'No CBP response',    desc: 'No CBP response after 72h on a sent filing.' },
     ],
   },
   {
@@ -54,22 +55,22 @@ const GROUPS: Group[] = [
     desc: 'Time-pressure reminders for upcoming and missed filings.',
     kinds: [
       { kind: 'deadline_warning', label: 'Approaching deadline', desc: '72h, 48h, or 24h before the ISF deadline.' },
-      { kind: 'deadline_overdue', label: 'Overdue',              desc: 'Filing deadline has passed — penalties may apply.', critical: true },
+      { kind: 'deadline_overdue', label: 'Overdue',              desc: 'Filing deadline has passed. Penalties may apply.', critical: true },
     ],
   },
   {
     id: 'entries',
-    title: 'CBP Entries (7501 / 3461)',
+    title: 'CBP entries (7501 / 3461)',
     desc: 'Entry-summary lifecycle events.',
     kinds: [
-      { kind: 'entry_submitted', label: 'Submitted',         desc: 'An entry you sent to CBP is awaiting acceptance.' },
+      { kind: 'entry_submitted', label: 'Sent',              desc: 'An entry you sent to CBP is awaiting acceptance.' },
       { kind: 'entry_accepted',  label: 'Accepted by CBP',   desc: 'CBP accepted the entry.' },
-      { kind: 'entry_rejected',  label: 'Rejected by CBP',   desc: 'CBP rejected the entry — needs your attention.', critical: true },
+      { kind: 'entry_rejected',  label: 'Rejected by CBP',   desc: 'CBP rejected the entry. It needs your attention.', critical: true },
     ],
   },
   {
     id: 'manifests',
-    title: 'Manifest Queries',
+    title: 'Manifest queries',
     desc: 'Personal lookups against CBP manifest data.',
     kinds: [
       { kind: 'manifest_query_complete', label: 'Results ready', desc: 'A manifest query has returned data.' },
@@ -171,85 +172,74 @@ export function NotificationPreferencesPanel() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="text-[13px]">
       {/* ── Column header ── */}
-      <div className="flex items-center justify-end gap-8 px-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
-        <span className="inline-flex items-center gap-1.5">
-          <Bell className="h-3 w-3" />
-          In-app
-        </span>
-        <span className="inline-flex items-center gap-1.5 w-12 justify-center">
-          <Mail className="h-3 w-3" />
-          Email
-        </span>
+      <div aria-hidden className="flex items-center justify-end gap-4 pb-1 text-[12px] font-medium text-muted-foreground">
+        <span className="w-12 text-center">In-app</span>
+        <span className="w-12 text-center">Email</span>
       </div>
 
       {/* ── Groups ── */}
-      {GROUPS.map(group => (
-        <section key={group.id} className="space-y-3">
-          <div>
-            <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">{group.title}</h3>
-            <p className="text-[12px] text-muted-foreground/80 mt-0.5">{group.desc}</p>
-          </div>
+      <div className="divide-y divide-border/70">
+        {GROUPS.map(group => (
+          <section key={group.id} aria-labelledby={`notif-${group.id}`} className="py-4 first:pt-0">
+            <h3 id={`notif-${group.id}`} className="text-[14px] font-semibold">{group.title}</h3>
+            <p className="mt-0.5 text-[12.5px] text-muted-foreground">{group.desc}</p>
 
-          <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
-            {group.kinds.map(meta => {
-              const v = draft[meta.kind] ?? { inApp: true, email: true };
-              return (
-                <div
-                  key={meta.kind}
-                  className={cn(
-                    'flex items-start gap-4 px-4 py-3 transition-colors',
-                    meta.critical && (!v.inApp || !v.email) && 'bg-red-500/[0.025]',
-                  )}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className={cn(
-                      'text-[13px] font-medium text-foreground',
-                      meta.critical && (!v.inApp || !v.email) && 'text-red-700 dark:text-red-400',
-                    )}>
-                      {meta.label}
-                      {meta.critical && (
-                        <span className="ml-2 inline-flex items-center text-[10px] font-semibold uppercase tracking-[0.14em] text-red-600 dark:text-red-400">
-                          critical
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-[12px] text-muted-foreground/80 mt-0.5 leading-snug">{meta.desc}</p>
+            <div className="mt-2 divide-y divide-border/60">
+              {group.kinds.map(meta => {
+                const v = draft[meta.kind] ?? { inApp: true, email: true };
+                const muted = !!meta.critical && (!v.inApp || !v.email);
+                return (
+                  <div
+                    key={meta.kind}
+                    className={cn(
+                      '-mx-2 flex items-start gap-4 rounded-md px-2 py-2.5 transition-colors duration-150',
+                      muted && 'bg-urgent-tint',
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-foreground">
+                        {meta.label}
+                        {meta.critical && (
+                          <span className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[12px] font-medium', TINT.urgent)}>
+                            <span aria-hidden className={cn('h-1.5 w-1.5 shrink-0 rounded-full', FILL.urgent)} />
+                            Critical
+                          </span>
+                        )}
+                      </p>
+                      <p className={cn('mt-0.5 text-[12.5px] leading-snug', muted ? 'text-foreground/75' : 'text-muted-foreground')}>{meta.desc}</p>
+                    </div>
+
+                    <label className="mt-0.5 flex w-12 cursor-pointer items-center justify-center">
+                      <Checkbox
+                        checked={v.inApp}
+                        onCheckedChange={(c) => toggle(meta.kind, 'inApp', c === true)}
+                        aria-label={`${meta.label}, in-app`}
+                      />
+                    </label>
+                    <label className="mt-0.5 flex w-12 cursor-pointer items-center justify-center">
+                      <Checkbox
+                        checked={v.email}
+                        onCheckedChange={(c) => toggle(meta.kind, 'email', c === true)}
+                        aria-label={`${meta.label}, email`}
+                      />
+                    </label>
                   </div>
-
-                  <label className="flex items-center justify-center w-12 cursor-pointer mt-0.5">
-                    <Checkbox
-                      checked={v.inApp}
-                      onCheckedChange={(c) => toggle(meta.kind, 'inApp', c === true)}
-                      aria-label={`${meta.label} — in-app`}
-                    />
-                  </label>
-                  <label className="flex items-center justify-center w-12 cursor-pointer mt-0.5">
-                    <Checkbox
-                      checked={v.email}
-                      onCheckedChange={(c) => toggle(meta.kind, 'email', c === true)}
-                      aria-label={`${meta.label} — email`}
-                    />
-                  </label>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
 
       {/* ── Save bar ── */}
-      <div className="flex items-center justify-between gap-3 pt-2">
-        <p className="text-[12px] text-muted-foreground/80">
+      <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-4">
+        <p className="text-[12.5px] text-muted-foreground" aria-live="polite">
           {dirty ? 'You have unsaved changes.' : 'All changes saved.'}
         </p>
-        <Button
-          onClick={handleSave}
-          disabled={!dirty || update.isPending}
-          className="gap-1.5 h-9 px-4 rounded-lg font-medium"
-        >
-          {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+        <Button onClick={handleSave} disabled={!dirty || update.isPending}>
+          {update.isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Save aria-hidden />}
           Save preferences
         </Button>
       </div>

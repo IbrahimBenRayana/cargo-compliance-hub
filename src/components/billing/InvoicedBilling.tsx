@@ -1,15 +1,15 @@
 import * as React from 'react';
-import { Landmark, Loader2, AlertTriangle, ExternalLink, Receipt, Pencil } from '@/components/icons';
+import { Loader2, ExternalLink } from '@/components/icons';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { useCreatePortalSession } from '@/hooks/useBilling';
 import { CardCapture } from '@/components/billing/CardCapture';
 import type { billingApi } from '@/api/client';
 import { isfBandLines, money } from '@/lib/pricing';
 
 type Subscription = Awaited<ReturnType<typeof billingApi.subscription>>;
+
+const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
 
 /**
  * Settings → Billing for an invoiced account (paid pilots, contracts): no
@@ -35,25 +35,23 @@ export function InvoicedBilling({ data, canManage }: { data: Subscription; canMa
   return (
     <div className="space-y-6">
       {data.billingHold && (
-        <div className="flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
-          <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="font-semibold text-destructive">New filings are on hold</p>
-            <p className="text-muted-foreground">An invoice is overdue. Contact us to settle it and keep filing. Drafts, amendments and cancellations still work.</p>
-          </div>
+        <div role="alert" className="rounded-lg bg-urgent-tint px-4 py-3 text-[13px]">
+          <p className="font-semibold text-urgent">New filings are on hold</p>
+          <p className="mt-0.5 text-foreground/80">An invoice is overdue. Contact us to settle it and keep filing. Drafts, amendments and cancellations still work.</p>
         </div>
       )}
 
-      {!canManage && <p className="text-sm text-muted-foreground">Only owners and admins can change billing.</p>}
+      {!canManage && <p className="text-[13px] text-muted-foreground">Only owners and admins can change billing.</p>}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2"><Receipt className="h-4 w-4" /> Plan</CardTitle>
-          <CardDescription>Invoiced monthly. Only filings CBP accepts count.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-lg font-semibold">{data.plan?.name}</div>
-          <ul className="text-sm text-muted-foreground">
+      <section aria-labelledby="invoiced-plan-title" className={PANEL}>
+        <div className="px-5 py-3.5">
+          <h2 id="invoiced-plan-title" className="text-[14px] font-semibold">Plan</h2>
+          <p className="text-[13px] text-muted-foreground">Invoiced monthly. Only filings CBP accepts count.</p>
+        </div>
+        <div className="border-t border-border/70 px-5 py-4">
+          <p className="text-[12px] text-muted-foreground">Current plan</p>
+          <p className="mt-0.5 text-[14px] font-medium">{data.plan?.name}</p>
+          <ul className="mt-3 divide-y divide-border/60 text-[13px] tabular-nums [&>li]:py-2">
             {inv && inv.monthlyMinimumCents > 0 && (
               <li>{money(inv.monthlyMinimumCents)} a month, including {inv.includedIsfs} accepted ISFs</li>
             )}
@@ -69,15 +67,15 @@ export function InvoicedBilling({ data, canManage }: { data: Subscription; canMa
               </>
             )}
           </ul>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2"><Landmark className="h-4 w-4" /> Bank account (ACH)</CardTitle>
-          <CardDescription>Your monthly invoice is debited from this account when it is issued.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <section aria-labelledby="invoiced-bank-title" className={PANEL}>
+        <div className="px-5 py-3.5">
+          <h2 id="invoiced-bank-title" className="text-[14px] font-semibold">Bank account (ACH)</h2>
+          <p className="text-[13px] text-muted-foreground">Your monthly invoice is debited from this account when it is issued.</p>
+        </div>
+        <div className="border-t border-border/70 px-5 py-4">
           {editingBank ? (
             <div>
               <CardCapture
@@ -85,64 +83,69 @@ export function InvoicedBilling({ data, canManage }: { data: Subscription; canMa
                 submitLabel={bank ? 'Update bank account' : 'Save bank account'}
                 onSaved={() => { setEditingBank(false); toast.success('Bank account saved.'); }}
               />
-              <button type="button" onClick={() => setEditingBank(false)} className="mt-3 w-full text-center text-xs text-muted-foreground hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => setEditingBank(false)}
+                className="mt-3 w-full rounded-md text-center text-[12px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring can-hover:hover:text-foreground"
+              >
                 Cancel
               </button>
             </div>
           ) : bank ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="grid size-10 place-items-center rounded-lg bg-muted"><Landmark className="h-5 w-5" /></div>
-                <div className="text-sm font-medium">{bank.bankName ?? 'Bank account'} •••• {bank.last4}</div>
-              </div>
+              <dl className="min-w-0">
+                <dt className="text-[12px] text-muted-foreground">Account on file</dt>
+                <dd className="mt-0.5 text-[14px] font-medium tabular-nums">{bank.bankName ?? 'Bank account'} •••• {bank.last4}</dd>
+              </dl>
               {canManage && (
                 <Button variant="outline" size="sm" onClick={() => setEditingBank(true)}>
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" /> Update
+                  Update
                 </Button>
               )}
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">No bank account yet. Until one is added, invoices arrive by email with a link to pay by ACH.</p>
+              <p className="min-w-0 flex-1 basis-64 text-[13px] text-muted-foreground">No bank account yet. Until one is added, invoices arrive by email with a link to pay by ACH.</p>
               {canManage && (
                 <Button size="sm" onClick={() => setEditingBank(true)}>
-                  <Landmark className="h-3.5 w-3.5 mr-1.5" /> Add bank account
+                  Add bank account
                 </Button>
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">This month so far</CardTitle>
-          <CardDescription>An estimate. Your invoice is issued after the month ends.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Accepted ISFs</span>
-            <span className="font-medium tabular-nums">{inv?.monthToDate.isfs ?? 0}</span>
+      <section aria-labelledby="invoiced-month-title" className={PANEL}>
+        <div className="px-5 py-3.5">
+          <h2 id="invoiced-month-title" className="text-[14px] font-semibold">This month so far</h2>
+          <p className="text-[13px] text-muted-foreground">An estimate. Your invoice is issued after the month ends.</p>
+        </div>
+        <dl className="divide-y divide-border/60 border-t border-border/70 px-5 text-[13px]">
+          <div className="flex items-center justify-between gap-4 py-2.5">
+            <dt className="text-muted-foreground">Accepted ISFs</dt>
+            <dd className="font-medium tabular-nums">{inv?.monthToDate.isfs ?? 0}</dd>
           </div>
           {(inv?.monthToDate.lines ?? []).map((l) => (
-            <div key={l.code} className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-muted-foreground">{l.description}</span>
-              <span className="font-medium tabular-nums">{money(l.amountCents)}</span>
+            <div key={l.code} className="flex items-center justify-between gap-4 py-2.5">
+              <dt className="text-muted-foreground">{l.description}</dt>
+              <dd className="font-medium tabular-nums">{money(l.amountCents)}</dd>
             </div>
           ))}
-          <Separator />
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium">Estimated total</span>
-            <span className="font-semibold tabular-nums">{money(inv?.monthToDate.estimatedCents ?? 0)}</span>
+          <div className="flex items-center justify-between gap-4 py-3">
+            <dt className="font-medium">Estimated total</dt>
+            <dd className="text-[14px] font-semibold tabular-nums">{money(inv?.monthToDate.estimatedCents ?? 0)}</dd>
           </div>
-          {canManage && (
-            <Button variant="ghost" size="sm" onClick={openPortal} disabled={portal.isPending} className="px-0">
-              {portal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ExternalLink className="h-4 w-4 mr-2" />}
-              Invoices &amp; payment methods in Stripe
+        </dl>
+        {canManage && (
+          <div className="border-t border-border/70 px-5 py-3.5">
+            <Button variant="outline" size="sm" onClick={openPortal} disabled={portal.isPending}>
+              {portal.isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <ExternalLink aria-hidden />}
+              Invoices and payment methods in Stripe
             </Button>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

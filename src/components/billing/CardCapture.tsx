@@ -69,13 +69,13 @@ function CardForm({ onSaved, submitLabel, method }: { onSaved?: () => void; subm
     <form onSubmit={handleSubmit} className="space-y-4">
       <PaymentElement options={{ layout: 'tabs' }} />
       <Button type="submit" className="w-full" size="lg" disabled={!stripe || submitting}>
-        {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
+        {submitting ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Lock aria-hidden />}
         {submitLabel}
       </Button>
-      <p className="text-center text-xs text-muted-foreground">
+      <p className="text-center text-[12px] text-muted-foreground">
         {method === 'us_bank_account'
           ? 'Your bank account is stored securely by Stripe. Nothing is debited now; your monthly invoice is debited when it is issued.'
-          : "Your card is stored securely by Stripe. No charge now — you're only billed per shipment, when CBP accepts it."}
+          : "Your card is stored securely by Stripe. No charge now. You're only billed per shipment, when CBP accepts it."}
       </p>
     </form>
   );
@@ -102,14 +102,14 @@ export function CardCapture({ onSaved, submitLabel = 'Save card', method = 'card
 
   if (config.isLoading || setupIntent.isPending || !clientSecret) {
     return (
-      <div className="flex items-center justify-center py-10 text-muted-foreground">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing secure {method === 'us_bank_account' ? 'bank account' : 'card'} form…
+      <div className="flex items-center justify-center py-10 text-[13px] text-muted-foreground">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> Preparing secure {method === 'us_bank_account' ? 'bank account' : 'card'} form…
       </div>
     );
   }
   if (config.isError || setupIntent.isError || !config.data?.publishableKey) {
     return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+      <div role="alert" className="rounded-lg bg-urgent-tint px-4 py-3 text-[13px] text-urgent">
         Could not load the secure card form. Please refresh and try again.
       </div>
     );
