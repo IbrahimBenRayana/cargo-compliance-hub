@@ -1,37 +1,46 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { motion, useReducedMotion } from 'framer-motion';
 import {
-  ShieldAlert, Search, Building2, ArrowRight, AlertTriangle, ShieldCheck,
+  ShieldAlert, Search, ArrowRight, AlertTriangle, ShieldCheck,
   ChevronDown, Loader2, Hash, FileBadge2, Globe2,
   type IconType,
 } from '@/components/icons';
 import { complianceApi, type UflpaScanResponse } from '@/api/client';
-import { Badge } from '@/components/ui/badge';
+import { BAND, FILL, TINT, type Tone } from '@/components/dashboard/tones';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 
+const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
+
+const TEXT: Record<Tone, string> = {
+  urgent: 'text-urgent', soon: 'text-soon', info: 'text-info', entry: 'text-entry', done: 'text-done', calm: 'text-muted-foreground',
+};
+
+type Severity = UflpaScanResponse['flagged'][number]['risk']['severity'];
+
+const SEVERITY: Record<Severity, { label: string; tone: Tone }> = {
+  high: { label: 'High', tone: 'urgent' },
+  elevated: { label: 'Elevated', tone: 'soon' },
+  low: { label: 'Low', tone: 'calm' },
+};
+
 /**
- * Risk & Watch List tab — three tools laid out as a single intelligence
- * surface:
+ * Risk and watch list tab: three tools on one surface.
  *
- *   • Hero strip: animated KPI tiles (scanned / high / elevated / clean)
- *   • Main column: UFLPA Risk Inbox — flagged filings as elevated cards
- *     with severity ring, search + severity filter, inline expand.
- *   • Side rail: Tools — PGA Flag Lookup + 5106 Self-Check stacked.
- *
- * The aesthetic matches the Compliance Center's other tabs: navy primary,
- * gold accent, slate neutrals, generous padding, severity tones only
- * where they drive action.
+ *   - Top strip: four counts from the UFLPA scan (scanned, high, elevated, no flag).
+ *   - Main column: the UFLPA risk inbox, flagged filings with search, a
+ *     severity filter and an inline expand.
+ *   - Side column: PGA flag lookup and the 5106 self-check, stacked.
  */
 export function RiskTab() {
   return (
     <div className="space-y-5">
       <RiskKpiStrip />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <RiskInbox />
         </div>
@@ -44,59 +53,36 @@ export function RiskTab() {
   );
 }
 
-// ─── KPI hero strip ─────────────────────────────────────────────────
+// ─── KPI strip ──────────────────────────────────────────────────────
 
 function RiskKpiStrip() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['compliance', 'uflpa-scan'],
     queryFn: () => complianceApi.uflpaScan(),
     staleTime: 60_000,
   });
 
+  // The inbox below carries the message when the scan fails.
+  if (isError && !data) return null;
+
   if (isLoading || !data) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[112px] rounded-2xl" />)}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[104px] rounded-xl" />)}
       </div>
     );
   }
 
   const clean = data.scanned - data.counts.high - data.counts.elevated;
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <KpiTile
-        label="Scanned"
-        value={data.scanned}
-        sub="last 90 days"
-        tone="slate"
-        Icon={Globe2}
-      />
-      <KpiTile
-        label="High risk"
-        value={data.counts.high}
-        sub="evidence required"
-        tone="rose"
-        Icon={ShieldAlert}
-      />
-      <KpiTile
-        label="Elevated"
-        value={data.counts.elevated}
-        sub="triage advised"
-        tone="amber"
-        Icon={AlertTriangle}
-      />
-      <KpiTile
-        label="No flag"
-        value={Math.max(0, clean)}
-        sub="UFLPA-clean"
-        tone="emerald"
-        Icon={ShieldCheck}
-      />
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <KpiTile label="Scanned" value={data.scanned} sub="Last 90 days" tone="calm" Icon={Globe2} />
+      <KpiTile label="High risk" value={data.counts.high} sub="Evidence required" tone="urgent" Icon={ShieldAlert} />
+      <KpiTile label="Elevated" value={data.counts.elevated} sub="Triage advised" tone="soon" Icon={AlertTriangle} />
+      <KpiTile label="No flag" value={Math.max(0, clean)} sub="No UFLPA signal" tone="done" Icon={ShieldCheck} />
     </div>
   );
 }
-
-type KpiTone = 'slate' | 'rose' | 'amber' | 'emerald';
 
 function KpiTile({
   label, value, sub, tone, Icon,
@@ -104,88 +90,27 @@ function KpiTile({
   label: string;
   value: number;
   sub: string;
-  tone: KpiTone;
+  tone: Tone;
   Icon: IconType;
 }) {
-  const palette = TONE_PALETTE[tone];
-  const animated = useCountUp(value, 700);
-
   return (
-    <article
-      className={cn(
-        'relative overflow-hidden rounded-2xl border bg-white dark:bg-slate-950 px-5 py-4',
-        palette.border,
-      )}
-    >
-      <div
-        aria-hidden
-        className="absolute inset-y-0 right-0 w-[60%] pointer-events-none"
-        style={{ background: palette.wash }}
-      />
-      <div className="relative flex items-start gap-3">
-        <div
-          className={cn(
-            'h-9 w-9 rounded-xl ring-1 flex items-center justify-center shrink-0',
-            palette.iconBg,
-          )}
-        >
-          <Icon className={cn('h-[18px] w-[18px]', palette.iconFg)} weight="bold" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className={cn('text-[10.5px] font-semibold uppercase tracking-[0.1em]', palette.labelFg)}>
-            {label}
-          </p>
-          <p className="text-[28px] font-semibold tabular-nums leading-none mt-1 text-slate-900 dark:text-slate-50">
-            {animated.toLocaleString()}
-          </p>
-          <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-1">
-            {sub}
-          </p>
-        </div>
-      </div>
+    <article className={cn(PANEL, 'px-5 py-4')}>
+      <p className={cn('flex items-center gap-1.5 text-[12px] font-medium', TEXT[tone])}>
+        <Icon weight="duotone" className="h-4 w-4 shrink-0" aria-hidden />
+        {label}
+      </p>
+      <p className="mt-1 text-[28px] font-semibold leading-9 tracking-[-0.02em] tabular-nums">{value.toLocaleString()}</p>
+      <p className="text-[12px] text-muted-foreground">{sub}</p>
     </article>
   );
 }
 
-const TONE_PALETTE: Record<KpiTone, {
-  border: string; wash: string; iconBg: string; iconFg: string; labelFg: string;
-}> = {
-  slate: {
-    border:  'border-slate-200 dark:border-slate-800',
-    wash:    'radial-gradient(ellipse 75% 100% at 100% 50%, hsl(215 16% 47% / 0.06), transparent 70%)',
-    iconBg:  'bg-slate-100 ring-slate-200/60 dark:bg-slate-800 dark:ring-slate-700/60',
-    iconFg:  'text-slate-600 dark:text-slate-300',
-    labelFg: 'text-slate-500 dark:text-slate-400',
-  },
-  rose: {
-    border:  'border-rose-200/70 dark:border-rose-500/25',
-    wash:    'radial-gradient(ellipse 75% 100% at 100% 50%, hsl(0 84% 60% / 0.10), transparent 70%)',
-    iconBg:  'bg-rose-100 ring-rose-200/60 dark:bg-rose-500/15 dark:ring-rose-500/30',
-    iconFg:  'text-rose-600 dark:text-rose-300',
-    labelFg: 'text-rose-700 dark:text-rose-300',
-  },
-  amber: {
-    border:  'border-amber-200/70 dark:border-amber-500/25',
-    wash:    'radial-gradient(ellipse 75% 100% at 100% 50%, hsl(43 96% 56% / 0.10), transparent 70%)',
-    iconBg:  'bg-amber-100 ring-amber-200/60 dark:bg-amber-500/15 dark:ring-amber-500/30',
-    iconFg:  'text-amber-700 dark:text-amber-300',
-    labelFg: 'text-amber-700 dark:text-amber-300',
-  },
-  emerald: {
-    border:  'border-emerald-200/70 dark:border-emerald-500/25',
-    wash:    'radial-gradient(ellipse 75% 100% at 100% 50%, hsl(160 70% 40% / 0.09), transparent 70%)',
-    iconBg:  'bg-emerald-100 ring-emerald-200/60 dark:bg-emerald-500/15 dark:ring-emerald-500/30',
-    iconFg:  'text-emerald-700 dark:text-emerald-300',
-    labelFg: 'text-emerald-700 dark:text-emerald-300',
-  },
-};
-
-// ─── UFLPA Risk Inbox ───────────────────────────────────────────────
+// ─── UFLPA risk inbox ───────────────────────────────────────────────
 
 type SeverityFilter = 'all' | 'high' | 'elevated' | 'low';
 
 function RiskInbox() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['compliance', 'uflpa-scan'],
     queryFn: () => complianceApi.uflpaScan(),
     staleTime: 60_000,
@@ -208,66 +133,56 @@ function RiskInbox() {
     });
   }, [data, filter, search]);
 
-  if (isLoading || !data) return <Skeleton className="h-[480px] rounded-2xl" />;
+  if (isError && !data) {
+    return (
+      <p role="alert" className={cn(PANEL, 'px-5 py-4 text-[13px] text-muted-foreground')}>
+        The UFLPA scan could not load.{' '}
+        <button type="button" onClick={() => refetch()} className="text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring">Retry</button>
+      </p>
+    );
+  }
+
+  if (isLoading || !data) return <Skeleton className="h-[480px] rounded-xl" />;
 
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-24 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 100% at 50% 0%, hsl(0 84% 60% / 0.06), transparent 70%)',
-        }}
-      />
-      <div className="relative p-6">
-        {/* Header */}
-        <div className="flex items-start gap-4 mb-5">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-rose-400 to-rose-600 ring-1 ring-rose-300/60 dark:ring-rose-400/40 shadow-[0_8px_20px_-10px_rgba(244,63,94,0.5)] flex items-center justify-center shrink-0">
-            <ShieldAlert className="h-5 w-5 text-rose-50" weight="bold" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-50">
-              UFLPA Risk Inbox
-            </h3>
-            <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Forced-labor exposure across your last 90 days of filings — Xinjiang origin signals + UFLPA priority HTS chapters.
-            </p>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
-          <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search BOL, country, HTS, reasons…"
-              className="pl-9 text-[13px]"
-            />
-          </div>
-          <SeverityChips value={filter} onChange={setFilter} counts={data.counts} />
-        </div>
-
-        {/* List */}
-        {data.flagged.length === 0 ? (
-          <EmptyAllClear scanned={data.scanned} />
-        ) : filtered.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 px-6 py-10 text-center">
-            <p className="text-[12.5px] text-slate-500 dark:text-slate-400">
-              No filings match the current filters.
-            </p>
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {filtered.map((f) => (
-              <RiskRow key={f.filingId} flagged={f} />
-            ))}
-          </ul>
-        )}
+    <section aria-labelledby="uflpa-inbox-title" className={PANEL}>
+      <div className="px-5 py-3.5">
+        <h2 id="uflpa-inbox-title" className="text-[14px] font-semibold">UFLPA risk inbox</h2>
+        <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+          Forced-labor exposure across your last 90 days of filings: Xinjiang origin signals and UFLPA priority HTS chapters.
+        </p>
       </div>
-    </article>
+
+      {/* Filters */}
+      <div className="flex flex-col gap-2 border-t border-border/70 px-5 py-3 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search bill, country, HTS or reason"
+            aria-label="Search flagged filings"
+            className="pl-9 text-[13px]"
+          />
+        </div>
+        <SeverityChips value={filter} onChange={setFilter} counts={data.counts} />
+      </div>
+
+      {/* List */}
+      {data.flagged.length === 0 ? (
+        <EmptyAllClear scanned={data.scanned} />
+      ) : filtered.length === 0 ? (
+        <p className="border-t border-border/70 px-5 py-8 text-center text-[13px] text-muted-foreground">
+          No filings match the current filters.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border/60 border-t border-border/70">
+          {filtered.map((f) => (
+            <RiskRow key={f.filingId} flagged={f} />
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -278,36 +193,29 @@ function SeverityChips({
   onChange: (v: SeverityFilter) => void;
   counts: { high: number; elevated: number; low: number };
 }) {
-  const chips: Array<{ id: SeverityFilter; label: string; count?: number; active: string }> = [
-    { id: 'all',      label: 'All',      active: 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' },
-    { id: 'high',     label: 'High',     count: counts.high,     active: 'bg-rose-600 text-white dark:bg-rose-500 dark:text-rose-50' },
-    { id: 'elevated', label: 'Elevated', count: counts.elevated, active: 'bg-amber-600 text-white dark:bg-amber-500 dark:text-amber-950' },
+  const chips: Array<{ id: SeverityFilter; label: string; count?: number }> = [
+    { id: 'all',      label: 'All' },
+    { id: 'high',     label: 'High',     count: counts.high },
+    { id: 'elevated', label: 'Elevated', count: counts.elevated },
   ];
   return (
-    <div className="flex gap-1.5 shrink-0">
+    <div role="radiogroup" aria-label="Severity" className="flex shrink-0 rounded-lg bg-muted p-0.5">
       {chips.map((c) => {
         const isActive = value === c.id;
         return (
           <button
             key={c.id}
             type="button"
+            role="radio"
+            aria-checked={isActive}
             onClick={() => onChange(c.id)}
             className={cn(
-              'inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-[12px] font-semibold transition-colors cursor-pointer',
-              isActive
-                ? c.active
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700',
+              'inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[13px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring',
+              isActive ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground can-hover:hover:text-foreground',
             )}
           >
             {c.label}
-            {c.count !== undefined && (
-              <span className={cn(
-                'tabular-nums text-[11px] font-semibold',
-                isActive ? 'opacity-90' : '',
-              )}>
-                {c.count}
-              </span>
-            )}
+            {c.count !== undefined && <span className="text-[12px] tabular-nums text-muted-foreground">{c.count}</span>}
           </button>
         );
       })}
@@ -317,125 +225,77 @@ function SeverityChips({
 
 function RiskRow({ flagged }: { flagged: UflpaScanResponse['flagged'][number] }) {
   const [open, setOpen] = useState(false);
-  const sev = flagged.risk.severity;
-  const sevTone =
-    sev === 'high' ? {
-      ring: 'border-rose-200/70 dark:border-rose-500/30 hover:border-rose-300 dark:hover:border-rose-500/50',
-      rail: 'bg-gradient-to-b from-rose-400 to-rose-600',
-      badge: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30',
-      dot: 'bg-rose-500',
-    } : sev === 'elevated' ? {
-      ring: 'border-amber-200/70 dark:border-amber-500/30 hover:border-amber-300 dark:hover:border-amber-500/50',
-      rail: 'bg-gradient-to-b from-amber-300 to-amber-500',
-      badge: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30',
-      dot: 'bg-amber-500',
-    } : {
-      ring: 'border-slate-200 dark:border-slate-800',
-      rail: 'bg-gradient-to-b from-slate-300 to-slate-500',
-      badge: 'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300',
-      dot: 'bg-slate-400',
-    };
-  const reducedMotion = useReducedMotion();
+  const sev = SEVERITY[flagged.risk.severity] ?? SEVERITY.low;
 
   return (
-    <motion.li
-      layout={reducedMotion ? false : true}
-      initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18 }}
-    >
+    <li>
       <Collapsible open={open} onOpenChange={setOpen}>
-        <div className={cn(
-          'relative rounded-xl border bg-white dark:bg-slate-900/40 overflow-hidden transition-colors',
-          sevTone.ring,
-        )}>
-          {/* Severity rail */}
-          <div className={cn('absolute left-0 top-0 bottom-0 w-1', sevTone.rail)} />
-          <CollapsibleTrigger className="w-full flex items-center gap-3 pl-5 pr-4 py-3 text-left cursor-pointer">
-            <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
-              <span className="text-[13px] font-mono font-semibold text-slate-900 dark:text-slate-50">
-                {flagged.bol}
+        <CollapsibleTrigger className="flex w-full items-center gap-3 px-5 py-3 text-left outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring can-hover:hover:bg-muted/50">
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-mono text-[13px] font-medium">{flagged.bol}</span>
+            <span className={cn('rounded-full px-2 py-px text-[11.5px] font-medium', TINT[sev.tone])}>{sev.label}</span>
+            {flagged.risk.origin?.country && (
+              <span className="inline-flex items-center gap-1 text-[12px] text-muted-foreground">
+                <Globe2 className="h-3.5 w-3.5" aria-hidden />
+                {flagged.risk.origin.country}
               </span>
-              <Badge variant="outline" className={cn('text-[10px] font-bold uppercase tracking-[0.06em]', sevTone.badge)}>
-                {sev}
-              </Badge>
-              {flagged.risk.origin?.country && (
-                <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                  <Globe2 className="h-3 w-3" />
-                  {flagged.risk.origin.country}
-                </span>
-              )}
-              {flagged.risk.htsMatches.length > 0 && (
-                <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                  <Hash className="h-3 w-3" />
-                  {flagged.risk.htsMatches.slice(0, 2).join(', ')}
-                  {flagged.risk.htsMatches.length > 2 && ` +${flagged.risk.htsMatches.length - 2}`}
-                </span>
-              )}
+            )}
+            {flagged.risk.htsMatches.length > 0 && (
+              <span className="inline-flex items-center gap-1 font-mono text-[12px] text-muted-foreground">
+                <Hash className="h-3.5 w-3.5" aria-hidden />
+                {flagged.risk.htsMatches.slice(0, 2).join(', ')}
+                {flagged.risk.htsMatches.length > 2 && ` +${flagged.risk.htsMatches.length - 2}`}
+              </span>
+            )}
+          </span>
+          <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none', open && 'rotate-180')} aria-hidden />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-3 px-5 pb-4">
+            <ul className="space-y-1.5 text-[13px]">
+              {flagged.risk.reasons.map((r, i) => (
+                <li key={i} className="flex gap-2">
+                  <span aria-hidden className={cn('mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full', FILL[sev.tone])} />
+                  <span className="flex-1">{r}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="rounded-lg bg-muted/50 px-3 py-2.5">
+              <p className="text-[12px] text-muted-foreground">Recommended action</p>
+              <p className="mt-0.5 text-[13px]">{flagged.risk.recommendation}</p>
             </div>
-            <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform shrink-0', open && 'rotate-180')} />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="pl-5 pr-5 pb-4 space-y-3 border-t border-slate-100 dark:border-slate-800/70">
-              <ul className="space-y-1.5 text-[12.5px] pt-3">
-                {flagged.risk.reasons.map((r, i) => (
-                  <li key={i} className="flex gap-2 text-slate-700 dark:text-slate-300">
-                    <span className={cn('h-1.5 w-1.5 rounded-full mt-1.5 shrink-0', sevTone.dot)} />
-                    <span className="flex-1">{r}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 ring-1 ring-slate-200 dark:ring-slate-800 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400 mb-1">
-                  Recommended action
-                </p>
-                <p className="text-[12.5px] text-slate-700 dark:text-slate-300 leading-relaxed">
-                  {flagged.risk.recommendation}
-                </p>
-              </div>
-              <Link
-                to={`/shipments/${flagged.filingId}`}
-                className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-primary hover:opacity-80 transition-opacity"
-              >
-                Open filing <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-          </CollapsibleContent>
-        </div>
+            <Button asChild size="sm" variant="outline">
+              <Link to={`/shipments/${flagged.filingId}`}>Open filing<ArrowRight aria-hidden /></Link>
+            </Button>
+          </div>
+        </CollapsibleContent>
       </Collapsible>
-    </motion.li>
+    </li>
   );
 }
 
 function EmptyAllClear({ scanned }: { scanned: number }) {
+  const tone: Tone = scanned === 0 ? 'calm' : 'done';
   return (
-    <div className="relative overflow-hidden rounded-xl ring-1 ring-emerald-200/60 dark:ring-emerald-500/20 px-6 py-8 text-center">
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 80% at 50% 0%, hsl(160 70% 40% / 0.09), transparent 70%)',
-        }}
-      />
-      <div className="relative">
-        <div className="mx-auto h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 ring-1 ring-emerald-300/60 dark:ring-emerald-400/40 shadow-[0_8px_20px_-10px_rgba(16,185,129,0.5)] flex items-center justify-center mb-3">
-          <ShieldCheck className="h-6 w-6 text-emerald-50" weight="bold" />
-        </div>
-        <p className="text-[14px] font-semibold text-slate-900 dark:text-slate-50">
-          {scanned === 0 ? 'No filings scanned yet' : 'All clear — no UFLPA risk detected'}
+    <div className={cn('flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border/70 px-5 py-4', BAND[tone])}>
+      <span aria-hidden className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-full text-white dark:text-background', FILL[tone])}>
+        <ShieldCheck weight="duotone" className="h-5 w-5" />
+      </span>
+      <div className="min-w-0 flex-1 basis-64">
+        <p className="text-[16px] font-semibold leading-6">
+          {scanned === 0 ? 'No filings scanned yet' : 'No UFLPA risk found'}
         </p>
-        <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
+        <p className="mt-0.5 text-[13px] text-foreground/75">
           {scanned === 0
-            ? 'Once a filing lands in the last 90 days it will appear here.'
-            : `${scanned} filings scanned in the last 90 days.`}
+            ? 'Filings from the last 90 days are scanned and any that are flagged appear here.'
+            : <><span className="tabular-nums">{scanned.toLocaleString()}</span> {scanned === 1 ? 'filing' : 'filings'} scanned in the last 90 days.</>}
         </p>
       </div>
     </div>
   );
 }
 
-// ─── PGA Flag Lookup ────────────────────────────────────────────────
+// ─── PGA flag lookup ────────────────────────────────────────────────
 
 function PgaLookupCard() {
   const [hts, setHts] = useState('');
@@ -449,69 +309,56 @@ function PgaLookupCard() {
   });
 
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
-      <div className="p-5">
-        <div className="flex items-start gap-3 mb-3">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 ring-1 ring-blue-300/60 dark:ring-blue-400/40 shadow-[0_8px_20px_-10px_rgba(59,130,246,0.5)] flex items-center justify-center shrink-0">
-            <Search className="h-[18px] w-[18px] text-blue-50" weight="bold" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[14px] font-semibold text-slate-900 dark:text-slate-50">
-              PGA Flag Lookup
-            </h3>
-            <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Which agencies require notice or permit for this HTS?
-            </p>
-          </div>
-        </div>
+    <section aria-labelledby="pga-lookup-title" className={PANEL}>
+      <div className="px-5 py-3.5">
+        <h2 id="pga-lookup-title" className="text-[14px] font-semibold">PGA flag lookup</h2>
+        <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+          Which agencies require notice or a permit for this HTS code?
+        </p>
+      </div>
+      <div className="border-t border-border/70 px-5 py-4">
         <Input
           value={hts}
           onChange={(e) => setHts(e.target.value)}
           placeholder="0304.19 or 8517.62"
+          aria-label="HTS code"
+          autoComplete="off"
+          spellCheck={false}
           className="font-mono text-[13px]"
         />
-        <div className="mt-3 min-h-[100px]">
+        <div className="mt-3 min-h-[100px]" aria-live="polite">
           {debounced.length < 2 ? (
-            <p className="text-[11.5px] text-slate-500 dark:text-slate-400 text-center pt-6">
-              Type ≥2 digits to scan PGA requirements.
+            <p className="pt-6 text-center text-[12.5px] text-muted-foreground">
+              Type at least 2 digits to look up PGA requirements.
             </p>
           ) : isFetching ? (
             <div className="flex items-center justify-center pt-6">
-              <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground motion-reduce:animate-none" aria-label="Looking up" />
             </div>
           ) : !data?.matched ? (
-            <div className="rounded-lg ring-1 ring-emerald-200/60 dark:ring-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-500/[0.06] px-3 py-2.5">
-              <p className="text-[12px] text-emerald-800 dark:text-emerald-300">
-                <strong>No PGA flag</strong> — standard CBP entry.
-              </p>
-            </div>
+            <p className={cn('rounded-lg px-3 py-2.5 text-[13px]', BAND.done)}>
+              <span className="font-semibold">No PGA flag.</span> Standard CBP entry.
+            </p>
           ) : (
-            <ul className="space-y-1.5">
-              {data!.flags.map((f, i) => (
-                <li
-                  key={i}
-                  className="rounded-lg ring-1 ring-amber-200/60 dark:ring-amber-500/20 bg-amber-50/40 dark:bg-amber-500/[0.06] px-3 py-2.5"
-                >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <Badge variant="outline" className="text-[10px] font-bold uppercase bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30">
-                      {f.agency}
-                    </Badge>
-                    <span className="text-[12px] font-semibold text-slate-900 dark:text-slate-50">
-                      {f.name}
-                    </span>
-                  </div>
-                  <p className="text-[11.5px] text-slate-700 dark:text-slate-300 leading-relaxed">{f.action}</p>
+            <ul className="divide-y divide-border/60">
+              {data.flags.map((f, i) => (
+                <li key={i} className="py-2.5 first:pt-0 last:pb-0">
+                  <p className="flex flex-wrap items-center gap-2">
+                    <span className={cn('rounded-full px-2 py-px text-[11.5px] font-medium', TINT.soon)}>{f.agency}</span>
+                    <span className="text-[13px] font-medium">{f.name}</span>
+                  </p>
+                  <p className="mt-1 text-[12.5px] text-muted-foreground">{f.action}</p>
                 </li>
               ))}
             </ul>
           )}
         </div>
       </div>
-    </article>
+    </section>
   );
 }
 
-// ─── 5106 Self-Check ────────────────────────────────────────────────
+// ─── 5106 self-check ────────────────────────────────────────────────
 
 function FiveOneSixCard() {
   const [ein, setEin] = useState('');
@@ -520,98 +367,58 @@ function FiveOneSixCard() {
   const formatted = isValid ? `${normalized.slice(0, 2)}-${normalized.slice(2)}` : ein;
 
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
-      <div className="p-5">
-        <div className="flex items-start gap-3 mb-3">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 ring-1 ring-slate-400/60 dark:ring-slate-500/40 shadow-[0_8px_20px_-10px_rgba(71,85,105,0.5)] flex items-center justify-center shrink-0">
-            <Building2 className="h-[18px] w-[18px] text-slate-50" weight="bold" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[14px] font-semibold text-slate-900 dark:text-slate-50">
-              CBP 5106 — Importer ID
-            </h3>
-            <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Verify EIN format. CBP rejects filings whose IOR isn't on file.
-            </p>
-          </div>
-        </div>
+    <section aria-labelledby="importer-id-title" className={PANEL}>
+      <div className="px-5 py-3.5">
+        <h2 id="importer-id-title" className="text-[14px] font-semibold">CBP 5106: importer ID</h2>
+        <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+          Check the EIN format. CBP rejects filings whose importer of record is not on file.
+        </p>
+      </div>
+      <div className="border-t border-border/70 px-5 py-4">
         <Input
           value={ein}
           onChange={(e) => setEin(e.target.value)}
           placeholder="12-3456789"
+          aria-label="EIN"
+          autoComplete="off"
+          spellCheck={false}
           className="font-mono text-[13px]"
           maxLength={11}
         />
         {ein && (
-          <div className="mt-3">
+          <div className="mt-3" aria-live="polite">
             {isValid ? (
-              <div className="rounded-lg ring-1 ring-emerald-200/60 dark:ring-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-500/[0.06] px-3 py-2.5">
-                <p className="text-[12px] text-emerald-800 dark:text-emerald-300">
-                  <strong>Format OK</strong> — <span className="font-mono">{formatted}</span>
+              <div className={cn('rounded-lg px-3 py-2.5', BAND.done)}>
+                <p className="text-[13px]">
+                  <span className="font-semibold">Format OK:</span> <span className="font-mono">{formatted}</span>
                 </p>
-                <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-1 leading-relaxed">
-                  Confirm this EIN is on file at CBP via your broker or by filing Form 5106 — there is no public verification API.
+                <p className="mt-1 text-[12.5px] text-foreground/75">
+                  Confirm this EIN is on file at CBP through your broker or by filing Form 5106. There is no public verification API.
                 </p>
               </div>
             ) : (
-              <div className="rounded-lg ring-1 ring-rose-200/60 dark:ring-rose-500/20 bg-rose-50/40 dark:bg-rose-500/[0.06] px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
-                  <p className="text-[12px] text-rose-700 dark:text-rose-300">
-                    <strong>Invalid</strong> — EIN must be 9 digits (XX-XXXXXXX).
-                  </p>
-                </div>
-              </div>
+              <p className={cn('flex items-start gap-2 rounded-lg px-3 py-2.5 text-[13px]', BAND.urgent)}>
+                <AlertTriangle weight="duotone" className="mt-0.5 h-4 w-4 shrink-0 text-urgent" aria-hidden />
+                <span><span className="font-semibold">Invalid.</span> An EIN must be 9 digits (XX-XXXXXXX).</span>
+              </p>
             )}
           </div>
         )}
-        <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+        <Button asChild size="sm" variant="outline" className="mt-3">
           <a
             href="https://www.cbp.gov/document/forms/form-5106-create-update-importer-identity-form"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-primary hover:opacity-80"
           >
-            <FileBadge2 className="h-3.5 w-3.5" />
-            Download CBP Form 5106 <ArrowRight className="h-3 w-3" />
+            <FileBadge2 aria-hidden />Download CBP Form 5106<ArrowRight aria-hidden />
           </a>
-        </div>
+        </Button>
       </div>
-    </article>
+    </section>
   );
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
-
-function useCountUp(target: number, durationMs: number): number {
-  const [value, setValue] = useState(target);
-  const startRef = useRef<number | null>(null);
-  const startValueRef = useRef(target);
-  const reducedMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (reducedMotion) {
-      setValue(target);
-      return;
-    }
-    startRef.current = null;
-    startValueRef.current = value;
-    let raf = 0;
-    const tick = (ts: number) => {
-      if (startRef.current === null) startRef.current = ts;
-      const t = Math.min(1, (ts - startRef.current) / durationMs);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const next = Math.round(startValueRef.current + (target - startValueRef.current) * eased);
-      setValue(next);
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, durationMs, reducedMotion]);
-
-  return value;
-}
 
 function useDebounce<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value);

@@ -3,6 +3,8 @@ import { Sparkles, Loader2, AlertCircle, RefreshCw, Plane } from '@/components/i
 import { complianceApi } from '@/api/client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { BAND, FILL } from '@/components/dashboard/tones';
+import { cn } from '@/lib/utils';
 
 /**
  * AI Coach drawer — slides in from the right, streams a GPT-4o response.
@@ -32,17 +34,17 @@ interface CoachConfig {
 
 const CONFIGS: Record<CoachMode, CoachConfig> = {
   'rejection': {
-    eyebrow:     'AI Compliance Coach',
-    title:       'What went wrong + how to fix it',
-    description: "Plain-English explanation of CBP's rejection, with numbered next steps. Generated from the filing's data — no copies are stored by the AI provider.",
+    eyebrow:     'AI compliance coach',
+    title:       'What went wrong and how to fix it',
+    description: "Plain-English explanation of CBP's rejection, with numbered next steps. AI-generated from the filing's data. No copies are stored by the AI provider.",
     fetch:       (id) => complianceApi.rejectionCoach(id),
     loadingText: 'Analysing rejection…',
     HeroIcon:    Sparkles,
   },
   'draft-review': {
-    eyebrow:     'AI Pre-Flight Review',
-    title:       'Will this filing clear CBP?',
-    description: 'Scans every field plus UFLPA + PGA risks and surfaces what to fix before you submit. Combines rule-based checks with AI judgment.',
+    eyebrow:     'AI pre-flight review',
+    title:       'Is this filing ready to send?',
+    description: 'Checks every field, plus UFLPA and PGA risks, and lists what to fix before you send. Combines rule-based checks with AI judgment.',
     fetch:       (id) => complianceApi.draftReview(id),
     loadingText: 'Reviewing draft…',
     HeroIcon:    Plane,
@@ -64,11 +66,12 @@ export function RejectionCoachDrawer({
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
-  const abortRef = useRef(false);
+  // Each run gets a number; a run that is no longer the latest stops writing.
+  const runRef = useRef(0);
 
   useEffect(() => {
     if (!open || !filingId) return;
-    abortRef.current = false;
+    const run = ++runRef.current;
     setText('');
     setError(null);
     setStreaming(true);
@@ -76,10 +79,11 @@ export function RejectionCoachDrawer({
     (async () => {
       try {
         for await (const chunk of cfg.fetch(filingId)) {
-          if (abortRef.current) return;
+          if (runRef.current !== run) return;
           setText((t) => t + chunk);
         }
       } catch (err: any) {
+        if (runRef.current !== run) return;
         if (err?.code === 'ai_unavailable') {
           setError('The AI coach is not currently configured for this org.');
         } else if (err?.code === 'ai_rate_limited') {
@@ -88,32 +92,34 @@ export function RejectionCoachDrawer({
           setError(err?.message || 'AI request failed. Please try again.');
         }
       } finally {
-        if (!abortRef.current) setStreaming(false);
+        if (runRef.current === run) setStreaming(false);
       }
     })();
 
     return () => {
-      abortRef.current = true;
+      // A counter, not a DOM node: bumping the live value is what retires this run.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      runRef.current++;
     };
   }, [open, filingId, mode, cfg]);
 
   function regenerate() {
     if (!filingId) return;
-    abortRef.current = true;
+    const run = ++runRef.current;
     setText('');
     setError(null);
     setStreaming(true);
-    abortRef.current = false;
     (async () => {
       try {
         for await (const chunk of cfg.fetch(filingId)) {
-          if (abortRef.current) return;
+          if (runRef.current !== run) return;
           setText((t) => t + chunk);
         }
       } catch (err: any) {
+        if (runRef.current !== run) return;
         setError(err?.message || 'AI request failed.');
       } finally {
-        if (!abortRef.current) setStreaming(false);
+        if (runRef.current === run) setStreaming(false);
       }
     })();
   }
@@ -124,69 +130,63 @@ export function RejectionCoachDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-md p-0 overflow-hidden flex flex-col"
+        className="flex w-full flex-col overflow-hidden p-0 sm:max-w-md"
       >
         {/* Header */}
-        <SheetHeader className="px-6 pt-6 pb-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-b from-amber-50/60 to-transparent dark:from-amber-400/[0.06]">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-7 w-7 rounded-md bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 flex items-center justify-center">
-              <HeroIcon className="h-3.5 w-3.5 text-amber-950" weight="bold" />
-            </div>
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-400">
-              {cfg.eyebrow}
-            </span>
-          </div>
-          <SheetTitle className="text-[18px] font-semibold leading-tight text-slate-900 dark:text-slate-50">
+        <SheetHeader className="border-b border-border/70 px-6 pb-4 pt-6">
+          <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+            <HeroIcon className="h-3.5 w-3.5" aria-hidden />
+            {cfg.eyebrow}
+          </p>
+          <SheetTitle className="text-[18px] font-semibold leading-tight text-foreground">
             {cfg.title}
           </SheetTitle>
-          <SheetDescription className="text-[12.5px] text-slate-600 dark:text-slate-400 mt-1">
+          <SheetDescription className="mt-1 text-[12.5px] text-muted-foreground">
             {cfg.description}
           </SheetDescription>
         </SheetHeader>
 
         {/* Streaming body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-6 py-5" aria-live="polite">
           {error ? (
-            <div className="rounded-lg border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                <span className="text-[13px] font-semibold text-rose-700 dark:text-rose-300">
-                  Couldn't generate guidance
-                </span>
+            <div role="alert" className={cn('flex items-center gap-4 rounded-xl px-4 py-4', BAND.urgent)}>
+              <span aria-hidden className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-full text-white dark:text-background', FILL.urgent)}>
+                <AlertCircle weight="duotone" className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[16px] font-semibold leading-6">Couldn't generate guidance</p>
+                <p className="mt-0.5 text-[13px] text-foreground/75">{error}</p>
               </div>
-              <p className="text-[12.5px] text-rose-700/80 dark:text-rose-300/80">{error}</p>
             </div>
           ) : text.length === 0 && streaming ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-[12.5px] text-slate-500 dark:text-slate-400">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <div className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
                 {cfg.loadingText}
               </div>
               <div className="space-y-1.5">
                 {[0, 1, 2].map((i) => (
                   <div
                     key={i}
-                    className="h-3 bg-slate-100 dark:bg-slate-800 rounded animate-pulse"
+                    className="h-3 animate-pulse rounded bg-muted motion-reduce:animate-none"
                     style={{ width: `${75 - i * 15}%` }}
                   />
                 ))}
               </div>
             </div>
           ) : (
-            <article className="prose prose-sm dark:prose-invert max-w-none">
-              <div className="text-[13.5px] leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
-                {text}
-                {streaming && (
-                  <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-amber-500 animate-pulse rounded-sm align-text-bottom" />
-                )}
-              </div>
+            <article className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
+              {text}
+              {streaming && (
+                <span aria-hidden className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-muted-foreground align-text-bottom motion-reduce:animate-none" />
+              )}
             </article>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
-          <p className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-snug">
+        <div className="flex items-center justify-between gap-3 border-t border-border/70 px-6 py-4">
+          <p className="text-[12px] leading-snug text-muted-foreground">
             AI guidance is a hint, not legal advice. Verify against current CBP regulations.
           </p>
           <Button
@@ -194,9 +194,9 @@ export function RejectionCoachDrawer({
             size="sm"
             onClick={regenerate}
             disabled={streaming}
-            className="gap-1.5 shrink-0"
+            className="shrink-0"
           >
-            <RefreshCw className={`h-3 w-3 ${streaming ? 'animate-spin' : ''}`} />
+            <RefreshCw className={streaming ? 'animate-spin motion-reduce:animate-none' : undefined} aria-hidden />
             {streaming ? 'Generating…' : 'Regenerate'}
           </Button>
         </div>

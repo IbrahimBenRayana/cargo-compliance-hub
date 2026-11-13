@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Sparkles, ShieldCheck, BookOpen, Archive, Activity } from '@/components/icons';
 import { complianceApi } from '@/api/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+import { FILL, TINT } from '@/components/dashboard/tones';
+import { cn } from '@/lib/utils';
 import { OverviewTab } from '@/components/compliance/OverviewTab';
 import { RiskTab } from '@/components/compliance/RiskTab';
 import { RecordsTab } from '@/components/compliance/RecordsTab';
@@ -64,69 +64,48 @@ export default function CompliancePage() {
   const actionCount = queueData?.counts.total ?? 0;
 
   return (
-    <div className="space-y-5">
-      {/* Page header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className="mx-auto flex max-w-[1360px] flex-col gap-5 -mx-2 sm:mx-auto pb-24 sm:pb-12">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-400 mb-1.5">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Compliance Center
-          </div>
-          <h1 className="text-[28px] font-semibold leading-tight text-slate-900 dark:text-slate-50">
-            Your CBP compliance, at a glance.
-          </h1>
-          <p className="text-[13.5px] text-slate-600 dark:text-slate-400 mt-1 max-w-xl">
-            Health score, prioritised action queue, and post-acceptance tracking for every shipment your team imports into the United States.
+          <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.015em]">Compliance</h1>
+          <p className="text-[13px] text-muted-foreground">Your score, what needs attention, and what to watch after CBP accepts a filing.</p>
+        </div>
+        {aiStatus && (
+          <p className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+            <span aria-hidden className={cn('h-1.5 w-1.5 rounded-full', aiStatus.enabled ? FILL.done : FILL.calm)} />
+            AI coach {aiStatus.enabled ? 'on' : 'off'}
           </p>
-        </div>
+        )}
+      </header>
 
-        <div className="flex items-center gap-2 shrink-0 pt-1">
-          {aiStatus?.enabled ? (
-            <Badge variant="outline" className="gap-1.5 bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30 text-[10.5px] font-semibold uppercase tracking-[0.08em]">
-              <Sparkles className="h-3 w-3" />
-              AI Coach on
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
-              AI Coach off
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <Tabs value={active} onValueChange={(v) => setTab(v as TabId)} className="space-y-4">
-        <TabsList className="bg-transparent p-0 h-auto border-b border-slate-200 dark:border-slate-800 w-full justify-start rounded-none gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&>*]:shrink-0">
-          {TABS.map((t) => {
-            const isOverview = t.id === 'overview';
-            return (
-              <TabsTrigger
-                key={t.id}
-                value={t.id}
-                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-4 py-2.5 text-[13px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
-              >
-                <t.icon className="h-3.5 w-3.5 mr-1.5" />
-                {t.label}
-                {isOverview && actionCount > 0 && (
-                  <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 text-[10px] font-bold tabular-nums px-1.5 min-w-[18px] h-[18px]">
-                    {actionCount > 99 ? '99+' : actionCount}
-                  </span>
-                )}
-              </TabsTrigger>
-            );
-          })}
+      <Tabs value={active} onValueChange={(v) => setTab(v as TabId)} className="flex flex-col gap-5">
+        <TabsList className="h-auto w-full justify-start gap-5 overflow-x-auto overflow-y-hidden rounded-none border-b border-border/70 bg-transparent p-0 [scrollbar-width:none] [&>*]:shrink-0">
+          {TABS.map((t) => (
+            <TabsTrigger
+              key={t.id}
+              value={t.id}
+              className="-mb-px rounded-none border-b-2 border-transparent px-0 pb-2.5 pt-1 text-[13px] font-medium text-muted-foreground shadow-none transition-colors duration-150 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none can-hover:hover:text-foreground"
+            >
+              {t.label}
+              {t.id === 'overview' && actionCount > 0 && (
+                <span className={cn('ml-1.5 rounded-md px-1.5 py-px text-[11.5px] font-medium tabular-nums', TINT.urgent)}>
+                  {actionCount > 99 ? '99+' : actionCount}
+                </span>
+              )}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="overview" className="mt-4">
+        <TabsContent value="overview" className="mt-0">
           <OverviewTab onOpenAiCoach={openAiCoach} />
         </TabsContent>
-        <TabsContent value="risk" className="mt-4">
+        <TabsContent value="risk" className="mt-0">
           <RiskTab />
         </TabsContent>
-        <TabsContent value="classification" className="mt-4">
+        <TabsContent value="classification" className="mt-0">
           <ClassificationTab />
         </TabsContent>
-        <TabsContent value="records" className="mt-4">
+        <TabsContent value="records" className="mt-0">
           <RecordsTab />
         </TabsContent>
       </Tabs>
@@ -146,10 +125,9 @@ export default function CompliancePage() {
 
 type TabId = 'overview' | 'risk' | 'classification' | 'records';
 
-const TABS: Array<{ id: TabId; label: string; icon: React.FC<{ className?: string }> }> = [
-  { id: 'overview',       label: 'Overview',        icon: Activity },
-  { id: 'risk',           label: 'Risk & Watch',    icon: ShieldCheck },
-  { id: 'classification', label: 'Classification',  icon: BookOpen },
-  { id: 'records',        label: 'Records',         icon: Archive },
+const TABS: Array<{ id: TabId; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'risk', label: 'Risk and watch' },
+  { id: 'classification', label: 'Classification' },
+  { id: 'records', label: 'Records' },
 ];
-
