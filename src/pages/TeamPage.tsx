@@ -94,7 +94,8 @@ export default function TeamPage() {
   const members = membersData?.data ?? [];
   const invitations = invitationsData?.data ?? [];
   const isOwnerOrAdmin = currentUser?.role === 'owner' || currentUser?.role === 'admin';
-  const pendingInvites = invitations.filter(i => i.status === 'pending').length;
+  // A pending invitation past its expiry shows as expired, so it is not counted as pending.
+  const pendingInvites = invitations.filter((i) => i.status === 'pending' && new Date(i.expiresAt) >= new Date()).length;
 
   const handleSendInvite = async () => {
     if (!inviteEmail.trim()) {
