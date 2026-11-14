@@ -4,10 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
-} from '@/components/ui/card';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -18,32 +14,43 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import {
-  Building2, UserPlus, Loader2, MoreHorizontal, CheckCircle2, Clock,
-  Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck, Radio, Landmark,
-  Activity, DollarSign, FileText,
+  UserPlus, Loader2, MoreHorizontal, Mail, ArrowRightLeft, Search, Trash2, UserX, UserCheck,
+  Radio, Landmark, Activity, DollarSign, FileText,
 } from '@/components/icons';
 import { CbpSetupDialog } from '@/components/admin/CbpSetupDialog';
 import { PricingDialog } from '@/components/admin/PricingDialog';
 import { UsageInvoicesDialog } from '@/components/admin/UsageInvoicesDialog';
+import { TINT, FILL, type Tone } from '@/components/dashboard/tones';
 import { adminApi } from '@/api/client';
 import type { AdminOrganization, AdminUserLookup } from '@/api/client';
 import { PLAN_META } from '@/lib/planMeta';
 import { money } from '@/lib/pricing';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+const PAGE = 'mx-auto flex max-w-[1360px] flex-col gap-5 -mx-2 sm:mx-auto pb-24 sm:pb-12';
+const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
+const TH = 'px-4 py-2.5 text-left text-[12px] font-medium text-muted-foreground';
+const TD = 'px-4 py-2.5';
+
+function Pill({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+  return (
+    <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-medium', TINT[tone])}>
+      <span aria-hidden className={cn('h-1.5 w-1.5 shrink-0 rounded-full', FILL[tone])} />{children}
+    </span>
+  );
+}
+
 function formatDate(ts: string | null) {
-  if (!ts) return '—';
+  if (!ts) return 'not recorded';
   return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/** Display name for a plan id — prefer the app's PLAN_META label, fall back to
+/** Display name for a plan id: prefer the app's PLAN_META label, fall back to
  *  the server-supplied name (covers the private `enterprise` tier). */
 function planLabel(planId: string | undefined, fallbackName: string | undefined) {
   if (planId && PLAN_META[planId]) return PLAN_META[planId].name;
-  return fallbackName ?? '—';
+  return fallbackName ?? 'Unnamed plan';
 }
 
 /** Short price note for a plan in the pickers. Entry prices are per org. */
@@ -107,7 +114,7 @@ function UserLookupCard() {
   const deleteUser = useMutation({
     mutationFn: (id: string) => adminApi.deleteUser(id),
     onSuccess: (data) => {
-      toast.success(`Account deleted — ${data.releasedEmail} can now be invited anywhere.`);
+      toast.success(`Account deleted. ${data.releasedEmail} can now be invited anywhere.`);
       refresh();
     },
     onError: (err: any) => toast.error(err.body?.error || 'Delete failed'),
@@ -130,67 +137,66 @@ function UserLookupCard() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Find a user</CardTitle>
-        <CardDescription>
-          Look up which organization holds an email address — useful when an invitation fails
+    <section className={PANEL}>
+      <div className="px-5 py-3.5">
+        <h2 className="text-[14px] font-semibold">Find a user</h2>
+        <p className="text-[13px] text-muted-foreground">
+          Look up which organization holds an email address. Use it when an invitation fails
           because the address is already taken somewhere on the platform.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        </p>
+      </div>
+      <div className="space-y-4 border-t border-border/70 px-5 py-4">
         <form onSubmit={handleSearch} className="flex gap-2">
           <Input
             type="email"
             placeholder="person@company.com"
+            aria-label="Email address to look up"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="max-w-sm"
+            className="min-w-0 max-w-sm"
           />
-          <Button type="submit" variant="secondary" disabled={lookup.isPending || !email.trim()}>
+          <Button type="submit" variant="outline" disabled={lookup.isPending || !email.trim()}>
             {lookup.isPending
-              ? <Loader2 className="h-4 w-4 animate-spin" />
-              : <Search className="h-4 w-4" />}
-            <span className="ml-2">Search</span>
+              ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
+              : <Search aria-hidden />}
+            Search
           </Button>
         </form>
 
         {result && !user && (
-          <p className="text-sm text-muted-foreground">
-            No account holds <span className="font-medium text-foreground">{result.searched}</span> —
-            this address is free to invite.
+          <p className="text-[13px] text-muted-foreground">
+            No account holds <span className="break-all font-mono text-foreground">{result.searched}</span>.
+            This address is free to invite.
           </p>
         )}
 
         {user && (
-          <div className="rounded-lg border p-4 space-y-3">
+          <div className="min-w-0 space-y-3 border-t border-border/70 pt-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">
+              <span className="text-[14px] font-medium">
                 {[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email}
               </span>
-              <span className="text-sm text-muted-foreground">{user.email}</span>
-              <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                {user.isActive ? 'Active' : 'Deactivated'}
-              </Badge>
-              <Badge variant="outline">{user.role}</Badge>
-              {user.isPlatformAdmin && <Badge variant="outline">Platform admin</Badge>}
-              {!user.emailVerified && <Badge variant="secondary">Email unverified</Badge>}
+              <span className="break-all font-mono text-[12.5px] text-muted-foreground">{user.email}</span>
+              <Pill tone={user.isActive ? 'done' : 'calm'}>{user.isActive ? 'Active' : 'Deactivated'}</Pill>
+              <Pill tone="calm">{user.role}</Pill>
+              {user.isPlatformAdmin && <Pill tone="info">Platform admin</Pill>}
+              {!user.emailVerified && <Pill tone="soon">Email unverified</Pill>}
             </div>
-            <div className="text-sm text-muted-foreground space-y-1">
+            <div className="space-y-1 text-[13px] text-muted-foreground">
               <div>
-                Organization: <span className="text-foreground font-medium">{user.organization.name}</span>
+                Organization: <span className="font-medium text-foreground">{user.organization.name}</span>
               </div>
-              <div>Created {formatDate(user.createdAt)} · Last login {formatDate(user.lastLoginAt)}</div>
-              <div>
-                {activityTotal === 0
-                  ? 'No filings or other work product — safe to delete.'
-                  : `Has work product (${Object.entries(user.activity)
-                      .filter(([, n]) => n > 0)
-                      .map(([k, n]) => `${n} ${k}`)
-                      .join(', ')}) — deactivate instead of deleting.`}
-              </div>
+              <div className="tabular-nums">Created {formatDate(user.createdAt)} · Last login {formatDate(user.lastLoginAt)}</div>
             </div>
-            <div className="flex gap-2 pt-1">
+            <p className={cn('rounded-lg px-4 py-3 text-[13px]', activityTotal === 0 ? 'bg-info-tint text-info' : 'bg-soon-tint text-soon')}>
+              {activityTotal === 0
+                ? 'No filings or other work product. Safe to delete.'
+                : `Has work product (${Object.entries(user.activity)
+                    .filter(([, n]) => n > 0)
+                    .map(([k, n]) => `${n} ${k}`)
+                    .join(', ')}). Deactivate instead of deleting.`}
+            </p>
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant="outline"
@@ -198,26 +204,26 @@ function UserLookupCard() {
                 disabled={setActive.isPending}
               >
                 {user.isActive
-                  ? <><UserX className="mr-2 h-3.5 w-3.5" />Deactivate</>
-                  : <><UserCheck className="mr-2 h-3.5 w-3.5" />Reactivate</>}
+                  ? <><UserX aria-hidden />Deactivate</>
+                  : <><UserCheck aria-hidden />Reactivate</>}
               </Button>
               <Button
                 size="sm"
-                variant="destructive"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={() => handleDelete(user)}
                 disabled={deleteUser.isPending || activityTotal > 0 || user.isPlatformAdmin}
                 title={activityTotal > 0 ? 'Users with filings or documents cannot be hard-deleted' : undefined}
               >
                 {deleteUser.isPending
-                  ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                  : <Trash2 className="mr-2 h-3.5 w-3.5" />}
+                  ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
+                  : <Trash2 aria-hidden />}
                 Delete permanently
               </Button>
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -287,7 +293,7 @@ export function AdminClientsPage() {
         planId: form.planId,
         maxUsers: maxUsersNum,
       });
-      toast.success(`Account created — a setup email was sent to ${form.ownerEmail.trim()}`);
+      toast.success(`Account created. A setup email was sent to ${form.ownerEmail.trim()}`);
       setForm(EMPTY_FORM);
       setProvisionOpen(false);
       queryClient.invalidateQueries({ queryKey: ['admin', 'organizations'] });
@@ -330,284 +336,248 @@ export function AdminClientsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className={PAGE}>
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
-          <p className="text-muted-foreground">Provision and manage client accounts</p>
+          <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.015em]">Clients</h1>
+          <p className="text-[13px] text-muted-foreground">Provision and manage client accounts.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link to="/admin/cbp">
-              <Activity className="mr-2 h-3.5 w-3.5" />
-              CBP traffic
-            </Link>
+            <Link to="/admin/cbp"><Activity aria-hidden />CBP traffic</Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
-            <Link to="/admin/cert">
-              <Radio className="mr-2 h-3.5 w-3.5" />
-              Certification console
-            </Link>
+            <Link to="/admin/cert"><Radio aria-hidden />Certification console</Link>
           </Button>
           <Dialog open={provisionOpen} onOpenChange={setProvisionOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Provision client
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Provision a client account</DialogTitle>
-              <DialogDescription>
-                Creates the organization and owner account. The owner receives an email
-                with a link to set their password.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="company-name">Company name</Label>
-                <Input
-                  id="company-name"
-                  placeholder="Acme Imports LLC"
-                  value={form.companyName}
-                  onChange={(e) => setField('companyName', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ior-number">IOR number <span className="text-muted-foreground">(optional)</span></Label>
-                <Input
-                  id="ior-number"
-                  placeholder="12-3456789"
-                  value={form.iorNumber}
-                  onChange={(e) => setField('iorNumber', e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="owner-first">Owner first name</Label>
+            <DialogTrigger asChild>
+              <Button size="sm"><UserPlus aria-hidden />Provision client</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Provision a client account</DialogTitle>
+                <DialogDescription>
+                  Creates the organization and owner account. The owner receives an email
+                  with a link to set their password.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="company-name">Company name</Label>
                   <Input
-                    id="owner-first"
-                    placeholder="Jane"
-                    value={form.ownerFirstName}
-                    onChange={(e) => setField('ownerFirstName', e.target.value)}
+                    id="company-name"
+                    placeholder="Acme Imports LLC"
+                    value={form.companyName}
+                    onChange={(e) => setField('companyName', e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="owner-last">Owner last name</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ior-number">IOR number <span className="font-normal text-muted-foreground">(optional)</span></Label>
                   <Input
-                    id="owner-last"
-                    placeholder="Doe"
-                    value={form.ownerLastName}
-                    onChange={(e) => setField('ownerLastName', e.target.value)}
+                    id="ior-number"
+                    placeholder="12-3456789"
+                    className="font-mono"
+                    value={form.iorNumber}
+                    onChange={(e) => setField('iorNumber', e.target.value)}
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="owner-email">Owner email</Label>
-                <Input
-                  id="owner-email"
-                  type="email"
-                  placeholder="jane@acme.com"
-                  value={form.ownerEmail}
-                  onChange={(e) => setField('ownerEmail', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Plan</Label>
-                <Select value={form.planId} onValueChange={(v) => setField('planId', v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a plan" />
-                  </SelectTrigger>
-                  <SelectContent>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="min-w-0 space-y-1.5">
+                    <Label htmlFor="owner-first">Owner first name</Label>
+                    <Input
+                      id="owner-first"
+                      placeholder="Jane"
+                      value={form.ownerFirstName}
+                      onChange={(e) => setField('ownerFirstName', e.target.value)}
+                    />
+                  </div>
+                  <div className="min-w-0 space-y-1.5">
+                    <Label htmlFor="owner-last">Owner last name</Label>
+                    <Input
+                      id="owner-last"
+                      placeholder="Doe"
+                      value={form.ownerLastName}
+                      onChange={(e) => setField('ownerLastName', e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="owner-email">Owner email</Label>
+                  <Input
+                    id="owner-email"
+                    type="email"
+                    placeholder="jane@acme.com"
+                    value={form.ownerEmail}
+                    onChange={(e) => setField('ownerEmail', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="provision-plan">Plan</Label>
+                  <Select value={form.planId} onValueChange={(v) => setField('planId', v)}>
+                    <SelectTrigger id="provision-plan">
+                      <SelectValue placeholder="Select a plan" />
+                    </SelectTrigger>
+                    <SelectContent>
                     {plans.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        <span className="flex items-center gap-2">
-                          <span>{planLabel(p.id, p.name)}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {planPrice(p)}
-                          </span>
-                        </span>
+                        <span className="font-medium">{planLabel(p.id, p.name)}</span>
+                        <span className="ml-2 text-[12.5px] tabular-nums text-muted-foreground">{planPrice(p)}</span>
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="max-users">Max users <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                  <Input
+                    id="max-users"
+                    type="number"
+                    min={1}
+                    placeholder="Default"
+                    value={form.maxUsers}
+                    onChange={(e) => setField('maxUsers', e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="max-users">Max users <span className="text-muted-foreground">(optional)</span></Label>
-                <Input
-                  id="max-users"
-                  type="number"
-                  min={1}
-                  placeholder="Default"
-                  value={form.maxUsers}
-                  onChange={(e) => setField('maxUsers', e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setProvisionOpen(false)}>Cancel</Button>
-              <Button onClick={handleProvision} disabled={provision.isPending}>
-                {provision.isPending
-                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  : <UserPlus className="mr-2 h-4 w-4" />}
-                Create account
-              </Button>
-            </DialogFooter>
-          </DialogContent>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setProvisionOpen(false)}>Cancel</Button>
+                <Button onClick={handleProvision} disabled={provision.isPending}>
+                  {provision.isPending
+                    ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
+                    : <UserPlus aria-hidden />}
+                  Create account
+                </Button>
+              </DialogFooter>
+            </DialogContent>
           </Dialog>
         </div>
-      </div>
+      </header>
 
       {/* Clients table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Client accounts</CardTitle>
-          <CardDescription>Organizations provisioned on the platform.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {orgsLoading ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              Loading clients…
-            </div>
-          ) : organizations.length === 0 ? (
-            <div className="text-center py-12">
-              <Building2 className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-muted-foreground">No clients yet</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => setProvisionOpen(true)}>
-                <UserPlus className="mr-2 h-3.5 w-3.5" />
-                Provision your first client
-              </Button>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>CBP</TableHead>
-                  <TableHead>Users</TableHead>
-                  <TableHead>Filings</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="w-[50px]" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+      <section className={PANEL}>
+        <div className="px-5 py-3.5">
+          <h2 className="text-[14px] font-semibold">Client accounts</h2>
+          <p className="text-[13px] text-muted-foreground">Organizations provisioned on the platform.</p>
+        </div>
+        {orgsLoading ? (
+          <div className="flex items-center justify-center gap-2 border-t border-border/70 px-5 py-12 text-[13px] text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />
+            Loading clients…
+          </div>
+        ) : organizations.length === 0 ? (
+          <div className="border-t border-border/70 px-5 py-10 text-center">
+            <p className="text-[14px] font-medium">No clients yet</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => setProvisionOpen(true)}>
+              <UserPlus aria-hidden />
+              Provision your first client
+            </Button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto border-t border-border/70">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-border/70">
+                  <th scope="col" className={TH}>Company</th>
+                  <th scope="col" className={TH}>Plan</th>
+                  <th scope="col" className={TH}>Owner</th>
+                  <th scope="col" className={TH}>CBP</th>
+                  <th scope="col" className={cn(TH, 'max-md:hidden')}>Users</th>
+                  <th scope="col" className={cn(TH, 'max-md:hidden')}>Filings</th>
+                  <th scope="col" className={cn(TH, 'max-md:hidden')}>Created</th>
+                  <th scope="col" aria-label="Actions" className="w-12" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
                 {organizations.map((org) => (
-                  <TableRow key={org.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                          <Building2 className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{org.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {org.iorNumber ? `IOR ${org.iorNumber}` : 'No IOR'}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
+                  <tr key={org.id} className="align-top">
+                    <td className={TD}>
+                      <p className="font-medium">{org.name}</p>
+                      <p className="text-[12.5px] text-muted-foreground">
+                        {org.iorNumber ? <>IOR <span className="font-mono">{org.iorNumber}</span></> : 'No IOR'}
+                      </p>
+                    </td>
+                    <td className={TD}>
                       {org.plan ? (
                         <div className="space-y-1">
-                          <Badge variant="secondary" className="text-xs">
-                            {planLabel(org.plan.id, org.plan.name)}
-                          </Badge>
-                          <p className="text-[11px] text-muted-foreground tabular-nums">{pricingSummary(org)}</p>
+                          <p className="font-medium">{planLabel(org.plan.id, org.plan.name)}</p>
+                          <p className="text-[12px] tabular-nums text-muted-foreground">{pricingSummary(org)}</p>
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">No plan</span>
+                        <span className="text-muted-foreground">No plan</span>
                       )}
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className={TD}>
                       {org.owner ? (
                         <div className="space-y-1">
-                          <p className="text-sm">{org.owner.email}</p>
-                          {org.owner.emailVerified ? (
-                            <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                              Verified
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-[10px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Pending setup
-                            </Badge>
-                          )}
+                          <p className="font-mono text-[12.5px]">{org.owner.email}</p>
+                          {org.owner.emailVerified
+                            ? <Pill tone="done">Verified</Pill>
+                            : <Pill tone="soon">Pending setup</Pill>}
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">No owner</span>
                       )}
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className={TD}>
                       {org.cbp?.filerCode ? (
                         <div className="space-y-1">
-                          <p className="font-mono text-sm">{org.cbp.filerCode}</p>
-                          <Badge
-                            variant="secondary"
-                            className={`text-[10px] ${org.cbp.serviceCenterApprovedAt
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'}`}
-                          >
+                          <p className="font-mono">{org.cbp.filerCode}</p>
+                          <Pill tone={org.cbp.serviceCenterApprovedAt ? 'done' : 'soon'}>
                             {org.cbp.serviceCenterApprovedAt ? 'Queue approved' : 'Awaiting rep'}
-                          </Badge>
+                          </Pill>
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">ISF via S7P only</span>
+                        <span className="whitespace-nowrap text-muted-foreground">ISF via S7P only</span>
                       )}
-                    </TableCell>
-                    <TableCell className="text-sm tabular-nums">
+                    </td>
+                    <td className={cn(TD, 'whitespace-nowrap tabular-nums max-md:hidden')}>
                       {org.userCount} / {org.maxUsers}
-                    </TableCell>
-                    <TableCell className="text-sm tabular-nums">{org.filingCount}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDate(org.createdAt)}</TableCell>
-                    <TableCell>
+                    </td>
+                    <td className={cn(TD, 'tabular-nums max-md:hidden')}>{org.filingCount}</td>
+                    <td className={cn(TD, 'whitespace-nowrap tabular-nums text-muted-foreground max-md:hidden')}>{formatDate(org.createdAt)}</td>
+                    <td className="px-2 py-1.5">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${org.name}`}>
-                            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                            <MoreHorizontal className="h-4 w-4" aria-hidden />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => setCbpDialogOrg(org)}>
-                            <Landmark className="h-3.5 w-3.5 mr-2" />
+                            <Landmark className="mr-2 h-4 w-4" aria-hidden />
                             CBP setup…
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openPlanDialog(org)}>
-                            <ArrowRightLeft className="h-3.5 w-3.5 mr-2" />
+                            <ArrowRightLeft className="mr-2 h-4 w-4" aria-hidden />
                             Change plan
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setPricingDialogOrg(org)} disabled={!org.plan}>
-                            <DollarSign className="h-3.5 w-3.5 mr-2" />
-                            Pricing &amp; billing…
+                            <DollarSign className="mr-2 h-4 w-4" aria-hidden />
+                            Pricing and billing…
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setUsageDialogOrg(org)} disabled={!org.plan}>
-                            <FileText className="h-3.5 w-3.5 mr-2" />
-                            Usage &amp; invoices…
+                            <FileText className="mr-2 h-4 w-4" aria-hidden />
+                            Usage and invoices…
                           </DropdownMenuItem>
                           {org.owner && (
                             <DropdownMenuItem
                               onClick={() => handleResendSetup(org)}
                               disabled={resendSetup.isPending}
                             >
-                              <Mail className="h-3.5 w-3.5 mr-2" />
+                              <Mail className="mr-2 h-4 w-4" aria-hidden />
                               Resend setup email
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <UserLookupCard />
 
@@ -625,23 +595,19 @@ export function AdminClientsPage() {
               pay is set under Pricing. An unpaid charge stays owed after a plan change.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label>Plan</Label>
+          <div className="space-y-1.5 py-2">
+            <Label htmlFor="change-plan">Plan</Label>
             <Select value={selectedPlan} onValueChange={setSelectedPlan}>
-              <SelectTrigger>
+              <SelectTrigger id="change-plan">
                 <SelectValue placeholder="Select a plan" />
               </SelectTrigger>
               <SelectContent>
-                {plans.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    <span className="flex items-center gap-2">
-                      <span>{planLabel(p.id, p.name)}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {planPrice(p)}
-                      </span>
-                    </span>
-                  </SelectItem>
-                ))}
+              {plans.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  <span className="font-medium">{planLabel(p.id, p.name)}</span>
+                  <span className="ml-2 text-[12.5px] tabular-nums text-muted-foreground">{planPrice(p)}</span>
+                </SelectItem>
+              ))}
               </SelectContent>
             </Select>
           </div>
@@ -651,7 +617,7 @@ export function AdminClientsPage() {
               onClick={handleChangePlan}
               disabled={changePlan.isPending || !selectedPlan || selectedPlan === planDialogOrg?.plan?.id}
             >
-              {changePlan.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {changePlan.isPending && <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />}
               Save plan
             </Button>
           </DialogFooter>

@@ -5,14 +5,21 @@ import { Download, ExternalLink, FileText, Loader2 } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { adminApi } from '@/api/client';
 import type { AdminOrganization } from '@/api/client';
 import { money } from '@/lib/pricing';
+import { cn } from '@/lib/utils';
+import { FILL, TINT, type Tone } from '@/components/dashboard/tones';
+
+const TH = 'py-2 text-left text-[12px] font-medium text-muted-foreground';
+
+/** Display only: the colour of an invoice status pill. Unknown statuses stay neutral. */
+const STATUS_TONE: Record<string, Tone> = {
+  paid: 'done', open: 'info', error: 'urgent', uncollectible: 'urgent',
+};
 
 /** The last full UTC month, as YYYY-MM. */
 function lastMonth(): string {
@@ -75,7 +82,7 @@ export function UsageInvoicesDialog({ org, onClose }: { org: AdminOrganization |
     <Dialog open={!!org} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Usage &amp; invoices</DialogTitle>
+          <DialogTitle>Usage and invoices</DialogTitle>
           <DialogDescription>
             {org?.name}: filings CBP accepted in a month (UTC).
             {invoiced ? ' Draft the monthly invoice here, then review and finalize it in Stripe.' : ' This client pays by card per filing.'}
@@ -86,79 +93,116 @@ export function UsageInvoicesDialog({ org, onClose }: { org: AdminOrganization |
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="usage-month">Month</Label>
-              <Input id="usage-month" type="month" value={period} onChange={(e) => setPeriod(e.target.value)} className="w-44" />
+              <Input id="usage-month" type="month" value={period} onChange={(e) => setPeriod(e.target.value)} className="w-44 tabular-nums" />
             </div>
-            <Button variant="outline" size="sm" onClick={() => download.mutate()} disabled={!validPeriod || download.isPending}>
-              {download.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            <Button variant="outline" onClick={() => download.mutate()} disabled={!validPeriod || download.isPending}>
+              {download.isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Download aria-hidden />}
               Usage CSV
             </Button>
           </div>
 
           {invoiced && (
-            <div className="rounded-lg border p-3 text-sm">
+            <section aria-label="Usage for the month" className="border-t border-border/70 pt-4 text-[13px]">
               {preview.isLoading ? (
-                <div className="flex items-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Rating the month…</div>
+                <div className="flex items-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> Rating the month…</div>
               ) : p ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{p.closed ? 'Usage invoice would bill' : 'Month to date (not closed yet)'}</span>
-                    <span className="text-muted-foreground tabular-nums">{p.isfCount} ISFs · {p.accruedShipments} shipments</span>
+                <>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+                    <h3 className="text-[13px] font-semibold">{p.closed ? 'Usage invoice would bill' : 'Month to date (not closed yet)'}</h3>
+                    <span className="text-[12px] tabular-nums text-muted-foreground">{p.isfCount} ISFs · {p.accruedShipments} shipments</span>
                   </div>
-                  {p.lines.length === 0 && <p className="text-muted-foreground">Nothing to invoice.</p>}
-                  {p.lines.map((l) => (
-                    <div key={l.code} className="flex items-center justify-between gap-4">
-                      <span className="text-muted-foreground">{l.description}</span>
-                      <span className="tabular-nums">{money(l.amountCents)}</span>
-                    </div>
-                  ))}
-                  <Separator />
-                  <div className="flex items-center justify-between font-medium">
-                    <span>Total</span>
-                    <span className="tabular-nums">{money(p.totalCents)}</span>
+                  {p.lines.length === 0 && <p className="mt-2 text-muted-foreground">Nothing to invoice.</p>}
+                  <div className="mt-1 overflow-x-auto">
+                    <table className="w-full text-[13px]">
+                      <thead className="sr-only">
+                        <tr><th scope="col">Line</th><th scope="col">Amount</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/60">
+                        {p.lines.map((l) => (
+                          <tr key={l.code}>
+                            <td className="py-2 pr-4 text-muted-foreground">{l.description}</td>
+                            <td className="py-2 text-right tabular-nums">{money(l.amountCents)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-border/70 font-medium">
+                          <th scope="row" className="py-2 pr-4 text-left font-medium">Total</th>
+                          <td className="py-2 text-right tabular-nums">{money(p.totalCents)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
-                </div>
+                </>
               ) : null}
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => draft.mutate('usage')} disabled={draft.isPending || !p?.closed || !p?.totalCents}>
-                  {draft.isPending && draft.variables === 'usage' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                  {draft.isPending && draft.variables === 'usage' ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <FileText aria-hidden />}
                   Draft usage invoice
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => draft.mutate('prepay')} disabled={draft.isPending || !org?.billing?.monthlyMinimumCents}>
-                  {draft.isPending && draft.variables === 'prepay' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {draft.isPending && draft.variables === 'prepay' && <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />}
                   Bill this month's minimum in advance
                 </Button>
               </div>
-              {!p?.closed && <p className="mt-2 text-xs text-muted-foreground">A usage invoice can be drafted once the month has ended.</p>}
-            </div>
+              {!p?.closed && <p className="mt-2 text-[12px] text-muted-foreground">A usage invoice can be drafted once the month has ended.</p>}
+            </section>
           )}
 
           {invoiced && (
-            <div className="space-y-2">
-              <Label>Invoices</Label>
+            <section aria-labelledby="usage-invoices-title" className="border-t border-border/70 pt-4">
+              <h3 id="usage-invoices-title" className="text-[13px] font-semibold">Invoices</h3>
               {(invoices.data?.invoices ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">None yet.</p>
+                <p className="mt-2 text-[13px] text-muted-foreground">None yet.</p>
               ) : (
-                <ul className="divide-y rounded-lg border text-sm">
-                  {invoices.data!.invoices.map((i) => (
-                    <li key={i.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                      <span>
-                        {i.period} · {i.kind === 'prepay' ? 'minimum in advance' : 'usage'}
-                        {i.lastError && <span className="block text-xs text-destructive">{i.lastError}</span>}
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <span className="tabular-nums">{money(i.totalCents)}</span>
-                        <Badge variant="secondary" className="text-[10px]">{i.status}</Badge>
-                        {i.dashboardUrl && (
-                          <a href={i.dashboardUrl} target="_blank" rel="noreferrer" aria-label="Open in Stripe" className="text-muted-foreground hover:text-foreground">
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-1 overflow-x-auto">
+                  <table className="w-full text-[13px]">
+                    <thead>
+                      <tr className="border-b border-border/70">
+                        <th scope="col" className={TH}>Month</th>
+                        <th scope="col" className={cn(TH, 'px-3')}>Type</th>
+                        <th scope="col" className={cn(TH, 'text-right')}>Amount</th>
+                        <th scope="col" className={cn(TH, 'pl-3')}>Status</th>
+                        <th scope="col" aria-label="Stripe" className="w-8" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {invoices.data!.invoices.map((i) => {
+                        const tone = STATUS_TONE[i.status] ?? 'calm';
+                        return (
+                          <tr key={i.id}>
+                            <td className="whitespace-nowrap py-2 align-top tabular-nums">{i.period}</td>
+                            <td className="px-3 py-2 align-top">
+                              {i.kind === 'prepay' ? 'Minimum in advance' : 'Usage'}
+                              {i.lastError && <span className="block text-xs text-urgent">{i.lastError}</span>}
+                            </td>
+                            <td className="py-2 text-right align-top tabular-nums">{money(i.totalCents)}</td>
+                            <td className="py-2 pl-3 align-top">
+                              <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-medium capitalize', TINT[tone])}>
+                                <span aria-hidden className={cn('h-1.5 w-1.5 shrink-0 rounded-full', FILL[tone])} />{i.status}
+                              </span>
+                            </td>
+                            <td className="py-2 pl-2 text-right align-top">
+                              {i.dashboardUrl && (
+                                <a
+                                  href={i.dashboardUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  aria-label="Open in Stripe"
+                                  className="inline-flex rounded-md p-1 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring can-hover:hover:text-foreground"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                                </a>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
-            </div>
+            </section>
           )}
         </div>
       </DialogContent>

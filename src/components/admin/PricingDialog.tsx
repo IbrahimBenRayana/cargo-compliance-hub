@@ -109,6 +109,9 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
     : invoiced && bandTooLow ? 'The lower rate must start after the included ISFs.'
     : invoiced && bandOrder ? `The lower rate must start before the next band (ISF ${laterBands[0].fromIsf}).` : undefined;
 
+  // Display only: in invoiced mode with entry prices set and no minimum, the summary has no lines.
+  const showSummary = !entriesSet || !invoiced || minimumCents != null;
+
   const save = useMutation({
     mutationFn: () =>
       adminApi.setPricing(org!.id, {
@@ -131,20 +134,20 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
     <Dialog open={!!org} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Pricing &amp; billing</DialogTitle>
+          <DialogTitle>Pricing and billing</DialogTitle>
           <DialogDescription>
             {org?.name}'s own prices, for filings CBP accepts. Changes apply to filings accepted from now on.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
+        <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label>How they pay</Label>
             <ToggleGroup type="single" value={mode} onValueChange={(v) => chooseMode(v as 'card' | 'invoiced' | '')} className="justify-start">
-              <ToggleGroupItem value="card" variant="outline" size="sm">Card, per filing</ToggleGroupItem>
-              <ToggleGroupItem value="invoiced" variant="outline" size="sm">Invoiced monthly (ACH)</ToggleGroupItem>
+              <ToggleGroupItem value="card" variant="outline" size="sm" className="data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Card, per filing</ToggleGroupItem>
+              <ToggleGroupItem value="invoiced" variant="outline" size="sm" className="data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Invoiced monthly (ACH)</ToggleGroupItem>
             </ToggleGroup>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[12px] text-muted-foreground">
               {invoiced
                 ? 'No card charges. Accepted filings add up to one Stripe invoice a month, debited from their bank account.'
                 : 'Each accepted filing is charged to their card right away.'}
@@ -165,13 +168,14 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
                 <Label htmlFor="bill-start">Billing starts</Label>
                 <Input id="bill-start" type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
               </div>
-              <p className="text-xs text-muted-foreground sm:col-span-3">
+              <p className="text-[12px] text-muted-foreground sm:col-span-3">
                 Nothing accepted before the start date is invoiced. Leave it blank to bill from now.
               </p>
             </div>
           )}
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 border-t border-border/70 pt-4">
+            <h3 className="pb-1.5 text-[13px] font-semibold">Prices</h3>
             <Label htmlFor="price-isf">{invoiced ? 'Per accepted ISF above the included ones ($)' : 'Per accepted ISF ($)'}</Label>
             <Input
               id="price-isf"
@@ -180,7 +184,7 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
               onChange={(e) => setIsf(e.target.value)}
               placeholder={invoiced ? PILOT.isf : `${(defaultIsf ?? 4500) / 100} (plan default)`}
             />
-            {!invoiced && <p className="text-xs text-muted-foreground">Leave blank for the plan default.</p>}
+            {!invoiced && <p className="text-[12px] text-muted-foreground">Leave blank for the plan default.</p>}
           </div>
           {invoiced && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -192,7 +196,7 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
                 <Label htmlFor="band-isf">Lower rate per ISF ($)</Label>
                 <Input id="band-isf" inputMode="decimal" value={bandIsf} onChange={(e) => setBandIsf(e.target.value)} placeholder="None" />
               </div>
-              <p className="text-xs text-muted-foreground sm:col-span-2">
+              <p className="text-[12px] text-muted-foreground sm:col-span-2">
                 Counted each month. Leave both blank for one rate above the included ISFs.
                 {laterBands.length > 0 && ` ${laterBands.length} further band${laterBands.length > 1 ? 's are' : ' is'} kept as set.`}
               </p>
@@ -202,51 +206,53 @@ export function PricingDialog({ org, onClose }: { org: AdminOrganization | null;
             <div className="space-y-1.5">
               <Label htmlFor="price-linked">Entry on an ISF ($)</Label>
               <Input id="price-linked" inputMode="decimal" value={linked} onChange={(e) => setLinked(e.target.value)} placeholder="Not offered" />
-              <p className="text-xs text-muted-foreground">{invoiced ? 'One entry per ISF.' : 'Charged on top of the ISF.'}</p>
+              <p className="text-[12px] text-muted-foreground">{invoiced ? 'One entry per ISF.' : 'Charged on top of the ISF.'}</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="price-entry">Entry without an ISF ($)</Label>
               <Input id="price-entry" inputMode="decimal" value={entryOnly} onChange={(e) => setEntryOnly(e.target.value)} placeholder="Not offered" />
-              <p className="text-xs text-muted-foreground">Also a 2nd+ entry on one ISF.</p>
+              <p className="text-[12px] text-muted-foreground">Also a 2nd+ entry on one ISF.</p>
             </div>
           </div>
 
-          <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-            {invoiced && minimumCents != null && !badNumber && (
-              <p className="mb-1">
-                {money(minimumCents)} a month including {includedIsfs ?? 0} ISFs, then {money(isfCents ?? 0)} per ISF
-                {isfBands.length > 0 ? `; ${isfBandLines(isfBands).join('; ')}.` : '.'}
-              </p>
-            )}
-            {!entriesSet ? (
-              <p className="text-muted-foreground">No entry pricing: this client can't send entries.</p>
-            ) : !invoiced ? (
-              <ul className="space-y-1">
-                <li>ISF + entry on one shipment: <span className="font-medium tabular-nums">{money(effectiveIsf + linkedCents!)}</span></li>
-                <li>ISF and an entry bought separately: <span className="font-medium tabular-nums">{money(effectiveIsf + entryOnlyCents!)}</span></li>
-              </ul>
-            ) : null}
-            {unbundleCheaper && (
-              <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                Buying them separately is cheaper than the bundle. The pricing plan keeps entry-only above the linked price.
-              </p>
-            )}
-          </div>
+          {showSummary && (
+            <div className="rounded-lg bg-muted/50 px-4 py-3 text-[13px]">
+              {invoiced && minimumCents != null && !badNumber && (
+                <p className="mb-1 tabular-nums">
+                  {money(minimumCents)} a month including {includedIsfs ?? 0} ISFs, then {money(isfCents ?? 0)} per ISF
+                  {isfBands.length > 0 ? `; ${isfBandLines(isfBands).join('; ')}.` : '.'}
+                </p>
+              )}
+              {!entriesSet ? (
+                <p className="text-muted-foreground">No entry pricing: this client can't send entries.</p>
+              ) : !invoiced ? (
+                <ul className="space-y-1">
+                  <li>ISF + entry on one shipment: <span className="font-medium tabular-nums">{money(effectiveIsf + linkedCents!)}</span></li>
+                  <li>ISF and an entry bought separately: <span className="font-medium tabular-nums">{money(effectiveIsf + entryOnlyCents!)}</span></li>
+                </ul>
+              ) : null}
+              {unbundleCheaper && (
+                <p className="mt-2 text-[12px] font-medium text-soon">
+                  Buying them separately is cheaper than the bundle. The pricing plan keeps entry-only above the linked price.
+                </p>
+              )}
+            </div>
+          )}
 
-          <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
+          <div className="flex items-start justify-between gap-4 border-t border-border/70 pt-4">
             <div>
               <Label htmlFor="bill-hold">Hold new submissions</Label>
-              <p className="text-xs text-muted-foreground">For an overdue invoice. Drafts, amendments and cancellations still work.</p>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">For an overdue invoice. Drafts, amendments and cancellations still work.</p>
             </div>
             <Switch id="bill-hold" checked={hold} onCheckedChange={setHold} />
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="rounded-lg bg-urgent-tint px-4 py-3 text-[13px] text-urgent">{error}</p>}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={() => save.mutate()} disabled={save.isPending || !!error}>
-            {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {save.isPending && <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />}
             Save
           </Button>
         </DialogFooter>

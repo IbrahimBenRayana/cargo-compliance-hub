@@ -66,15 +66,15 @@ export function CbpSetupDialog({ org, onClose }: { org: AdminOrganization | null
     <Dialog open={!!org} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>CBP setup · {org?.name}</DialogTitle>
+          <DialogTitle>CBP setup: {org?.name}</DialogTitle>
           <DialogDescription>
             Entries, and ISF filed under the client&apos;s own code, transmit only with a filer code and an
-            approved service-center queue.
+            approved service center queue.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="cbp-filer">Client filer code</Label>
               <Input
@@ -86,7 +86,7 @@ export function CbpSetupDialog({ org, onClose }: { org: AdminOrganization | null
                 className="font-mono uppercase"
                 aria-invalid={codeError ? true : undefined}
               />
-              {codeError && <p className="text-xs text-red-600">{codeError}</p>}
+              {codeError && <p className="text-xs text-urgent">{codeError}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Gateway</Label>
@@ -100,7 +100,8 @@ export function CbpSetupDialog({ org, onClose }: { org: AdminOrganization | null
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-4 border-t border-border/70 pt-4 sm:grid-cols-2">
+            <h3 className="text-[13px] font-semibold sm:col-span-2">Service center approval</h3>
             <div className="space-y-1.5">
               <Label htmlFor="cbp-approved">Rep approved our queue on</Label>
               <Input id="cbp-approved" type="date" value={approvedAt} onChange={(e) => setApprovedAt(e.target.value)} />
@@ -111,7 +112,7 @@ export function CbpSetupDialog({ org, onClose }: { org: AdminOrganization | null
             </div>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 border-t border-border/70 pt-4">
             <Label>Default ISF filer</Label>
             <Select value={isfDefault} onValueChange={(v) => setIsfDefault(v as 'SIGMA' | 'CLIENT')}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -121,7 +122,7 @@ export function CbpSetupDialog({ org, onClose }: { org: AdminOrganization | null
               </SelectContent>
             </Select>
             {clientModeBlocked && (
-              <p className="text-xs text-amber-700 dark:text-amber-300">
+              <p className="rounded-lg bg-soon-tint px-4 py-3 text-[13px]">
                 Filing under the client&apos;s code needs a filer code and an approval date.
               </p>
             )}
@@ -136,7 +137,7 @@ export function CbpSetupDialog({ org, onClose }: { org: AdminOrganization | null
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={() => save.mutate()} disabled={save.isPending || !!codeError || clientModeBlocked}>
-            {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {save.isPending && <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />}
             Save
           </Button>
         </DialogFooter>
