@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -14,26 +12,29 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import { useTestCCConnection } from '@/hooks/useFilings';
 import { useAuthStore } from '@/hooks/useAuth';
 import { integrationsApi, apiKeysApi, type ApiKey, type ApiKeyCreated } from '@/api/client';
-import {
-  CheckCircle2, XCircle, Loader2, Plug, Zap, Search, Activity, Globe,
-  FileText, Mail, Send, Server, ShieldCheck, Radio, Sparkles, ArrowUpRight,
-  KeyRound, Copy, Trash2, Plus, AlertTriangle,
-} from '@/components/icons';
+import { CheckCircle2, Loader2, Zap, Activity, Send, KeyRound, Copy, Trash2, Plus } from '@/components/icons';
+import { TINT, FILL, type Tone } from '@/components/dashboard/tones';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+const PAGE = 'mx-auto flex max-w-[1360px] flex-col gap-5 -mx-2 sm:mx-auto pb-24 sm:pb-12';
+const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
+const TH = 'px-4 py-2.5 text-left text-[12px] font-medium text-muted-foreground';
+const TD = 'px-4 py-2.5';
+const SPIN = 'animate-spin motion-reduce:animate-none';
+
+type Health = 'ok' | 'error' | 'warning' | 'neutral';
+const HEALTH_TONE: Record<Health, Tone> = { ok: 'done', error: 'urgent', warning: 'soon', neutral: 'calm' };
 
 // ─── API Key scopes (must match server) ────────────────────
 const API_KEY_SCOPES: { value: string; label: string; desc: string }[] = [
   { value: 'filings:read', label: 'filings:read', desc: 'Read filings and their status' },
-  { value: 'filings:write', label: 'filings:write', desc: 'Create, update & submit filings' },
+  { value: 'filings:write', label: 'filings:write', desc: 'Create, update and submit filings' },
   { value: 'entries:read', label: 'entries:read', desc: 'Read entry summaries' },
-  { value: 'entries:write', label: 'entries:write', desc: 'Create & amend entry summaries' },
+  { value: 'entries:write', label: 'entries:write', desc: 'Create and amend entry summaries' },
 ];
 
 const PUBLIC_API_BASE_URL = 'https://app.mycargolens.com/api/public/v1';
@@ -111,256 +112,155 @@ export default function IntegrationsApi() {
   };
 
   const capabilities = [
-    { icon: FileText, label: 'ISF-10 Filing', desc: 'Importer Security Filing (10+2)', status: 'active' as const },
-    { icon: FileText, label: 'ISF-5 Filing', desc: 'Carrier Security Filing (5+2)', status: 'active' as const },
-    { icon: Radio, label: 'Status Updates', desc: 'CBP responses are checked automatically', status: 'active' as const },
-    { icon: Search, label: 'HTS Classification', desc: 'AI-powered tariff code suggestions', status: 'active' as const },
-    { icon: Zap, label: 'Amendment & Cancel', desc: 'File amendments and cancellations via filing gateway', status: 'active' as const },
-    { icon: Globe, label: 'MID Lookup', desc: 'Manufacturer Identification (MID) database', status: 'beta' as const },
+    { label: 'ISF-10 filing', desc: 'Importer Security Filing (10+2)', status: 'active' as const },
+    { label: 'ISF-5 filing', desc: 'Carrier Security Filing (5+2)', status: 'active' as const },
+    { label: 'Status updates', desc: 'CBP responses are checked automatically', status: 'active' as const },
+    { label: 'HTS classification', desc: 'AI-powered tariff code suggestions', status: 'active' as const },
+    { label: 'Amendment and cancel', desc: 'File amendments and cancellations', status: 'active' as const },
+    { label: 'MID lookup', desc: 'Manufacturer Identification (MID) database', status: 'beta' as const },
   ];
 
   const emailTriggers = [
-    { label: 'Team Invitations', desc: 'Sent when a team member is invited to the organization' },
-    { label: 'Welcome Email', desc: 'Sent after a new user registers' },
-    { label: 'Filing Submitted', desc: 'Confirmation when an ISF filing is submitted to CBP' },
-    { label: 'Filing Accepted', desc: 'All org members notified when CBP accepts a filing' },
-    { label: 'Filing Rejected', desc: 'All org members alerted when CBP rejects a filing' },
-    { label: 'Deadline Warning', desc: 'Alerts at 72h, 48h, and 24h before filing deadlines' },
+    { label: 'Team invitations', desc: 'Sent when a team member is invited to the organization' },
+    { label: 'Welcome email', desc: 'Sent after a new user registers' },
+    { label: 'Filing sent', desc: 'Confirmation when an ISF filing is sent to CBP' },
+    { label: 'Filing accepted', desc: 'All org members notified when CBP accepts a filing' },
+    { label: 'Filing rejected', desc: 'All org members alerted when CBP rejects a filing' },
+    { label: 'Deadline warning', desc: 'Alerts at 72h, 48h, and 24h before filing deadlines' },
   ];
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto">
+    <div className={PAGE}>
       {/* ─── Header ─────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-[28px] font-bold tracking-tight text-foreground">API & Integrations</h1>
-            <Badge variant="secondary" className="gap-1 text-[10px] font-bold uppercase tracking-wider px-2">
-              <Sparkles className="h-3 w-3" />
-              Live
-            </Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Manage your filing gateway connectivity, email delivery, and data services
+          <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.015em]">API & integrations</h1>
+          <p className="text-[13px] text-muted-foreground">
+            Filing connectivity, email delivery and API keys for your organization.
           </p>
         </div>
         {isPlatformAdmin && (
-        <Button onClick={handleTestConnection} disabled={testConnection.isPending} className="cursor-pointer shrink-0">
-          {testConnection.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          ) : (
-            <Zap className="h-4 w-4 mr-2" />
-          )}
-          Test All Connections
+        <Button size="sm" onClick={handleTestConnection} disabled={testConnection.isPending} className="shrink-0">
+          {testConnection.isPending ? <Loader2 className={SPIN} aria-hidden /> : <Zap aria-hidden />}
+          Test all connections
         </Button>
         )}
-      </div>
+      </header>
 
-      {/* ─── Top Stat Cards ─────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          icon={Plug}
-          label="Filing Gateway"
+      {/* ─── Top stats ──────────────────────────────────── */}
+      <dl className={cn(PANEL, 'grid grid-cols-2 divide-border/70 max-md:[&>div:nth-child(n+3)]:border-t md:grid-cols-4 md:divide-x')}>
+        <Stat
+          label="Filing gateway"
           value={connectionResult ? (connectionResult.connected ? 'Online' : 'Offline') : 'Unchecked'}
           status={connectionResult ? (connectionResult.connected ? 'ok' : 'error') : 'neutral'}
-          delay={80}
         />
-        <StatCard
-          icon={Mail}
-          label="Email Service"
+        <Stat
+          label="Email service"
           value={emailStatus ? (emailStatus.connected ? 'Online' : 'Offline') : 'Unchecked'}
           status={emailStatus ? (emailStatus.connected ? 'ok' : 'error') : 'neutral'}
-          delay={160}
         />
-        <StatCard
-          icon={Radio}
-          label="Status Poller"
-          value="5 min interval"
-          status="ok"
-          delay={240}
-        />
-        <StatCard
-          icon={ShieldCheck}
-          label="Environment"
-          value={connectionResult?.environment || 'Production'}
-          status="ok"
-          delay={320}
-        />
-      </div>
+        <Stat label="Status poller" value="5 min interval" status="ok" />
+        <Stat label="Environment" value={connectionResult?.environment || 'Unchecked'} status={connectionResult?.environment ? 'ok' : 'neutral'} />
+      </dl>
 
-      {/* ─── Filing Gateway Card ────────────────────────── */}
-      <Card className="opacity-0 animate-fade-in-up overflow-hidden" style={{ animationDelay: '380ms', animationFillMode: 'forwards' }}>
-        <CardHeader className="border-b bg-gradient-to-r from-amber-500/5 via-transparent to-transparent">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-md shadow-amber-500/30">
-                <Plug className="h-5 w-5 text-amber-950" />
-              </div>
-              <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  CBP Filing Gateway
-                  <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">v2</span>
-                </CardTitle>
-                <CardDescription className="mt-0.5">
-                  Transmits your ISF and entry filings to US Customs &amp; Border Protection
-                </CardDescription>
-              </div>
-            </div>
-            <Button
-              onClick={handleTestConnection}
-              disabled={testConnection.isPending}
-              variant="outline"
-              size="sm"
-              className="cursor-pointer"
-            >
-              {testConnection.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
-              ) : (
-                <Activity className="h-3.5 w-3.5 mr-2" />
-              )}
-              Test
+      {/* ─── Filing gateway ─────────────────────────────── */}
+      <section className={PANEL}>
+        <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-3.5">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-[14px] font-semibold">
+              CBP filing gateway
+              <span className="rounded-md bg-muted px-1.5 py-px font-mono text-[11.5px] font-normal text-muted-foreground">v2</span>
+            </h2>
+            <p className="text-[13px] text-muted-foreground">
+              Transmits your ISF and entry filings to US Customs and Border Protection.
+            </p>
+          </div>
+          <Button onClick={handleTestConnection} disabled={testConnection.isPending} variant="outline" size="sm">
+            {testConnection.isPending ? <Loader2 className={SPIN} aria-hidden /> : <Activity aria-hidden />}
+            Test
+          </Button>
+        </div>
+        {connectionResult && (
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 border-t border-border/70 px-5 py-4 sm:grid-cols-3">
+            <InfoTile label="Connection" value={connectionResult.connected ? 'Connected' : 'Failed'} variant={connectionResult.connected ? 'ok' : 'error'} />
+            <InfoTile label="Environment" value={connectionResult.environment} variant="neutral" uppercase />
+            <InfoTile label="Base URL" value={connectionResult.baseUrl} variant="neutral" mono />
+          </dl>
+        )}
+
+        {/* Capabilities */}
+        <div className="border-t border-border/70 px-5 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[12px] text-muted-foreground">Available capabilities</p>
+            <span className="text-[12px] tabular-nums text-muted-foreground">
+              {capabilities.filter((c) => c.status === 'active').length} / {capabilities.length} active
+            </span>
+          </div>
+          <ul className="mt-2 grid gap-x-8 md:grid-cols-2">
+            {capabilities.map((cap) => (
+              <li key={cap.label} className="flex min-w-0 items-start justify-between gap-3 border-t border-border/60 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium">{cap.label}</p>
+                  <p className="text-[12.5px] text-muted-foreground">{cap.desc}</p>
+                </div>
+                <Pill tone={cap.status === 'active' ? 'done' : 'info'}>{cap.status === 'active' ? 'Active' : 'Beta'}</Pill>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* ─── Email notifications ────────────────────────── */}
+      <section className={PANEL}>
+        <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-3.5">
+          <div className="min-w-0">
+            <h2 className="text-[14px] font-semibold">Email notifications</h2>
+            <p className="text-[13px] text-muted-foreground">
+              Transactional email delivery via Azure Communication Services.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleCheckEmailStatus} disabled={emailChecking} variant="outline" size="sm">
+              {emailChecking ? <Loader2 className={SPIN} aria-hidden /> : <Activity aria-hidden />}
+              Check status
+            </Button>
+            <Button onClick={handleSendTestEmail} disabled={emailTesting} size="sm">
+              {emailTesting ? <Loader2 className={SPIN} aria-hidden /> : <Send aria-hidden />}
+              Send test
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="pt-6 space-y-5">
-          {connectionResult && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <InfoTile label="Connection" value={connectionResult.connected ? 'Connected' : 'Failed'} variant={connectionResult.connected ? 'ok' : 'error'} />
-              <InfoTile label="Environment" value={connectionResult.environment} variant="neutral" uppercase />
-              <InfoTile label="Base URL" value={connectionResult.baseUrl} variant="neutral" mono />
-            </div>
-          )}
+        </div>
+        {emailStatus && (
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 border-t border-border/70 px-5 py-4 sm:grid-cols-3">
+            <InfoTile
+              label="Connection"
+              value={
+                emailStatus.connected ? 'Connected' : emailStatus.configured ? 'Configured' : 'Not set up'
+              }
+              variant={emailStatus.connected ? 'ok' : emailStatus.configured ? 'warning' : 'error'}
+            />
+            <InfoTile label="Provider" value="Azure Comm Services" variant="neutral" />
+            <InfoTile label="From address" value={emailStatus.from} variant="neutral" mono />
+          </dl>
+        )}
 
-          {/* Capabilities grid */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Available Capabilities
-              </p>
-              <span className="text-[11px] text-muted-foreground tabular-nums">
-                {capabilities.filter((c) => c.status === 'active').length} / {capabilities.length} active
-              </span>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {capabilities.map((cap) => (
-                <div
-                  key={cap.label}
-                  className="group flex items-start gap-3 p-4 rounded-xl border bg-card hover:bg-muted/40 hover:border-amber-500/30 transition-all cursor-default"
-                >
-                  <div
-                    className={cn(
-                      'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105',
-                      cap.status === 'active'
-                        ? 'bg-gradient-to-br from-amber-400/20 to-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20'
-                        : 'bg-muted text-muted-foreground',
-                    )}
-                  >
-                    <cap.icon className="h-[18px] w-[18px]" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold">{cap.label}</p>
-                      <Badge
-                        variant={cap.status === 'active' ? 'default' : 'secondary'}
-                        className={cn(
-                          'text-[9px] px-1.5 py-0 h-4 uppercase font-bold tracking-wider',
-                          cap.status === 'active' && 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20',
-                        )}
-                      >
-                        {cap.status === 'active' ? 'Active' : 'Beta'}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{cap.desc}</p>
-                  </div>
+        <div className="border-t border-border/70 px-5 py-4">
+          <p className="text-[12px] text-muted-foreground">Automated email triggers</p>
+          <ul className="mt-2 grid gap-x-8 md:grid-cols-2">
+            {emailTriggers.map((trigger) => (
+              <li key={trigger.label} className="flex min-w-0 items-start justify-between gap-3 border-t border-border/60 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium">{trigger.label}</p>
+                  <p className="text-[12.5px] text-muted-foreground">{trigger.desc}</p>
                 </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-done" aria-hidden />
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
 
-      {/* ─── Email Integration Card ─────────────────────── */}
-      <Card className="opacity-0 animate-fade-in-up overflow-hidden" style={{ animationDelay: '460ms', animationFillMode: 'forwards' }}>
-        <CardHeader className="border-b bg-gradient-to-r from-blue-500/5 via-transparent to-transparent">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-md shadow-blue-500/30">
-                <Mail className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Email Notifications</CardTitle>
-                <CardDescription className="mt-0.5">
-                  Transactional email delivery via Azure Communication Services
-                </CardDescription>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={handleCheckEmailStatus}
-                disabled={emailChecking}
-                variant="outline"
-                size="sm"
-                className="cursor-pointer"
-              >
-                {emailChecking ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
-                ) : (
-                  <Activity className="h-3.5 w-3.5 mr-2" />
-                )}
-                Check Status
-              </Button>
-              <Button onClick={handleSendTestEmail} disabled={emailTesting} size="sm" className="cursor-pointer">
-                {emailTesting ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
-                ) : (
-                  <Send className="h-3.5 w-3.5 mr-2" />
-                )}
-                Send Test
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6 space-y-5">
-          {emailStatus && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <InfoTile
-                label="Connection"
-                value={
-                  emailStatus.connected ? 'Connected' : emailStatus.configured ? 'Configured' : 'Not set up'
-                }
-                variant={emailStatus.connected ? 'ok' : emailStatus.configured ? 'warning' : 'error'}
-              />
-              <InfoTile label="Provider" value="Azure Comm Services" variant="neutral" />
-              <InfoTile label="From Address" value={emailStatus.from} variant="neutral" mono />
-            </div>
-          )}
-
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
-              Automated Email Triggers
-            </p>
-            <div className="grid gap-2 md:grid-cols-2">
-              {emailTriggers.map((trigger) => (
-                <div
-                  key={trigger.label}
-                  className="flex items-start gap-3 p-3 rounded-xl border bg-card hover:bg-muted/40 transition-colors cursor-default"
-                >
-                  <div className="h-8 w-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                    <Mail className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold">{trigger.label}</p>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">{trigger.desc}</p>
-                  </div>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-1" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ─── API Keys Card ───────────────────────────────── */}
+      {/* ─── API keys ────────────────────────────────────── */}
       <ApiKeysCard />
     </div>
   );
@@ -444,172 +344,154 @@ function ApiKeysCard() {
       await navigator.clipboard.writeText(created.key);
       toast.success('API key copied to clipboard');
     } catch {
-      toast.error('Could not copy — copy it manually');
+      toast.error('Could not copy. Copy it manually.');
     }
   };
 
   return (
-    <Card className="opacity-0 animate-fade-in-up overflow-hidden" style={{ animationDelay: '540ms', animationFillMode: 'forwards' }}>
-      <CardHeader className="border-b bg-gradient-to-r from-violet-500/5 via-transparent to-transparent">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shadow-md shadow-violet-500/30">
-              <KeyRound className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <CardTitle className="text-base">API Keys</CardTitle>
-              <CardDescription className="mt-0.5">
-                Programmatic credentials for the MyCargoLens public API
-              </CardDescription>
-            </div>
-          </div>
-          {canManage && (
-            <Dialog
-              open={createOpen}
-              onOpenChange={(open) => {
-                setCreateOpen(open);
-                if (!open) resetForm();
-              }}
-            >
-              <DialogTrigger asChild>
-                <Button size="sm" className="cursor-pointer">
-                  <Plus className="h-3.5 w-3.5 mr-2" />
-                  Create API key
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create API key</DialogTitle>
-                  <DialogDescription>
-                    Give the key a name and choose the scopes it can access. The secret is shown only once.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="api-key-name">Name</Label>
-                    <Input
-                      id="api-key-name"
-                      placeholder="e.g. Production server"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Scopes</Label>
-                    <div className="grid gap-2">
-                      {API_KEY_SCOPES.map((scope) => (
-                        <label
-                          key={scope.value}
-                          htmlFor={`scope-${scope.value}`}
-                          className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/40 transition-colors cursor-pointer"
-                        >
-                          <Checkbox
-                            id={`scope-${scope.value}`}
-                            checked={scopes.includes(scope.value)}
-                            onCheckedChange={() => toggleScope(scope.value)}
-                            className="mt-0.5"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-mono font-semibold">{scope.label}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{scope.desc}</p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-                  <Button onClick={handleCreate} disabled={createMutation.isPending}>
-                    {createMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <KeyRound className="mr-2 h-4 w-4" />
-                    )}
-                    Create key
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="pt-6 space-y-5">
-        {/* How to use */}
-        <div className="flex items-start gap-3 p-3.5 rounded-xl border bg-violet-500/5 border-violet-500/20">
-          <Globe className="h-4 w-4 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Keys authenticate the public API at{' '}
-            <code className="font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground">{PUBLIC_API_BASE_URL}</code>{' '}
-            via the{' '}
-            <code className="font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground">Authorization: Bearer &lt;key&gt;</code>{' '}
-            header.
+    <section className={PANEL}>
+      <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-3.5">
+        <div className="min-w-0">
+          <h2 className="text-[14px] font-semibold">API keys</h2>
+          <p className="text-[13px] text-muted-foreground">
+            Programmatic credentials for the MyCargoLens public API.
           </p>
         </div>
-
-        {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}
-          </div>
-        ) : keys.length === 0 ? (
-          <div className="text-center py-10">
-            <KeyRound className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground">No API keys yet</p>
-            {canManage && (
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => setCreateOpen(true)}>
-                <Plus className="mr-2 h-3.5 w-3.5" />
-                Create your first key
+        {canManage && (
+          <Dialog
+            open={createOpen}
+            onOpenChange={(open) => {
+              setCreateOpen(open);
+              if (!open) resetForm();
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus aria-hidden />
+                Create API key
               </Button>
-            )}
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Key</TableHead>
-                <TableHead>Scopes</TableHead>
-                <TableHead>Last used</TableHead>
-                <TableHead>Created</TableHead>
-                {canManage && <TableHead className="w-[60px]" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create API key</DialogTitle>
+                <DialogDescription>
+                  Give the key a name and choose the scopes it can access. The secret is shown only once.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="api-key-name">Name</Label>
+                  <Input
+                    id="api-key-name"
+                    placeholder="e.g. Production server"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Scopes</Label>
+                  <div className="grid gap-2">
+                    {API_KEY_SCOPES.map((scope) => (
+                      <label
+                        key={scope.value}
+                        htmlFor={`scope-${scope.value}`}
+                        className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/70 p-3 transition-colors duration-150 can-hover:hover:bg-muted/50"
+                      >
+                        <Checkbox
+                          id={`scope-${scope.value}`}
+                          checked={scopes.includes(scope.value)}
+                          onCheckedChange={() => toggleScope(scope.value)}
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono text-[13px] font-medium">{scope.label}</p>
+                          <p className="mt-0.5 text-[12.5px] text-muted-foreground">{scope.desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreate} disabled={createMutation.isPending}>
+                  {createMutation.isPending ? <Loader2 className={SPIN} aria-hidden /> : <KeyRound aria-hidden />}
+                  Create key
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
+      {/* How to use */}
+      <p className="border-t border-border/70 px-5 py-4 text-[13px] leading-6 text-muted-foreground">
+        Keys authenticate the public API at{' '}
+        <code className="break-all rounded-md bg-muted px-1.5 py-0.5 font-mono text-[12px] text-foreground">{PUBLIC_API_BASE_URL}</code>{' '}
+        via the{' '}
+        <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[12px] text-foreground">Authorization: Bearer &lt;key&gt;</code>{' '}
+        header.
+      </p>
+
+      {isLoading ? (
+        <div className="space-y-2 border-t border-border/70 p-4">
+          {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
+        </div>
+      ) : keys.length === 0 ? (
+        <div className="border-t border-border/70 px-5 py-10 text-center">
+          <p className="text-[14px] font-medium">No API keys yet</p>
+          {canManage && (
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => setCreateOpen(true)}>
+              <Plus aria-hidden />
+              Create your first key
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="overflow-x-auto border-t border-border/70">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-border/70">
+                <th scope="col" className={TH}>Name</th>
+                <th scope="col" className={TH}>Key</th>
+                <th scope="col" className={TH}>Scopes</th>
+                <th scope="col" className={cn(TH, 'max-md:hidden')}>Last used</th>
+                <th scope="col" className={cn(TH, 'max-md:hidden')}>Created</th>
+                {canManage && <th scope="col" aria-label="Actions" className="w-12" />}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
               {[...activeKeys, ...revokedKeys].map((k) => {
                 const isRevoked = !!k.revokedAt;
                 return (
-                  <TableRow key={k.id} className={cn(isRevoked && 'opacity-50')}>
-                    <TableCell>
+                  <tr key={k.id} className={cn(isRevoked && 'text-muted-foreground')}>
+                    <td className={TD}>
                       <div className="flex items-center gap-2">
-                        <span className={cn('font-medium text-sm', isRevoked && 'line-through')}>{k.name}</span>
-                        {isRevoked && (
-                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 uppercase font-bold tracking-wider bg-red-500/15 text-red-700 dark:text-red-400">
-                            Revoked
-                          </Badge>
-                        )}
+                        <span className={cn('font-medium', isRevoked && 'line-through')}>{k.name}</span>
+                        {isRevoked && <Pill tone="urgent">Revoked</Pill>}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <code className="font-mono text-xs text-muted-foreground">{k.prefix}…</code>
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className={cn(TD, 'whitespace-nowrap')}>
+                      <code className="font-mono text-[12.5px] text-muted-foreground">{k.prefix}…</code>
+                    </td>
+                    <td className={TD}>
                       <div className="flex flex-wrap gap-1">
                         {k.scopes.map((s) => (
-                          <Badge key={s} variant="secondary" className="text-[10px] font-mono px-1.5 py-0">
+                          <span key={s} className="whitespace-nowrap rounded-md bg-muted px-1.5 py-px font-mono text-[11.5px] text-muted-foreground">
                             {s}
-                          </Badge>
+                          </span>
                         ))}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{fmtKeyRelative(k.lastUsedAt)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{fmtKeyDate(k.createdAt)}</TableCell>
+                    </td>
+                    <td className={cn(TD, 'whitespace-nowrap tabular-nums text-muted-foreground max-md:hidden')}>{fmtKeyRelative(k.lastUsedAt)}</td>
+                    <td className={cn(TD, 'whitespace-nowrap tabular-nums text-muted-foreground max-md:hidden')}>{fmtKeyDate(k.createdAt)}</td>
                     {canManage && (
-                      <TableCell>
+                      <td className="px-2">
                         {!isRevoked && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" title="Revoke key">
-                                <Trash2 className="h-3.5 w-3.5" />
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-urgent hover:text-urgent" aria-label={`Revoke key ${k.name}`}>
+                                <Trash2 className="h-4 w-4" aria-hidden />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -622,7 +504,7 @@ function ApiKeysCard() {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
-                                  className="bg-red-600 hover:bg-red-700"
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                   onClick={() => revokeMutation.mutate(k.id)}
                                 >
                                   Revoke key
@@ -631,15 +513,15 @@ function ApiKeysCard() {
                             </AlertDialogContent>
                           </AlertDialog>
                         )}
-                      </TableCell>
+                      </td>
                     )}
-                  </TableRow>
+                  </tr>
                 );
               })}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* One-time secret reveal dialog */}
       <Dialog open={!!created} onOpenChange={(open) => { if (!open) dismissSecret(); }}>
@@ -647,28 +529,25 @@ function ApiKeysCard() {
           <DialogHeader>
             <DialogTitle>API key created</DialogTitle>
             <DialogDescription>
-              Copy this key now — you won't be able to see it again.
+              Copy this key now. You won't be able to see it again.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="flex items-start gap-3 p-3.5 rounded-xl border bg-amber-500/10 border-amber-500/30">
-              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-                This is the only time the full secret is shown. Store it somewhere safe.
-              </p>
-            </div>
-            <div className="space-y-2">
+            <p className="rounded-lg bg-soon-tint px-4 py-3 text-[13px] text-soon">
+              This is the only time the full secret is shown. Store it somewhere safe.
+            </p>
+            <div className="space-y-1.5">
               <Label htmlFor="created-key">Secret key</Label>
               <div className="flex items-center gap-2">
                 <Input
                   id="created-key"
                   readOnly
                   value={created?.key ?? ''}
-                  className="font-mono text-xs"
+                  className="min-w-0 font-mono text-[12px]"
                   onFocus={(e) => e.currentTarget.select()}
                 />
-                <Button variant="outline" size="icon" className="shrink-0" onClick={copySecret} title="Copy key">
-                  <Copy className="h-4 w-4" />
+                <Button variant="outline" size="icon" className="shrink-0" onClick={copySecret} aria-label="Copy key">
+                  <Copy className="h-4 w-4" aria-hidden />
                 </Button>
               </div>
             </div>
@@ -678,68 +557,31 @@ function ApiKeysCard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </section>
   );
 }
 
 // ─── Sub-components ─────────────────────────────────────────
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  status,
-  delay,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  status: 'ok' | 'error' | 'warning' | 'neutral';
-  delay: number;
-}) {
+function Pill({ tone, children }: { tone: Tone; children: React.ReactNode }) {
   return (
-    <Card
-      className="relative overflow-hidden opacity-0 animate-fade-in-up hover:shadow-md transition-shadow"
-      style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
-    >
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-3">
-          <div
-            className={cn(
-              'h-10 w-10 rounded-xl flex items-center justify-center',
-              status === 'ok' && 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-              status === 'error' && 'bg-red-500/10 text-red-600 dark:text-red-400',
-              status === 'warning' && 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-              status === 'neutral' && 'bg-muted text-muted-foreground',
-            )}
-          >
-            <Icon className="h-[18px] w-[18px]" />
-          </div>
-          <span
-            className={cn(
-              'inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full',
-              status === 'ok' && 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-              status === 'error' && 'bg-red-500/15 text-red-700 dark:text-red-400',
-              status === 'warning' && 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
-              status === 'neutral' && 'bg-muted text-muted-foreground',
-            )}
-          >
-            <span
-              className={cn(
-                'h-1.5 w-1.5 rounded-full',
-                status === 'ok' && 'bg-emerald-500 animate-pulse',
-                status === 'error' && 'bg-red-500',
-                status === 'warning' && 'bg-amber-500',
-                status === 'neutral' && 'bg-muted-foreground/60',
-              )}
-            />
-            {status === 'ok' ? 'Live' : status === 'error' ? 'Down' : status === 'warning' ? 'Warn' : 'Idle'}
-          </span>
-        </div>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-        <p className="text-xl font-bold tracking-tight mt-1 truncate">{value}</p>
-      </CardContent>
-    </Card>
+    <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-medium', TINT[tone])}>
+      <span aria-hidden className={cn('h-1.5 w-1.5 shrink-0 rounded-full', FILL[tone])} />{children}
+    </span>
+  );
+}
+
+function Stat({ label, value, status }: { label: string; value: string; status: Health }) {
+  return (
+    <div className="min-w-0 px-5 py-3.5">
+      <dt className="text-[12px] text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="truncate text-[16px] font-semibold leading-6 tabular-nums">{value}</span>
+        <Pill tone={HEALTH_TONE[status]}>
+          {status === 'ok' ? 'Live' : status === 'error' ? 'Down' : status === 'warning' ? 'Warn' : 'Idle'}
+        </Pill>
+      </dd>
+    </div>
   );
 }
 
@@ -752,37 +594,30 @@ function InfoTile({
 }: {
   label: string;
   value: string;
-  variant: 'ok' | 'error' | 'warning' | 'neutral';
+  variant: Health;
   mono?: boolean;
   uppercase?: boolean;
 }) {
   return (
-    <div className="rounded-xl border bg-muted/20 p-3.5 min-w-0">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">{label}</p>
-      <div className="flex items-center gap-2">
+    <div className="min-w-0">
+      <dt className="text-[12px] text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 flex min-w-0 items-center gap-2">
         {variant !== 'neutral' && (
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full shrink-0',
-              variant === 'ok' && 'bg-emerald-500',
-              variant === 'error' && 'bg-red-500',
-              variant === 'warning' && 'bg-amber-500',
-            )}
-          />
+          <span aria-hidden className={cn('h-1.5 w-1.5 shrink-0 rounded-full', FILL[HEALTH_TONE[variant]])} />
         )}
-        <p
+        <span
           className={cn(
-            'text-sm font-semibold truncate',
-            mono && 'font-mono text-xs',
+            'truncate text-[14px] font-medium',
+            mono && 'font-mono text-[13px]',
             uppercase && 'capitalize',
-            variant === 'ok' && 'text-emerald-700 dark:text-emerald-400',
-            variant === 'error' && 'text-red-700 dark:text-red-400',
-            variant === 'warning' && 'text-amber-700 dark:text-amber-400',
+            variant === 'ok' && 'text-done',
+            variant === 'error' && 'text-urgent',
+            variant === 'warning' && 'text-soon',
           )}
         >
           {value}
-        </p>
-      </div>
+        </span>
+      </dd>
     </div>
   );
 }
