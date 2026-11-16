@@ -32,6 +32,7 @@ import { transmitNative } from './nativeTransmit.js';
 import { convertInvoiceValuesToUsd, CurrencyConversionError, type CurrencyConversion } from './currency.js';
 import { cbpTransport, cbpTrafficConfig } from './transport.js';
 import { requireCbpSender } from './sender.js';
+import { canonicalImporterNumber } from '../../abi-engine/records/importerNumber.js';
 
 const ACTION_CODE: Record<EntryAction, 'A' | 'R' | 'D'> = { ADD: 'A', REPLACE: 'R', DELETE: 'D' };
 /** Entry types whose AE is certified for cargo release (combined 3461+7501);
@@ -72,7 +73,7 @@ function releaseEntities(body: AbiDocumentBody): { entities: AeCargoEntity[] } |
           countryCode: upper(seller.country).slice(0, 2),
         },
       },
-      { code: 'BY', identifier: { qualifier: 'EI', value: ior } },
+      { code: 'BY', identifier: { qualifier: canonicalImporterNumber(ior)?.type ?? 'EI', value: ior } },
     ],
   };
 }

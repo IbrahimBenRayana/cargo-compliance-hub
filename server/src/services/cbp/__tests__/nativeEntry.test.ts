@@ -64,6 +64,18 @@ describe('transmitEntryNative', () => {
     expect(out.httpStatus).toBe(202);
   });
 
+  it('types the buyer identifier from the IOR number format instead of assuming an EIN', async () => {
+    await transmitEntryNative(ARGS);
+    expect(engine.buildEntrySummary.mock.calls[0][0].cargoEntities[1].identifier).toEqual({ qualifier: 'EI', value: '57-123456789' });
+
+    vi.clearAllMocks();
+    prisma.abiDocument.findFirst.mockResolvedValue({ ...DOC, payload: { ...PAYLOAD, ior: { number: '261303-12345' } } });
+    prisma.abiDocument.updateMany.mockResolvedValue({ count: 1 });
+    transmit.transmitNative.mockResolvedValue({ id: 't1', userDataTag: 'MCLX', status: 'SENT' });
+    await transmitEntryNative(ARGS);
+    expect(engine.buildEntrySummary.mock.calls[0][0].cargoEntities[1].identifier).toEqual({ qualifier: 'ANI', value: '261303-12345' });
+  });
+
   it('certifies a type 03 (AD/CVD) entry for cargo release too (CATAIR note ee)', async () => {
     prisma.abiDocument.findFirst.mockResolvedValue({ ...DOC, entryType: '03' });
     await transmitEntryNative(ARGS);
