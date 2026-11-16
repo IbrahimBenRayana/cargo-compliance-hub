@@ -2048,6 +2048,18 @@ export interface ABILocation {
 export interface ABIIOR {
   number: string;
   name: string;
+  /** 19 CFR 141.22 declaration (7501 15-Record). Never defaulted. */
+  usImporterOfRecord?: boolean;
+  /** The filing broker is the IOR, acting for a principal. */
+  brokerActingAsIor?: boolean;
+  /** The principal's EIN, SSN or CBP-assigned number (power of attorney). */
+  principalOnPoa?: string;
+  /** Attestation box next to a U.S. declaration. */
+  usIorAttested?: boolean;
+  /** Server-stamped when the box is ticked; read-only. */
+  usIorAttestedById?: string;
+  usIorAttestedByEmail?: string;
+  usIorAttestedAt?: string;
 }
 
 export interface ABIBond {

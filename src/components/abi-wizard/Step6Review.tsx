@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SectionHeader } from './shared';
 import { CbpPreflightCard } from './CbpPreflightCard';
 import { needsForeignPortOfLading } from './validators';
+import { iorStatusLabel } from './IorDeclarationFields';
 
 export interface ValidationResult {
   valid: boolean;
@@ -49,6 +50,8 @@ export function validateAbiDraft(draft: ABIDocumentDraft): ValidationResult {
 
   if (!draft.ior?.number) missing.push('IOR Number');
   if (!draft.ior?.name) missing.push('IOR Name');
+  if (draft.ior?.usImporterOfRecord === undefined) missing.push('Importer of record status (U.S. or foreign)');
+  else if (draft.ior.usImporterOfRecord && !draft.ior.usIorAttested) missing.push('U.S. importer of record confirmation');
 
   if (!draft.bond?.type) missing.push('Bond Type');
   if (!draft.bond?.suretyCode) missing.push('Bond Surety Code');
@@ -380,6 +383,14 @@ export default function Step6Review({ value, doc }: Props) {
             <h4 className="text-sm font-semibold">Importer of Record</h4>
             <p className="text-sm">{value.ior?.name ?? '—'}</p>
             <p className="text-xs text-muted-foreground">{value.ior?.number ?? '—'}</p>
+            <p className="text-xs">
+              {iorStatusLabel(value.ior) ?? <span className="text-urgent">Status not chosen</span>}
+              {value.ior?.brokerActingAsIor && (
+                <span className="text-muted-foreground">
+                  {' · '}Broker is IOR{value.ior.principalOnPoa ? <> for <span className="font-mono">{value.ior.principalOnPoa}</span></> : ''}
+                </span>
+              )}
+            </p>
             <div className="pt-2 border-t grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
               <div>
                 <dt className="text-muted-foreground">Bond</dt>

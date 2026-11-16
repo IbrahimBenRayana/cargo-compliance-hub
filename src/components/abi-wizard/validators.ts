@@ -25,6 +25,9 @@ export type FieldErrors = Record<string, string>;
 
 const TAXID_RE =
   /^(?:[A-Z0-9]{2}-[A-Z0-9]{9}|[A-Z0-9]{3}-[A-Z0-9]{2}-[A-Z0-9]{4}|[A-Z0-9]{6}-[A-Z0-9]{5})$/;
+// Importer number formats CBP accepts for the principal on power of
+// attorney (ES usage note f): SSN, EIN with optional suffix, CBP-assigned.
+const IMPORTER_NUMBER_RE = /^(?:\d{3}-\d{2}-\d{4}|\d{2}-\d{7}(?:[A-Z0-9]{2})?|\d{6}-\d{5})$/;
 const ENTRY_NUMBER_RE = /^[A-Z0-9-]{9,13}$/;
 const HTS_RE = /^\d{10}$/;
 const TAXID_HINT =
@@ -58,6 +61,15 @@ export function validateStep2(d: ABIDocumentDraft): FieldErrors {
   const e: FieldErrors = {};
   if (!d.ior?.number) e['ior.number'] = 'Required';
   if (!d.ior?.name) e['ior.name'] = 'Required';
+  // CBP foreign IOR rule: a person must choose, and a U.S. answer is attested.
+  if (d.ior?.usImporterOfRecord === undefined) {
+    e['ior.usImporterOfRecord'] = 'Choose U.S. or foreign importer of record';
+  } else if (d.ior.usImporterOfRecord && !d.ior.usIorAttested) {
+    e['ior.usIorAttested'] = 'Confirm you have checked the importer meets 19 CFR 110.2';
+  }
+  if (d.ior?.brokerActingAsIor && d.ior.principalOnPoa && !IMPORTER_NUMBER_RE.test(d.ior.principalOnPoa)) {
+    e['ior.principalOnPoa'] = 'EIN (12-3456789), SSN (123-45-6789) or CBP-assigned (261303-12345)';
+  }
 
   if (!d.bond?.type) e['bond.type'] = 'Required';
   if (!d.bond?.suretyCode) e['bond.suretyCode'] = 'Required';

@@ -46,6 +46,7 @@ import { summarizeEntry } from '@/components/entries/summary';
 import { CopyButton } from '@/components/shipment-detail/CopyButton';
 import { stamp } from '@/components/shipment-detail/summary';
 import { usePortName } from '@/components/shipment-detail/usePortName';
+import { attestedLine, iorStatusLabel } from '@/components/abi-wizard/IorDeclarationFields';
 
 function lookupLabel(options: { value: string; label: string }[], value: string | null | undefined) {
   if (!value) return '';
@@ -249,6 +250,7 @@ export default function ABIDocumentDetailPage() {
   const invoices: ABIInvoice[] = (manifest0?.invoices ?? []) as ABIInvoice[];
   const consignee = payload.entryConsignee as any | undefined;
   const ior = payload.ior as any | undefined;
+  const iorAttested = ior ? attestedLine(ior) : null;
   const bond = payload.bond as any | undefined;
   const payment = payload.payment as any | undefined;
 
@@ -590,6 +592,12 @@ export default function ABIDocumentDetailPage() {
               <h3 className={H3}>Importer and bond</h3>
               <dl className={GRID}>
                 <LabeledValue label="Importer of record" value={doc.iorName ?? ior?.name} sub={doc.iorNumber ? <span className="font-mono">{doc.iorNumber}</span> : undefined} />
+                <LabeledValue
+                  label="Importer of record status"
+                  value={iorStatusLabel(ior)}
+                  sub={iorAttested ? <span title={iorAttested}>{iorAttested}</span> : undefined}
+                />
+                {ior?.brokerActingAsIor && <LabeledValue label="Broker acting as IOR for" value={ior.principalOnPoa ?? 'Yes'} mono={Boolean(ior.principalOnPoa)} />}
                 <LabeledValue label="Bond type" value={bond?.type ? lookupLabel(BOND_TYPES, bond.type) : null} />
                 <LabeledValue label="Bond tax ID" value={bond?.taxId} mono />
                 <LabeledValue label="Payment type" value={payment?.typeCode != null ? lookupLabel(PAYMENT_TYPE_CODES, String(payment.typeCode)) : null} />
