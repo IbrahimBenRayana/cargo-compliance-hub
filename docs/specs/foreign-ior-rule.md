@@ -163,7 +163,7 @@ with the gate off unless a scenario opts in. New goldens cover the 15-record cas
 - **"Importer of record status"** is a required two-option choice with no default: *U.S. importer
   of record* / *Foreign importer of record*. A short helper summarises §110.2, with a "How to
   decide" disclosure. Choosing U.S. shows the attestation checkbox ("I have verified the
-  importer meets 19 CFR 110.2"), which records the user and time.
+  importer meets 19 CFR 110.2"), which records the user and time (server-stamped, see §6).
 - Prefill from `ImporterProfile` when the IOR number matches, and show who declared it and when.
 - **"Filing as IOR on behalf of a principal"** toggle (broker orgs only) shows principal number,
   with the type inferred and editable.
@@ -175,11 +175,16 @@ with the gate off unless a scenario opts in. New goldens cover the 15-record cas
   verifies.
 
 ### 6. Public API (`/api/public/v1`)
-- Additive request fields on `POST /entries` and `PATCH`: `importerOfRecord.usImporterOfRecord: boolean`,
-  `brokerActingAsIor?: boolean` (default `false`), `principalOnPowerOfAttorney?: { number, type: "EI"|"ANI"|"SSN" }`.
-  Returned on GET.
-- Drafts may omit them. After the gate, `POST /entries/:id/send` returns **422
-  `ior_declaration_required`** if missing. No server-side default.
+- Additive fields on the existing `ior` object of `POST /entries` and `PATCH` (as built in PR #242):
+  `ior.usImporterOfRecord: boolean`, `ior.brokerActingAsIor?: boolean` (default `false`),
+  `ior.principalOnPoa?: string` (EIN `NN-NNNNNNN[ss]`, SSN `NNN-NN-NNNN` or CBP-assigned
+  `YYDDPP-NNNNN`; the type is inferred from the format). Returned on GET.
+- Drafts may omit them. After the gate, `POST /entries/:id/send` returns the usual **422
+  `ENTRY_DATA_INCOMPLETE`** with an issue on field `ior.usImporterOfRecord` if missing, and on
+  `ior.principalOnPoa` if the number is malformed. No server-side default.
+- The wizard's attestation (`ior.usIorAttested`) is stamped server-side as `ior.usIorAttestedById`,
+  `usIorAttestedByEmail`, `usIorAttestedAt`; clients cannot set the stamp. API callers are not
+  asked to attest: calling `/send` with a declaration is their declaration.
 - This is behaviourally breaking for integrators on Jan 5: changelog entry, API docs, email to
   API-key holders before Dec 15. Webhook reject payloads get the new error codes and their
   explanations.
