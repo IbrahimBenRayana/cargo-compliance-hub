@@ -1,6 +1,7 @@
 # Spec: Foreign Importer of Record rule (U.S. IOR declaration on every entry)
 
-Status: DRAFT 2026-11-16, plan only, nothing built. Needs founder answers (end of doc).
+Status: DRAFT 2026-11-16, plan only, nothing built. Founder decisions recorded (end of doc);
+CBP client-rep questions outstanding.
 Rule: CBP interim final rule "Heightened Requirements for Foreign Importers of Record",
 91 FR 69977 (FR Doc 2026-22735, CBP Dec. 26-19, docket USCBP-2026-1387), published Nov 6 2026,
 **effective Jan 5 2027**. Engine scope: native ABI engine only (CustomsCity path is frozen).
@@ -154,7 +155,7 @@ with the gate off unless a scenario opts in. New goldens cover the 15-record cas
 | R1 | No U.S./foreign answer (after gate) | **Block** (would be 888) |
 | R2 | BIC=Y, filer CTPAT not VALIDATED, no PPA | **Block** (892) |
 | R3 | PPA present but bad format / missing type | **Block** (893 / SE 342) |
-| R4 | Foreign IOR, BIC=N, IOR CTPAT ≠ VALIDATED, filer CTPAT ≠ VALIDATED | **Warn** "CBP will likely reject (894)" (block vs warn: founder Q2) |
+| R4 | Foreign IOR, BIC=N, IOR CTPAT ≠ VALIDATED, filer CTPAT ≠ VALIDATED | **Warn** "CBP will likely reject (894)"; send needs explicit "send anyway" (decision 2) |
 | R5 | Foreign IOR, BIC=Y, filer not CTPAT, principal CTPAT ≠ VALIDATED | **Warn** (894 / SE 339) |
 | R6 | U.S. IOR chosen but no declaration on the profile by a named user | **Block** until the user ticks the §110.2 attestation |
 
@@ -204,19 +205,19 @@ if we want it.
 **Out of scope:** CustomsCity path; ISF; wiring standalone SE cargo release; V111 12/13
 Final-Delivered-To records (a separate catch-up, worth checking whether any of our flows need it).
 
+## Founder decisions (2026-11-16, Ibrahim)
+
+1. **Both** brokers (own filer code) and self-filing importers file entries. The broker-as-IOR
+   / principal UI ships at launch for broker orgs, and `Organization.ctpatStatus` ships at launch.
+2. **CTPAT mismatch (R4/R5): warn**, with an explicit "send anyway" that is audit-logged.
+3. **Broker verification support is in scope:** the §111.29 evidence workflow (document upload
+   per ImporterProfile, verification checklist against §110.2, 5-year retention from the
+   verification date) is Phase 2, due before **May 6 2027**. Jan 5 ships attestation only.
+4. **Public API:** the declaration is required on `/send` from Jan 5. Breaking change accepted.
+
 ## Open questions
 
 **For the founder**
-1. **Who files our entries?** Licensed brokers under their own filer code, importers
-   self-filing, or both? This decides how prominent the broker-as-IOR / principal UI is and
-   whether `Organization.ctpatStatus` is needed at launch.
-2. **CTPAT mismatch (R4/R5): block or warn?** Our CTPAT data is self-attested, so I recommend
-   *warn + require an explicit "send anyway"*.
-3. **Scope of broker verification support.** Store attestation only (recommended for Jan 5),
-   or also build the §111.29 evidence workflow (document upload, 5-year retention) as a feature
-   for brokers before May 6 2027?
-4. **Public API:** OK to make the declaration required on `/send` from Jan 5 (breaking for
-   integrators who don't update)? I recommend yes: CBP will reject without it anyway.
 5. Do we want to file a comment on the IFR (deadline Jan 5 2027)? Optional.
 6. Marketing may announce "supports CBP's U.S./foreign IOR declaration" once slice 5 passes on CERT.
    No claim that we verify CTPAT or IOR status.
