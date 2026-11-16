@@ -22,6 +22,9 @@ model Organization {
   ccEnvironment       String   @default("sandbox") @map("cc_environment") @db.VarChar(20)
   maxUsers            Int      @default(10) @map("max_users") // Seat limit
   onboardingCompleted Boolean  @default(false) @map("onboarding_completed")
+  /// The org's own CTPAT validation as a filer (self-attested): VALIDATED | NONE | UNKNOWN.
+  /// Only drives pre-send warnings for CBP's foreign IOR rule; never sent to CBP.
+  ctpatStatus         String   @default("UNKNOWN") @map("ctpat_status") @db.VarChar(10)
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
@@ -48,6 +51,7 @@ model Organization {
 
   @@map("organizations")
   cbpConfig        OrgCbpConfig?
+  importerProfiles ImporterProfile[]
 }
 
 // ─── Entry number blocks ───────────────────────────────────
@@ -921,6 +925,8 @@ model AbiDocument {
   // Parties denorm
   iorNumber     String? @map("ior_number") @db.VarChar(100)
   iorName       String? @map("ior_name") @db.VarChar(255)
+  /// U.S. | FOREIGN, from payload.ior.usImporterOfRecord (CBP foreign IOR rule); null = not declared.
+  iorUsStatus   String? @map("ior_us_status") @db.VarChar(8)
   consigneeName String? @map("consignee_name") @db.VarChar(255)
 
   // Ports & dates denorm (YYYYMMDD strings in UI; mapped to integers at send time)
@@ -1437,4 +1443,33 @@ model Lead {
   @@index([notificationStatus, createdAt])
   @@index([email])
   @@map("leads")
+}
+
+// ─── Saved importers (CBP foreign IOR rule, docs/specs/foreign-ior-rule.md) ──
+// What the org last declared for an importer of record, so the next entry
+// for the same IOR fills itself in. The entry's own payload stays the legal
+// declaration; editing a profile never rewrites a sent entry.
+model ImporterProfile {
+  id              String    @id @default(uuid()) @db.Uuid
+  orgId           String    @map("org_id") @db.Uuid
+  /// Canonical hyphenated form (EI NN-NNNNNNN[ss], 34 NNN-NN-NNNN, ANI YYDDPP-NNNNN).
+  iorNumber       String    @map("ior_number") @db.VarChar(12)
+  /// EI | ANI | 34 (ES usage note f).
+  iorNumberType   String    @map("ior_number_type") @db.VarChar(3)
+  name            String?   @db.VarChar(255)
+  /// US | FOREIGN.
+  usIorStatus     String    @map("us_ior_status") @db.VarChar(8)
+  /// The importer's CTPAT validation as the user stated it: VALIDATED | NONE | UNKNOWN.
+  ctpatStatus     String    @default("UNKNOWN") @map("ctpat_status") @db.VarChar(10)
+  /// Who declared the current status, and when (for U.S.: the 19 CFR 110.2 attestation).
+  declaredById    String?   @map("declared_by_id") @db.Uuid
+  declaredByEmail String?   @map("declared_by_email") @db.VarChar(255)
+  declaredAt      DateTime? @map("declared_at") @db.Timestamptz()
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, iorNumber])
+  @@map("importer_profiles")
 }

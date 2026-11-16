@@ -35,6 +35,9 @@ const abiIORSchema = z.object({
   // Wizard attestation box next to a U.S. declaration; the server stamps
   // who ticked it and when (services/abi/iorAttestation.ts).
   usIorAttested: z.boolean().optional(),
+  // The importer's (or principal's) CTPAT validation as the user states it;
+  // drives pre-send warnings only (services/cbp/ctpatRules.ts).
+  ctpatStatus: z.enum(['VALIDATED', 'NONE', 'UNKNOWN']).optional(),
 });
 
 // IRS / EIN / SSN / CBP-assigned identifier formats used by

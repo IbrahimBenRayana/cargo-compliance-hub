@@ -543,7 +543,7 @@ router.post('/:id/preflight', async (req: AuthRequest, res: Response): Promise<v
     res.json({ ready: false, ...built.body });
     return;
   }
-  res.json({ ready: true, filerCode: built.filerCode, releaseRequested: built.releaseRequested, conversions: built.conversions });
+  res.json({ ready: true, filerCode: built.filerCode, releaseRequested: built.releaseRequested, conversions: built.conversions, warnings: built.warnings });
 });
 
 router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -553,6 +553,7 @@ router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled,
     orgId: req.user!.orgId,
     userId: req.user!.id,
     requestMeta: getRequestMeta(req),
+    acknowledgeWarnings: req.body?.acknowledgeWarnings === true,
   });
   res.status(outcome.httpStatus).json(outcome.body);
 });
@@ -567,7 +568,10 @@ router.post('/:id/cbp-action', ccApiLimiter, requireVerifiedEmail, requireMfaEnr
     res.status(400).json({ error: "action must be 'REPLACE' or 'DELETE'" });
     return;
   }
-  const outcome = await transmitEntryNative({ docId: String(req.params.id), orgId: req.user!.orgId, userId: req.user!.id, action });
+  const outcome = await transmitEntryNative({
+    docId: String(req.params.id), orgId: req.user!.orgId, userId: req.user!.id, action,
+    acknowledgeWarnings: req.body?.acknowledgeWarnings === true,
+  });
   res.status(outcome.httpStatus).json(outcome.body);
 });
 

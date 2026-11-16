@@ -34,6 +34,7 @@ import { cbpTransport, cbpTrafficConfig } from './transport.js';
 import { requireCbpSender } from './sender.js';
 import { canonicalImporterNumber } from '../../abi-engine/records/importerNumber.js';
 import { iorDeclarationRequired } from './iorDeclaration.js';
+import { ctpatChecks, type CtpatWarning } from './ctpatRules.js';
 
 const ACTION_CODE: Record<EntryAction, 'A' | 'R' | 'D'> = { ADD: 'A', REPLACE: 'R', DELETE: 'D' };
 /** Entry types whose AE is certified for cargo release (combined 3461+7501);
@@ -89,6 +90,8 @@ type BuildOutcome =
       filerCode: string;
       releaseRequested: boolean;
       conversions: CurrencyConversion[];
+      /** CTPAT predictions (spec §4 R4/R5): sending needs an explicit "send anyway". */
+      warnings: CtpatWarning[];
     }
   | { ok: false; httpStatus: number; body: Record<string, unknown> };
 
@@ -180,6 +183,7 @@ export async function buildNativeEntry(opts: {
   }
   let lines: string[];
   let districtPort: string;
+  let warnings: CtpatWarning[] = [];
   try {
     const now = new Date();
     const applicabilityDate = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')}`;
@@ -233,6 +237,12 @@ export async function buildNativeEntry(opts: {
     const requireIorDeclaration = iorDeclarationRequired(cbpTrafficConfig.environment);
     if (!requireIorDeclaration) input.iorDeclaration = undefined;
     const issues = validateEntrySummary(input, { requireIorDeclaration }).map(wordLinePartyIssue).map(wordIorIssue);
+    if (requireIorDeclaration && input.iorDeclaration) {
+      const org = await prisma.organization.findUnique({ where: { id: opts.orgId }, select: { ctpatStatus: true } });
+      const ctpat = ctpatChecks({ declaration: input.iorDeclaration, filerCtpat: org?.ctpatStatus ?? 'UNKNOWN', iorCtpat: body.ior?.ctpatStatus });
+      issues.push(...ctpat.blocks.map((b) => ({ severity: 'F' as const, ...b })));
+      warnings = ctpat.warnings;
+    }
     if (issues.length > 0) {
       return { ok: false, httpStatus: 422, body: { error: 'This entry does not meet CBP rules yet.', code: 'ENTRY_DATA_INCOMPLETE', issues } };
     }
@@ -244,7 +254,7 @@ export async function buildNativeEntry(opts: {
     throw err;
   }
 
-  return { ok: true, doc, body, lines, districtPort, filerCode: filer.filerCode, releaseRequested, conversions };
+  return { ok: true, doc, body, lines, districtPort, filerCode: filer.filerCode, releaseRequested, conversions, warnings };
 }
 
 export async function transmitEntryNative(opts: {
@@ -252,12 +262,27 @@ export async function transmitEntryNative(opts: {
   orgId: string;
   userId: string;
   action: EntryAction;
+  /** The user saw the CTPAT warnings and chose to send anyway (audit-logged). */
+  acknowledgeWarnings?: boolean;
 }): Promise<EntryTransmitOutcome> {
   if (cbpTrafficConfig.transport === 'mock' && env.NODE_ENV === 'production') {
     return { httpStatus: 503, body: { error: 'This server is not connected to CBP yet.', code: 'CBP_NOT_CONNECTED' } };
   }
   const built = await buildNativeEntry(opts);
   if (!built.ok) return { httpStatus: built.httpStatus, body: built.body };
+  if (built.warnings.length > 0 && !opts.acknowledgeWarnings) {
+    return {
+      httpStatus: 409,
+      body: { error: 'CBP will likely reject this entry. Send it anyway only if you are sure.', code: 'CBP_WARNINGS_UNACKNOWLEDGED', warnings: built.warnings },
+    };
+  }
+  if (built.warnings.length > 0) {
+    writeAuditLog({
+      orgId: opts.orgId, userId: opts.userId,
+      action: 'entry.send_anyway', entityType: 'abi_document', entityId: opts.docId,
+      newValue: { action: opts.action, warnings: built.warnings.map((w) => w.code) },
+    });
+  }
   const { doc, body, lines, districtPort, releaseRequested, conversions } = built;
   const filer = { filerCode: built.filerCode };
 

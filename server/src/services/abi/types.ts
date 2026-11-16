@@ -35,6 +35,10 @@ export interface AbiIOR {
   brokerActingAsIor?: boolean;
   /** Principal's SSN/IRS/CBP-assigned number; needed when a non-CTPAT broker acts as IOR. */
   principalOnPoa?: string;
+  /** The importer's (or, with the broker as IOR, the principal's) CTPAT validation, as the user stated it. Never sent to CBP. */
+  ctpatStatus?: 'VALIDATED' | 'NONE' | 'UNKNOWN';
+  /** Wizard attestation next to a U.S. declaration; stamped server-side. */
+  usIorAttested?: boolean;
 }
 
 export interface AbiBond {

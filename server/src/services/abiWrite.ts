@@ -130,6 +130,8 @@ export async function sendAbiDocumentToCBP(params: {
   orgId: string;
   userId: string;
   requestMeta?: AuditMeta;
+  /** Send despite CTPAT warnings (native only; spec §4 R4/R5). */
+  acknowledgeWarnings?: boolean;
 }): Promise<AbiWriteOutcome> {
   const { docId, orgId, userId, requestMeta = {} } = params;
 
@@ -212,7 +214,7 @@ export async function sendAbiDocumentToCBP(params: {
   if (((await loadOrgCbpConfig(orgId))?.gateway ?? 'NATIVE') === 'NATIVE') {
     // Keep the list columns (entry number, MBOL, ports) in step with the payload.
     await prisma.abiDocument.updateMany({ where: { id: doc.id, status: doc.status }, data: denorm });
-    const native = await transmitEntryNative({ docId: doc.id, orgId, userId, action: 'ADD' });
+    const native = await transmitEntryNative({ docId: doc.id, orgId, userId, action: 'ADD', acknowledgeWarnings: params.acknowledgeWarnings });
     if (native.httpStatus >= 300) return { httpStatus: native.httpStatus, body: native.body };
     const updated = await prisma.abiDocument.findUnique({ where: { id: doc.id } });
     emitWebhook(orgId, 'entry.sent', { abiDocumentId: doc.id, entryNumber: doc.entryNumber, entryType: doc.entryType, mbolNumber: doc.mbolNumber });

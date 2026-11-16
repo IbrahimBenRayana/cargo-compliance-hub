@@ -113,6 +113,38 @@ describe('transmitEntryNative', () => {
     });
   });
 
+  it('asks for "send anyway" when CBP will likely reject a foreign IOR for CTPAT (894)', async () => {
+    const foreign = { districtPortOfEntry: '2704', iorDeclaration: { usImporterOfRecord: false, brokerActingAsIor: false } };
+    engine.toAeEntrySummaryInput.mockReturnValueOnce(foreign as never);
+    const held = await transmitEntryNative(ARGS);
+    expect(held.httpStatus).toBe(409);
+    expect(held.body).toMatchObject({ code: 'CBP_WARNINGS_UNACKNOWLEDGED', warnings: [{ code: 'CTPAT_FOREIGN_IOR' }] });
+    expect(transmit.transmitNative).not.toHaveBeenCalled();
+
+    engine.toAeEntrySummaryInput.mockReturnValueOnce(foreign as never);
+    const sent = await transmitEntryNative({ ...ARGS, acknowledgeWarnings: true });
+    expect(sent.httpStatus).toBe(202);
+  });
+
+  it('sends a foreign IOR without asking when the filer is CTPAT validated', async () => {
+    prisma.organization.findUnique.mockResolvedValue({ phone: '(202) 341-7574', ctpatStatus: 'VALIDATED' });
+    engine.toAeEntrySummaryInput.mockReturnValueOnce({
+      districtPortOfEntry: '2704',
+      iorDeclaration: { usImporterOfRecord: false, brokerActingAsIor: false },
+    } as never);
+    expect((await transmitEntryNative(ARGS)).httpStatus).toBe(202);
+  });
+
+  it('blocks a non-CTPAT broker acting as IOR without the principal (892)', async () => {
+    engine.toAeEntrySummaryInput.mockReturnValueOnce({
+      districtPortOfEntry: '2704',
+      iorDeclaration: { usImporterOfRecord: true, brokerActingAsIor: true },
+    } as never);
+    const out = await transmitEntryNative({ ...ARGS, acknowledgeWarnings: true });
+    expect(out.httpStatus).toBe(422);
+    expect((out.body.issues as { field: string }[]).map((i) => i.field)).toEqual(['ior.principalOnPoa']);
+  });
+
   it('refuses an informal entry over $2,500 before any claim', async () => {
     prisma.abiDocument.findFirst.mockResolvedValue({ ...DOC, entryType: '11' });
     engine.enrichWithDuty.mockResolvedValueOnce({ entrySummary: { lines: [{ tariffs: [{ htsNumber: '8507600030', valueDollars: 2600 }] }] } });
