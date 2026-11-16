@@ -3,7 +3,7 @@
  * the ACE ABI CATAIR "Entry Summary Create/Update" chapter, July 2026
  * (docs/abi-engine/specs/entry-summary/ae-ax-create-update-2026-07.pdf).
  *
- * Covers the Entry Summary HEADER Grouping input records: 10, 11, 20, SE13,
+ * Covers the Entry Summary HEADER Grouping input records: 10, 11, 15, 20, SE13,
  * 21, 22, 23, SE16, SE17, 30, 31, 32, 33, 34, 35, 36, SE20, SE30, SE31,
  * SE32, SE35, and SE36. Page references in comments are to the chapter's
  * ESF-n page numbers. Positions are transcribed digit-for-digit from the
@@ -72,6 +72,26 @@ export const INPUT_11: RecordDef = {
     { name: 'usStateOfDestinationCode', start: 61, end: 62, class: 'AN', designation: 'C' },
     { name: 'foreignTradeZoneIdentifier', start: 63, end: 71, class: 'AN', designation: 'C' }, // 9AN, see Note 3
     { name: 'filler3', start: 72, end: 80, class: 'S', designation: 'M' },
+  ],
+};
+
+/**
+ * Importer of Record Information — input 15-Record (V112, ESF-42; Foreign
+ * IOR enhancement, CSMS #70409426). Mandatory in the HEADER grouping from
+ * the PROD deployment on 2027-01-05; on an entry summary certified for cargo
+ * release it also carries the 3461 declaration (no SE20 UIR/BIC/PPA).
+ */
+export const INPUT_15: RecordDef = {
+  id: '15',
+  name: 'ImporterOfRecordInformation',
+  fields: [
+    { name: 'controlIdentifier', start: 1, end: 2, class: 'AN', designation: 'M', constant: '15' },
+    { name: 'filler', start: 3, end: 3, class: 'S', designation: 'M' },
+    { name: 'usImporterOfRecordIndicator', start: 4, end: 4, class: 'A', designation: 'M' }, // Y | N
+    { name: 'filler2', start: 5, end: 5, class: 'S', designation: 'M' },
+    { name: 'brokerActingAsIorIndicator', start: 6, end: 6, class: 'A', designation: 'M' }, // Y | N
+    { name: 'principalOnPowerOfAttorney', start: 7, end: 18, class: 'X', designation: 'C' }, // usage note f
+    { name: 'filler3', start: 19, end: 80, class: 'S', designation: 'M' },
   ],
 };
 
@@ -410,6 +430,7 @@ export const INPUT_SE36: RecordDef = {
 for (const def of [
   INPUT_10,
   INPUT_11,
+  INPUT_15,
   INPUT_20,
   INPUT_SE13,
   INPUT_21,

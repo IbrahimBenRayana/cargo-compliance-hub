@@ -16,6 +16,7 @@ import { buildPgaLine, type PgaLineInput } from '../pga/builder.js';
 import {
   INPUT_10,
   INPUT_11,
+  INPUT_15,
   INPUT_20,
   INPUT_SE13,
   INPUT_21,
@@ -219,6 +220,15 @@ export interface AeLine {
   cargoEntities?: AeCargoEntity[];
 }
 
+export interface AeIorDeclaration {
+  /** IOR (or the principal, when the broker acts as IOR) meets 19 CFR 110.2. */
+  usImporterOfRecord: boolean;
+  /** The broker lists itself as filer and IOR on behalf of a principal. */
+  brokerActingAsIor: boolean;
+  /** Principal's IOR number (usage note f); required when a non-CTPAT broker acts as IOR. */
+  principalOnPoa?: string;
+}
+
 export interface AeEntrySummaryInput {
   /** A add, R replace, D delete. */
   action: 'A' | 'R' | 'D';
@@ -265,6 +275,11 @@ export interface AeEntrySummaryInput {
     usStateOfDestination?: string;
     foreignTradeZoneId?: string;
   };
+  /**
+   * 15-Record U.S. IOR declaration (V112). Absent = not emitted, which is
+   * right only before the 2027-01-05 PROD deployment; the caller decides.
+   */
+  iorDeclaration?: AeIorDeclaration;
   cargo?: {
     carrierCode?: string;
     districtPortOfUnlading?: string;
@@ -415,6 +430,16 @@ export function buildEntrySummary(input: AeEntrySummaryInput): string[] {
       foreignTradeZoneIdentifier: input.header.foreignTradeZoneId,
     })
   );
+
+  if (input.iorDeclaration) {
+    lines.push(
+      writeRecord(INPUT_15, {
+        usImporterOfRecordIndicator: input.iorDeclaration.usImporterOfRecord ? 'Y' : 'N',
+        brokerActingAsIorIndicator: input.iorDeclaration.brokerActingAsIor ? 'Y' : 'N',
+        principalOnPowerOfAttorney: input.iorDeclaration.principalOnPoa,
+      })
+    );
+  }
 
   if (input.cargo) {
     lines.push(
