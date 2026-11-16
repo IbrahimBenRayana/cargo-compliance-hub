@@ -176,6 +176,21 @@ describe('migrateV1ToV2', () => {
     expect(lines[lines.length - 1].startsWith('90')).toBe(true);
   });
 
+  it('carries the U.S. IOR declaration into the 15-Record only when one was made', () => {
+    expect(migrateV1ToV2(V1).entrySummary.iorDeclaration).toBeUndefined();
+    const declared = migrateV1ToV2({
+      ...V1,
+      ior: { ...V1.ior, usImporterOfRecord: false, brokerActingAsIor: true, principalOnPoa: '261303 12345' },
+    });
+    expect(declared.entrySummary.iorDeclaration).toEqual({
+      usImporterOfRecord: false,
+      brokerActingAsIor: true,
+      principalOnPoa: '261303-12345',
+    });
+    const us = migrateV1ToV2({ ...V1, ior: { ...V1.ior, usImporterOfRecord: true } });
+    expect(us.entrySummary.iorDeclaration).toEqual({ usImporterOfRecord: true, brokerActingAsIor: false, principalOnPoa: undefined });
+  });
+
   it('refuses unmappable values instead of degrading silently', () => {
     expect(() => migrateV1ToV2({ ...V1, entryNumber: 'BAD' })).toThrow(/cannot split/);
     expect(() => migrateV1ToV2({ ...V1, bond: { ...V1.bond, type: 'X' } })).toThrow(/bond type/);

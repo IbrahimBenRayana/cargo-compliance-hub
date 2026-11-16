@@ -29,6 +29,12 @@ export interface AbiLocation {
 export interface AbiIOR {
   number: string;
   name: string;
+  /** 19 CFR 141.22: IOR (or principal, when the broker acts as IOR) meets 19 CFR 110.2. */
+  usImporterOfRecord?: boolean;
+  /** The broker files as IOR on behalf of a principal on the power of attorney. */
+  brokerActingAsIor?: boolean;
+  /** Principal's SSN/IRS/CBP-assigned number; needed when a non-CTPAT broker acts as IOR. */
+  principalOnPoa?: string;
 }
 
 export interface AbiBond {

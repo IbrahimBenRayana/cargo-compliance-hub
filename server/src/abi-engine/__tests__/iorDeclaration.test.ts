@@ -24,6 +24,7 @@ describe('canonicalImporterNumber (usage note f)', () => {
     expect(canonicalImporterNumber('12-3456789A1')).toEqual({ type: 'EI', number: '12-3456789A1' });
     expect(canonicalImporterNumber(' 261303-12345 ')).toEqual({ type: 'ANI', number: '261303-12345' });
     expect(canonicalImporterNumber('26130312345')).toEqual({ type: 'ANI', number: '261303-12345' });
+    expect(canonicalImporterNumber('261303 12345')).toEqual({ type: 'ANI', number: '261303-12345' });
   });
 
   it('returns null for anything else', () => {

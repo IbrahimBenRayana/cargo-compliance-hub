@@ -27,6 +27,11 @@ const abiLocationSchema = z.object({
 const abiIORSchema = z.object({
   number: z.string().min(1).max(50),
   name: z.string().min(1).max(255),
+  // 19 CFR 141.22 declaration (15-Record). Optional here: required at
+  // transmission from CBP's cutover date (services/cbp/iorDeclaration.ts).
+  usImporterOfRecord: z.boolean().optional(),
+  brokerActingAsIor: z.boolean().optional(),
+  principalOnPoa: z.string().max(12).optional(),
 });
 
 // IRS / EIN / SSN / CBP-assigned identifier formats used by

@@ -1,7 +1,7 @@
 /** Native entry transmission (native go-live 4.1). */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-const { prisma, filer, engine, transmit, cfg } = vi.hoisted(() => ({
+const { prisma, filer, engine, transmit, gate, cfg } = vi.hoisted(() => ({
   prisma: {
     abiDocument: { findFirst: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
     user: { findUnique: vi.fn() },
@@ -15,6 +15,7 @@ const { prisma, filer, engine, transmit, cfg } = vi.hoisted(() => ({
     validateEntrySummary: vi.fn((_input: unknown): unknown[] => []), buildEntrySummary: vi.fn((_input: any) => ['AE10']),
   },
   transmit: { transmitNative: vi.fn() },
+  gate: { iorDeclarationRequired: vi.fn(() => true) },
   cfg: { transport: 'mqipt', environment: 'CERT' },
 }));
 vi.mock('../../../config/database.js', () => ({ prisma }));
@@ -26,6 +27,7 @@ vi.mock('../../../abi-engine/payload/toAeInput.js', () => ({ toAeEntrySummaryInp
 vi.mock('../../../abi-engine/validate/entrySummary.js', () => ({ validateEntrySummary: engine.validateEntrySummary }));
 vi.mock('../../../abi-engine/ae/builder.js', () => ({ buildEntrySummary: engine.buildEntrySummary }));
 vi.mock('../nativeTransmit.js', () => transmit);
+vi.mock('../iorDeclaration.js', () => gate);
 vi.mock('../transport.js', () => ({ cbpTransport: {}, cbpTrafficConfig: cfg }));
 vi.mock('../sender.js', () => ({ requireCbpSender: () => ({ siteCode: '1303', idCode: 'S7P', password: 'X' }) }));
 vi.mock('../../auditLog.js', () => ({ writeAuditLog: vi.fn() }));
@@ -80,6 +82,35 @@ describe('transmitEntryNative', () => {
     prisma.abiDocument.findFirst.mockResolvedValue({ ...DOC, entryType: '03' });
     await transmitEntryNative(ARGS);
     expect(engine.buildEntrySummary.mock.calls[0][0].cargoReleaseCertification).toBe(true);
+  });
+
+  it('requires and sends the U.S. IOR declaration once CBP has the 15-Record', async () => {
+    const declaration = { usImporterOfRecord: true, brokerActingAsIor: false };
+    engine.toAeEntrySummaryInput.mockReturnValueOnce({ districtPortOfEntry: '2704', iorDeclaration: declaration } as never);
+    await transmitEntryNative(ARGS);
+    expect(engine.validateEntrySummary).toHaveBeenCalledWith(expect.anything(), { requireIorDeclaration: true });
+    expect(engine.buildEntrySummary.mock.calls[0][0].iorDeclaration).toEqual(declaration);
+  });
+
+  it('holds the declaration back before the cutover so PROD never sees an unknown record', async () => {
+    gate.iorDeclarationRequired.mockReturnValueOnce(false);
+    engine.toAeEntrySummaryInput.mockReturnValueOnce({
+      districtPortOfEntry: '2704',
+      iorDeclaration: { usImporterOfRecord: true, brokerActingAsIor: false },
+    } as never);
+    await transmitEntryNative(ARGS);
+    expect(engine.validateEntrySummary).toHaveBeenCalledWith(expect.anything(), { requireIorDeclaration: false });
+    expect(engine.buildEntrySummary.mock.calls[0][0].iorDeclaration).toBeUndefined();
+  });
+
+  it('words a missing declaration against the entry fields', async () => {
+    engine.validateEntrySummary.mockReturnValueOnce([{ severity: 'F', field: 'iorDeclaration', message: 'raw' }]);
+    const out = await transmitEntryNative(ARGS);
+    expect(out.httpStatus).toBe(422);
+    expect((out.body.issues as { field: string; message: string }[])[0]).toMatchObject({
+      field: 'ior.usImporterOfRecord',
+      message: expect.stringMatching(/U\.S\. importer of record or a foreign importer of record/),
+    });
   });
 
   it('refuses an informal entry over $2,500 before any claim', async () => {

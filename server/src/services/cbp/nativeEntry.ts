@@ -33,6 +33,7 @@ import { convertInvoiceValuesToUsd, CurrencyConversionError, type CurrencyConver
 import { cbpTransport, cbpTrafficConfig } from './transport.js';
 import { requireCbpSender } from './sender.js';
 import { canonicalImporterNumber } from '../../abi-engine/records/importerNumber.js';
+import { iorDeclarationRequired } from './iorDeclaration.js';
 
 const ACTION_CODE: Record<EntryAction, 'A' | 'R' | 'D'> = { ADD: 'A', REPLACE: 'R', DELETE: 'D' };
 /** Entry types whose AE is certified for cargo release (combined 3461+7501);
@@ -105,6 +106,23 @@ function wordLinePartyIssue<T extends { field: string; message: string }>(issue:
   const m = /^lines\[(\d+)\]\.parties\[([A-Z])\]$/.exec(issue.field);
   const words = m && LINE_PARTY_WORDS[m[2]];
   return words ? { ...issue, message: `Line ${Number(m[1]) + 1} needs ${words}.` } : issue;
+}
+
+/** 15-Record issues, keyed to the entry's own `ior` fields and worded for people. */
+const IOR_DECLARATION_ISSUES: Record<string, { field: string; message: string }> = {
+  iorDeclaration: {
+    field: 'ior.usImporterOfRecord',
+    message: 'Say whether the importer of record is a U.S. importer of record or a foreign importer of record. CBP requires this on every entry.',
+  },
+  'iorDeclaration.principalOnPoa': {
+    field: 'ior.principalOnPoa',
+    message: 'The principal on the power of attorney must be an SSN (NNN-NN-NNNN), IRS number (NN-NNNNNNN) or CBP-assigned number (YYDDPP-NNNNN), and is only used when you file as importer of record for them.',
+  },
+};
+
+function wordIorIssue<T extends { field: string; message: string }>(issue: T): T {
+  const worded = IOR_DECLARATION_ISSUES[issue.field];
+  return worded ? { ...issue, ...worded } : issue;
 }
 
 export async function buildNativeEntry(opts: {
@@ -211,7 +229,10 @@ export async function buildNativeEntry(opts: {
       input.cargoEntities = entities.entities;
     }
 
-    const issues = validateEntrySummary(input).map(wordLinePartyIssue);
+    // 15-Record: sent and required only from CBP's cutover for this environment.
+    const requireIorDeclaration = iorDeclarationRequired(cbpTrafficConfig.environment);
+    if (!requireIorDeclaration) input.iorDeclaration = undefined;
+    const issues = validateEntrySummary(input, { requireIorDeclaration }).map(wordLinePartyIssue).map(wordIorIssue);
     if (issues.length > 0) {
       return { ok: false, httpStatus: 422, body: { error: 'This entry does not meet CBP rules yet.', code: 'ENTRY_DATA_INCOMPLETE', issues } };
     }

@@ -13,7 +13,7 @@ export type ImporterNumberType = 'EI' | 'ANI' | '34';
 
 /** The number's type and canonical hyphenated form, or null if it fits no format. */
 export function canonicalImporterNumber(raw: string): { type: ImporterNumberType; number: string } | null {
-  const cleaned = raw.trim().toUpperCase();
+  const cleaned = raw.trim().toUpperCase().replace(/\s+/g, '-');
   if (/^[0-9]{3}-[0-9]{2}-[0-9]{4}$/.test(cleaned)) return { type: '34', number: cleaned };
   const ani = /^([0-9]{6})-?([0-9]{5})$/.exec(cleaned);
   if (ani) return { type: 'ANI', number: `${ani[1]}-${ani[2]}` };
