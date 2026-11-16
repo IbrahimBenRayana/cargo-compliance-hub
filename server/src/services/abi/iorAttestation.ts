@@ -35,7 +35,9 @@ export function stampIorAttestation<P extends { ior?: unknown }>(
   previous: { ior?: unknown } | null | undefined,
   merged: P,
   user: { id: string; email: string },
-  now: Date = new Date()
+  now: Date = new Date(),
+  /** A saved importer's existing U.S. attestation, kept instead of a new stamp. */
+  saved?: IorAttestationStamp
 ): P {
   const ior = merged.ior as IorSlice | undefined;
   if (!ior || typeof ior !== 'object') return merged;
@@ -48,6 +50,8 @@ export function stampIorAttestation<P extends { ior?: unknown }>(
     const sameDeclaration = attested(before) && before?.number === ior.number && typeof before?.usIorAttestedAt === 'string';
     if (sameDeclaration) {
       for (const key of STAMP_KEYS) next[key] = before![key];
+    } else if (saved) {
+      Object.assign(next, saved);
     } else {
       next.usIorAttestedById = user.id;
       next.usIorAttestedByEmail = user.email;

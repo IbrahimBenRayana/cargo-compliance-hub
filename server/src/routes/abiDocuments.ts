@@ -45,6 +45,7 @@ import {
 import { renderEntry7501Pdf } from '../services/entryPdf.js';
 import { contentDispositionAttachment } from '../utils/httpHeaders.js';
 import { stampIorAttestation } from '../services/abi/iorAttestation.js';
+import { rememberImporter, savedAttestation } from '../services/importerProfiles.js';
 import {
   parseLineImportCsv,
   LINE_IMPORT_TEMPLATE,
@@ -247,10 +248,13 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     return;
   }
 
+  const unstamped = mergePayload(existing.payload, parsed.data.payload);
   const merged = stampIorAttestation(
     existing.payload as { ior?: unknown } | null,
-    mergePayload(existing.payload, parsed.data.payload),
-    req.user!
+    unstamped,
+    req.user!,
+    new Date(),
+    unstamped.ior?.usIorAttested ? await savedAttestation(req.user!.orgId, unstamped.ior.number) : undefined
   );
   const denorm = extractDenormFromPayload(merged);
 
@@ -261,6 +265,10 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       ...denorm,
     },
   });
+  // Saved importers: remember a completed declaration for the next entry.
+  rememberImporter(req.user!.orgId, merged.ior, req.user!).catch((err) =>
+    logger.warn({ err, docId: existing.id }, '[AbiDocuments] saving the importer profile failed')
+  );
 
   res.json({ data: updated });
 });

@@ -45,6 +45,12 @@ describe('stampIorAttestation', () => {
     expect(out.ior).not.toHaveProperty('usIorAttestedById');
   });
 
+  it("keeps a saved importer's attestation instead of re-stamping", () => {
+    const saved = { usIorAttestedById: 'u-9', usIorAttestedByEmail: 'cy@broker.test', usIorAttestedAt: '2026-10-01T00:00:00.000Z' };
+    const out = stampIorAttestation({}, { ior: usIor }, user, t1, saved);
+    expect(out.ior).toMatchObject(saved);
+  });
+
   it('leaves a payload without an ior slice alone', () => {
     const payload: { ior?: unknown; entryType: string } = { entryType: '01' };
     expect(stampIorAttestation({}, payload, user, t1)).toBe(payload);
