@@ -1175,6 +1175,8 @@ export interface OrgCbpIdentity {
   serviceCenterApprovedAt: string | null;
   sigmaFilerCode: string;
   environment: 'NONE' | 'CERT' | 'PROD';
+  /** The org's own CTPAT validation as a filer (self-attested). */
+  ctpatStatus: CtpatStatus;
 }
 
 export interface AdminPriceOverrides {
@@ -1972,6 +1974,13 @@ export const organizationApi = {
     return apiFetch<{ cbp: OrgCbpIdentity }>('/api/v1/organization/cbp');
   },
 
+  setCtpatStatus(ctpatStatus: CtpatStatus) {
+    return apiFetch<{ cbp: { ctpatStatus: CtpatStatus } }>('/api/v1/organization/cbp/ctpat', {
+      method: 'PATCH',
+      body: JSON.stringify({ ctpatStatus }),
+    });
+  },
+
   setIsfFilerDefault(isfFilerModeDefault: 'SIGMA' | 'CLIENT') {
     return apiFetch<{ cbp: { isfFilerModeDefault: 'SIGMA' | 'CLIENT' } }>('/api/v1/organization/cbp', {
       method: 'PATCH',
@@ -2045,6 +2054,24 @@ export interface ABILocation {
   destinationStateUS: string;
 }
 
+export type CtpatStatus = 'VALIDATED' | 'NONE' | 'UNKNOWN';
+
+/** CBP will likely reject (foreign IOR rule, ES 894); sending needs "send anyway". */
+export interface CbpWarning {
+  code: string;
+  message: string;
+}
+
+/** What the org last declared for an importer of record. */
+export interface ImporterProfile {
+  iorNumber: string;
+  name: string | null;
+  usIorStatus: 'US' | 'FOREIGN';
+  ctpatStatus: CtpatStatus;
+  declaredByEmail: string | null;
+  declaredAt: string | null;
+}
+
 export interface ABIIOR {
   number: string;
   name: string;
@@ -2056,6 +2083,8 @@ export interface ABIIOR {
   principalOnPoa?: string;
   /** Attestation box next to a U.S. declaration. */
   usIorAttested?: boolean;
+  /** The importer's (or principal's) CTPAT validation as the user states it. Warnings only; never sent to CBP. */
+  ctpatStatus?: CtpatStatus;
   /** Server-stamped when the box is ticked; read-only. */
   usIorAttestedById?: string;
   usIorAttestedByEmail?: string;
@@ -2341,7 +2370,15 @@ export interface EntryPreflight {
   filerCode?: string;
   releaseRequested?: boolean;
   conversions?: Array<{ currency: string; amount: number; usd: number; rate: number; rateDate: string }>;
+  /** Ready to send, but CBP will likely reject; sending needs "send anyway". */
+  warnings?: CbpWarning[];
 }
+
+export const importerProfilesApi = {
+  lookup(number: string) {
+    return apiFetch<{ data: ImporterProfile | null }>(`/api/v1/importer-profiles/lookup?number=${encodeURIComponent(number)}`);
+  },
+};
 
 export const abiDocumentsApi = {
   /** Full native build + CBP-rule validation, without sending anything. */
@@ -2355,10 +2392,10 @@ export const abiDocumentsApi = {
   },
 
   /** Replace or delete the entry summary CBP holds (native entries). */
-  cbpAction(id: string, action: 'REPLACE' | 'DELETE') {
+  cbpAction(id: string, action: 'REPLACE' | 'DELETE', acknowledgeWarnings = false) {
     return apiFetch<{ transmissionId: string; outcome: string }>(`/api/v1/abi-documents/${id}/cbp-action`, {
       method: 'POST',
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, ...(acknowledgeWarnings && { acknowledgeWarnings }) }),
     });
   },
 
@@ -2411,9 +2448,10 @@ export const abiDocumentsApi = {
     return apiFetch<void>(`/api/v1/abi-documents/${id}`, { method: 'DELETE' });
   },
 
-  send(id: string) {
+  send(id: string, acknowledgeWarnings = false) {
     return apiFetch<AbiDocumentEnvelope>(`/api/v1/abi-documents/${id}/send`, {
       method: 'POST',
+      ...(acknowledgeWarnings && { body: JSON.stringify({ acknowledgeWarnings }) }),
     });
   },
 

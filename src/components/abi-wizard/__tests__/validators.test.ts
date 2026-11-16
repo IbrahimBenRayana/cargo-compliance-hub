@@ -1,6 +1,6 @@
 /** ENT-01 (testing week): CBP needs a "sold to" (Buyer + tax ID) party on each line of a type 01/03 entry. */
 import { describe, it, expect } from 'vitest';
-import { validateStep2, validateStep5 } from '../validators';
+import { canonicalIorNumber, validateStep2, validateStep5 } from '../validators';
 import type { ABIDocumentDraft } from '@/api/client';
 
 const item = (parties: Array<Record<string, string>>) => ({
@@ -51,5 +51,15 @@ describe('validateStep2 importer of record status', () => {
       expect(iorErrors({ ...base, principalOnPoa: n })).toEqual([]);
     }
     expect(iorErrors(base)).toEqual([]);
+  });
+});
+
+describe('canonicalIorNumber', () => {
+  it('matches the server: hyphenated EIN, SSN and CBP-assigned numbers', () => {
+    expect(canonicalIorNumber('123456789')).toBe('12-3456789');
+    expect(canonicalIorNumber('12-3456789a1')).toBe('12-3456789A1');
+    expect(canonicalIorNumber('123-45-6789')).toBe('123-45-6789');
+    expect(canonicalIorNumber('261303 12345')).toBe('261303-12345');
+    expect(canonicalIorNumber('ACME')).toBeNull();
   });
 });

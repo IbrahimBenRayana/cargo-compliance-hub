@@ -28,6 +28,16 @@ const TAXID_RE =
 // Importer number formats CBP accepts for the principal on power of
 // attorney (ES usage note f): SSN, EIN with optional suffix, CBP-assigned.
 const IMPORTER_NUMBER_RE = /^(?:\d{3}-\d{2}-\d{4}|\d{2}-\d{7}(?:[A-Z0-9]{2})?|\d{6}-\d{5})$/;
+/** An importer number in CBP's hyphenated form, or null (mirrors the server's canonicalImporterNumber). */
+export function canonicalIorNumber(raw: string): string | null {
+  const cleaned = raw.trim().toUpperCase().replace(/\s+/g, '-');
+  if (/^\d{3}-\d{2}-\d{4}$/.test(cleaned)) return cleaned;
+  const ani = /^(\d{6})-?(\d{5})$/.exec(cleaned);
+  if (ani) return `${ani[1]}-${ani[2]}`;
+  const ein = /^(\d{2})-?(\d{7})([A-Z0-9]{2})?$/.exec(cleaned);
+  return ein ? `${ein[1]}-${ein[2]}${ein[3] ?? ''}` : null;
+}
+
 const ENTRY_NUMBER_RE = /^[A-Z0-9-]{9,13}$/;
 const HTS_RE = /^\d{10}$/;
 const TAXID_HINT =

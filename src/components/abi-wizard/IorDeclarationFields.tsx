@@ -6,15 +6,17 @@
  * mistake, so a person must choose it and attest to it. The server stamps
  * who attested and when. CBP verifies the declaration; we never claim to.
  */
-import { useId } from 'react';
+import { useEffect, useId } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, ShieldCheck } from '@/components/icons';
-import type { ABIDocumentDraft } from '@/api/client';
+import { importerProfilesApi, type ABIDocumentDraft, type ImporterProfile } from '@/api/client';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { SectionHeader, TextField } from './shared';
+import { SectionHeader, SelectField, TextField } from './shared';
+import { canonicalIorNumber } from './validators';
 
 type Ior = NonNullable<ABIDocumentDraft['ior']>;
 
@@ -46,12 +48,51 @@ export function iorStatusLabel(ior: Pick<Ior, 'usImporterOfRecord'> | undefined)
   return ior.usImporterOfRecord ? 'U.S. importer of record' : 'Foreign importer of record';
 }
 
+const CTPAT_OPTIONS = [
+  { value: 'VALIDATED', label: 'Yes, validated (Tier 2 or 3)' },
+  { value: 'NONE', label: 'No' },
+  { value: 'UNKNOWN', label: 'Not sure' },
+];
+
+function savedLine(saved: ImporterProfile): string {
+  const status = saved.usIorStatus === 'US' ? 'U.S. importer of record' : 'Foreign importer of record';
+  const when = saved.declaredAt ? new Date(saved.declaredAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : null;
+  return `Filled in from your saved importer: ${status}${when ? `, declared ${when}` : ''}${saved.declaredByEmail ? ` by ${saved.declaredByEmail}` : ''}.`;
+}
+
 export default function IorDeclarationFields({ ior, setIor, errors }: Props) {
   const id = useId();
   const statusError = errors['ior.usImporterOfRecord'];
   const attestError = errors['ior.usIorAttested'];
   const status = ior.usImporterOfRecord === undefined ? '' : ior.usImporterOfRecord ? 'US' : 'FOREIGN';
-  const stamp = attestedLine(ior);
+
+  // Saved importers: the org's last declaration for this IOR fills an
+  // unanswered entry in. It never overrides an answer already given.
+  const lookupNumber = canonicalIorNumber(ior.number ?? '');
+  const { data: saved } = useQuery({
+    queryKey: ['importer-profile', lookupNumber],
+    queryFn: () => importerProfilesApi.lookup(lookupNumber!).then((r) => r.data),
+    enabled: lookupNumber !== null,
+    staleTime: 60_000,
+  });
+  const unanswered = ior.usImporterOfRecord === undefined;
+  useEffect(() => {
+    if (!saved || !unanswered) return;
+    setIor({
+      usImporterOfRecord: saved.usIorStatus === 'US',
+      usIorAttested: saved.usIorStatus === 'US' && saved.declaredAt ? true : undefined,
+      ...(saved.ctpatStatus !== 'UNKNOWN' && { ctpatStatus: saved.ctpatStatus }),
+      ...(!ior.name && saved.name && { name: saved.name }),
+    });
+    // setIor and ior.name change every render; the saved answer applies once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved, unanswered]);
+  const fromSaved = saved && saved.usIorStatus === status && saved.iorNumber === lookupNumber ? saved : null;
+  const stamp =
+    attestedLine(ior) ??
+    (fromSaved?.usIorStatus === 'US' && ior.usIorAttested && fromSaved.declaredAt
+      ? attestedLine({ usIorAttestedAt: fromSaved.declaredAt, usIorAttestedByEmail: fromSaved.declaredByEmail ?? undefined })
+      : null);
 
   return (
     <div>
@@ -96,6 +137,19 @@ export default function IorDeclarationFields({ ior, setIor, errors }: Props) {
         </RadioGroup>
       </div>
       <FieldError id={`${id}-status-error`} message={statusError} />
+      {fromSaved && <p className="mt-1.5 text-xs text-muted-foreground">{savedLine(fromSaved)}</p>}
+
+      {ior.usImporterOfRecord === false && (
+        <SelectField
+          className="mt-3 md:max-w-sm"
+          label={ior.brokerActingAsIor ? 'Is your client CTPAT validated?' : 'Is this importer CTPAT validated?'}
+          value={ior.ctpatStatus ?? ''}
+          onChange={(v) => setIor({ ctpatStatus: v as Ior['ctpatStatus'] })}
+          options={CTPAT_OPTIONS}
+          placeholder="Choose…"
+          hint="CBP checks CTPAT itself and is not told your answer. It only lets us warn you before CBP would reject a foreign importer's entry."
+        />
+      )}
 
       {ior.usImporterOfRecord && (
         <div className="mt-3 rounded-lg border border-border/70 bg-muted/40 px-3.5 py-3">

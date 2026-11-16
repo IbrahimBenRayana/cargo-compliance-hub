@@ -28,6 +28,7 @@ import type {
   AbiDocument,
   ABIInvoice,
   ABIItem,
+  CbpWarning,
 } from '@/api/client';
 import {
   ENTRY_TYPES,
@@ -47,6 +48,7 @@ import { CopyButton } from '@/components/shipment-detail/CopyButton';
 import { stamp } from '@/components/shipment-detail/summary';
 import { usePortName } from '@/components/shipment-detail/usePortName';
 import { attestedLine, iorStatusLabel } from '@/components/abi-wizard/IorDeclarationFields';
+import { SendAnywayDialog, cbpWarningsFrom } from '@/components/abi-wizard/SendAnywayDialog';
 
 function lookupLabel(options: { value: string; label: string }[], value: string | null | undefined) {
   if (!value) return '';
@@ -224,6 +226,8 @@ export default function ABIDocumentDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [cbpAction, setCbpAction] = useState<'REPLACE' | 'DELETE' | null>(null);
   const [cbpActionPending, setCbpActionPending] = useState(false);
+  // CTPAT warnings (foreign IOR rule) on a replacement: the server asks first.
+  const [actionWarnings, setActionWarnings] = useState<CbpWarning[] | null>(null);
   const queryClient = useQueryClient();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
@@ -332,16 +336,21 @@ export default function ABIDocumentDetailPage() {
   const canResend = isNativeResendable(doc);
   const onFile = isNative && isOnFileAtCbp(doc);
 
-  const handleCbpAction = async () => {
+  const handleCbpAction = async (acknowledgeWarnings = false) => {
     if (!cbpAction) return;
     setCbpActionPending(true);
     try {
-      await abiDocumentsApi.cbpAction(doc.id, cbpAction);
+      await abiDocumentsApi.cbpAction(doc.id, cbpAction, acknowledgeWarnings);
       toast.success(cbpAction === 'DELETE' ? 'Deletion sent to CBP.' : 'Replacement sent to CBP.');
       setCbpAction(null);
       queryClient.invalidateQueries({ queryKey: ['abi-documents', doc.id] });
       queryClient.invalidateQueries({ queryKey: ['abi-document', doc.id, 'cbp'] });
     } catch (err: any) {
+      const warnings = cbpWarningsFrom(err);
+      if (warnings) {
+        setActionWarnings(warnings);
+        return;
+      }
       toast.error(err?.body?.error || err?.message || 'Could not send to CBP');
     } finally {
       setCbpActionPending(false);
@@ -720,7 +729,7 @@ export default function ABIDocumentDetailPage() {
       </AlertDialog>
 
       {/* Replace / delete at CBP */}
-      <AlertDialog open={cbpAction !== null} onOpenChange={(open) => !open && setCbpAction(null)}>
+      <AlertDialog open={cbpAction !== null && actionWarnings === null} onOpenChange={(open) => !open && setCbpAction(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -748,6 +757,18 @@ export default function ABIDocumentDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <SendAnywayDialog
+        warnings={actionWarnings}
+        onCancel={() => {
+          setActionWarnings(null);
+          setCbpAction(null);
+        }}
+        onSendAnyway={() => {
+          setActionWarnings(null);
+          handleCbpAction(true);
+        }}
+      />
 
       {/* Delete confirmation */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
