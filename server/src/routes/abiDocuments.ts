@@ -44,6 +44,7 @@ import {
 } from '../services/entryNumberBlocks.js';
 import { renderEntry7501Pdf } from '../services/entryPdf.js';
 import { contentDispositionAttachment } from '../utils/httpHeaders.js';
+import { stampIorAttestation } from '../services/abi/iorAttestation.js';
 import {
   parseLineImportCsv,
   LINE_IMPORT_TEMPLATE,
@@ -246,7 +247,11 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     return;
   }
 
-  const merged = mergePayload(existing.payload, parsed.data.payload);
+  const merged = stampIorAttestation(
+    existing.payload as { ior?: unknown } | null,
+    mergePayload(existing.payload, parsed.data.payload),
+    req.user!
+  );
   const denorm = extractDenormFromPayload(merged);
 
   const updated = await prisma.abiDocument.update({

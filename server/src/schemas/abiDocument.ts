@@ -32,6 +32,9 @@ const abiIORSchema = z.object({
   usImporterOfRecord: z.boolean().optional(),
   brokerActingAsIor: z.boolean().optional(),
   principalOnPoa: z.string().max(12).optional(),
+  // Wizard attestation box next to a U.S. declaration; the server stamps
+  // who ticked it and when (services/abi/iorAttestation.ts).
+  usIorAttested: z.boolean().optional(),
 });
 
 // IRS / EIN / SSN / CBP-assigned identifier formats used by
