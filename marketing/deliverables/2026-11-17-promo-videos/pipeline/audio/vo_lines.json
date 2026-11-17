@@ -1,6 +1,6 @@
 [
  { "id": "p01", "text": "Which filing needs you, right now?" },
- { "id": "p02", "text": "MyCargoLens opens on today's work, with the ISFs nearest their cutoff at the top." },
+ { "id": "p02", "text": "MyCargoLens opens on today's work, with every ISF filing that is near its cutoff at the top." },
  { "id": "p03", "text": "Every ISF carries its own deadline clock." },
  { "id": "p04", "text": "Each draft is checked against the rules before you submit it." },
  { "id": "p05", "text": "Open work is ranked by urgency, in one inbox." },

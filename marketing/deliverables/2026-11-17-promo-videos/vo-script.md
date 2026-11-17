@@ -7,7 +7,7 @@ Voice: Kokoro `af_heart`, speed 0.95, generated locally. Source of truth: `pipel
 | Scene | Line |
 |---|---|
 | Opening | Which filing needs you, right now? |
-| Today | MyCargoLens opens on today's work, with the ISFs nearest their cutoff at the top. |
+| Today | MyCargoLens opens on today's work, with every ISF filing that is near its cutoff at the top. |
 | Shipments | Every ISF carries its own deadline clock. |
 | Rule checks | Each draft is checked against the rules before you submit it. |
 | Compliance | Open work is ranked by urgency, in one inbox. |
