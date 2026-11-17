@@ -14,10 +14,12 @@ Staging uses Stripe **test mode**. Prod uses live mode, and live mode changes ar
 2. **Invoicing.** In Settings → Billing → Invoices, set the business name, address and support email on
    invoices, and turn on invoice reminders (the plan's cadence is days −3, 0, +3 and +7).
 3. **Webhook endpoint** (`/api/v1/billing/webhook`). Add these events to the existing four:
-   `invoice.finalized`, `invoice.paid`, `invoice.payment_failed`, `invoice.voided` and
-   `invoice.marked_uncollectible`.
-4. **Customer portal.** Turn on invoice history and payment-method updates, so the client's
-   "Invoices & payment methods in Stripe" link shows its invoices.
+   `invoice.finalized`, `invoice.paid`, `invoice.payment_failed`, `invoice.voided`,
+   `invoice.marked_uncollectible` and `invoice.deleted`.
+4. **Customer portal.** Turn on invoice history so the client's "Invoices & payment methods in Stripe"
+   link shows its invoices. Leave **payment-method updates off** for now: a bank account changed in the
+   portal is not recorded on our side, so the next invoice would try the old one. Clients change their
+   bank account in Settings → Billing instead.
 
 ## Setting up a pilot (in /admin)
 
@@ -50,7 +52,12 @@ Staging uses Stripe **test mode**. Prod uses live mode, and live mode changes ar
    reason in the billing sheet.
 
 Each month can be invoiced once per kind. If Stripe fails mid-way, the row shows `error`; click again
-and the retry re-uses the same Stripe invoice.
+and the retry re-uses the same Stripe invoice. A retry more than 24 hours later may leave a stray draft
+in Stripe: delete any extra draft for the month before finalizing.
+
+To redo a wrong invoice, **void** it (or delete the draft) in Stripe. Its shipments go back to unbilled
+and the month can be drafted again. A prepay can't be made for a month that already has a usage
+invoice, and an invoiced org can't be switched back to card while it has unbilled shipments.
 
 ## Overdue invoices
 

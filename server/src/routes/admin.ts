@@ -366,6 +366,15 @@ router.put('/organizations/:id/pricing', async (req: AuthRequest, res: Response)
     ...(billingStartsOn !== undefined && { billingStartsOn: billingStartsOn ? new Date(`${billingStartsOn}T00:00:00Z`) : null }),
   };
   const mode = parsed.data.billingMode ?? existing.billingMode;
+  if (existing.billingMode === 'invoiced' && mode === 'card') {
+    // Accrued shipments are only billed by a monthly invoice, which card orgs
+    // never get: invoice them before switching.
+    const accrued = await prisma.shipmentCharge.count({ where: { orgId, status: 'accrued' } });
+    if (accrued > 0) {
+      res.status(409).json({ error: `${accrued} accepted shipment(s) are still waiting for a monthly invoice. Invoice them before switching to card billing.` });
+      return;
+    }
+  }
   if (mode === 'invoiced') {
     // Pilot defaults for anything the admin didn't set (pricing plan v2 §5.1).
     data.isfCents ??= PILOT_DEFAULTS.isfCents;
