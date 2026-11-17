@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Info, Search, Loader2, Sparkles, AlertCircle, Wand2 } from 'lucide-react';
+import { Info, Search, Loader2, Sparkles, AlertCircle, Wand2 } from '@/components/icons';
 import { integrationsApi } from '@/api/client';
 import { HtsSuggestions } from '@/components/hts/HtsSuggestions';
 import { formatHtsCode } from '@/lib/htsFormat';

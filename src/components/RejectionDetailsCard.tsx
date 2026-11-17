@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -240,7 +240,7 @@ export function RejectionDetailsCard({
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-md bg-rose-100 dark:bg-rose-500/15 ring-1 ring-rose-200 dark:ring-rose-500/30 flex items-center justify-center">
-              <AlertTriangle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" strokeWidth={2.25} />
+              <AlertTriangle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" weight="bold" />
             </div>
             <div>
               <CardTitle className="text-sm font-semibold text-rose-700 dark:text-rose-300">{heading}</CardTitle>

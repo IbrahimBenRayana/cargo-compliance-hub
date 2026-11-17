@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Loader2 } from '@/components/icons';
 
 /** Shown while a page's code loads on first visit. */
 export function PageLoading() {

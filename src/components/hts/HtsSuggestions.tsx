@@ -3,7 +3,7 @@
  * the Compliance > Classification card. A wrong code means wrong duty, so the
  * confidence, the duty rate and every warning are shown, not just the code.
  */
-import { AlertTriangle, HelpCircle, Info } from 'lucide-react';
+import { AlertTriangle, HelpCircle, Info } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { formatHtsCode } from '@/lib/htsFormat';
 import type { HtsClassifyResult, HtsConfidence, HtsSuggestion, HtsUsage } from '@/types/htsClassify';

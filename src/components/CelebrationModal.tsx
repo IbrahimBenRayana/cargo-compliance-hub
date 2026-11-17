@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, Receipt, Sparkles } from 'lucide-react';
+import { Check, Receipt, Sparkles } from '@/components/icons';
 import {
   Dialog,
   DialogContent,
@@ -51,7 +51,7 @@ export function CelebrationModal({ planId, onClose }: CelebrationModalProps) {
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
               className="relative h-16 w-16 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_8px_24px_-8px_rgba(245,158,11,0.5)] flex items-center justify-center"
             >
-              <Check className="h-8 w-8 text-amber-950" strokeWidth={3} />
+              <Check className="h-8 w-8 text-amber-950" weight="bold" />
             </motion.div>
           </div>
 
@@ -97,7 +97,7 @@ export function CelebrationModal({ planId, onClose }: CelebrationModalProps) {
                 key={cap}
                 className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11.5px] font-medium text-slate-700 dark:text-slate-300"
               >
-                <Check className="h-3 w-3 text-amber-500" strokeWidth={3} />
+                <Check className="h-3 w-3 text-amber-500" weight="bold" />
                 {CAPABILITY_LABEL[cap] ?? cap}
               </span>
             ))}

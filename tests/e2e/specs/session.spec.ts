@@ -18,7 +18,8 @@ test.skip(!SECOND.email, 'set E2E_EMAIL_2 / E2E_PASSWORD_2 / E2E_TOTP_SECRET_2 (
 
 async function planName(page: Page) {
   await gotoAuthed(page, '/settings?tab=billing');
-  const name = page.getByText(/per shipment filed|Custom pricing/).locator('xpath=preceding-sibling::div[1]');
+  // The plan card reads "Current plan" then the plan's name (settings redesign #236).
+  const name = page.getByText('Current plan', { exact: true }).locator('xpath=following-sibling::*[1]');
   await expect(name).toBeVisible({ timeout: 15_000 });
   return (await name.textContent())?.trim();
 }

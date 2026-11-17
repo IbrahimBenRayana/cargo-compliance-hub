@@ -8,7 +8,7 @@ import {
   Hand,
   CheckCheck,
   UserCheck,
-} from 'lucide-react';
+} from '@/components/icons';
 import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';

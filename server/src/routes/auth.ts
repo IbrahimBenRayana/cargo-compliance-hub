@@ -7,6 +7,7 @@ import { emailField } from '../schemas/common.js';
 import logger from '../config/logger.js';
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
+import { seesRollout } from '../services/rollout.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { writeAuditLog, getRequestMeta } from '../services/auditLog.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
@@ -618,6 +619,10 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promi
     emailVerified: user.emailVerified,
     mfaEnabled: user.mfaEnabled,
     mfaSetupRequired: user.mfaEnforced && !user.mfaEnabled,
+    features: {
+      dashboardV2: seesRollout(env.DASHBOARD_V2, user.isPlatformAdmin),
+      shipmentsV2: seesRollout(env.SHIPMENTS_V2, user.isPlatformAdmin),
+    },
     organization: {
       id: user.organization.id,
       name: user.organization.name,

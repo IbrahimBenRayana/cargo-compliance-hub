@@ -135,7 +135,9 @@ export async function submitFilingToCBP(params: {
   if (!ent.canFile || !ent.capabilities.includes(CAPABILITIES.ISF_FILING)) {
     return {
       httpStatus: 402,
-      body: ent.delinquent
+      body: ent.billingHold
+        ? { error: 'Your account is on hold for an overdue invoice. Contact us to keep filing.', code: 'billing_hold' }
+        : ent.delinquent
         ? { error: 'A previous charge failed — update your card to keep filing.', code: 'payment_required', upgradeUrl: '/settings?tab=billing' }
         : !ent.hasActiveTier
           ? { error: 'Choose a plan to submit filings.', code: 'subscription_required', upgradeUrl: '/settings?tab=billing' }

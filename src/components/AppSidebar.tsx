@@ -1,4 +1,4 @@
-import { LayoutDashboard, Ship, Shield, ShieldCheck, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator, Container, MessagesSquare, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, Ship, Shield, ShieldCheck, Plug, Settings, FileText, ChevronRight, Users, Search, FileCheck, Calculator, MessagesSquare } from '@/components/icons';
 import { LogoMark } from '@/components/LogoMark';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -63,13 +63,11 @@ const navSections: NavSection[] = [
     items: [
       { title: 'Shipments',       url: '/shipments',     icon: Ship },
       { title: 'Entry Documents', url: '/abi-documents', icon: FileCheck, requiredCapability: CAPABILITIES.ABI_ENTRY },
-      { title: 'In-Bond',         url: '/inbond',        icon: ArrowLeftRight, requiredCapability: CAPABILITIES.IN_BOND },
     ],
   },
   {
     label: 'Lookups',
     items: [
-      { title: 'Tracking',        url: '/tracking',        icon: Container, requiredCapability: CAPABILITIES.CONTAINER_TRACKING },
       { title: 'Manifest Query',  url: '/manifest-query',  icon: Search },
       { title: 'Duty Calculator', url: '/duty-calculator', icon: Calculator, requiredCapability: CAPABILITIES.HTS_CLASSIFICATION },
     ],
@@ -199,7 +197,7 @@ export function AppSidebar() {
                       className={navItemClass}
                     >
                       <NavLink to={item.url} end={item.end}>
-                        <item.icon className="h-[18px] w-[18px] transition-transform duration-200 group-hover/btn:scale-110 shrink-0" />
+                        <item.icon weight="duotone" className="!h-5 !w-5 transition-transform duration-200 group-hover/btn:scale-110 shrink-0" />
                         {!collapsed && (
                           <>
                             <span className="font-medium text-[13px]">{item.title}</span>

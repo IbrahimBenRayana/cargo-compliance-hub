@@ -20,18 +20,18 @@ test('three house bills become three ISFs; bulk submit; CBP accepts each', async
   await expect(page.getByText(/consolidation created — 3 ISF drafts/)).toBeVisible({ timeout: 20_000 });
 
   await gotoAuthed(page, '/shipments');
-  await page.getByPlaceholder(/Search bill of lading/).fill(masterBol);
+  await page.getByRole('searchbox').or(page.getByPlaceholder(/Search bill of lading/)).first().fill(masterBol);
   const rows = page.locator('tbody tr').filter({ has: page.getByRole('checkbox') });
   await expect(rows).toHaveCount(3, { timeout: 15_000 });
   for (let i = 0; i < 3; i++) await rows.nth(i).getByRole('checkbox').check();
-  await page.getByRole('button', { name: /^Submit 3$/ }).click();
+  await page.getByRole('button', { name: /^(Submit 3|Send 3 drafts)$/ }).click();
   const confirm = page.getByRole('alertdialog');
   if (await confirm.isVisible().catch(() => false)) await confirm.getByRole('button', { name: /Send|Submit|Confirm/ }).last().click();
 
   // CBP answers each within a couple of minutes; the list shows the result.
   await expect.poll(async () => {
     await page.reload();
-    await page.getByPlaceholder(/Search bill of lading/).fill(masterBol);
+    await page.getByRole('searchbox').or(page.getByPlaceholder(/Search bill of lading/)).first().fill(masterBol);
     await page.waitForTimeout(1500);
     return (await rows.allInnerTexts()).filter((t) => /Accepted/.test(t)).length;
   }, { timeout: 300_000, intervals: [20_000] }).toBe(3);

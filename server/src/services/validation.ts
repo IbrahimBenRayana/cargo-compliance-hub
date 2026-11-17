@@ -124,7 +124,7 @@ function validatePortCode(port: string | null | undefined, fieldPath: string, fi
   }
 
   const trimmed = port.trim().toUpperCase();
-  // CBP Schedule D port codes are exactly 4 digits (e.g., "2704" = Houston).
+  // CBP Schedule D port codes are exactly 4 digits (e.g., "2704" = Los Angeles).
   // UN/LOCODEs are 5 letters (e.g., "USLAX" = Los Angeles).
   // Anything else is rejected. This is `critical` severity now (was 'warning')
   // because CC's allowed-values list is fixed and a freeform port string

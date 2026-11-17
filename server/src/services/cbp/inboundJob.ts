@@ -12,6 +12,7 @@ import { dispatchPending, type DispatchResult, type InboundHandler } from './dis
 import { certInboundHandler } from './certAttach.js';
 import { taggedTransmissionHandler, businessKeyHandler } from './transmissionHandlers.js';
 import { currencyRateHandler } from './currency.js';
+import { manifestQueryHandler } from './nativeManifestQuery.js';
 
 export function inboundEnvironment(): InboundEnvironment {
   if (cbpTrafficConfig.transport === 'mock') return 'MOCK';
@@ -19,14 +20,14 @@ export function inboundEnvironment(): InboundEnvironment {
 }
 
 /**
- * Handlers per environment, first claim wins: our tagged transmissions,
- * then cert-console scenarios (CERT only), then unsolicited messages by
- * ISF transaction / entry number.
+ * Handlers per environment, first claim wins: replies to our manifest
+ * queries, our other tagged transmissions, then cert-console scenarios
+ * (CERT only), then unsolicited messages by ISF transaction / entry number.
  */
 function handlersFor(environment: InboundEnvironment): InboundHandler[] {
   return environment === 'PROD'
-    ? [taggedTransmissionHandler, currencyRateHandler, businessKeyHandler]
-    : [taggedTransmissionHandler, certInboundHandler, currencyRateHandler, businessKeyHandler];
+    ? [manifestQueryHandler, taggedTransmissionHandler, currencyRateHandler, businessKeyHandler]
+    : [manifestQueryHandler, taggedTransmissionHandler, certInboundHandler, currencyRateHandler, businessKeyHandler];
 }
 
 export interface InboundRun {

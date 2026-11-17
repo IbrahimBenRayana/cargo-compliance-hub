@@ -17,7 +17,7 @@ import {
   XOctagon,
   UserPlus,
   ShieldAlert,
-} from 'lucide-react';
+} from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -177,7 +177,7 @@ export function NotificationBell() {
           className="relative h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors cursor-pointer"
           aria-label={badgeCount > 0 ? `Open notifications, ${badgeCount} unread` : 'Open notifications'}
         >
-          <Bell className="h-[18px] w-[18px]" />
+          <Bell className="icon-ring h-[18px] w-[18px]" />
           {badgeKind !== 'none' && (
             <span
               className={cn(

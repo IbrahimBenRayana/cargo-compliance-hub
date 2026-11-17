@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ShieldCheck, LogOut } from 'lucide-react';
+import { ShieldCheck, LogOut } from '@/components/icons';
 import { MfaEnrollment } from '@/components/settings/MfaEnrollment';
 import { useAuthStore } from '@/hooks/useAuth';
 import { useLogout } from '@/hooks/useAuth';
@@ -61,7 +61,7 @@ export default function MfaSetupPage() {
           {/* Hero header */}
           <div className="px-7 pt-8 pb-6 bg-gradient-to-b from-amber-50/60 to-transparent dark:from-amber-400/[0.06] dark:to-transparent text-center">
             <div className="mx-auto h-14 w-14 rounded-full bg-amber-100 dark:bg-amber-500/15 ring-1 ring-amber-200 dark:ring-amber-500/30 flex items-center justify-center mb-4">
-              <ShieldCheck className="h-7 w-7 text-amber-600 dark:text-amber-400" strokeWidth={2} />
+              <ShieldCheck className="h-7 w-7 text-amber-600 dark:text-amber-400" />
             </div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-400 mb-2">
               Two-factor authentication

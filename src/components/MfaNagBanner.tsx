@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, X } from 'lucide-react';
+import { ShieldAlert, X } from '@/components/icons';
 import { useAuthStore } from '@/hooks/useAuth';
 
 const DISMISS_KEY = 'mcl_mfa_nag_dismissed';

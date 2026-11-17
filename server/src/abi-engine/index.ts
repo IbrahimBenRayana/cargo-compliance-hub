@@ -334,6 +334,27 @@ export type {
   QuotaResponseBatch,
 } from './apps/quota/responseParser.js';
 export * as quotaRecordDefs from './apps/quota/recordDefs.js';
+export { buildManifestQuery } from './apps/manifestQuery/builder.js';
+export type {
+  ManifestQueryRequest,
+  ManifestQueryLimit,
+  BillQuery,
+  AirWaybillQuery,
+  InbondQuery,
+  EntryQuery,
+} from './apps/manifestQuery/builder.js';
+export { parseManifestQueryResponse, parseManifestQueryResponseBatch } from './apps/manifestQuery/responseParser.js';
+export type {
+  ManifestQueryResponse,
+  ManifestQueryError,
+  ManifestConveyance,
+  ManifestBill,
+  ManifestInbond,
+  ManifestDisposition,
+  ManifestPorts,
+  ManifestQueryResponseBatch,
+} from './apps/manifestQuery/responseParser.js';
+export * as manifestQueryRecordDefs from './apps/manifestQuery/recordDefs.js';
 
 // ── Harmonized Tariff Schedule Query (HA/HY) ───────────────
 export { buildHtsQuery } from './apps/htsQuery/builder.js';

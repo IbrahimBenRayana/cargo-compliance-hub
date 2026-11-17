@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Check, Lock, Sparkles } from 'lucide-react';
+import { ArrowRight, Check, Lock, Sparkles } from '@/components/icons';
 import {
   Dialog,
   DialogContent,
@@ -75,7 +75,7 @@ export function PlanLimitModal({ open, onClose, capability }: PlanLimitModalProp
         <div className="relative px-6 pt-7 pb-5 bg-gradient-to-b from-primary/[0.06] to-transparent">
           <div className="flex items-center gap-3 mb-4">
             <div className="h-11 w-11 rounded-xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center shrink-0">
-              <Lock className="h-5 w-5 text-primary" strokeWidth={2.25} />
+              <Lock className="h-5 w-5 text-primary" weight="bold" />
             </div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/80">
               {featureLabel ?? 'Upgrade required'}

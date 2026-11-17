@@ -183,7 +183,9 @@ export async function sendAbiDocumentToCBP(params: {
   if (!ent.canFile) {
     return {
       httpStatus: 402,
-      body: ent.delinquent
+      body: ent.billingHold
+        ? { error: 'Your account is on hold for an overdue invoice. Contact us to keep filing.', code: 'billing_hold' }
+        : ent.delinquent
         ? { error: 'A previous charge failed — update your card to keep filing.', code: 'payment_required', upgradeUrl: '/settings?tab=billing' }
         : { error: 'Add a payment method to submit entries.', code: 'card_required', upgradeUrl: '/settings?tab=billing' },
     };

@@ -2,7 +2,7 @@
  * ABI Entry Summary 7501 — shared enum/constant data.
  *
  * Dropdown option sources for the ABI wizard. Port lookups are NOT duplicated
- * here — use `SCHEDULE_D_PORTS` from `./schedule-d-ports` for port fields.
+ * here — use `ENTRY_PORTS` from `./schedule-d-ports` for port fields.
  *
  * Color tokens follow the app's Tailwind convention used in
  * `src/components/StatusBadge.tsx` (slate / blue / emerald / red / amber).

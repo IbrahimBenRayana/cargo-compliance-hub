@@ -19,6 +19,9 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
   const where: any = { orgId: req.user!.orgId };
   if (filingId) where.filingId = filingId;
+  // Background status checks are GETs and outnumber everything else many
+  // times over; `sends=1` leaves only the calls that sent something.
+  if (req.query.sends === '1') where.method = { not: 'GET' };
 
   const [logs, total] = await Promise.all([
     prisma.submissionLog.findMany({

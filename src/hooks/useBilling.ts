@@ -50,7 +50,7 @@ export function useSelectTier() {
 
 /** Begin saving a card — returns a SetupIntent client secret for Elements. */
 export function useCreateSetupIntent() {
-  return useMutation({ mutationFn: billingApi.createSetupIntent });
+  return useMutation({ mutationFn: (method?: 'card' | 'us_bank_account') => billingApi.createSetupIntent(method) });
 }
 
 /** Confirm a saved card after Elements confirms the SetupIntent. */

@@ -11,8 +11,10 @@ import {
   stripeConfigured,
   createStripeCustomer,
   createSetupIntent,
-  setDefaultCard,
+  setDefaultPaymentMethod,
+  type SavedPaymentMethod,
 } from '../services/stripe.js';
+import { syncInvoiceStatus, previewMonth } from '../services/invoicing.js';
 import { getOrgEntitlements } from '../services/entitlements.js';
 import { retryOrgCharges } from '../services/shipmentBilling.js';
 import { notify } from '../services/notifications.js';
@@ -66,14 +68,18 @@ router.post(
 );
 
 // ─── Event dispatch with an idempotency ledger ─────────────────────────────
-// Stripe delivers at-least-once. We INSERT event.id ON CONFLICT DO NOTHING; an
-// empty result means we already processed it. processedAt is set only after the
-// handler finishes (and nulled on failure) so a crashed handler can be retried.
+// Stripe delivers at-least-once. We INSERT event.id; an empty result means we
+// already processed it. processedAt is set only after the handler finishes (and
+// nulled on failure), so Stripe's retry of a failed event re-claims the row
+// instead of being skipped as a duplicate. The 2-minute gap keeps a retry from
+// re-claiming an event whose first delivery is still being handled.
 export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
   const inserted = await prisma.$queryRaw<Array<{ event_id: string }>>`
     INSERT INTO "stripe_webhook_events" ("event_id", "type", "received_at")
     VALUES (${event.id}, ${event.type}, NOW())
-    ON CONFLICT ("event_id") DO NOTHING
+    ON CONFLICT ("event_id") DO UPDATE SET "received_at" = NOW()
+      WHERE "stripe_webhook_events"."processed_at" IS NULL
+        AND "stripe_webhook_events"."received_at" < NOW() - INTERVAL '2 minutes'
     RETURNING "event_id"
   `;
   if (inserted.length === 0) {
@@ -95,6 +101,20 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       case 'charge.refunded':
         await onChargeRefunded(event.data.object as Stripe.Charge);
         break;
+      // Monthly invoices for invoiced accounts: mirror their status.
+      case 'invoice.finalized':
+      case 'invoice.paid':
+      case 'invoice.voided':
+      case 'invoice.marked_uncollectible':
+        await syncInvoiceStatus((event.data.object as Stripe.Invoice).id!, (event.data.object as Stripe.Invoice).status);
+        break;
+      // A draft deleted in the dashboard: free the month so it can be redone.
+      case 'invoice.deleted':
+        await syncInvoiceStatus((event.data.object as Stripe.Invoice).id!, 'deleted');
+        break;
+      case 'invoice.payment_failed':
+        await onInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+        break;
       default:
         logger.debug({ type: event.type }, 'Unhandled Stripe event');
     }
@@ -111,28 +131,64 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
   });
 }
 
-/** Backup for POST /billing/card — a confirmed SetupIntent saved a card. */
+/**
+ * Record a newly saved payment method on the org. A card becomes the card we
+ * charge per shipment (and unsettled charges are retried on it); a US bank
+ * account becomes the ACH account monthly invoices debit.
+ */
+async function recordPaymentMethod(orgId: string, pm: SavedPaymentMethod): Promise<void> {
+  if (pm.type === 'us_bank_account') {
+    await prisma.subscription.update({
+      where: { orgId },
+      data: { achPaymentMethodId: pm.paymentMethodId, achBankName: pm.bankName, achLast4: pm.last4 },
+    });
+    return;
+  }
+  await prisma.subscription.update({
+    where: { orgId },
+    data: {
+      defaultPaymentMethodId: pm.paymentMethodId,
+      cardBrand: pm.brand,
+      cardLast4: pm.last4,
+      cardExpMonth: pm.expMonth,
+      cardExpYear: pm.expYear,
+      status: 'card_on_file',
+    },
+  });
+  // Now that a card is on file, settle anything that previously failed.
+  await retryOrgCharges(orgId, { cardChanged: true });
+}
+
+/** Backup for POST /billing/card — a confirmed SetupIntent saved a card or a
+ *  bank account (micro-deposit verification completes here, days later). */
 async function onSetupIntentSucceeded(si: Stripe.SetupIntent): Promise<void> {
   const customerId = typeof si.customer === 'string' ? si.customer : si.customer?.id;
   const pmId = typeof si.payment_method === 'string' ? si.payment_method : si.payment_method?.id;
   if (!customerId || !pmId) return;
   const sub = await prisma.subscription.findFirst({ where: { stripeCustomerId: customerId } });
   if (!sub) return;
-  if (sub.defaultPaymentMethodId === pmId) return; // already recorded by the direct endpoint
-  const card = await setDefaultCard(customerId, pmId);
-  await prisma.subscription.update({
-    where: { orgId: sub.orgId },
-    data: {
-      defaultPaymentMethodId: card.paymentMethodId,
-      cardBrand: card.brand,
-      cardLast4: card.last4,
-      cardExpMonth: card.expMonth,
-      cardExpYear: card.expYear,
-      status: 'card_on_file',
-    },
-  });
-  await retryOrgCharges(sub.orgId, { cardChanged: true });
-  logger.info({ orgId: sub.orgId }, '✓ Card saved (via setup_intent webhook)');
+  // Already recorded by the direct endpoint.
+  if (sub.defaultPaymentMethodId === pmId || sub.achPaymentMethodId === pmId) return;
+  const pm = await setDefaultPaymentMethod(customerId, pmId);
+  await recordPaymentMethod(sub.orgId, pm);
+  logger.info({ orgId: sub.orgId, type: pm.type }, '✓ Payment method saved (via setup_intent webhook)');
+}
+
+/** A monthly invoice's ACH debit failed: mirror it and tell owners/admins. */
+async function onInvoicePaymentFailed(inv: Stripe.Invoice): Promise<void> {
+  if (!inv.id) return;
+  await syncInvoiceStatus(inv.id, inv.status);
+  const orgId = inv.metadata?.orgId;
+  if (!orgId) return;
+  await notify({
+    kind: 'billing_payment_failed',
+    audience: { orgId, roles: ['ADMIN', 'OWNER'] },
+    title: 'Invoice payment failed',
+    message: 'The bank debit for your monthly MyCargoLens invoice did not go through. Check your bank account in Settings → Billing.',
+    linkUrl: '/settings?tab=billing',
+    metadata: { invoiceId: inv.id },
+    dedupeKey: `invoice_failed_${inv.id}`,
+  }).catch(() => {});
 }
 
 /** Mark the matching ShipmentCharge paid (backup for the synchronous path). */
@@ -246,11 +302,17 @@ router.post('/select-tier', requireRole('owner', 'admin'), async (req: AuthReque
   res.json({ planId: plan.id, canFile: ent.canFile, cardOnFile: ent.cardOnFile });
 });
 
-// POST /api/v1/billing/setup-intent → { clientSecret }
-// Starts saving a card. Requires a selected tier (so we have a billing row).
+// POST /api/v1/billing/setup-intent  { method?: 'card' | 'us_bank_account' } → { clientSecret }
+// Starts saving a card, or (invoiced accounts only) a US bank account for ACH
+// Direct Debit of the monthly invoice. Requires a plan (so we have a billing row).
 router.post('/setup-intent', requireRole('owner', 'admin'), requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   if (!stripeConfigured()) {
     res.status(503).json({ error: 'Billing not configured. Contact support.' });
+    return;
+  }
+  const parsed = z.object({ method: z.enum(['card', 'us_bank_account']).default('card') }).safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
   const orgId = req.user!.orgId;
@@ -259,18 +321,23 @@ router.post('/setup-intent', requireRole('owner', 'admin'), requireVerifiedEmail
     res.status(400).json({ error: 'Choose a plan before adding a card.', code: 'tier_required' });
     return;
   }
+  if (parsed.data.method === 'us_bank_account' && sub.billingMode !== 'invoiced') {
+    res.status(400).json({ error: 'Bank accounts are for invoiced accounts. Contact us to set one up.', code: 'not_invoiced' });
+    return;
+  }
   let customerId = sub.stripeCustomerId;
   if (!customerId) {
     customerId = await createStripeCustomer({ orgId, email: req.user!.email });
     await prisma.subscription.update({ where: { orgId }, data: { stripeCustomerId: customerId } });
   }
-  const { clientSecret } = await createSetupIntent(customerId);
+  const { clientSecret } = await createSetupIntent(customerId, parsed.data.method);
   res.json({ clientSecret });
 });
 
 // POST /api/v1/billing/card  { setupIntentId }
-// Confirm a saved card: set it as the default payment method, store the display
-// summary, and reattempt any unsettled charges (clearing delinquency on success).
+// Confirm a saved payment method. A card: set it as the default, store the
+// display summary, and reattempt any unsettled charges (clearing delinquency on
+// success). A bank account: store it as the ACH account for monthly invoices.
 router.post('/card', requireRole('owner', 'admin'), requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
   if (!stripeConfigured()) {
     res.status(503).json({ error: 'Billing not configured' });
@@ -290,34 +357,32 @@ router.post('/card', requireRole('owner', 'admin'), requireVerifiedEmail, requir
   const si = await getStripe().setupIntents.retrieve(parsed.data.setupIntentId);
   const pmId = typeof si.payment_method === 'string' ? si.payment_method : si.payment_method?.id;
   const siCustomer = typeof si.customer === 'string' ? si.customer : si.customer?.id;
-  if (si.status !== 'succeeded' || !pmId || siCustomer !== sub.stripeCustomerId) {
+  if (siCustomer !== sub.stripeCustomerId) {
     res.status(400).json({ error: 'Card was not confirmed. Please try again.' });
     return;
   }
-  const card = await setDefaultCard(sub.stripeCustomerId, pmId);
-  await prisma.subscription.update({
-    where: { orgId },
-    data: {
-      defaultPaymentMethodId: card.paymentMethodId,
-      cardBrand: card.brand,
-      cardLast4: card.last4,
-      cardExpMonth: card.expMonth,
-      cardExpYear: card.expYear,
-      status: 'card_on_file',
-    },
-  });
+  // A bank account verified by micro-deposits finishes days later; the
+  // setup_intent.succeeded webhook records it then.
+  if (si.status === 'requires_action' && si.next_action?.type === 'verify_with_microdeposits') {
+    res.status(202).json({ pending: true, message: "Stripe is sending two small deposits to your account. Confirm them from Stripe's email and we'll save the account." });
+    return;
+  }
+  if (si.status !== 'succeeded' || !pmId) {
+    res.status(400).json({ error: 'Card was not confirmed. Please try again.' });
+    return;
+  }
+  const pm = await setDefaultPaymentMethod(sub.stripeCustomerId, pmId);
+  await recordPaymentMethod(orgId, pm);
   writeAuditLog({
     orgId,
     userId: req.user!.id,
-    action: 'billing.card_saved',
+    action: pm.type === 'card' ? 'billing.card_saved' : 'billing.bank_account_saved',
     entityType: 'subscription',
     entityId: orgId,
-    newValue: { brand: card.brand, last4: card.last4 },
+    newValue: pm.type === 'card' ? { brand: pm.brand, last4: pm.last4 } : { bankName: pm.bankName, last4: pm.last4 },
   });
-  // Now that a card is on file, settle anything that previously failed.
-  await retryOrgCharges(orgId, { cardChanged: true });
   const ent = await getOrgEntitlements(orgId);
-  res.json({ card, canFile: ent.canFile });
+  res.json({ card: pm.type === 'card' ? pm : null, bankAccount: pm.type === 'us_bank_account' ? pm : null, canFile: ent.canFile });
 });
 
 // GET /api/v1/billing/subscription → { plan, capabilities, card, canFile, usage }
@@ -336,6 +401,8 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
     _count: { _all: true },
     _sum: { amountCents: true },
   });
+  // Invoiced accounts: this month so far, rated as the monthly invoice will be.
+  const invoiced = ent.billingMode === 'invoiced' && sub ? await previewMonth(orgId, periodStart) : null;
 
   res.json({
     plan: plan
@@ -357,6 +424,18 @@ router.get('/subscription', async (req: AuthRequest, res: Response): Promise<voi
     delinquent: ent.delinquent,
     card: ent.cardOnFile
       ? { brand: sub?.cardBrand, last4: sub?.cardLast4, expMonth: sub?.cardExpMonth, expYear: sub?.cardExpYear }
+      : null,
+    billingMode: ent.billingMode,
+    billingHold: ent.billingHold,
+    // Invoiced accounts: the terms, the ACH account, and this month so far.
+    invoicing: invoiced
+      ? {
+          monthlyMinimumCents: invoiced.terms.minimumCents,
+          includedIsfs: invoiced.terms.includedIsfs,
+          isfBands: invoiced.terms.isfBands,
+          bankAccount: sub?.achLast4 ? { bankName: sub.achBankName, last4: sub.achLast4 } : null,
+          monthToDate: { isfs: invoiced.isfCount, shipments: invoiced.rows.length, estimatedCents: invoiced.totalCents, lines: invoiced.lines },
+        }
       : null,
     usage: {
       periodStart,

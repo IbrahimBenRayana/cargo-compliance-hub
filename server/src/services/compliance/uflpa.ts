@@ -138,7 +138,7 @@ export function assessUflpaRisk(filing: FilingLike): UflpaRisk {
   const chinaParty = [filing.manufacturer, filing.seller].some(isChinaOrigin);
   if (severity === 'low' && chinaParty && chinaOriginCommodities.length > 0) {
     severity = 'elevated';
-    reasons.push('China-origin commodities — recommended to verify supply chain documentation');
+    reasons.push('China-origin commodities: verify supply chain documentation');
   }
 
   const recommendation =

@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore, useCurrentUser } from '@/hooks/useAuth';
-import { Loader2 } from 'lucide-react';
+import { Loader2 } from '@/components/icons';
 
 /**
  * Route guard for the platform-admin area. Renders the nested routes only when

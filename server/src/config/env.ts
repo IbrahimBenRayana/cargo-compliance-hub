@@ -113,6 +113,15 @@ const envSchema = z.object({
       message: 'MFA_ENC_KEY must be 64 hex characters (32 bytes)',
     })
     .optional(),
+  // Which dashboard people see: off = the classic page, staff = platform admins
+  // get the new one, all = everyone. Rolling back is setting this to off.
+  DASHBOARD_V2: z.enum(['off', 'staff', 'all']).default('off'),
+  // The same choice for the Shipments page.
+  SHIPMENTS_V2: z.enum(['off', 'staff', 'all']).default('off'),
+  // Who asks CBP directly for manifest queries (CQ) instead of the gateway:
+  // off = nobody, staff = platform admins, all = every org filing natively.
+  // Off until CBP confirms CQ on our profile (docs/specs/native-manifest-query.md).
+  MANIFEST_QUERY_NATIVE: z.enum(['off', 'staff', 'all']).default('off'),
   // Native CBP connection (services/cbp/environment.ts): ABI_TRANSPORT,
   // CBP_ENVIRONMENT (staging = CERT, production = PROD), mq-bridge URL+token.
   ...cbpEnvShape,

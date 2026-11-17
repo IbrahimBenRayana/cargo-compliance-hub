@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { filingsApi, FilingListParams, notificationsApi, templatesApi, settingsApi, integrationsApi, bulkApi, organizationApi, documentsApi, exportApi } from '../api/client';
 
@@ -6,6 +6,23 @@ export function useFilings(params?: FilingListParams) {
   return useQuery({
     queryKey: ['filings', params],
     queryFn: () => filingsApi.list(params),
+  });
+}
+
+/** One page of the Shipments list. The last page stays on screen while the next one loads. */
+export function useFilingsPage(params: FilingListParams) {
+  return useQuery({
+    queryKey: ['filings', params],
+    queryFn: () => filingsApi.list(params),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useFilingFacets(params: Parameters<typeof filingsApi.facets>[0]) {
+  return useQuery({
+    queryKey: ['filings', 'facets', params],
+    queryFn: () => filingsApi.facets(params),
+    placeholderData: keepPreviousData,
   });
 }
 

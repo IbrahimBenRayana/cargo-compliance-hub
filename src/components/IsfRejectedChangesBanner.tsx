@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from '@/components/icons';
 import { filingsApi, type FilingCbpActivity } from '@/api/client';
 import { rejectedChanges } from '@/lib/isfRejectedChanges';
 

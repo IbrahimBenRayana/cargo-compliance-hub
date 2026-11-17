@@ -20,7 +20,7 @@ test.describe('Authentication', () => {
   test('valid credentials log in and land on the dashboard', async ({ page }) => {
     await login(page);
     await expect(page).toHaveURL(new RegExp(`^${BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/$`));
-    await expect(page.getByText(/shipments? in flight|your shipments will flow through here/i).first()).toBeVisible();
+    await expect(page.getByText(/^Today$|open shipments?|your shipments will flow through here/i).first()).toBeVisible();
   });
 
   test('invalid credentials are rejected and keep the user on /login', async ({ page }) => {
@@ -35,7 +35,7 @@ test.describe('Authentication', () => {
   test('session survives a hard page reload (refresh-token recovery)', async ({ page }) => {
     await login(page);
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByText(/shipments? in flight|your shipments will flow through here/i).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/^Today$|open shipments?|your shipments will flow through here/i).first()).toBeVisible({ timeout: 15000 });
     await expect(page).not.toHaveURL(/\/login/);
   });
 });

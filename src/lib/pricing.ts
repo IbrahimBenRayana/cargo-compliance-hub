@@ -32,3 +32,20 @@ export function dollarsToCents(v: string): number | null {
   if (!/^\d+(\.\d{1,2})?$/.test(t)) return Number.NaN;
   return Math.round(Number(t) * 100);
 }
+
+/** Invoiced volume band: from the fromIsf-th accepted ISF of a month on, each costs cents. */
+export interface IsfBand {
+  fromIsf: number;
+  cents: number;
+}
+
+const ordinal = (n: number) => {
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  return `${n.toLocaleString('en-US')}${suffix}`;
+};
+
+/** One line per band, e.g. "$4 per accepted ISF from the 251st in a month". */
+export function isfBandLines(bands: IsfBand[] | null | undefined): string[] {
+  return (bands ?? []).map((b) => `${money(b.cents)} per accepted ISF from the ${ordinal(b.fromIsf)} in a month`);
+}

@@ -4,7 +4,7 @@
  * Phase 1 models a single manifest (`manifest[0]`). Invoices/items belong to
  * that manifest and are handled in Step 5.
  */
-import { Ship } from 'lucide-react';
+import { Ship } from '@/components/icons';
 import type { ABIDocumentDraft, AbiDocument } from '@/api/client';
 import { BILL_TYPES, QUANTITY_UOM, YES_NO } from '@/data/abiEnums';
 import { ENTRY_PORTS } from '@/data/schedule-d-ports';
@@ -45,7 +45,7 @@ export default function Step4Manifest({ value, onChange, doc, errors = {} }: Pro
   return (
     <div className="space-y-6">
       {prefilled && (
-        <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-900/40 text-xs text-blue-800 dark:text-blue-300 px-3 py-2">
+        <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-900/40 text-xs text-info px-3 py-2">
           Pre-populated from Manifest Query {doc?.manifestQueryId}
         </div>
       )}

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Lock, Loader2, ArrowRight, Sparkles } from 'lucide-react';
+import { Lock, Loader2, ArrowRight, Sparkles } from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useCapabilities } from '@/hooks/useBilling';
@@ -54,7 +54,7 @@ function UpgradePanel({ capability }: { capability: Capability }) {
       <Card className="w-full max-w-lg border-border/60 shadow-sm">
         <CardHeader className="text-center space-y-3 pb-2">
           <div className="mx-auto h-12 w-12 rounded-xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center">
-            <Lock className="h-5 w-5 text-primary" strokeWidth={2.25} />
+            <Lock className="h-5 w-5 text-primary" weight="bold" />
           </div>
           <div className="space-y-1.5">
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary/80">

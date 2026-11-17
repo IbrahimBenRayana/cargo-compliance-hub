@@ -7,7 +7,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle, AlertTriangle, ArrowLeft, ArrowLeftRight, CalendarClock, ChevronDown,
   ChevronRight, Loader2, MapPin, Pencil, Plus, ShieldCheck, Terminal, Trash2,
-} from 'lucide-react';
+} from '@/components/icons';
 import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

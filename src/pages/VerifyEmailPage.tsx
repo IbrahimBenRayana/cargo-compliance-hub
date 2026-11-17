@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Loader2, MailCheck, ShieldCheck, RotateCw, ArrowLeft } from 'lucide-react';
+import { Loader2, MailCheck, ShieldCheck, RotateCw, ArrowLeft } from '@/components/icons';
 
 import { authApi } from '@/api/client';
 import { useAuthStore } from '@/hooks/useAuth';
@@ -187,12 +187,12 @@ export default function VerifyEmailPage() {
                   className="absolute inset-0 rounded-full bg-amber-400/30 motion-reduce:hidden"
                 />
                 <div className="relative h-14 w-14 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 ring-1 ring-amber-300/60 dark:ring-amber-400/40 shadow-[0_8px_20px_-10px_rgba(245,158,11,0.5)] flex items-center justify-center">
-                  <ShieldCheck className="h-7 w-7 text-amber-950" strokeWidth={2.5} />
+                  <ShieldCheck className="h-7 w-7 text-amber-950" weight="bold" />
                 </div>
               </motion.div>
             ) : (
               <div className="mx-auto h-14 w-14 rounded-full bg-amber-100 dark:bg-amber-500/15 ring-1 ring-amber-200 dark:ring-amber-500/30 flex items-center justify-center mb-4">
-                <MailCheck className="h-7 w-7 text-amber-600 dark:text-amber-400" strokeWidth={2} />
+                <MailCheck className="h-7 w-7 text-amber-600 dark:text-amber-400" />
               </div>
             )}
 

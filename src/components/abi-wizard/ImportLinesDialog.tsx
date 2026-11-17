@@ -7,7 +7,7 @@
  * the wizard's own state, so autosave persists them like any edit.
  */
 import { useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, Download, FileUp, Loader2, Upload } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, FileUp, Loader2, Upload } from '@/components/icons';
 import { toast } from 'sonner';
 import { abiDocumentsApi } from '@/api/client';
 import type { ABIItem, LineImportError } from '@/api/client';
@@ -158,12 +158,12 @@ export function ImportLinesDialog({ docId, invoiceIndex, onImport }: Props) {
           {report && (
             <div className="space-y-3">
               <div className="flex items-center gap-4 text-sm">
-                <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                <span className="flex items-center gap-1.5 text-done">
                   <CheckCircle2 className="h-4 w-4" />
                   {report.validRows} of {report.totalRows} rows ready
                 </span>
                 {report.errors.length > 0 && (
-                  <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                  <span className="flex items-center gap-1.5 text-urgent">
                     <AlertCircle className="h-4 w-4" />
                     {report.errors.length} problem{report.errors.length === 1 ? '' : 's'}
                   </span>

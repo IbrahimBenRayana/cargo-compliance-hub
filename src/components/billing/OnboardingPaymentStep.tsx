@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Check, Loader2, CreditCard, Star } from 'lucide-react';
+import { Check, Loader2, CreditCard, Star } from '@/components/icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useSubscription, useSelectTier } from '@/hooks/useBilling';

@@ -3,12 +3,10 @@ import { CbpTimeline } from '@/components/CbpTimeline';
 import { IsfRejectedChangesBanner } from '@/components/IsfRejectedChangesBanner';
 import { TransmitConfirmDialog } from '@/components/TransmitConfirmDialog';
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useFiling, useSubmitFiling, useAmendFiling, useCancelFiling, useValidateFiling, useCheckFilingStatus, useDuplicateFiling, useSaveFilingAsTemplate, useFilingDocuments, useUploadDocuments, useDownloadDocument, useDeleteDocument, useExportPdf, useConsolidationSiblings } from '@/hooks/useFilings';
+import { useFiling, useSubmitFiling, useAmendFiling, useCancelFiling, useValidateFiling, useCheckFilingStatus, useDuplicateFiling, useSaveFilingAsTemplate, useExportPdf } from '@/hooks/useFilings';
 import { useAbiDocumentsList } from '@/hooks/useAbiDocument';
 import { useManifestQueries } from '@/hooks/useManifestQuery';
-import { Filing, getPartyName, getFirstCommodity, ShipmentStatus } from '@/types/shipment';
-import { StatusBadge } from '@/components/StatusBadge';
-import { LifecycleWidget } from '@/components/LifecycleWidget';
+import { Filing } from '@/types/shipment';
 import { PlanLimitModal } from '@/components/PlanLimitModal';
 import { CAPABILITIES, type Capability } from '@/lib/planMeta';
 import { useCapabilities } from '@/hooks/useBilling';
@@ -20,13 +18,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -36,17 +32,22 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Pencil, RotateCcw, ArrowLeft, CheckCircle2, Circle, XCircle, Send, Loader2,
-  FileEdit, Ban, Shield, AlertTriangle, Ship, Package, Globe, Anchor,
-  Container, Users, FileText, Clock, ChevronRight, Zap, Activity,
+  Pencil, RotateCcw, ArrowLeft, CheckCircle2, XCircle, Send, Loader2,
+  FileEdit, Ban, Shield, FileText, Clock, Zap, Activity,
   RefreshCw, Radio, Inbox, ArrowDownToLine, Copy, Bookmark, MoreHorizontal,
-  Upload, Trash2, Paperclip, Search, FileCheck, Sparkles, Layers,
-} from 'lucide-react';
+  Search, FileCheck, Sparkles,
+} from '@/components/icons';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import { useNow } from '@/hooks/useDashboard';
+import { DocumentsPanel } from '@/components/shipment-detail/DocumentsPanel';
+import { FilingDetails } from '@/components/shipment-detail/FilingDetails';
+import { Rail } from '@/components/shipment-detail/Rail';
+import { latestLinked, relatedItems, type LinkedEntry, type LinkedQuery } from '@/components/shipment-detail/related';
+import { SummaryCard } from '@/components/shipment-detail/SummaryCard';
+import { summarize } from '@/components/shipment-detail/summary';
+import { StatusPill } from '@/components/shipments/StatusPill';
+import { lastListView } from '@/components/shipments/useListState';
 
 // ─── Step-by-step submission pipeline ──────────────────────
 
@@ -230,9 +231,9 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
   };
 
   const stepConfig = [
-    { key: 'validate' as PipelineStep, label: 'Validate Fields', desc: 'Check all required fields and formats', icon: Shield },
-    { key: 'send_cc' as PipelineStep, label: 'Create Filing', desc: 'Prepare document for CBP submission', icon: Zap },
-    { key: 'send_cbp' as PipelineStep, label: 'Send to CBP', desc: 'Transmit filing to U.S. Customs', icon: Send },
+    { key: 'validate' as PipelineStep, label: 'Validate fields', desc: 'Check every required field and format', icon: Shield },
+    { key: 'send_cc' as PipelineStep, label: 'Create filing', desc: 'Prepare the document for CBP', icon: Zap },
+    { key: 'send_cbp' as PipelineStep, label: 'Send to CBP', desc: 'Send the ISF to US Customs', icon: Send },
   ];
 
   return (
@@ -246,12 +247,11 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
       onConfirm={transmit}
       pending={submitFiling.isPending}
     />
-    <Card>
+    <Card className="rounded-xl border-border/70 shadow-card">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-primary" />
-            <CardTitle className="text-base font-semibold">Submission Pipeline</CardTitle>
+            <CardTitle className="text-[15px] font-semibold">Send to CBP</CardTitle>
           </div>
           <Button
             onClick={runPipeline}
@@ -261,12 +261,12 @@ function SubmissionPipeline({ filing, onComplete }: { filing: Filing; onComplete
             {isRunning ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Send className="h-4 w-4" />
+              <Send className="icon-send h-4 w-4" />
             )}
-            {isRunning ? 'Processing...' : 'Start Submission'}
+            {isRunning ? 'Working…' : 'Start submission'}
           </Button>
         </div>
-        <CardDescription>Validate, prepare, and transmit your filing to CBP</CardDescription>
+        <CardDescription className="text-[13px]">Checks every field, prepares the filing, then sends it. You confirm before anything goes to CBP.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-0">
         {stepConfig.map((cfg, i) => {
@@ -435,7 +435,7 @@ function CBPStatusChecker({ filing, onStatusUpdate }: { filing: Filing; onStatus
               <Radio className={cn('h-4 w-4', autoPolling ? 'text-primary' : 'text-muted-foreground')} />
             </div>
             <div>
-              <CardTitle className="text-base font-semibold">CBP Response Status</CardTitle>
+              <CardTitle className="text-[14px] font-semibold">CBP response status</CardTitle>
               <CardDescription className="text-xs">
                 {autoPolling
                   ? 'Auto-checking every 30s for CBP response...'
@@ -573,61 +573,11 @@ function CBPStatusChecker({ filing, onStatusUpdate }: { filing: Filing; onStatus
 // Shown at the top of the detail page when this filing belongs to a
 // multi-HBL consolidation. Lists every sibling as a clickable chip + its
 // status; the current filing's chip is highlighted in place.
-function ConsolidationStrip({
-  consolidationId,
-  currentId,
-  masterBol,
-}: {
-  consolidationId: string;
-  currentId: string;
-  masterBol: string | null;
-}) {
-  const { data, isLoading } = useConsolidationSiblings(consolidationId);
-  if (isLoading || !data) return null;
-  const siblings = data.filings;
-  if (siblings.length < 2) return null;
-  return (
-    <div className="rounded-xl border border-amber-200/70 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 px-4 py-3">
-      <div className="flex items-center gap-2 mb-2">
-        <Layers className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" />
-        <span className="text-[11px] uppercase tracking-wider font-semibold text-amber-700 dark:text-amber-300">
-          Consolidation {masterBol ? <>· <span className="tabular-nums normal-case font-mono">{masterBol}</span></> : null}
-        </span>
-        <span className="text-[11px] text-muted-foreground">
-          {siblings.length} house bills — each filed separately with CBP and billed as 1 filing
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {siblings.map((s, idx) => {
-          const isCurrent = s.id === currentId;
-          return (
-            <Link
-              key={s.id}
-              to={`/shipments/${s.id}`}
-              className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] tabular-nums ring-1 transition-colors ${
-                isCurrent
-                  ? 'bg-amber-100 dark:bg-amber-900/40 ring-amber-300/70 dark:ring-amber-700/60 font-semibold text-amber-900 dark:text-amber-100'
-                  : 'bg-background ring-border hover:bg-accent hover:ring-accent-foreground/20'
-              }`}
-              aria-current={isCurrent ? 'page' : undefined}
-            >
-              <span className="text-muted-foreground text-[10px]">HBL {idx + 1}</span>
-              <span>{s.houseBol || s.id.slice(0, 8)}</span>
-              <StatusBadge status={s.status as ShipmentStatus} />
-            </Link>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Component ────────────────────────────────────────
-
 export default function ShipmentDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { data: filing, isLoading, isError, refetch } = useFiling(id);
+  const now = useNow();
   const amendFiling = useAmendFiling();
   const cancelFiling = useCancelFiling();
   const submitFiling = useSubmitFiling();
@@ -657,28 +607,28 @@ export default function ShipmentDetails() {
     staleTime: 5 * 60_000,
   });
 
-  // Document upload state
-  const { data: docsData, isLoading: docsLoading } = useFilingDocuments(id);
   // Lifecycle widget data — fetched lazily; failure of either is fine
   // (the widget falls back to ISF-only state if abis/mqs don't load).
   const { data: abiListData } = useAbiDocumentsList({ take: 100 }, { enabled: can(CAPABILITIES.ABI_ENTRY) });
   const { data: mqListData } = useManifestQueries({ limit: 50 });
-  const uploadDocs = useUploadDocuments();
-  const downloadDoc = useDownloadDocument();
-  const deleteDoc = useDeleteDocument();
   const exportPdf = useExportPdf();
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
-  const [uploadDocType, setUploadDocType] = useState('bol');
 
   if (isLoading) {
+    // The page's own shape, so nothing jumps when the shipment arrives.
     return (
-      <div className="space-y-6 max-w-[1200px] mx-auto">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-48 w-full rounded-xl" />
-        <div className="grid gap-4 md:grid-cols-2">
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
+      <div role="status" aria-busy="true" aria-label="Loading shipment" className="mx-auto flex max-w-[1200px] flex-col gap-5">
+        <div className="dash-sk h-4 w-24" />
+        <div className="flex items-center gap-4">
+          <div className="dash-sk h-11 w-11 rounded-xl" />
+          <div className="space-y-2"><div className="dash-sk h-7 w-56" /><div className="dash-sk h-4 w-72" style={{ '--i': 1 } as React.CSSProperties} /></div>
+        </div>
+        <div className="dash-sk h-40 w-full rounded-xl" style={{ '--i': 2 } as React.CSSProperties} />
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-5">
+            <div className="dash-sk h-44 rounded-xl" style={{ '--i': 3 } as React.CSSProperties} />
+            <div className="dash-sk h-80 rounded-xl" style={{ '--i': 4 } as React.CSSProperties} />
+          </div>
+          <div className="dash-sk h-64 rounded-xl" style={{ '--i': 5 } as React.CSSProperties} />
         </div>
       </div>
     );
@@ -686,17 +636,17 @@ export default function ShipmentDetails() {
 
   if (isError || !filing) {
     return (
-      <div className="text-center py-16">
-        <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-          <FileText className="h-6 w-6 text-muted-foreground" />
-        </div>
-        <p className="text-muted-foreground font-medium">Filing not found</p>
-        <Button variant="link" asChild className="mt-2"><Link to="/shipments">Back to filings</Link></Button>
+      <div className="py-16 text-center">
+        <span className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-muted text-muted-foreground">
+          <FileText className="h-5 w-5" aria-hidden />
+        </span>
+        <p className="mt-3 text-[13px] font-medium">We could not find this shipment.</p>
+        <p className="mt-1 text-[13px] text-muted-foreground">It may have been deleted, or it belongs to another account.</p>
+        <Button variant="outline" size="sm" asChild className="mt-4"><Link to="/shipments">Shipments</Link></Button>
       </div>
     );
   }
 
-  const commodity = getFirstCommodity(filing);
 
   const handleResubmit = async () => {
     setResubmitConfirmOpen(false);
@@ -764,76 +714,17 @@ export default function ShipmentDetails() {
     }
   };
 
-  // Timeline
-  const timeline = [
-    { label: 'Created', date: filing.createdAt, icon: Circle, done: true },
-    { label: 'Submitted', date: filing.submittedAt, icon: Send, done: !!filing.submittedAt },
-    ...(filing.status === 'rejected'
-      ? [{ label: 'Rejected', date: filing.rejectedAt, icon: XCircle, done: true }]
-      : [{ label: 'Accepted', date: filing.acceptedAt, icon: CheckCircle2, done: !!filing.acceptedAt }]),
-  ];
-
   const isISF5 = filing.filingType === 'ISF-5';
-  const isf5 = (filing as any).isf5Data ?? {};
-
-  const sections = isISF5 ? [
-    { title: 'ISF Filer & Booking Party', icon: Users, items: [
-      ['ISF Filer', isf5.ISFFilerName || filing.importerName || ''],
-      ['Filer EIN', isf5.ISFFilerNumber || filing.importerNumber || ''],
-      ['Booking Party', isf5.bookingPartyName || ''],
-      ['Booking Party Country', isf5.bookingPartyCountry || ''],
-      ['Bond Holder ID', isf5.bondHolderID || ''],
-    ]},
-    { title: 'Parties', icon: Users, items: [
-      ['Ship-to Party', getPartyName(filing.shipToParty)],
-      ['Manufacturer', getPartyName(filing.manufacturer)],
-    ]},
-    { title: 'Shipment Info', icon: Ship, items: [
-      ['Master BOL', filing.masterBol || ''],
-      ['House BOL', filing.houseBol || ''],
-      ['US Port of Arrival', isf5.USPortOfArrival || filing.foreignPortOfUnlading || ''],
-      ['Bond Type', filing.bondType || ''],
-      ['Est. Arrival', filing.estimatedArrival ? new Date(filing.estimatedArrival).toLocaleDateString() : ''],
-    ]},
-    { title: 'Product Info', icon: Package, items: [
-      ['HTS Code', commodity.htsCode],
-      ['Country of Origin', commodity.countryOfOrigin],
-      ['Description', commodity.description],
-    ]},
-  ] : [
-    { title: 'Parties', icon: Users, items: [
-      ['Manufacturer', getPartyName(filing.manufacturer)],
-      ['Seller', getPartyName(filing.seller)],
-      ['Buyer', getPartyName(filing.buyer)],
-      ['Ship-to Party', getPartyName(filing.shipToParty)],
-      ['Importer', filing.importerName || ''],
-      ['Consignee', filing.consigneeName || ''],
-    ]},
-    { title: 'Shipment Info', icon: Ship, items: [
-      ['Master BOL', filing.masterBol || ''],
-      ['House BOL', filing.houseBol || ''],
-      ['Vessel Name', filing.vesselName || ''],
-      ['Voyage Number', filing.voyageNumber || ''],
-      ['SCAC Code', filing.scacCode || ''],
-      ['Foreign Port', filing.foreignPortOfUnlading || ''],
-      ['Place of Delivery', filing.placeOfDelivery || ''],
-    ]},
-    { title: 'Product Info', icon: Package, items: [
-      ['HTS Code', commodity.htsCode],
-      ['Country of Origin', commodity.countryOfOrigin],
-      ['Description', commodity.description],
-    ]},
-    { title: 'Logistics', icon: Globe, items: [
-      ['Container Stuffing', getPartyName(filing.containerStuffingLocation)],
-      ['Consolidator', getPartyName(filing.consolidator)],
-      ['Bond Type', filing.bondType || ''],
-      ['Est. Departure', filing.estimatedDeparture ? new Date(filing.estimatedDeparture).toLocaleDateString() : ''],
-      ['Est. Arrival', filing.estimatedArrival ? new Date(filing.estimatedArrival).toLocaleDateString() : ''],
-    ]},
-  ];
+  const isf5 = filing.isf5Data ?? {};
+  const related = relatedItems({
+    filing,
+    ...latestLinked(filing, (abiListData?.data ?? []) as LinkedEntry[], (((mqListData as any)?.data ?? []) as LinkedQuery[])),
+    canFileEntry: can(CAPABILITIES.ABI_ENTRY),
+  });
+  const hasRail = related.length > 0 || !!filing.consolidationId || (filing.statusHistory?.length ?? 0) > 0;
 
   return (
-    <div className="space-y-6 max-w-[1200px] mx-auto">
+    <div className="dash-enter mx-auto flex max-w-[1200px] flex-col gap-5 pb-16">
       <PlanLimitModal
         open={upgradePrompt !== null}
         onClose={() => setUpgradePrompt(null)}
@@ -876,21 +767,26 @@ export default function ShipmentDetails() {
         </DialogContent>
       </Dialog>
 
-      {/* Header */}
-      <div className="flex flex-wrap items-start gap-3 opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
-        <Button variant="ghost" size="icon" className="rounded-xl shrink-0" asChild>
-          <Link to="/shipments" aria-label="Back to shipments"><ArrowLeft className="h-4 w-4" /></Link>
-        </Button>
-        <div className="flex-1 min-w-0">
+      {/* Back to the list as it was last left: same tab, filters, sort and page. */}
+      <Link
+        to={`/shipments${lastListView()}`}
+        className="inline-flex w-fit items-center gap-1.5 text-[13px] text-muted-foreground transition-colors duration-150 hover:text-foreground"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" aria-hidden />Shipments
+      </Link>
+
+      <div className="-mt-2 flex flex-wrap items-start gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="text-2xl font-black tracking-tight break-all">{filing.houseBol || filing.masterBol || filing.id.slice(0, 8)}</h1>
-            <StatusBadge status={filing.status as ShipmentStatus} />
+            <h1 className="break-all font-mono text-[24px] font-semibold leading-8 tracking-[-0.01em]">{filing.houseBol || filing.masterBol || filing.id.slice(0, 8)}</h1>
+            <StatusPill status={filing.status} />
             {filing.ccFilingId && (
-              <Badge variant="outline" className="text-[10px] font-mono">Ref: {filing.ccFilingId.slice(0, 12)}</Badge>
+              <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">Ref {filing.ccFilingId.slice(0, 12)}</span>
             )}
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
             {filing.filingType} {'\u00b7'} {isISF5 ? (isf5.ISFFilerName || filing.importerName || 'Unknown filer') : (filing.importerName || 'Unknown importer')}
+            {filing.houseBol && filing.masterBol && <> {'\u00b7'} MBL <span className="font-mono">{filing.masterBol}</span></>}
             {filing.createdAt && (
               <> {'\u00b7'} Created {new Date(filing.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
             )}
@@ -904,19 +800,20 @@ export default function ShipmentDetails() {
             && (['draft', 'submitted', 'pending_cbp', 'on_hold'] as const).includes(filing.status as any) && (
             <Button
               variant="outline"
-              className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-500/30 dark:text-amber-300 dark:hover:bg-amber-500/10"
+              size="sm"
+              className="gap-1.5 border-soon/30 text-soon hover:bg-soon-tint hover:text-soon"
               onClick={() => { setCoachMode('draft-review'); setCoachOpen(true); }}
             >
-              <Sparkles className="h-4 w-4" /> AI Pre-Flight Review
+              <Sparkles className="h-4 w-4" /> AI pre-flight review
             </Button>
           )}
           {(filing.status === 'draft' || filing.status === 'rejected') && (
-            <Button variant="outline" className="gap-1.5" asChild>
+            <Button variant="outline" size="sm" className="gap-1.5" asChild>
               <Link to={`/shipments/${filing.id}/edit`}><Pencil className="h-4 w-4" /> Edit</Link>
             </Button>
           )}
           {filing.status === 'rejected' && (
-            <Button onClick={() => setResubmitConfirmOpen(true)} disabled={submitFiling.isPending} className="gap-1.5">
+            <Button size="sm" onClick={() => setResubmitConfirmOpen(true)} disabled={submitFiling.isPending} className="gap-1.5">
               {submitFiling.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
               Resubmit
             </Button>
@@ -924,7 +821,7 @@ export default function ShipmentDetails() {
           {filing.status === 'accepted' && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" className="gap-1.5" disabled={amendFiling.isPending}>
+                <Button variant="outline" size="sm" className="gap-1.5" disabled={amendFiling.isPending}>
                   {amendFiling.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileEdit className="h-4 w-4" />}
                   Amend
                 </Button>
@@ -933,10 +830,10 @@ export default function ShipmentDetails() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>File an amendment with CBP?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This re-transmits the ISF to CBP. Amendments can incur
-                    per-submission fees on your CC plan, and depending on the
-                    timing relative to vessel departure, late-amendment penalties
-                    may apply. Make sure your changes are final before continuing.
+                    This sends the ISF to CBP again with your changes. Depending
+                    on timing relative to vessel departure, late-amendment
+                    penalties may apply. Make sure your changes are final before
+                    continuing.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -949,36 +846,21 @@ export default function ShipmentDetails() {
             </AlertDialog>
           )}
 
-          {/* Check Manifest — look up cargo status at CBP */}
-          {filing.masterBol && (
-            <Button variant="outline" className="gap-1.5" asChild>
-              <Link to={`/manifest-query?bol=${encodeURIComponent(filing.masterBol)}`}>
-                <Search className="h-4 w-4" />
-                Check Manifest
-              </Link>
-            </Button>
-          )}
-
-          {/* File Entry Documents — once ISF is accepted, file the
-              7501 + 3461 entry. Server prefills IOR, consignee, MBOL,
-              carrier, and bond from this filing. */}
-          {filing.status === 'accepted' && can(CAPABILITIES.ABI_ENTRY) && (
-            <Button variant="outline" className="gap-1.5" asChild>
-              <Link to={`/abi-documents/new?fromShipment=${filing.id}`}>
-                <FileCheck className="h-4 w-4" />
-                File Entry Documents
-              </Link>
-            </Button>
-          )}
-
           {/* More Actions Dropdown — Duplicate, Save Template, Cancel */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="shrink-0" aria-label="More actions">
+              <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" aria-label="More actions">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuContent align="end" className="w-56">
+              {related.filter((r) => r.action).map((r) => (
+                <DropdownMenuItem key={r.key} onClick={() => navigate(r.action!.to)}>
+                  {r.key === 'manifest' ? <Search className="h-4 w-4 mr-2" /> : <FileCheck className="h-4 w-4 mr-2" />}
+                  {r.action!.label}
+                </DropdownMenuItem>
+              ))}
+              {related.some((r) => r.action) && <DropdownMenuSeparator />}
               <DropdownMenuItem onClick={handleDuplicate} disabled={duplicateFiling.isPending}>
                 <Copy className="h-4 w-4 mr-2" />
                 {duplicateFiling.isPending ? 'Duplicating...' : 'Duplicate as New Draft'}
@@ -1086,54 +968,65 @@ export default function ShipmentDetails() {
         </div>
       </div>
 
-      {/* Consolidation strip — only when this filing is part of a multi-HBL
-          consolidation. Chips jump to siblings; current filing's chip is
-          highlighted. The list is fetched from the lightweight sibling
-          endpoint so this page works even if siblings live off the current
-          ShipmentsList page (pagination boundary). */}
-      {filing.consolidationId && (
-        <ConsolidationStrip
-          consolidationId={filing.consolidationId}
-          currentId={filing.id}
-          masterBol={filing.masterBol ?? null}
-        />
-      )}
-
-      {/* Lifecycle widget — horizontal stage tracker (ISF · Manifest · Entry · Cleared) */}
-      <div
-        className="opacity-0 animate-fade-in-up motion-reduce:opacity-100 motion-reduce:animate-none"
-        style={{ animationDelay: '60ms', animationFillMode: 'forwards' }}
-      >
-        <LifecycleWidget
-          filing={filing}
-          abiDocs={(abiListData?.data ?? []) as any}
-          manifestQueries={((mqListData as any)?.data ?? []) as any}
-        />
-      </div>
+      <SummaryCard filing={filing} summary={summarize(filing, now)} now={now} />
 
       {/* CBP rejected the last changes: what's shown is not what CBP has (BUG-015) */}
       {filing.lastTransmissionId && <IsfRejectedChangesBanner filingId={filing.id} />}
 
-      {/* Submission Pipeline — only for draft filings */}
-      {filing.status === 'draft' && (
-        <div className="opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
-          <SubmissionPipeline filing={filing} onComplete={() => refetch()} />
-        </div>
-      )}
+      <div className={cn('grid items-start gap-5', hasRail && 'lg:grid-cols-[minmax(0,1fr)_320px]')}>
+        <div className="flex min-w-0 flex-col gap-5">
+          {/* The work first: send a draft, fix a rejection, read CBP's answers. */}
+          {filing.status === 'draft' && <SubmissionPipeline filing={filing} onComplete={() => refetch()} />}
 
-      {/* CBP Status Checker — for submitted filings awaiting CBP response */}
-      {filing.status === 'submitted' && !filing.lastTransmissionId && (
-        <div className="opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
-          <CBPStatusChecker filing={filing} onStatusUpdate={() => refetch()} />
-        </div>
-      )}
+          {filing.status === 'rejected' && filing.rejectionReason && (
+            <RejectionDetailsCard
+              reason={filing.rejectionReason}
+              variant="current"
+              animationDelayMs={0}
+              actions={
+                <>
+                  {aiStatusQuery.data?.enabled && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 border-soon/30 text-soon hover:bg-soon-tint hover:text-soon"
+                      onClick={() => { setCoachMode('rejection'); setCoachOpen(true); }}
+                    >
+                      <Sparkles className="h-3.5 w-3.5" /> Ask AI Coach
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="gap-1.5" asChild>
+                    <Link to={`/shipments/${filing.id}/edit`}><Pencil className="h-3.5 w-3.5" /> Edit & Fix</Link>
+                  </Button>
+                  <Button size="sm" className="gap-1.5" onClick={() => setResubmitConfirmOpen(true)} disabled={submitFiling.isPending}>
+                    {submitFiling.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                    Resubmit
+                  </Button>
+                </>
+              }
+            />
+          )}
 
-      {/* Native CBP activity: what was sent and CBP's answer, live while pending */}
-      {filing.lastTransmissionId && (
-        <div className="opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
-          <CbpTimeline filingId={filing.id} />
+          {/* Older filings sent through the gateway are checked on request. */}
+          {filing.status === 'submitted' && !filing.lastTransmissionId && <CBPStatusChecker filing={filing} onStatusUpdate={() => refetch()} />}
+
+          {/* What was sent and CBP's answer, live while one is pending. */}
+          {filing.lastTransmissionId && <CbpTimeline filingId={filing.id} />}
+
+          {/* An earlier rejection matters only while the filing is still in
+              flight. Once accepted it contradicts the status, so it is hidden. */}
+          {(['draft', 'submitted', 'pending_cbp', 'on_hold'] as const).includes(filing.status as any)
+            && filing.rejectionReason && (
+            <RejectionDetailsCard reason={filing.rejectionReason} variant="previous" animationDelayMs={0} />
+          )}
+
+          <FilingDetails filing={filing} />
+          <DocumentsPanel filingId={filing.id} />
+          <ScoreHistoryCard filingId={filing.id} />
         </div>
-      )}
+
+        {hasRail && <Rail filing={filing} related={related} now={now} />}
+      </div>
 
       <TransmitConfirmDialog
         open={resubmitConfirmOpen}
@@ -1144,355 +1037,13 @@ export default function ShipmentDetails() {
         pending={submitFiling.isPending}
       />
 
-      {/* Timeline */}
-      <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-semibold">Timeline</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3 flex-wrap">
-            {timeline.map((step, i) => (
-              <div key={step.label} className="flex items-center gap-3">
-                <div className={cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-lg transition-all',
-                  step.done ? 'bg-muted/60' : 'opacity-50',
-                )}>
-                  <step.icon className={cn(
-                    'h-4 w-4',
-                    step.done
-                      ? step.label === 'Rejected' ? 'text-red-500' : 'text-emerald-500'
-                      : 'text-muted-foreground',
-                  )} />
-                  <div>
-                    <p className="text-sm font-medium">{step.label}</p>
-                    {step.date && <p className="text-[10px] text-muted-foreground tabular-nums">{new Date(step.date).toLocaleString()}</p>}
-                  </div>
-                </div>
-                {i < timeline.length - 1 && (
-                  <ChevronRight className={cn('h-4 w-4 shrink-0', step.done ? 'text-muted-foreground' : 'text-border')} />
-                )}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Compliance score trajectory — status-band derived from FilingStatusHistory */}
-      <ScoreHistoryCard filingId={filing.id} />
-
-      {/* Rejection details — extracted to RejectionDetailsCard for reuse + legacy [object Object] cleanup */}
-      {filing.status === 'rejected' && filing.rejectionReason && (
-        <RejectionDetailsCard
-          reason={filing.rejectionReason}
-          variant="current"
-          actions={
-            <>
-              {aiStatusQuery.data?.enabled && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-500/30 dark:text-amber-300 dark:hover:bg-amber-500/10"
-                  onClick={() => { setCoachMode('rejection'); setCoachOpen(true); }}
-                >
-                  <Sparkles className="h-3.5 w-3.5" /> Ask AI Coach
-                </Button>
-              )}
-              <Button variant="outline" size="sm" className="gap-1.5" asChild>
-                <Link to={`/shipments/${filing.id}/edit`}><Pencil className="h-3.5 w-3.5" /> Edit & Fix</Link>
-              </Button>
-              <Button size="sm" className="gap-1.5" onClick={() => setResubmitConfirmOpen(true)} disabled={submitFiling.isPending}>
-                {submitFiling.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                Resubmit
-              </Button>
-            </>
-          }
-        />
-      )}
-
-      {/* AI Coach drawer — streaming OpenAI response. Renders in either
-          "rejection" mode (explains a rejection) or "draft-review" mode
-          (pre-flights an in-flight filing). One drawer instance + state. */}
+      {/* AI Coach drawer: explains a rejection, or pre-flights a filing before it is sent. */}
       <RejectionCoachDrawer
         open={coachOpen}
         onOpenChange={setCoachOpen}
         mode={coachMode}
         filingId={filing.id}
       />
-
-
-      {/* Historical rejection — only meaningful while the filing is still
-          in flight (user is mid-recovery: editing a draft, awaiting CBP on
-          a resubmit, on hold). For terminal-success states (accepted) the
-          rejection history is noise and contradicts the green status badge,
-          so we hide it. Backend also nulls rejectionReason on accept now
-          (see routes/filings.ts + backgroundJobs.ts), so this also guards
-          against legacy filings whose data wasn't cleaned up. */}
-      {(['draft', 'submitted', 'pending_cbp', 'on_hold'] as const).includes(filing.status as any)
-        && filing.rejectionReason && (
-        <RejectionDetailsCard reason={filing.rejectionReason} variant="previous" />
-      )}
-
-      {/* Data sections */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {sections.map((section, i) => (
-          <Card key={section.title} className="opacity-0 animate-fade-in-up" style={{ animationDelay: `${300 + i * 80}ms`, animationFillMode: 'forwards' }}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <section.icon className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm font-semibold">{section.title}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {section.items.map(([label, value]) => (
-                <div key={label as string} className="flex justify-between text-sm gap-4">
-                  <span className="text-muted-foreground shrink-0">{label as string}</span>
-                  <span className="font-medium text-right truncate">
-                    {(value as string) || <span className="text-muted-foreground italic text-xs">Not provided</span>}
-                  </span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Commodities */}
-      {filing.commodities && filing.commodities.length > 0 && (
-        <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '620ms', animationFillMode: 'forwards' }}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-semibold">Commodities ({filing.commodities.length})</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {filing.commodities.map((c: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
-                <div>
-                  <p className="text-sm font-medium">{c.description || 'No description'}</p>
-                  <p className="text-xs text-muted-foreground">HTS: {c.htsCode} · Origin: {c.countryOfOrigin}</p>
-                </div>
-                {c.quantity && <span className="text-sm text-muted-foreground tabular-nums">Qty: {c.quantity}</span>}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Containers */}
-      {filing.containers && filing.containers.length > 0 && (
-        <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '700ms', animationFillMode: 'forwards' }}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Container className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-semibold">Containers ({filing.containers.length})</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {filing.containers.map((c: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
-                <p className="text-sm font-medium font-mono">{c.number}</p>
-                <p className="text-xs text-muted-foreground">{c.type} {c.sealNumber ? `· Seal: ${c.sealNumber}` : ''}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Documents & Attachments */}
-      <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '780ms', animationFillMode: 'forwards' }}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Paperclip className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-semibold">
-                Documents {docsData?.data?.length ? `(${docsData.data.length})` : ''}
-              </CardTitle>
-            </div>
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="gap-1.5 h-8">
-                  <Upload className="h-3.5 w-3.5" /> Upload
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Upload Document</DialogTitle>
-                  <DialogDescription>
-                    Attach BOL copies, commercial invoices, packing lists, or other documents.
-                    Max 10 MB per file. Up to 5 files at once.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-2">
-                  <div className="space-y-2">
-                    <Label>Document Type</Label>
-                    <Select value={uploadDocType} onValueChange={setUploadDocType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="bol">Bill of Lading</SelectItem>
-                        <SelectItem value="commercial_invoice">Commercial Invoice</SelectItem>
-                        <SelectItem value="packing_list">Packing List</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Files</Label>
-                    <Input
-                      type="file"
-                      multiple
-                      accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                      onChange={e => {
-                        const files = Array.from(e.target.files || []);
-                        setUploadFiles(files);
-                      }}
-                    />
-                    {uploadFiles.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {uploadFiles.length} file(s) selected ({(uploadFiles.reduce((a, f) => a + f.size, 0) / 1024 / 1024).toFixed(2)} MB)
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => { setUploadDialogOpen(false); setUploadFiles([]); }}>Cancel</Button>
-                  <Button
-                    disabled={uploadFiles.length === 0 || uploadDocs.isPending}
-                    onClick={async () => {
-                      try {
-                        await uploadDocs.mutateAsync({ filingId: filing.id, files: uploadFiles, documentType: uploadDocType });
-                        toast.success(`${uploadFiles.length} file(s) uploaded`);
-                        setUploadFiles([]);
-                        setUploadDialogOpen(false);
-                      } catch (err: any) {
-                        toast.error(err.body?.error || err.message || 'Upload failed');
-                      }
-                    }}
-                  >
-                    {uploadDocs.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                    Upload
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {docsLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-12 rounded-lg" />
-              <Skeleton className="h-12 rounded-lg" />
-            </div>
-          ) : !docsData?.data?.length ? (
-            <div className="text-center py-8">
-              <Paperclip className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No documents attached</p>
-              <p className="text-xs text-muted-foreground">Upload BOL copies, invoices, or packing lists</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {docsData.data.map((doc: any) => {
-                const docTypeLabels: Record<string, string> = {
-                  bol: 'Bill of Lading',
-                  commercial_invoice: 'Commercial Invoice',
-                  packing_list: 'Packing List',
-                  other: 'Other',
-                };
-                const sizeKb = (doc.fileSizeBytes / 1024).toFixed(0);
-                const sizeMb = (doc.fileSizeBytes / 1024 / 1024).toFixed(1);
-                const sizeStr = doc.fileSizeBytes > 1024 * 1024 ? `${sizeMb} MB` : `${sizeKb} KB`;
-
-                return (
-                  <div key={doc.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors group">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <FileText className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{doc.fileName}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {docTypeLabels[doc.documentType] || doc.documentType} · {sizeStr} ·{' '}
-                          {doc.uploadedBy?.firstName} {doc.uploadedBy?.lastName} ·{' '}
-                          {new Date(doc.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-1 transition-opacity can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:focus-within:opacity-100">
-                      <Button
-                        variant="ghost" size="icon" className="h-8 w-8"
-                        title="Download"
-                        disabled={downloadDoc.isPending}
-                        onClick={() => downloadDoc.mutate({ filingId: filing.id, docId: doc.id })}
-                      >
-                        <ArrowDownToLine className="h-3.5 w-3.5" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" title="Delete">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete document?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              "{doc.fileName}" will be permanently deleted. This cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-red-600 hover:bg-red-700"
-                              onClick={async () => {
-                                try {
-                                  await deleteDoc.mutateAsync({ filingId: filing.id, docId: doc.id });
-                                  toast.success('Document deleted');
-                                } catch {
-                                  toast.error('Failed to delete document');
-                                }
-                              }}
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Status History */}
-      {filing.statusHistory && filing.statusHistory.length > 0 && (
-        <Card className="opacity-0 animate-fade-in-up" style={{ animationDelay: '860ms', animationFillMode: 'forwards' }}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-semibold">Status History</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {filing.statusHistory.map((h: any) => (
-              <div key={h.id} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors text-sm">
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={h.status as ShipmentStatus} />
-                  {h.message && <span className="text-muted-foreground text-xs">{h.message}</span>}
-                </div>
-                <span className="text-[10px] text-muted-foreground tabular-nums">{new Date(h.createdAt).toLocaleString()}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

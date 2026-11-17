@@ -2,10 +2,11 @@
  * API Client — Typed fetch wrapper with auto-refresh JWT tokens
  */
 
+import type { ActionFilter, ActionsPage, DashboardResponse } from '@/types/dashboard';
 import type { HtsClassifyResult } from '@/types/htsClassify';
 import type { AuthSession, LoginResult, MfaMethod, User } from '@/types/auth';
 import type { Filing } from '@/types/shipment';
-import type { OrgPricing } from '@/lib/pricing';
+import type { IsfBand, OrgPricing } from '@/lib/pricing';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -316,13 +317,26 @@ export const authApi = {
 
 // ─── Filings API ──────────────────────────────────────────
 export interface FilingListParams {
+  /** One status, or several joined with commas. */
   status?: string;
   filingType?: string;
   search?: string;
+  /** Country codes of the first commodity, joined with commas. */
+  origin?: string;
+  /** ISO instants bounding the estimated departure. */
+  etdFrom?: string;
+  etdTo?: string;
+  consolidationId?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+}
+
+/** Counts for the Shipments filters: statuses under the other filters, and every origin shipped from. */
+export interface FilingFacets {
+  status: Record<string, number>;
+  origins: { code: string; count: number }[];
 }
 
 /** A CBP condition as the server describes it (services/cbp/conditions). */
@@ -387,6 +401,15 @@ export const filingsApi = {
     }
     const qs = query.toString();
     return apiFetch<PaginatedResponse<Filing>>(`/api/v1/filings${qs ? `?${qs}` : ''}`);
+  },
+
+  facets(params?: Pick<FilingListParams, 'search' | 'origin' | 'etdFrom' | 'etdTo'>) {
+    const query = new URLSearchParams();
+    Object.entries(params ?? {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') query.set(k, String(v));
+    });
+    const qs = query.toString();
+    return apiFetch<FilingFacets>(`/api/v1/filings/facets${qs ? `?${qs}` : ''}`);
   },
 
   get(id: string) {
@@ -529,7 +552,7 @@ export interface SubmissionLogEntry {
 }
 
 export const submissionLogsApi = {
-  list(params?: { filingId?: string; page?: number; limit?: number }) {
+  list(params?: { filingId?: string; page?: number; limit?: number; sends?: '1' }) {
     const query = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
@@ -972,8 +995,18 @@ export const exportApi = {
 };
 
 // ─── Billing API (card-on-file, immediate per-shipment charge) ─────────────
-export type { OrgPricing };
+export type { IsfBand, OrgPricing };
 export type BillingCard = { brand: string | null; last4: string | null; expMonth: number | null; expYear: number | null };
+export type BillingBankAccount = { bankName: string | null; last4: string | null };
+
+/** One line of a monthly invoice (or of the month-to-date estimate). */
+export interface InvoiceLine {
+  code: 'minimum' | 'isf_overage' | 'isf_band' | 'entry_linked' | 'entry';
+  description: string;
+  quantity: number;
+  unitCents: number | null;
+  amountCents: number;
+}
 
 export const billingApi = {
   subscription() {
@@ -998,6 +1031,19 @@ export const billingApi = {
       delinquent: boolean;
       /** Saved card summary, or null when none on file. */
       card: BillingCard | null;
+      /** "card" = charged per filing; "invoiced" = monthly invoice by ACH. */
+      billingMode: 'card' | 'invoiced';
+      /** New submissions are on hold (e.g. an overdue invoice). */
+      billingHold: boolean;
+      /** Invoiced accounts only: terms, ACH account and this month so far. */
+      invoicing: {
+        monthlyMinimumCents: number;
+        includedIsfs: number;
+        /** Lower rates by monthly volume, in order (pilot ladder: $4 from the 251st). */
+        isfBands: IsfBand[];
+        bankAccount: BillingBankAccount | null;
+        monthToDate: { isfs: number; shipments: number; estimatedCents: number; lines: InvoiceLine[] };
+      } | null;
       // This calendar month's charged shipments + running total.
       usage: {
         periodStart: string | null;
@@ -1022,13 +1068,21 @@ export const billingApi = {
   },
 
   /** Start saving a card — returns a SetupIntent client secret for Elements. */
-  createSetupIntent() {
-    return apiFetch<{ clientSecret: string }>('/api/v1/billing/setup-intent', { method: 'POST' });
+  /** `us_bank_account` = ACH Direct Debit for invoiced accounts. */
+  createSetupIntent(method: 'card' | 'us_bank_account' = 'card') {
+    return apiFetch<{ clientSecret: string }>('/api/v1/billing/setup-intent', { method: 'POST', body: JSON.stringify({ method }) });
   },
 
   /** Confirm the saved card after Elements confirms the SetupIntent. */
   saveCard(body: { setupIntentId: string }) {
-    return apiFetch<{ card: BillingCard; canFile: boolean }>('/api/v1/billing/card', {
+    return apiFetch<{
+      card: BillingCard | null;
+      bankAccount: BillingBankAccount | null;
+      canFile?: boolean;
+      /** A bank account awaiting micro-deposit verification. */
+      pending?: boolean;
+      message?: string;
+    }>('/api/v1/billing/card', {
       method: 'POST',
       body: JSON.stringify(body),
     });
@@ -1095,6 +1149,7 @@ export interface AdminOrganization {
   subscriptionStatus: string | null;
   /** The org's own prices (cents; null = default) and what they resolve to. */
   pricing: (AdminPriceOverrides & { effective: OrgPricing }) | null;
+  billing: AdminBillingTerms & { bankAccount: BillingBankAccount | null } | null;
   cardOnFile: boolean;
   owner: { email: string; firstName: string | null; lastName: string | null; emailVerified: boolean } | null;
   userCount: number;
@@ -1126,6 +1181,38 @@ export interface AdminPriceOverrides {
   isfCents: number | null;
   entryLinkedCents: number | null;
   entryOnlyCents: number | null;
+}
+
+export interface AdminBillingTerms {
+  mode: 'card' | 'invoiced';
+  monthlyMinimumCents: number | null;
+  includedIsfs: number | null;
+  isfBands: IsfBand[];
+  /** YYYY-MM-DD; nothing before it is invoiced. */
+  billingStartsOn: string | null;
+  billingHold: boolean;
+}
+
+export interface AdminInvoice {
+  id: string;
+  period: string;
+  kind: 'usage' | 'prepay';
+  status: string;
+  totalCents: number;
+  lines: InvoiceLine[];
+  lastError: string | null;
+  dashboardUrl: string | null;
+  createdAt: string;
+}
+
+export interface AdminUsagePreview {
+  billingMode: 'card' | 'invoiced';
+  period: { start: string; end: string };
+  closed: boolean;
+  lines: InvoiceLine[];
+  totalCents: number;
+  isfCount: number;
+  accruedShipments: number;
 }
 
 export interface AdminPlan {
@@ -1177,10 +1264,36 @@ export const adminApi = {
     );
   },
 
-  setPricing(orgId: string, body: AdminPriceOverrides) {
-    return apiFetch<{ orgId: string; pricing: AdminPriceOverrides & { effective: OrgPricing } }>(
+  setPricing(orgId: string, body: AdminPriceOverrides & Partial<{
+    billingMode: 'card' | 'invoiced';
+    monthlyMinimumCents: number | null;
+    includedIsfs: number | null;
+    isfBands: IsfBand[] | null;
+    billingStartsOn: string | null;
+    billingHold: boolean;
+  }>) {
+    return apiFetch<{ orgId: string; pricing: AdminPriceOverrides & { effective: OrgPricing }; billing: AdminBillingTerms }>(
       `/api/v1/admin/organizations/${orgId}/pricing`,
       { method: 'PUT', body: JSON.stringify(body) },
+    );
+  },
+
+  usage(orgId: string, period: string) {
+    return apiFetch<AdminUsagePreview>(`/api/v1/admin/organizations/${orgId}/usage?period=${encodeURIComponent(period)}`);
+  },
+
+  usageCsv(orgId: string, period: string) {
+    return apiDownload(`/api/v1/admin/organizations/${orgId}/usage?period=${encodeURIComponent(period)}&format=csv`);
+  },
+
+  invoices(orgId: string) {
+    return apiFetch<{ invoices: AdminInvoice[] }>(`/api/v1/admin/organizations/${orgId}/invoices`);
+  },
+
+  createInvoice(orgId: string, body: { period: string; kind: 'usage' | 'prepay' }) {
+    return apiFetch<{ invoice: { id: string; stripeInvoiceId: string; totalCents: number; dashboardUrl: string } }>(
+      `/api/v1/admin/organizations/${orgId}/invoices`,
+      { method: 'POST', body: JSON.stringify(body) },
     );
   },
 
@@ -1615,9 +1728,11 @@ export interface ManifestQueryRecord {
   bolType: string;
   houseBOLNumber: string | null;
   status: 'pending' | 'polling' | 'completed' | 'failed' | 'timeout';
-  responseData: Record<string, unknown> | null;
+  /** The answer as it arrived; the manifest query page reads it. */
+  response: unknown;
   errorMessage: string | null;
   createdAt: string;
+  completedAt: string | null;
   updatedAt: string;
 }
 
@@ -1694,8 +1809,13 @@ export interface DutyCalcSubheading {
   hts: string;
   name: string;
   duty: number;
-  /** AI mode only: 'section301', 'fentanylCN', 'reciprocal', 'steel', etc. */
+  /** 'section301', 'section301ForcedLabor', 'reciprocal', 'auto-parts', 'steel', etc. */
   section?: string;
+  /** The program in words, e.g. "Section 232 - Automobiles and Auto Parts". */
+  program?: string;
+  dutyPercentage?: number;
+  /** 'DUTY', or 'EXCEPTION' for a tariff that was considered and does not apply. */
+  kind?: string;
 }
 
 export interface DutyCalcItemResult {
@@ -1713,7 +1833,8 @@ export interface DutyCalcItemResult {
   totalDutiable: number;
   charges: number;
   duty: number;
-  userFee: number;
+  /** A plain amount, or the fees by class code with their total. */
+  userFee: number | { total: number; [feeClass: string]: number };
   irTax: number;
   adcvdAmount: number;
   subheadingDuties: number;
@@ -1759,10 +1880,10 @@ export interface DutyCalcResponse {
   modeOfTransportation: string;
   estimatedEntryDate: string;
   currency: string;
-  entryFee: { entryProcessingFee: number; portProcessingFee: number };
+  entryFee?: { entryProcessingFee: number; portProcessingFee: number };
   summary: DutyCalcSummary;
   /** AI endpoint sometimes returns null — UI must guard. */
-  dutiesBreakdown: DutyCalcDutiesBreakdown | null;
+  dutiesBreakdown?: DutyCalcDutiesBreakdown | null;
   ddpBreakdown: {
     ddpIncluded: boolean;
     ddp: number;
@@ -2125,7 +2246,8 @@ export interface AbiDocument {
 }
 
 export interface AbiDocumentListParams {
-  status?: AbiDocumentStatus;
+  /** One status, or several joined with commas. */
+  status?: AbiDocumentStatus | string;
   mbolNumber?: string;
   entryNumber?: string;
   skip?: number;
@@ -2239,6 +2361,16 @@ export const abiDocumentsApi = {
     return apiFetch<AbiDocumentListResponse>(
       `/api/v1/abi-documents${qs ? `?${qs}` : ''}`,
     );
+  },
+
+  /** Status counts for the list's tabs, under the same search. */
+  facets(params?: Pick<AbiDocumentListParams, 'mbolNumber' | 'entryNumber'>) {
+    const query = new URLSearchParams();
+    Object.entries(params ?? {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') query.set(k, String(v));
+    });
+    const qs = query.toString();
+    return apiFetch<{ status: Record<string, number> }>(`/api/v1/abi-documents/facets${qs ? `?${qs}` : ''}`);
   },
 
   get(id: string) {
@@ -2764,6 +2896,17 @@ export interface LiquidationTracked {
   daysUntilPscDeadline: number;
   status: 'pending' | 'psc-window-open' | 'awaiting-liquidation' | 'liquidated';
 }
+
+export const dashboardApi = {
+  get() {
+    return apiFetch<DashboardResponse>('/api/v1/dashboard');
+  },
+  actions(q: { filter?: ActionFilter; group?: string; page?: number; limit?: number }) {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(q)) if (v !== undefined) params.set(k, String(v));
+    return apiFetch<ActionsPage>(`/api/v1/dashboard/actions?${params}`);
+  },
+};
 
 export const complianceApi = {
   aiStatus() {

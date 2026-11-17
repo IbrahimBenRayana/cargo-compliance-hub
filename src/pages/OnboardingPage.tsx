@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import {
   Building2, FileText, PartyPopper, ArrowRight, ArrowLeft, CreditCard,
   CheckCircle2, Loader2, Ship, Globe, ChevronRight,
-} from 'lucide-react';
+} from '@/components/icons';
 
 // ─── Step definitions ─────────────────────────────────────
 const STEPS = [

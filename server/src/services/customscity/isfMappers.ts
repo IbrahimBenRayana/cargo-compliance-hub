@@ -464,11 +464,12 @@ export function mapFilingToISF5CC(filing: any): CCDocumentCreatePayload {
 
   // US Port of Arrival is 4-char CBP code.
   // isf5.USPortOfArrival is the primary source (4-digit CBP code from the form).
-  // filing.foreignPortOfUnlading is now a 5-digit Schedule D code, so only use its first 4 digits as fallback.
+  // On ISF-5 filing.foreignPortOfUnlading is a 5-digit Schedule K (foreign port) code, so its first
+  // 4 digits are not a US port; this fallback is legacy and only fires when USPortOfArrival is empty.
   const usPort = (isf5.USPortOfArrival || (filing.foreignPortOfUnlading ? filing.foreignPortOfUnlading.slice(0, 4) : '') || '1001').replace(/\s/g, '').slice(0, 4);
 
-  // foreignPortOfUnlading: CC requires a valid 5-digit Schedule D port code.
-  // The form stores this in filing.foreignPortOfUnlading (a 5-digit Schedule D code from the dropdown).
+  // foreignPortOfUnlading: CC requires a valid 5-digit Schedule K (foreign port) code.
+  // The form stores this in filing.foreignPortOfUnlading (from the SCHEDULE_K_PORTS dropdown).
   // Fall back to deriving from USPortOfArrival by padding to 5 digits.
   const foreignPortRaw = filing.foreignPortOfUnlading ?? isf5.foreignPortOfUnlading ?? '';
   const foreignPort = foreignPortRaw ? portFive(foreignPortRaw) : portFive(usPort);
@@ -487,7 +488,7 @@ export function mapFilingToISF5CC(filing: any): CCDocumentCreatePayload {
     bondHolderID:        bondHolderFormatted,
     USPortOfArrival:     usPort,
     estimateDateOfArrival: toYYYYMMDDString(isf5.estimateDateOfArrival) || toYYYYMMDDString(filing.estimatedArrival) || toYYYYMMDDString(new Date()),
-    // foreignPortOfUnlading: 5-digit Schedule D port code (required by CC)
+    // foreignPortOfUnlading: 5-digit Schedule K foreign port code (required by CC)
     foreignPortOfUnlading: foreignPort,
     // placeOfDelivery: 5-digit code for the place where cargo will be delivered in the US
     placeOfDelivery:       portFive(isf5.placeOfDelivery ?? filing.placeOfDelivery ?? usPort + '0'),

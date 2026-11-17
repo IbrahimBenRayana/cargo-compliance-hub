@@ -434,8 +434,8 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       severity,
       title:
         hoursToCutoff <= 0
-          ? `ISF deadline passed — ${bol}`
-          : `ISF deadline in ${Math.round(hoursToCutoff)}h — ${bol}`,
+          ? `ISF cutoff passed: ${bol}`
+          : `ISF cutoff in ${Math.round(hoursToCutoff)}h: ${bol}`,
       context: `Vessel departs ${new Date(f.estimatedDeparture).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. Submit before cutoff to avoid CBP penalty.`,
       filingId: f.id,
       bol,
@@ -462,7 +462,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       id: `rejection:${f.id}`,
       kind: 'rejection',
       severity: 'critical',
-      title: `Rejected by CBP — ${bol}`,
+      title: `Rejected by CBP: ${bol}`,
       context: 'Edit the filing, fix the issues, and resubmit. The AI coach can explain what went wrong.',
       filingId: f.id,
       bol,
@@ -489,7 +489,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       id: `uflpa:${f.id}`,
       kind: 'uflpa',
       severity: 'high',
-      title: `High UFLPA risk — ${bol}`,
+      title: `High UFLPA risk: ${bol}`,
       context: risk.reasons[0] ?? 'Supply-chain documentation required before clearance.',
       filingId: f.id,
       bol,
@@ -516,7 +516,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       id: `${psc ? 'psc' : 'liquidation'}:${e.id}`,
       kind: psc ? 'psc' : 'liquidation',
       severity: psc ? (liq.daysUntilPscDeadline <= 7 ? 'high' : 'medium') : 'medium',
-      title: psc ? `PSC window closes in ${liq.daysUntilPscDeadline}d — ${e.ref}` : `Liquidation in ${liq.daysUntilLiquidation}d — ${e.ref}`,
+      title: psc ? `PSC window closes in ${liq.daysUntilPscDeadline}d: ${e.ref}` : `Liquidation in ${liq.daysUntilLiquidation}d: ${e.ref}`,
       context: psc
         ? 'File a Post-Summary Correction within the window, or accept the current duty assessment.'
         : 'After liquidation you have 180 days to file a protest if the duty assessment is contested.',
@@ -555,7 +555,7 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       kind: 'bulk-fix',
       severity: 'high',
       title: `${filingIds.length} filings share the same rejection`,
-      context: `"${reason}" — fix once, apply to ${filingIds.length} filings.`,
+      context: `"${reason}": fix once, apply to ${filingIds.length} filings.`,
       timestamp: now,
       isNew: false,
       score: null,            // bulk-fix isn't a single filing
@@ -585,12 +585,12 @@ router.get('/action-queue', async (req: AuthRequest, res: Response): Promise<voi
       id: `draft:${f.id}`,
       kind: 'draft_review',
       severity,
-      title: `Draft — ${bol}`,
+      title: `Draft: ${bol}`,
       context:
         en.score < 50
           ? 'Many required fields are missing. Open to continue editing.'
           : en.score < 75
-          ? 'In progress — a few fields still need attention before submit.'
+          ? 'In progress. A few fields still need attention before it can be sent.'
           : 'Looking clean. Run the AI pre-flight before submitting.',
       filingId: f.id,
       bol,
@@ -1108,27 +1108,27 @@ const NARRATIVE_TTL_MS = 5 * 60_000;
 function ruleBasedNarrative(s: NarrativeSignals): string {
   // Severity-ordered fallback so we still ship a useful line when AI is off.
   if (s.rejected > 0) {
-    return `${s.rejected} filing${s.rejected === 1 ? '' : 's'} rejected by CBP — open the action queue to start corrections.`;
+    return `${s.rejected} filing${s.rejected === 1 ? '' : 's'} rejected by CBP. They are listed below to correct.`;
   }
   if (s.uflpaHigh > 0) {
     return `${s.uflpaHigh} high-risk UFLPA filing${s.uflpaHigh === 1 ? '' : 's'} needs evidence of origin before clearance.`;
   }
   if (s.pscClosingSoon > 0) {
-    return `${s.pscClosingSoon} PSC deadline${s.pscClosingSoon === 1 ? '' : 's'} closing within 14 days — file corrections soon.`;
+    return `${s.pscClosingSoon} PSC deadline${s.pscClosingSoon === 1 ? '' : 's'} closing within 14 days. File corrections soon.`;
   }
   if (s.drafts > 0) {
     return `${s.drafts} draft${s.drafts === 1 ? '' : 's'} waiting on you. Run an AI pre-flight check before submitting.`;
   }
   if (s.uflpaElevated > 0) {
-    return `${s.uflpaElevated} filing${s.uflpaElevated === 1 ? '' : 's'} flagged as UFLPA-elevated — worth a quick review.`;
+    return `${s.uflpaElevated} filing${s.uflpaElevated === 1 ? '' : 's'} flagged as elevated UFLPA risk. Worth a review.`;
   }
   if (s.liquidatingSoon > 0) {
-    return `${s.liquidatingSoon} entr${s.liquidatingSoon === 1 ? 'y is' : 'ies are'} liquidating within 14 days — confirm duties paid.`;
+    return `${s.liquidatingSoon} entr${s.liquidatingSoon === 1 ? 'y is' : 'ies are'} liquidating within 14 days. Confirm duties are paid.`;
   }
   if (s.awaitingCbp > 0) {
-    return `${s.awaitingCbp} filing${s.awaitingCbp === 1 ? '' : 's'} submitted and awaiting CBP response — nothing else needs you right now.`;
+    return `${s.awaitingCbp} filing${s.awaitingCbp === 1 ? '' : 's'} sent and awaiting an answer from CBP. Nothing else needs you right now.`;
   }
-  return 'Inbox is clear — no rejections, no UFLPA hits, no deadlines closing this week.';
+  return 'Nothing open: no rejections, no UFLPA flags, no deadlines closing this week.';
 }
 
 router.get('/health-narrative', async (req: AuthRequest, res: Response): Promise<void> => {
