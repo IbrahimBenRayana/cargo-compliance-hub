@@ -30,6 +30,21 @@ beforeEach(() => {
   prisma.subscription.updateMany.mockResolvedValue({ count: 1 });
 });
 
+describe('idempotency ledger', () => {
+  it("a retry of an event whose handler failed is claimed again, not skipped as a duplicate", async () => {
+    await handleStripeEvent(event('invoice.paid', { id: 'in_1', status: 'paid' }));
+    const sql = (prisma.$queryRaw.mock.calls[0][0] as string[]).join('?');
+    expect(sql).toMatch(/ON CONFLICT \("event_id"\) DO UPDATE/);
+    expect(sql).toMatch(/"processed_at" IS NULL/);
+  });
+
+  it('an event already processed is skipped', async () => {
+    prisma.$queryRaw.mockResolvedValue([]);
+    await handleStripeEvent(event('invoice.paid', { id: 'in_1', status: 'paid' }));
+    expect(prisma.billingInvoice.updateMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('payment_intent.payment_failed', () => {
   it('fails the current attempt and marks the org delinquent', async () => {
     prisma.shipmentCharge.findUnique.mockResolvedValue({ id: 'c1', orgId: 'o1', status: 'processing', stripePaymentIntentId: null });
@@ -77,6 +92,11 @@ describe('monthly invoices', () => {
   it('mirrors a paid invoice', async () => {
     await handleStripeEvent(event('invoice.paid', { id: 'in_1', status: 'paid', metadata: { orgId: 'o1' } }));
     expect(prisma.billingInvoice.updateMany).toHaveBeenCalledWith({ where: { stripeInvoiceId: 'in_1' }, data: { status: 'paid' } });
+  });
+
+  it('an invoice deleted in the Stripe dashboard is marked deleted, so the month can be redone', async () => {
+    await handleStripeEvent(event('invoice.deleted', { id: 'in_3', status: 'draft' }));
+    expect(prisma.billingInvoice.updateMany).toHaveBeenCalledWith({ where: { stripeInvoiceId: 'in_3' }, data: { status: 'deleted' } });
   });
 
   it('a failed ACH debit is mirrored and owners/admins are told', async () => {

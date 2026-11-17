@@ -27,6 +27,9 @@ export type InvoiceKind = 'usage' | 'prepay';
 
 /** Statuses that mean "this month's minimum was really billed in advance". */
 const LIVE_INVOICE = ['creating', 'draft', 'open', 'paid'];
+/** Stripe invoices that are gone (voided, or a draft deleted in the dashboard):
+ *  the month can be invoiced again. */
+const REDOABLE = ['void', 'deleted'];
 
 interface Terms {
   minimumCents: number;
@@ -108,8 +111,25 @@ export async function createMonthlyInvoice(opts: {
   const existing = await prisma.billingInvoice.findUnique({
     where: { orgId_periodStart_kind: { orgId, periodStart, kind } },
   });
-  if (existing && existing.status !== 'error') {
+  if (existing && existing.status !== 'error' && !REDOABLE.includes(existing.status)) {
     return { ok: false, httpStatus: 409, error: `This month already has a ${kind} invoice (${existing.status}).` };
+  }
+  if (kind === 'prepay') {
+    // A prepay after the usage invoice would bill the minimum twice.
+    const usage = await prisma.billingInvoice.findUnique({
+      where: { orgId_periodStart_kind: { orgId, periodStart, kind: 'usage' } },
+    });
+    if (usage && LIVE_INVOICE.includes(usage.status)) {
+      return { ok: false, httpStatus: 409, error: `This month already has a usage invoice (${usage.status}); it includes the minimum.` };
+    }
+  }
+  if (existing && REDOABLE.includes(existing.status)) {
+    // The old invoice is gone in Stripe: its shipments go back to accrued so
+    // this attempt bills them.
+    await prisma.shipmentCharge.updateMany({
+      where: { invoiceId: existing.id, status: 'invoiced' },
+      data: { status: 'accrued', invoiceId: null },
+    });
   }
 
   let lines: InvoiceLine[];
@@ -146,7 +166,12 @@ export async function createMonthlyInvoice(opts: {
       customerId = await createStripeCustomer({ orgId, email: owner?.email, name: sub.organization.name });
       await prisma.subscription.update({ where: { orgId }, data: { stripeCustomerId: customerId } });
     }
-    const key = `mcl-invoice-${record.id}`;
+    // A redo after a voided/deleted invoice needs a new key, or Stripe would
+    // hand back the old invoice. stripeInvoiceId is only saved on success, so
+    // a retry after an error (of a first attempt or of a redo) keeps its key.
+    const key = existing?.stripeInvoiceId
+      ? `mcl-invoice-${record.id}-after-${existing.stripeInvoiceId}`
+      : `mcl-invoice-${record.id}`;
     const period = periodStart.toISOString().slice(0, 7);
     const debit = !!sub.achPaymentMethodId;
     const params: Stripe.InvoiceCreateParams = {

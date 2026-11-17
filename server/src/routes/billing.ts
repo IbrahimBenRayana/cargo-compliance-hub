@@ -68,14 +68,18 @@ router.post(
 );
 
 // ─── Event dispatch with an idempotency ledger ─────────────────────────────
-// Stripe delivers at-least-once. We INSERT event.id ON CONFLICT DO NOTHING; an
-// empty result means we already processed it. processedAt is set only after the
-// handler finishes (and nulled on failure) so a crashed handler can be retried.
+// Stripe delivers at-least-once. We INSERT event.id; an empty result means we
+// already processed it. processedAt is set only after the handler finishes (and
+// nulled on failure), so Stripe's retry of a failed event re-claims the row
+// instead of being skipped as a duplicate. The 2-minute gap keeps a retry from
+// re-claiming an event whose first delivery is still being handled.
 export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
   const inserted = await prisma.$queryRaw<Array<{ event_id: string }>>`
     INSERT INTO "stripe_webhook_events" ("event_id", "type", "received_at")
     VALUES (${event.id}, ${event.type}, NOW())
-    ON CONFLICT ("event_id") DO NOTHING
+    ON CONFLICT ("event_id") DO UPDATE SET "received_at" = NOW()
+      WHERE "stripe_webhook_events"."processed_at" IS NULL
+        AND "stripe_webhook_events"."received_at" < NOW() - INTERVAL '2 minutes'
     RETURNING "event_id"
   `;
   if (inserted.length === 0) {
@@ -103,6 +107,10 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       case 'invoice.voided':
       case 'invoice.marked_uncollectible':
         await syncInvoiceStatus((event.data.object as Stripe.Invoice).id!, (event.data.object as Stripe.Invoice).status);
+        break;
+      // A draft deleted in the dashboard: free the month so it can be redone.
+      case 'invoice.deleted':
+        await syncInvoiceStatus((event.data.object as Stripe.Invoice).id!, 'deleted');
         break;
       case 'invoice.payment_failed':
         await onInvoicePaymentFailed(event.data.object as Stripe.Invoice);

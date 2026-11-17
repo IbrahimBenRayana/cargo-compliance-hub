@@ -117,7 +117,48 @@ describe('createMonthlyInvoice (usage)', () => {
   });
 });
 
+describe('redoing a voided or deleted invoice', () => {
+  for (const status of ['void', 'deleted']) {
+    it(`a ${status} usage invoice frees its shipments and is drafted again under a new Stripe key`, async () => {
+      prisma.billingInvoice.findUnique.mockImplementation(({ where }: { where: { orgId_periodStart_kind: { kind: string } } }) =>
+        Promise.resolve(where.orgId_periodStart_kind.kind === 'usage' ? { id: 'bi1', status, stripeInvoiceId: 'in_old' } : null));
+      prisma.billingInvoice.update.mockResolvedValue({ id: 'bi1', stripeInvoiceId: 'in_old' });
+      const out = await createMonthlyInvoice({ orgId: 'o1', periodStart: SEP, kind: 'usage', createdById: 'u1' });
+      expect(out).toMatchObject({ ok: true });
+      expect(prisma.shipmentCharge.updateMany.mock.calls[0][0]).toEqual({
+        where: { invoiceId: 'bi1', status: 'invoiced' },
+        data: { status: 'accrued', invoiceId: null },
+      });
+      expect(prisma.billingInvoice.create).not.toHaveBeenCalled();
+      expect(stripeApi.invoices.create.mock.calls[0][1]).toEqual({ idempotencyKey: 'mcl-invoice-bi1-after-in_old' });
+      expect(stripeApi.invoiceItems.create.mock.calls[0][1]).toEqual({ idempotencyKey: 'mcl-invoice-bi1-after-in_old-line-0' });
+    });
+  }
+
+  it('a redo that failed is retried under the same new key, not the voided one', async () => {
+    prisma.billingInvoice.findUnique.mockImplementation(({ where }: { where: { orgId_periodStart_kind: { kind: string } } }) =>
+      Promise.resolve(where.orgId_periodStart_kind.kind === 'usage' ? { id: 'bi1', status: 'error', stripeInvoiceId: 'in_old' } : null));
+    prisma.billingInvoice.update.mockResolvedValue({ id: 'bi1' });
+    await createMonthlyInvoice({ orgId: 'o1', periodStart: SEP, kind: 'usage', createdById: 'u1' });
+    expect(stripeApi.invoices.create.mock.calls[0][1]).toEqual({ idempotencyKey: 'mcl-invoice-bi1-after-in_old' });
+  });
+
+  it('an open or paid invoice is still never redone', async () => {
+    prisma.billingInvoice.findUnique.mockResolvedValue({ id: 'bi1', status: 'open', stripeInvoiceId: 'in_old' });
+    expect(await createMonthlyInvoice({ orgId: 'o1', periodStart: SEP, kind: 'usage', createdById: 'u1' })).toMatchObject({ ok: false, httpStatus: 409 });
+    expect(prisma.shipmentCharge.updateMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('prepay and billing start', () => {
+  it('refuses a prepay for a month that already has a usage invoice (the minimum would be billed twice)', async () => {
+    prisma.billingInvoice.findUnique.mockImplementation(({ where }: { where: { orgId_periodStart_kind: { kind: string } } }) =>
+      Promise.resolve(where.orgId_periodStart_kind.kind === 'usage' ? { id: 'bu', status: 'draft' } : null));
+    const out = await createMonthlyInvoice({ orgId: 'o1', periodStart: SEP, kind: 'prepay', createdById: 'u1' });
+    expect(out).toMatchObject({ ok: false, httpStatus: 409 });
+    expect(stripeApi.invoices.create).not.toHaveBeenCalled();
+  });
+
   it('a prepay invoice bills the minimum only', async () => {
     const out = await createMonthlyInvoice({ orgId: 'o1', periodStart: new Date('2027-01-01T00:00:00Z'), kind: 'prepay', createdById: 'u1' });
     expect(out).toMatchObject({ ok: true, invoice: { totalCents: 25000 } });
