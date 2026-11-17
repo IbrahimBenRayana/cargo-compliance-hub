@@ -1,0 +1,16 @@
+[
+ { "id": "p01", "text": "Which filing needs you, right now?" },
+ { "id": "p02", "text": "MyCargoLens opens on today's work, with the ISFs nearest their cutoff at the top." },
+ { "id": "p03", "text": "Every ISF carries its own deadline clock." },
+ { "id": "p04", "text": "Each draft is checked against the rules before you submit it." },
+ { "id": "p05", "text": "Open work is ranked by urgency, in one inbox." },
+ { "id": "p06", "text": "When the ISF is accepted, the entry starts prefilled from it." },
+ { "id": "p07", "text": "And every request and response is logged." },
+ { "id": "p08", "text": "MyCargoLens. An inbox for US customs. Book a demo." },
+ { "id": "f01", "text": "Filing an ISF-10 should not mean retyping it." },
+ { "id": "f02", "text": "Start from a saved template. Parties, ports, HTS codes and bond are already in." },
+ { "id": "f03", "text": "Walk the six steps, and add what is new for this shipment." },
+ { "id": "f04", "text": "Before it goes, every field is checked against the filing rules." },
+ { "id": "f05", "text": "After you submit, the status and full history stay in one place." },
+ { "id": "f06", "text": "Forty-five dollars per accepted ISF. Book a demo at mycargolens dot com." }
+]
