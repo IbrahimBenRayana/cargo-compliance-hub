@@ -209,7 +209,7 @@ export default function CustomsEntryPage() {
             <ul className="mt-6 space-y-2 border-t border-[hsl(var(--surface-border))] pt-5 text-[14.5px] text-tone-fg">
               <li>Entry summary (7501) and cargo release (3461)</li>
               <li>Linked to the accepted ISF on one shipment</li>
-              <li>Container tracking and the duty calculator: ask us</li>
+              <li>The duty calculator: ask us</li>
             </ul>
             <Button asChild variant="outline" size="lg" className="mt-7 w-full bg-[hsl(var(--surface))]">
               <Link
