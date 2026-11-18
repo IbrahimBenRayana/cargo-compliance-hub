@@ -185,16 +185,7 @@ export default function InboxPage() {
         />
       </Section>
 
-      {/* S6 · Containers and last free day */}
-      <Section tone="lilac" id="containers" accent="inbox" spacing="compact">
-        <SectionHeading
-          eyebrow="Tracking, on request"
-          title="Vessel ETAs and last free day next to the filing"
-          intro="Tracked containers show vessel ETAs, port arrival and the last free day, so the filing and the box sit in the same place. It's available with customs entry; ask us in the demo."
-        />
-      </Section>
-
-      {/* S7 · Webhooks */}
+      {/* S6 · Webhooks */}
       <Section tone="ink" id="webhooks" accent="inbox" spacing="compact">
         <div className="grid items-end gap-8 lg:grid-cols-[1.4fr_1fr]">
           <SectionHeading

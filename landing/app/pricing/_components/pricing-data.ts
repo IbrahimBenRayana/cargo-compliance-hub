@@ -52,7 +52,7 @@ export const ENTRY_PLAN: Plan = {
     "Entry summary (7501)",
     "Cargo release (3461), prefilled from the accepted ISF",
     "ISF and entry linked on one shipment",
-    "Container tracking and the duty calculator: ask us in the demo",
+    "The duty calculator: ask us in the demo",
   ],
 };
 
