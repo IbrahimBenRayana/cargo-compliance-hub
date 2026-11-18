@@ -107,7 +107,7 @@ export default function CustomsEntryPage() {
             </>
           }
           actions={<TextLinks links={[{ label: "How ISF filing works", href: ROUTES.isfFiling.href }]} />}
-          screenshot={{ screen: "app-dashboard-stages" }}
+          screenshot={{ screen: "app-dashboard-actions" }}
         />
       </Section>
 

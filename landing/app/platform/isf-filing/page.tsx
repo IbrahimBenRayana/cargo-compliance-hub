@@ -249,7 +249,7 @@ export default function IsfFilingPage() {
             </p>
           }
           actions={<TextLinks links={[{ label: "Customs entry, prefilled from the ISF", href: ROUTES.customsEntry.href }]} />}
-          screenshot={{ screen: "app-dashboard-stages" }}
+          screenshot={{ screen: "app-dashboard-actions" }}
         />
       </Section>
 
