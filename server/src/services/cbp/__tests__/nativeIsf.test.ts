@@ -20,6 +20,8 @@ vi.mock('../transport.js', () => ({ cbpTransport: { send: vi.fn() }, cbpTrafficC
 vi.mock('../sender.js', () => ({ requireCbpSender: () => ({ siteCode: '1303', idCode: 'S7P', password: 'X' }) }));
 vi.mock('../../notifications.js', () => ({ notifyFilingSubmitted: vi.fn() }));
 
+import { Prisma } from '@prisma/client';
+import { RecordCodecError } from '../../../abi-engine/records/codec.js';
 import { transmitIsfNative } from '../nativeIsf.js';
 
 const DRAFT = { id: 'f1', orgId: 'o1', status: 'draft', cbpState: 'NOT_ON_FILE', pendingAction: null, isfFilerMode: null, isfFilerCode: null, cbpTransactionId: null, houseBol: 'HB1', masterBol: 'MB1' };
@@ -82,7 +84,7 @@ describe('transmitIsfNative', () => {
   it('keeps the filing awaiting CBP when the outcome is unknown', async () => {
     transmit.transmitNative.mockResolvedValue({ id: 't1', userDataTag: 'MCLX', status: 'UNKNOWN', lastError: 'timeout' });
     const out = await transmitIsfNative(ARGS);
-    expect(prisma.filing.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.not.objectContaining({ pendingAction: null }) }));
+    expect(prisma.filing.update).not.toHaveBeenCalled();
     expect(out).toMatchObject({ httpStatus: 202, body: { outcome: 'UNKNOWN' } });
   });
 
@@ -91,5 +93,44 @@ describe('transmitIsfNative', () => {
     await transmitIsfNative({ ...ARGS, action: 'DELETE' });
     expect(filer.resolveIsfFiler).not.toHaveBeenCalled();
     expect(transmit.transmitNative).toHaveBeenCalledWith(expect.objectContaining({ action: 'D', filerCode: 'ABC', isfTransactionNumber: 'ABC-12345678901' }));
+  });
+
+  describe('a replace with edits', () => {
+    const ON_FILE = { ...DRAFT, status: 'accepted', cbpState: 'ON_FILE', isfFilerCode: 'S7P', cbpTransactionId: 'S7P-1', vesselName: 'OLD VESSEL', estimatedDeparture: null, estimatedLading: null, pendingChanges: null, rejectedChanges: null };
+    const EDITS = { vesselName: 'NEW VESSEL' };
+    const REPLACE = { ...ARGS, action: 'REPLACE' as const, edits: EDITS };
+
+    beforeEach(() => prisma.filing.findFirst.mockResolvedValue(ON_FILE));
+
+    it('sends the edits to CBP but holds them off the row', async () => {
+      await transmitIsfNative(REPLACE);
+      expect(mapper.mapFilingToIsfInput).toHaveBeenCalledWith(expect.objectContaining({ vesselName: 'NEW VESSEL' }), expect.anything());
+      const claim = prisma.filing.updateMany.mock.calls[0][0].data;
+      expect(claim).toMatchObject({ pendingAction: 'REPLACE', pendingChanges: EDITS });
+      expect(claim).not.toHaveProperty('vesselName');
+    });
+
+    it('stores nothing when the edits cannot be built into an ISF', async () => {
+      mapper.buildIsf.mockImplementationOnce(() => { throw new RecordCodecError([{ record: 'SF10', field: 'x', problem: 'required', message: 'required' }] as never); });
+      const out = await transmitIsfNative(REPLACE);
+      expect(out.httpStatus).toBe(422);
+      expect(prisma.filing.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('drops the in-flight edits when nothing reached CBP', async () => {
+      transmit.transmitNative.mockResolvedValue({ id: 't1', status: 'FAILED', lastError: 'queue down' });
+      await transmitIsfNative(REPLACE);
+      const data = prisma.filing.update.mock.calls[0][0].data;
+      expect(data).toMatchObject({ status: 'accepted', pendingAction: null, pendingChanges: Prisma.DbNull });
+      expect(data).not.toHaveProperty('rejectedChanges');
+    });
+
+    it('a replace without edits leaves the edits kept from a rejection alone', async () => {
+      prisma.filing.findFirst.mockResolvedValue({ ...ON_FILE, rejectedChanges: { vesselName: 'REJECTED VESSEL' } });
+      await transmitIsfNative({ ...ARGS, action: 'REPLACE' });
+      const claim = prisma.filing.updateMany.mock.calls[0][0].data;
+      expect(claim).not.toHaveProperty('rejectedChanges');
+      expect(claim).not.toHaveProperty('pendingChanges');
+    });
   });
 });

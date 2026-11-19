@@ -5,6 +5,8 @@
  *    with the tag in the B-record user data (CBP echoes it back), and store
  *    the row as QUEUED before anything is sent.
  * 2. Send. Success -> SENT with the MQ MsgId.
+ *    An answer can land before the send returns, so these writes only move a
+ *    row that is still QUEUED and never overwrite CBP's verdict.
  * 3. Failure is classified, never retried here:
  *    - FAILED: provably never left (environment guard refusal, bridge
  *      unreachable), so the caller may retry with a new transmission;
@@ -28,6 +30,8 @@ function provablyNotSent(err: unknown): boolean {
 }
 
 export interface NativeTransmitInput {
+  /** The id the caller claimed the filing with, so a response can match from the first moment. */
+  id?: string;
   transport: Pick<AbiTransport, 'send'>;
   orgId: string | null;
   environment: 'CERT' | 'PROD' | 'MOCK';
@@ -52,7 +56,7 @@ export interface NativeTransmitResult {
 }
 
 export async function transmitNative(input: NativeTransmitInput): Promise<NativeTransmitResult> {
-  const id = randomUUID();
+  const id = input.id ?? randomUUID();
   const userDataTag = correlationTag(id);
   const lines = input.buildWire(userDataTag);
 
@@ -77,15 +81,19 @@ export async function transmitNative(input: NativeTransmitInput): Promise<Native
 
   try {
     const receipt = await input.transport.send(lines, { correlationId: userDataTag });
-    await prisma.cbpTransmission.update({
-      where: { id },
-      data: { status: 'SENT', mqMessageId: receipt.messageId, sentAt: new Date() },
+    const sentAt = new Date();
+    const marked = await prisma.cbpTransmission.updateMany({
+      where: { id, status: 'QUEUED' },
+      data: { status: 'SENT', mqMessageId: receipt.messageId, sentAt },
     });
+    if (marked.count === 0) {
+      await prisma.cbpTransmission.update({ where: { id }, data: { mqMessageId: receipt.messageId, sentAt } });
+    }
     return { id, userDataTag, status: 'SENT', mqMessageId: receipt.messageId };
   } catch (err) {
     const status = provablyNotSent(err) ? 'FAILED' : 'UNKNOWN';
     const lastError = err instanceof Error ? err.message : String(err);
-    await prisma.cbpTransmission.update({ where: { id }, data: { status, lastError } });
+    await prisma.cbpTransmission.updateMany({ where: { id, status: 'QUEUED' }, data: { status, lastError } });
     return { id, userDataTag, status, lastError };
   }
 }

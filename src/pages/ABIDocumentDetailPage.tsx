@@ -223,6 +223,7 @@ export default function ABIDocumentDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [cbpAction, setCbpAction] = useState<'REPLACE' | 'DELETE' | null>(null);
   const [cbpActionPending, setCbpActionPending] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const queryClient = useQueryClient();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
@@ -343,6 +344,19 @@ export default function ABIDocumentDetailPage() {
       toast.error(err?.body?.error || err?.message || 'Could not send to CBP');
     } finally {
       setCbpActionPending(false);
+    }
+  };
+
+  const handleReopenRejected = async () => {
+    setReopening(true);
+    try {
+      await abiDocumentsApi.reopenRejected(doc.id);
+      await queryClient.invalidateQueries({ queryKey: ['abi-documents', doc.id] });
+      navigate(`/abi-documents/${doc.id}/edit`);
+    } catch (err: any) {
+      toast.error(err?.body?.error || err?.message || 'Could not reopen the rejected changes');
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -547,6 +561,20 @@ export default function ABIDocumentDetailPage() {
         <div role="alert" className="rounded-xl bg-urgent-tint px-4 py-3">
           <p className="flex items-center gap-2 text-[13.5px] font-semibold text-urgent"><AlertTriangle className="h-4 w-4" aria-hidden />Last error</p>
           <p className="mt-1 whitespace-pre-wrap text-[13px] text-foreground">{doc.lastError}</p>
+        </div>
+      )}
+
+      {/* A rejected replace: the entry went back to what CBP holds; the edits wait here. */}
+      {onFile && doc.rejectedPayload && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-soon-tint px-4 py-3">
+          <div className="min-w-0 flex-1 basis-64">
+            <p className="flex items-center gap-2 text-[13.5px] font-semibold"><AlertTriangle className="h-4 w-4 text-soon" aria-hidden />CBP rejected your replacement</p>
+            <p className="mt-1 text-[13px] text-foreground">CBP still holds the version it accepted before. Reopen your changes to fix and resend them. This replaces any edits made since the rejection.</p>
+          </div>
+          <Button size="sm" variant="outline" disabled={reopening} onClick={handleReopenRejected}>
+            {reopening && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />}
+            Reopen rejected changes
+          </Button>
         </div>
       )}
 

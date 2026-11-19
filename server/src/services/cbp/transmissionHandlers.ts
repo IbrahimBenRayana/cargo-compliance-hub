@@ -8,8 +8,9 @@
  *
  * businessKeyHandler: unsolicited messages carry no tag (ISF SA advisories,
  * cargo release SO, UC notifications). They are matched to the latest
- * transmission with the same ISF transaction or entry number, without
- * changing its status; the filing-level verdict logic decides what they mean.
+ * transmission CBP could have seen with the same ISF transaction or entry
+ * number, without changing its status; the filing-level verdict logic decides
+ * what they mean.
  */
 import { prisma } from '../../config/database.js';
 import type { InboundHandler } from './dispatcher.js';
@@ -54,8 +55,8 @@ export const businessKeyHandler: InboundHandler = async (row) => {
   if (!isfTransactionNumber && !entryNumber) return null;
   const tx = await prisma.cbpTransmission.findFirst({
     where: isfTransactionNumber
-      ? { isfTransactionNumber, environment: row.environment }
-      : { entryNumber, environment: row.environment },
+      ? { isfTransactionNumber, environment: row.environment, status: { not: 'FAILED' } }
+      : { entryNumber, environment: row.environment, status: { not: 'FAILED' } },
     orderBy: { createdAt: 'desc' },
   });
   if (!tx) return null;
