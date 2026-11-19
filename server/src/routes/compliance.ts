@@ -884,7 +884,7 @@ Format your response in markdown with these sections (skip a section if it has n
 
 **5. PGA action items** — for each flagged commodity, what permit/notice the importer needs.
 
-Be concrete and brief. Refer to the filing's actual values when relevant ("Master BOL 'MAEU…' looks like an SCAC-prefix" not "your BOL"). Use numbered or bulleted lists, not paragraphs.
+Be concrete and brief. Refer to the filing's actual values when relevant ("Master BOL 'MAEU…' looks like an SCAC-prefix" not "your BOL"). Use numbered or bulleted lists, not paragraphs. Start each list item with the field name in bold. When a field has no value, say it "is empty"; never write "null" or "undefined".
   `.trim();
 
   res.set({
