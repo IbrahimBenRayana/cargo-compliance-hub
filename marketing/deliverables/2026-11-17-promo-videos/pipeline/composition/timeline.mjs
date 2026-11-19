@@ -86,14 +86,48 @@ const SCENES = {
 		zooms: { history: { z: 1.22, fx: 850, at: 1.8, hold: 9 } },
 		vo: [['f05', 0.9]]
 	},
-	'f-end': { ...END, dur: 7.6, line: 'File your next ISF-10<br>from a template.', price: '<b>ISF $45</b> per accepted ISF. No monthly fee.', vo: [['f06', 0.8]] }
+	'f-end': { ...END, dur: 7.6, line: 'File your next ISF-10<br>from a template.', price: '<b>ISF $45</b> per accepted ISF. No monthly fee.', vo: [['f06', 0.8]] },
+
+	// ── Video 4: AI pre-flight review ──────────────────────────────────────
+	'a-hook': { kind: 'hook', dur: 5.2, hook: 'Catch it before<br><em>CBP does.</em>', vo: [['a01', 0.7]] },
+	'a-inbox': {
+		kind: 'app', clip: 'compliance', from: 0.4, dur: 5.2,
+		captions: [{ at: 0, eyebrow: 'Compliance', title: 'Drafts waiting<br>on you.', sub: 'The filings that need attention, most urgent first.' }],
+		zooms: { inbox: { z: 1.22, fx: 850, at: 1.6, hold: 9 } },
+		vo: [['a02', 0.8]]
+	},
+	'a-open': {
+		kind: 'app', clip: 'ai', mark: 'open', from: 0.3, dur: 4.0,
+		captions: [{ at: 0, eyebrow: 'AI pre-flight review', title: 'One click.<br>A full review.', sub: 'Run it on any draft, before you send.' }],
+		vo: [['a03', 0.9]]
+	},
+	'a-review': {
+		kind: 'app', clip: 'ai', mark: 'read', from: 0.92, dur: 9.4,
+		captions: [{ at: 0, eyebrow: 'The review', title: 'What to fix,<br>in plain English.', sub: 'Field by field, plus possible UFLPA and agency flags.' }],
+		push: [{ at: 0.2, z: 1.45, fx: 1216, fy: 530, hold: 9 }],
+		vo: [['a04', 1.0]]
+	},
+	'a-fix': {
+		kind: 'app', clip: 'ai', mark: 'fix', from: 0.2, dur: 4.3,
+		captions: [{ at: 0, eyebrow: 'The fix', title: 'Fix it.<br>Then you decide.', sub: 'Correct the draft, then run the rule check.' }],
+		push: [{ at: 0.1, z: 1.22, fx: 850, fy: 405, hold: 9, dur: 0.6 }],
+		vo: [['a05', 0.9]]
+	},
+	'a-send': {
+		kind: 'app', clip: 'ai', mark: 'submit', from: 0.9, dur: 5.8,
+		captions: [{ at: 0, eyebrow: 'Rule checks', title: 'Checked, then<br>you confirm.', sub: 'Every field is checked. Nothing goes to CBP until you say so.' }],
+		push: [{ at: 0.1, z: 1.22, fx: 850, fy: 405, hold: 9, dur: 0.6 }],
+		zooms: { confirm: { z: 1.3, hold: 9 } },
+	},
+	'a-end': { ...END, line: 'AI pre-flight review,<br>on every draft.', vo: [['a06', 0.8]] }
 };
 
 export const CUTS = {
 	promo: { format: 'wide', scenes: ['hook', 'dashboard', 'shipments', 'validate', 'compliance', 'entry', 'logs', 'end'] },
 	'promo-square': { format: 'square', audio: 'promo', scenes: ['hook', 'dashboard', 'shipments', 'validate', 'compliance', 'entry', 'logs', 'end'] },
 	vertical: { format: 'vertical', scenes: ['v-hook', 'v-dashboard', 'v-shipments', 'v-end'] },
-	isf: { format: 'wide', scenes: ['f-hook', 'f-template', 'f-steps', 'f-check', 'f-accepted', 'f-end'] }
+	isf: { format: 'wide', scenes: ['f-hook', 'f-template', 'f-steps', 'f-check', 'f-accepted', 'f-end'] },
+	ai: { format: 'wide', scenes: ['a-hook', 'a-inbox', 'a-open', 'a-review', 'a-fix', 'a-send', 'a-end'] }
 };
 
 // stage size, the app window's view, and how the camera behaves per format

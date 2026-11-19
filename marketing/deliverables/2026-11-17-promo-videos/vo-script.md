@@ -30,3 +30,14 @@ No voice. Captions: "Which ISF is about to miss its cutoff?" / "Today's work, mo
 | Rule checks | Before it goes, every field is checked against the filing rules. |
 | After you submit | After you submit, the status and full history stay in one place. |
 | End card | Forty-five dollars per accepted ISF. Book a demo at mycargolens dot com. |
+
+## Video 4. "AI pre-flight review"
+
+| Scene | Line |
+|---|---|
+| Opening | A rejected filing means rework. Catch the problem before you send. |
+| Compliance | MyCargoLens shows which drafts are waiting, most urgent first. |
+| AI pre-flight review | Run an AI pre-flight review on any draft. |
+| The review | It checks every field, flags possible UFLPA and agency risks, and lists what to fix. |
+| The fix, rule checks | Fix it, run the rule check, and you confirm before anything goes to CBP. |
+| End card | MyCargoLens. Book a demo. |

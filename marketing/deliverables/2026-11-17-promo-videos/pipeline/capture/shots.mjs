@@ -1,7 +1,7 @@
 // The storyboard's screen shots. Times are video ms. Selectors target visible
 // text where possible so a restyle does not break the script.
 import { go, tidy } from './session.mjs';
-import { filingId, entryId, reset } from './db.mjs';
+import { filingId, entryId, reset, sql } from './db.mjs';
 
 const PHONE = { width: 540, height: 700 };
 
@@ -34,6 +34,34 @@ const today = async (page) => {
 	});
 	await settle(page, 12000);
 };
+
+// The review panel prints the model's markdown as plain text ("**1. …**", "- …").
+// For the film the same words are laid out as headings and bullets; nothing is added or removed.
+const MARKDOWN = `(() => {
+  if (window.__promoMd) return; window.__promoMd = true;
+  const css = document.createElement('style'); css.textContent = '[role="dialog"] article { display: none !important; }'; document.head.appendChild(css);
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const inline = (s) => esc(s).replace(/\\*\\*(.+?)\\*\\*/g, '<strong style="font-weight:600">$1</strong>').replace(/\\*\\*/g, '');
+  const render = (src) => src.split('\\n').map((l) => {
+    const t = l.trim();
+    if (!t) return '';
+    const h = t.match(/^(?:#+\\s*)?\\*\\*(\\d+\\.\\s.+?)\\*\\*:?$/) || t.match(/^#+\\s*(.+)$/);
+    if (h) return '<div style="margin:18px 0 6px;font-size:14px;font-weight:600">' + esc(h[1]) + '</div>';
+    const b = t.match(/^(?:[-*]|\\d+\\.)\\s+(.*)$/);
+    if (b) return '<div style="position:relative;margin:6px 0;padding-left:16px"><span style="position:absolute;left:3px;opacity:.55">•</span>' + inline(b[1]) + '</div>';
+    return '<div style="margin:6px 0">' + inline(t) + '</div>';
+  }).join('');
+  const sync = () => {
+    const a = document.querySelector('[role="dialog"] article');
+    if (!a) return;
+    let m = a.parentElement.querySelector('[data-promo-md]');
+    if (!m) { m = document.createElement('div'); m.setAttribute('data-promo-md', ''); m.className = a.className.replace('whitespace-pre-wrap', ''); m.style.marginTop = '-12px'; a.after(m); }
+    const html = render(a.textContent);
+    if (m.__src !== html) { m.__src = html; m.innerHTML = html; }
+  };
+  new MutationObserver(sync).observe(document.body, { subtree: true, childList: true, characterData: true });
+})();`;
+const DRAFT_HTS = (v) => sql(`update filings set commodities = jsonb_set(commodities, '{0,htsCode}', '"${v}"') where master_bol = 'HLCU349102260' and status = 'draft'`);
 
 export const SHOTS = {
 	// Today: KPI strip, then the two ISFs nearest their cutoff
@@ -223,6 +251,67 @@ export const SHOTS = {
 			await rec.wait(5500);
 		},
 		async after(page) { await page.keyboard.press('Escape'); reset(); }
+	},
+
+	// the AI pre-flight review on a draft, the fix, then the rule check. Nothing is sent: it ends on the confirm dialog.
+	ai: {
+		async setup(page) {
+			DRAFT_HTS('9401');
+			await go(page, `/shipments/${filingId('HLCU349102260', 'draft')}`);
+			await page.evaluate(MARKDOWN);
+			await settle(page);
+		},
+		async run(rec, page) {
+			const next = () => button(page, 'Next');
+			rec.cursor = { x: 900, y: 520 };
+			rec.mark('open');
+			await rec.wait(1000);
+			await rec.click(button(page, /AI pre-flight review/), { move: 900 });
+			await button(page, /Regenerate/).waitFor({ state: 'visible', timeout: 180000 });   // reads "Generating…" until the review is complete
+			await rec.wait(700);
+			rec.mark('read');
+			await rec.move({ x: 1216, y: 500, w: 1, h: 1 }, 800);
+			await rec.wait(3000);
+			await rec.scroll(320, 2600);
+			await rec.wait(4500);
+			await page.keyboard.press('Escape');
+			await rec.wait(700);
+			// to the Cargo step of the draft (not in the film)
+			await page.getByRole('link', { name: /^Edit$/ }).first().click();
+			for (let i = 0; i < 4; i++) {
+				await next().waitFor({ state: 'visible', timeout: 60000 });
+				await next().scrollIntoViewIfNeeded();
+				await next().click();
+				await page.waitForTimeout(5000);
+			}
+			const hts = page.getByPlaceholder('e.g., 731815');
+			await hts.waitFor({ state: 'visible', timeout: 60000 });
+			await page.evaluate(() => scrollTo(0, 0));
+			await tidy(page);
+			await page.mouse.move(900, 660); rec.cursor = { x: 900, y: 660 };
+			await page.waitForTimeout(4000);
+			rec.mark('fix');
+			await rec.wait(800);
+			await rec.click(hts, { move: 800 });
+			await page.keyboard.press('End');
+			await rec.type('614011', 120);
+			await rec.wait(1200);
+			await rec.click(next(), { move: 700 });
+			await rec.wait(1200);
+			const save = button(page, /Save Changes/);
+			await rec.scrollTo(save, 1200, 0.86);
+			await rec.click(save, { move: 600 });
+			await button(page, /Start submission/).waitFor({ state: 'visible', timeout: 60000 });
+			await tidy(page);
+			await rec.wait(1300);
+			rec.mark('submit');
+			await rec.click(button(page, /Start submission/), { move: 800 });
+			await text(page, 'Send this ISF to CBP?').waitFor({ state: 'visible', timeout: 60000 });
+			await rec.wait(400);
+			await rec.focus(await around(text(page, 'Send this ISF to CBP?'), button(page, 'Cancel'), text(page, /charged under your plan/)), 'confirm', 60);
+			await rec.wait(5500);
+		},
+		async after(page) { await page.keyboard.press('Escape'); DRAFT_HTS('9401'); }
 	},
 
 	// an accepted ISF: status, what was filed, history

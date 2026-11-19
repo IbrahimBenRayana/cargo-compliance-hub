@@ -17,7 +17,7 @@ out.mkdir(parents=True, exist_ok=True)
 k = Kokoro(str(model / "kokoro-v1.0.onnx"), str(model / "voices-v1.0.bin"))
 g2p = en.G2P(trf=False, british=voice.startswith("b"), fallback=None)
 # how the product words are said
-SAY = {"MyCargoLens": "My Cargo Lens", "mycargolens": "my cargo lens", "ISF-10": "I.S.F. ten", "ISFs": "I.S.F.s", "ISF": "I.S.F.", "HTS": "H.T.S.", "US customs": "U.S. customs"}
+SAY = {"MyCargoLens": "My Cargo Lens", "mycargolens": "my cargo lens", "ISF-10": "I.S.F. ten", "ISFs": "I.S.F.s", "ISF": "I.S.F.", "HTS": "H.T.S.", "US customs": "U.S. customs", "UFLPA": "U.F.L.P.A.", "AI ": "A.I. "}
 meta = []
 for line in json.loads((here / "vo_lines.json").read_text()):
     text = line["text"]

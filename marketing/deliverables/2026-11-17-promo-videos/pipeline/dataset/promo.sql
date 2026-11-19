@@ -22,3 +22,8 @@ DELETE FROM abi_documents WHERE entry_type = '86';
 UPDATE filings SET foreign_port_of_unlading = '3901',
        commodities = jsonb_set(commodities, '{0,htsCode}', '"9401"')
  WHERE master_bol = 'HLCU349102260' AND status = 'draft';
+-- The same draft gets a container, so the AI pre-flight review
+-- talks about the HTS number and not about empty optional fields.
+UPDATE filings SET
+       containers = '[{"number": "HLXU8841207", "type": "40GP", "sealNumber": "HL-DE221904"}]'::jsonb
+ WHERE master_bol = 'HLCU349102260' AND status = 'draft';
