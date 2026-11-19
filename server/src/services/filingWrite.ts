@@ -40,7 +40,7 @@ export async function createFilingForOrg(params: {
   const { data, orgId, userId, meta = {} } = params;
 
   // ISF deadline: 24h before lading, estimated from departure (services/isfDeadline).
-  const filingDeadline: Date | null = data.estimatedDeparture ? isfFilingDeadline(data.estimatedDeparture, data.estimatedLading) : null;
+  const filingDeadline = isfFilingDeadline(data.estimatedDeparture, data.estimatedLading);
 
   const filing = await prisma.filing.create({
     data: {

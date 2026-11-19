@@ -9,7 +9,7 @@
  * Only the first accepted ADD bills the shipment.
  */
 import { prisma } from '../../config/database.js';
-import { notifyFilingAccepted, notifyFilingRejected } from '../notifications.js';
+import { notifyFilingAccepted, notifyFilingChangeRejected, notifyFilingRejected } from '../notifications.js';
 import { billShipmentForFiling } from '../shipmentBilling.js';
 import { recordScoreSnapshot, triggerForStatus } from '../compliance/scoreSnapshot.js';
 import { isfStateOnVerdict } from './isfLifecycle.js';
@@ -79,6 +79,10 @@ export async function applyIsfVerdict(opts: {
     await notifyFilingAccepted(filing.orgId, filing.id, bol);
     if (action === 'ADD') await billShipmentForFiling(filing.id, filing.orgId);
   } else {
-    await notifyFilingRejected(filing.orgId, filing.id, bol, summary.conditions.map((c) => c.narrative).join('; ') || summary.narrative);
+    const reason = summary.conditions.map((c) => c.narrative).join('; ') || summary.narrative;
+    // A rejected replace or delete leaves the filing accepted, so it never
+    // shows up as a rejection; the notification has to carry it.
+    if (action === 'ADD') await notifyFilingRejected(filing.orgId, filing.id, bol, reason);
+    else await notifyFilingChangeRejected(filing.orgId, filing.id, bol, action as 'REPLACE' | 'DELETE', reason);
   }
 }

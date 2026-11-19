@@ -30,7 +30,7 @@ export default function UpgradePage() {
   const [step, setStep] = React.useState<'pick' | 'card' | 'done'>('pick');
   const [chosen, setChosen] = React.useState<string>(KNOWN_PLAN_IDS.includes(presetPlan) ? presetPlan : '');
 
-  const hasCard = !!billing?.card;
+  const hasCard = !!billing?.cardOnFile;
   const chosenMeta = chosen ? PLAN_META[chosen] : null;
   // An org on a plan we set up (ISF + Entry, Enterprise) can't switch itself.
   const managedPlan = !subLoading && !!billing?.plan && billing.plan.isPublic === false;

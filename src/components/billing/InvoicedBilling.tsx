@@ -51,7 +51,7 @@ export function InvoicedBilling({ data, canManage }: { data: Subscription; canMa
         <div className="border-t border-border/70 px-5 py-4">
           <p className="text-[12px] text-muted-foreground">Current plan</p>
           <p className="mt-0.5 text-[14px] font-medium">{data.plan?.name}</p>
-          <ul className="mt-3 divide-y divide-border/60 text-[13px] tabular-nums [&>li]:py-2">
+          {canManage && <ul className="mt-3 divide-y divide-border/60 text-[13px] tabular-nums [&>li]:py-2">
             {inv && inv.monthlyMinimumCents > 0 && (
               <li>{money(inv.monthlyMinimumCents)} a month, including {inv.includedIsfs} accepted ISFs</li>
             )}
@@ -66,10 +66,11 @@ export function InvoicedBilling({ data, canManage }: { data: Subscription; canMa
                 <li>{money(entryOnly)} per entry without an ISF</li>
               </>
             )}
-          </ul>
+          </ul>}
         </div>
       </section>
 
+      {canManage && <>
       <section aria-labelledby="invoiced-bank-title" className={PANEL}>
         <div className="px-5 py-3.5">
           <h2 id="invoiced-bank-title" className="text-[14px] font-semibold">Bank account (ACH)</h2>
@@ -137,15 +138,14 @@ export function InvoicedBilling({ data, canManage }: { data: Subscription; canMa
             <dd className="text-[14px] font-semibold tabular-nums">{money(inv?.monthToDate.estimatedCents ?? 0)}</dd>
           </div>
         </dl>
-        {canManage && (
-          <div className="border-t border-border/70 px-5 py-3.5">
-            <Button variant="outline" size="sm" onClick={openPortal} disabled={portal.isPending}>
-              {portal.isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <ExternalLink aria-hidden />}
-              Invoices and payment methods in Stripe
-            </Button>
-          </div>
-        )}
+        <div className="border-t border-border/70 px-5 py-3.5">
+          <Button variant="outline" size="sm" onClick={openPortal} disabled={portal.isPending}>
+            {portal.isPending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <ExternalLink aria-hidden />}
+            Invoices and payment methods in Stripe
+          </Button>
+        </div>
       </section>
+      </>}
     </div>
   );
 }
