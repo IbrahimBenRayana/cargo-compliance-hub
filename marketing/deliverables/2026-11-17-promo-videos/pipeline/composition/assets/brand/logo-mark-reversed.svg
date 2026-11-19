@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="256" height="256" role="img" aria-label="MyCargoLens">
+  <title>MyCargoLens — reversed mark (for dark backgrounds)</title>
+  <g fill="none" stroke="#8C99B8" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 26 40 L 26 26 L 40 26"></path>
+    <path d="M 60 26 L 74 26 L 74 40"></path>
+    <path d="M 74 60 L 74 74 L 60 74"></path>
+    <path d="M 40 74 L 26 74 L 26 60"></path>
+  </g>
+  <rect x="42" y="42" width="16" height="16" rx="4.6" fill="#FBBE24"></rect>
+</svg>

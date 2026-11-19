@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=%RW%, height=%RH%" />
+<script src="assets/vendor/gsap.min.js"></script>
+<style>
+  @font-face { font-family: 'Inter'; src: url('assets/fonts/inter.woff2') format('woff2'); font-weight: 100 900; }
+  :root {
+    --navy: #1E2D4D; --navy-deep: #16223B; --gold: #FBBE24; --gold-ink: #D8920F;
+    --ink: #1E2D4D; --ink-2: #4A5876; --ink-3: #8C99B8; --paper: #F5F6F8; --line: #E3E6EC;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: %RW%px; height: %RH%px; overflow: hidden; background: var(--paper); }
+  #root { position: relative; width: %RW%px; height: %RH%px; overflow: hidden; font-family: 'Inter', sans-serif; font-optical-sizing: auto; }
+  #stage { position: absolute; left: 0; top: 0; width: %SW%px; height: %SH%px; transform: scale(2); transform-origin: 0 0; overflow: hidden; }
+  .layer { position: absolute; inset: 0; }
+
+  /* light world: flat paper with a faint dot grid */
+  #bg-light { background: var(--paper); }
+  #grid { position: absolute; inset: -40px; opacity: .55;
+    background-image: radial-gradient(circle at 1px 1px, rgba(30,45,77,.09) 1px, transparent 0); background-size: 28px 28px; }
+
+  /* captions */
+  .cap { position: absolute; display: flex; flex-direction: column; opacity: 0; }
+  .eyebrow { font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); display: flex; align-items: center; gap: 10px; }
+  .eyebrow .dot { width: 9px; height: 9px; border-radius: 3px; background: var(--gold); }
+  .cap h2 { font-weight: 750; letter-spacing: -.03em; color: var(--ink); }
+  .cap h2 .line { display: block; overflow: hidden; padding-bottom: 6px; }
+  .cap h2 .line > span { display: inline-block; }
+  .cap p { color: var(--ink-2); font-weight: 450; }
+
+  /* the app window */
+  #win { position: absolute; border-radius: 16px; background: #fff; overflow: hidden; transform-origin: 50% 50%; opacity: 0;
+    box-shadow: 0 0 0 1px rgba(30,45,77,.08), 0 30px 80px -24px rgba(30,45,77,.30), 0 12px 30px -14px rgba(30,45,77,.18); }
+  #win .bar { position: absolute; left: 0; right: 0; top: 0; background: #EEF0F4; border-bottom: 1px solid var(--line); display: flex; align-items: center; }
+  #win .dots { display: flex; gap: 7px; margin-left: 14px; }
+  #win .dots i { width: 11px; height: 11px; border-radius: 50%; background: #D3D8E2; display: block; }
+  #win .pill { position: absolute; left: 50%; transform: translateX(-50%); height: 22px; padding: 0 14px; border-radius: 11px; background: #fff;
+    border: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--ink-2); display: flex; align-items: center; gap: 7px; }
+  #win .pill svg { width: 10px; height: 10px; }
+  #view { position: absolute; left: 0; overflow: hidden; background: #F8FAFC; }
+  #cam { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .shot { position: absolute; left: 0; top: 0; object-fit: fill; opacity: 0; }
+  #cursor { position: absolute; left: 0; top: 0; width: 30px; height: 30px; transform-origin: 3px 3px; opacity: 0; z-index: 5; }
+  #ripple { position: absolute; left: -32px; top: -32px; width: 64px; height: 64px; border-radius: 50%; border: 4px solid var(--gold);
+    background: rgba(251,190,36,.16); opacity: 0; z-index: 4; }
+  #brand { position: absolute; left: 0; right: 0; display: none; justify-content: center; opacity: 0; }
+
+  /* navy frames: the opening question and the end card */
+  #bg-dark, #end { background: var(--navy); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .frame-grid { position: absolute; inset: -80px; opacity: .5;
+    background-image: linear-gradient(rgba(140,153,184,.10) 1px, transparent 1px), linear-gradient(90deg, rgba(140,153,184,.10) 1px, transparent 1px);
+    background-size: 72px 72px; }
+  .mark { position: relative; }
+  #hook-q { position: relative; color: #fff; font-weight: 750; letter-spacing: -.035em; line-height: 1.04; }
+  #hook-q em { font-style: normal; color: var(--gold); }
+  #end { clip-path: inset(100% 0 0 0); }
+  #end .lockup { position: relative; display: flex; align-items: center; color: #fff; font-weight: 700; letter-spacing: -.03em; }
+  #end .lockup em { font-style: normal; color: var(--gold); }
+  #end h1 { position: relative; color: #fff; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+  #end .price { position: relative; color: #C9D1E3; font-weight: 500; }
+  #end .price b { color: #fff; font-weight: 700; }
+  #end .rule { position: relative; height: 4px; border-radius: 2px; background: var(--gold); }
+  #end .cta { position: relative; display: flex; align-items: center; }
+  #end .btn { background: var(--gold); color: var(--navy); font-weight: 700; border-radius: 12px; }
+  #end .url { color: #C9D1E3; font-weight: 600; }
+
+  /* ── 16:9 ── */
+  .wide .cap { left: 92px; top: 0; width: 400px; height: 1080px; justify-content: center; }
+  .wide .eyebrow { font-size: 15px; }
+  .wide .cap h2 { margin-top: 18px; font-size: 48px; line-height: 1.07; white-space: nowrap; }
+  .wide .cap p { margin-top: 18px; font-size: 20px; line-height: 1.5; max-width: 370px; }
+  .wide #win { left: 520px; top: 152px; width: 1320px; height: 776.5px; }
+  .wide #win .bar { height: 34px; }
+  .wide #view { top: 34px; width: 1320px; height: 742.5px; }
+  .wide .mark { width: 150px; height: 150px; }
+  .wide #hook-q { margin-top: 34px; font-size: 104px; }
+  .wide #end .mark { width: 128px; height: 128px; }
+  .wide #end .lockup { font-size: 84px; gap: 8px; }
+  .wide #end h1 { margin-top: 52px; font-size: 72px; }
+  .wide #end .price { margin-top: 26px; font-size: 38px; }
+  .wide #end .rule { margin-top: 46px; width: 150px; height: 5px; }
+  .wide #end .cta { margin-top: 44px; gap: 32px; }
+  .wide #end .btn { font-size: 34px; padding: 19px 38px; border-radius: 14px; }
+  .wide #end .url { font-size: 34px; }
+
+  /* ── 1:1 ── */
+  .square .cap { left: 60px; top: 62px; width: 960px; height: 250px; justify-content: flex-start; }
+  .square .eyebrow { font-size: 17px; }
+  .square .cap h2 { margin-top: 14px; font-size: 50px; line-height: 1.06; white-space: nowrap; }
+  .square .cap p { margin-top: 10px; font-size: 23px; line-height: 1.4; }
+  .square #win { left: 40px; top: 350px; width: 1000px; height: 592.5px; }
+  .square #win .bar { height: 30px; }
+  .square #view { top: 30px; width: 1000px; height: 562.5px; }
+  .square #brand { display: flex; top: 982px; }
+  .square #brand .lock { font-size: 26px; }
+  .square .mark { width: 120px; height: 120px; }
+  .square #hook-q { margin-top: 26px; font-size: 80px; padding: 0 60px; }
+  .square #end .mark { width: 88px; height: 88px; }
+  .square #end .lockup { font-size: 56px; gap: 4px; }
+  .square #end h1 { margin-top: 40px; font-size: 52px; padding: 0 70px; }
+  .square #end .price { margin-top: 20px; font-size: 28px; }
+  .square #end .rule { margin-top: 36px; width: 110px; }
+  .square #end .cta { margin-top: 36px; gap: 18px; flex-direction: column; }
+  .square #end .btn { font-size: 28px; padding: 16px 34px; }
+  .square #end .url { font-size: 26px; }
+
+  /* ── 9:16 ── */
+  .vertical .cap { left: 70px; top: 270px; width: 940px; height: 380px; justify-content: flex-end; }
+  .vertical .eyebrow { font-size: 24px; }
+  .vertical .eyebrow .dot { width: 13px; height: 13px; }
+  .vertical .cap h2 { margin-top: 18px; font-size: 82px; line-height: 1.04; white-space: nowrap; }
+  .vertical .cap p { display: none; }
+  .vertical #win { left: 60px; top: 720px; width: 960px; height: 1066.7px; border-radius: 28px; }
+  .vertical #win .bar { display: none; }
+  .vertical #view { top: 0; width: 960px; height: 1066.7px; }
+  .vertical #brand { display: flex; top: 120px; }
+  .vertical #brand .lock { font-size: 36px; }
+  .vertical .mark { width: 170px; height: 170px; }
+  .vertical #hook-q { margin-top: 40px; font-size: 104px; padding: 0 70px; }
+  .vertical #end .mark { width: 130px; height: 130px; }
+  .vertical #end .lockup { font-size: 78px; gap: 4px; flex-direction: column; }
+  .vertical #end h1 { margin-top: 70px; font-size: 76px; padding: 0 80px; }
+  .vertical #end .price { margin-top: 30px; font-size: 40px; }
+  .vertical #end .rule { margin-top: 60px; width: 150px; height: 6px; }
+  .vertical #end .cta { margin-top: 60px; gap: 30px; flex-direction: column; }
+  .vertical #end .btn { font-size: 44px; padding: 26px 56px; border-radius: 18px; }
+  .vertical #end .url { font-size: 36px; }
+
+  #brand .lock { display: flex; align-items: center; gap: 2px; font-weight: 700; letter-spacing: -.03em; color: var(--navy); }
+  #brand .lock em { font-style: normal; color: var(--gold-ink); }
+  #brand .lock svg { height: 1.7em; width: 1.7em; margin-right: .12em; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="%TOTAL%" data-width="%RW%" data-height="%RH%">
+  <div id="stage" class="%FORMAT%">
+    <div id="bg-light" class="layer"><div id="grid"></div></div>
+
+    <div id="brand"><div class="lock">
+      <svg viewBox="14 14 72 72"><g fill="none" stroke="#1E2D4D" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"><path d="M26 40V26h14"/><path d="M60 26h14v14"/><path d="M74 60v14H60"/><path d="M40 74H26V60"/></g><rect x="42" y="42" width="16" height="16" rx="4.6" fill="#FBBE24"/></svg>
+      <span>MyCargo<em>Lens</em></span></div></div>
+%CAPTIONS%
+    <div id="win">
+      <div class="bar"><div class="dots"><i></i><i></i><i></i></div>
+        <div class="pill"><svg viewBox="0 0 10 12"><path d="M2 5V3.5a3 3 0 0 1 6 0V5h.5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1.5 0h3V3.5a1.5 1.5 0 0 0-3 0z" fill="#8C99B8"/></svg>MyCargoLens</div>
+      </div>
+      <div id="view"><div id="cam">
+          %VIDEOS%
+          <div id="ripple"></div>
+          <svg id="cursor" viewBox="0 0 34 34"><path d="M5 3 L5 26 L11.2 20.4 L15.4 30 L19.4 28.3 L15.3 18.9 L23.6 18.9 Z" fill="#1E2D4D" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/></svg>
+      </div></div>
+    </div>
+
+    <div id="end" class="layer"><div class="frame-grid"></div>
+      <div class="lockup">
+        <svg class="mark" viewBox="14 14 72 72"><g fill="none" stroke="#8C99B8" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"><path d="M26 40V26h14"/><path d="M60 26h14v14"/><path d="M74 60v14H60"/><path d="M40 74H26V60"/></g><rect x="42" y="42" width="16" height="16" rx="4.6" fill="#FBBE24"/></svg>
+        <span>MyCargo<em>Lens</em></span>
+      </div>
+      <h1>%END_LINE%</h1>
+      %END_PRICE%
+      <div class="rule"></div>
+      <div class="cta"><div class="btn">Book a demo</div><div class="url">mycargolens.com/book-a-demo</div></div>
+    </div>
+
+    <div id="bg-dark" class="layer"><div class="frame-grid" id="dark-grid"></div>
+      <svg class="mark" id="hook-mark" viewBox="14 14 72 72">
+        <g fill="none" stroke="#8C99B8" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round">
+          <path class="br" d="M26 40V26h14"/><path class="br" d="M60 26h14v14"/><path class="br" d="M74 60v14H60"/><path class="br" d="M40 74H26V60"/></g>
+        <rect id="hook-dot" x="42" y="42" width="16" height="16" rx="4.6" fill="#FBBE24"/></svg>
+      <div id="hook-q">%HOOK%</div>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  const DATA = %DATA%;
+  const tl = gsap.timeline({ paused: true });
+  const $ = (s) => document.querySelector(s);
+  const VW = DATA.vw, VH = DATA.vh;                    // capture viewport (CSS px)
+  const W = DATA.layout.viewW, H = DATA.layout.viewH, S0 = W / VW;   // window view and its scale vs the capture
+  gsap.set(['#cam', '.shot'], { width: VW, height: VH });
+  const ZMAX = DATA.layout.zmax;
+  const CH = DATA.layout.clipH || VH;                  // how much of the capture's height is usable
+  const BASE = DATA.layout.base || { z: 1, fx: VW / 2, fy: VH / 2 };
+
+  // camera: show clip point (fx, fy) at the view centre with zoom z
+  const camAt = (z, fx, fy) => {
+    const s = S0 * z;
+    let x = W / 2 - fx * s, y = H / 2 - fy * s;
+    x = Math.min(0, Math.max(W - VW * s, x));
+    y = Math.min(0, Math.max(H - CH * s, y));
+    return { x, y, scale: s };
+  };
+  const home = () => camAt(BASE.z, BASE.fx, BASE.fy);
+  gsap.set('#cam', home());
+  gsap.set('#cursor', { x: VW * .57, y: VH * .74 });
+
+  const captionIn = (el, t) => {
+    tl.set(el, { opacity: 1 }, t);
+    tl.fromTo(el.querySelector('.eyebrow'), { y: 14, opacity: 0 }, { y: 0, opacity: 1, duration: .45, ease: 'power3.out' }, t);
+    tl.fromTo(el.querySelectorAll('h2 .line > span'), { yPercent: 108 }, { yPercent: 0, duration: .7, ease: 'power4.out', stagger: .08 }, t + .05);
+    const p = el.querySelector('p');
+    if (p) tl.fromTo(p, { y: 16, opacity: 0 }, { y: 0, opacity: 1, duration: .55, ease: 'power3.out' }, t + .25);
+  };
+  const captionOut = (el, t) => tl.to(el, { opacity: 0, y: -18, duration: .35, ease: 'power2.in' }, t);
+
+  for (const s of DATA.scenes) {
+    const t0 = s.start, t1 = s.start + s.dur;
+
+    if (s.kind === 'hook') {
+      tl.fromTo('#dark-grid', { y: 0 }, { y: 72, duration: s.dur, ease: 'none' }, t0);
+      // the focus frame closes on its subject, then the question
+      tl.fromTo('#hook-mark .br', { scale: 1.9, opacity: 0, transformOrigin: '50px 50px', svgOrigin: '50 50' }, { scale: 1, opacity: 1, duration: .8, ease: 'expo.out', stagger: .04 }, t0 + .1);
+      tl.fromTo('#hook-dot', { scale: 0, svgOrigin: '50 50' }, { scale: 1, duration: .5, ease: 'back.out(2.2)' }, t0 + .55);
+      tl.fromTo('#hook-q', { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: .7, ease: 'power3.out' }, t0 + .5);
+      // the navy frame lifts off the product
+      tl.fromTo('#bg-dark', { clipPath: 'inset(0% 0% 0% 0%)' }, { clipPath: 'inset(0% 0% 100% 0%)', duration: .8, ease: 'power3.inOut' }, t1 - .55);
+      tl.to(['#hook-q', '#hook-mark'], { y: -60, duration: .8, ease: 'power3.inOut' }, t1 - .55);
+      if (DATA.layout.brand) tl.to('#brand', { opacity: 1, duration: .5 }, t1 - .1);
+      continue;
+    }
+
+    if (s.kind === 'end') {
+      tl.to('#win', { y: -30, scale: .97, duration: .7, ease: 'power2.in' }, t0 - .15);
+      tl.fromTo('#end', { clipPath: 'inset(100% 0% 0% 0%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: .8, ease: 'power3.inOut' }, t0 - .15);
+      tl.fromTo('#end .frame-grid', { y: 0 }, { y: -50, duration: s.dur + .2, ease: 'none' }, t0 - .15);
+      tl.fromTo('#end .lockup', { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: .8, ease: 'power3.out' }, t0 + .4);
+      tl.fromTo('#end h1', { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: .8, ease: 'power3.out' }, t0 + .7);
+      if ($('#end .price')) tl.fromTo('#end .price', { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: .7, ease: 'power3.out' }, t0 + 1.0);
+      tl.fromTo('#end .rule', { scaleX: 0 }, { scaleX: 1, duration: .7, ease: 'power3.inOut' }, t0 + 1.15);
+      tl.fromTo('#end .btn', { y: 16, opacity: 0 }, { y: 0, opacity: 1, duration: .6, ease: 'power3.out' }, t0 + 1.45);
+      tl.fromTo('#end .url', { opacity: 0 }, { opacity: 1, duration: .6 }, t0 + 1.7);
+      continue;
+    }
+
+    // ── app scenes ────────────────────────────────────────────────────────
+    const first = DATA.scenes.find((x) => x.clip) === s;
+    if (first) {
+      tl.fromTo('#win', { opacity: 0, y: 120, scale: .94 }, { opacity: 1, y: 0, scale: 1, duration: 1.0, ease: 'expo.out' }, t0 - .35);
+    }
+    const v = $(`#v-${s.id}`);
+    tl.fromTo(v, { opacity: 0 }, { opacity: 1, duration: first ? .01 : .35, ease: 'none' }, first ? t0 - .35 : t0 - .3);
+    tl.set(v, { opacity: 0 }, t1 + .85);
+
+    (s.captions || []).forEach((c, i) => {
+      const el = $(`#cap-${s.id}-${i}`);
+      captionIn(el, t0 + c.at + (i === 0 ? .15 : .35));
+      const next = s.captions[i + 1];
+      captionOut(el, next ? t0 + next.at : t1 - .2);
+    });
+
+    // camera: zoom on each configured focus, back out before the scene ends
+    const toScene = (ms) => ms / 1000 - s.from;
+    tl.to('#cam', { ...home(), duration: .6, ease: 'power2.inOut' }, t0);
+    for (const ev of s.events.filter((e) => e.type === 'focus' && s.zooms && s.zooms[e.label])) {
+      const cfg = s.zooms[ev.label];
+      const z = Math.min(ZMAX, cfg.z * DATA.layout.zoomGain);
+      const at = cfg.at ?? toScene(ev.t);
+      if (at < 0 || at > s.dur) continue;
+      const fx = cfg.fx ?? ev.x + ev.w / 2 + (cfg.dx || 0), fy = ev.y + ev.h / 2 + (cfg.dy || 0);
+      const outAt = at + cfg.hold;
+      tl.to('#cam', { ...camAt(z, fx, fy), duration: 1.0, ease: 'power3.inOut' }, t0 + Math.max(.05, at - .1));
+      // a zoom that runs to the cut stays in: the next scene's opening move resets the camera
+      if (outAt < s.dur - .9) tl.to('#cam', { ...home(), duration: .8, ease: 'power3.inOut' }, t0 + outAt);
+    }
+
+    // hand-placed pushes (scene time, capture coordinates)
+    for (const p of s.push || []) {
+      tl.to('#cam', { ...camAt(Math.min(ZMAX, p.z * DATA.layout.zoomGain), p.fx, p.fy), duration: p.dur || 1.1, ease: 'power3.inOut' }, t0 + p.at);
+      if (p.at + p.hold < s.dur - .9) tl.to('#cam', { ...home(), duration: .8, ease: 'power3.inOut' }, t0 + p.at + p.hold);
+    }
+
+    // cursor
+    const evs = s.events.filter((e) => ['move', 'click'].includes(e.type) && toScene(e.t) >= -0.2 && toScene(e.t) <= s.dur);
+    const firstMove = evs.find((e) => e.type === 'move');
+    if (firstMove) {
+      tl.set('#cursor', { x: firstMove.from.x, y: firstMove.from.y }, t0);
+      tl.to('#cursor', { opacity: 1, duration: .3 }, t0 + .1);
+      tl.to('#cursor', { opacity: 0, duration: .3 }, t1 - .3);
+    }
+    evs.forEach((e, i) => {
+      const at = t0 + Math.max(0, toScene(e.t));
+      if (e.type === 'move') {
+        const next = evs.slice(i + 1).find((x) => x.type === 'click' || x.type === 'move');
+        const end = next && next.type === 'click' ? t0 + toScene(next.t) - .12 : at + e.ms / 1000 * 1.25;
+        tl.fromTo('#cursor', { x: e.from.x, y: e.from.y }, { x: e.x, y: e.y, duration: Math.max(.2, end - at), ease: 'power2.inOut', immediateRender: false }, at);
+      } else {
+        tl.to('#cursor', { scale: .82, duration: .08, ease: 'power2.out' }, at);
+        tl.to('#cursor', { scale: 1, duration: .22, ease: 'power2.out' }, at + .08);
+        tl.fromTo('#ripple', { x: e.x, y: e.y, scale: .2, opacity: .9 }, { scale: 1.25, opacity: 0, duration: .55, ease: 'power2.out', immediateRender: false }, at);
+      }
+    });
+  }
+  // the dot grid drifts slowly all film long
+  tl.fromTo('#grid', { x: 0, y: 0 }, { x: 28, y: 28, duration: DATA.total, ease: 'none' }, 0);
+
+  window.__timelines = window.__timelines || {};
+  window.__timelines['main'] = tl;
+  tl.seek(0);
+})();
+</script>
+</body>
+</html>
