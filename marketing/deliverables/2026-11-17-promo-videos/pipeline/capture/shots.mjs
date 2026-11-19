@@ -253,10 +253,43 @@ export const SHOTS = {
 		async after(page) { await page.keyboard.press('Escape'); reset(); }
 	},
 
+	// the compliance inbox with the notification list opened from the bell
+	'ai-inbox': {
+		async setup(page) {
+			await go(page, '/compliance');
+			// the two-factor reminder is snoozed for the film; its row in the notification list goes too (the app re-adds it at sign-in)
+			await page.evaluate(() => {
+				const hide = () => {
+					for (const el of document.querySelectorAll('p, div, span, h3, h4')) {
+						if (el.children.length || !/two-factor authentication/i.test(el.textContent)) continue;
+						let row = el;
+						while (row.parentElement && !/Deadline in/.test(row.parentElement.textContent)) row = row.parentElement;
+						if (row.parentElement) row.style.display = 'none';
+					}
+				};
+				new MutationObserver(hide).observe(document.body, { subtree: true, childList: true });
+			});
+			await settle(page, 12000);
+		},
+		async run(rec, page) {
+			rec.cursor = { x: 980, y: 520 };
+			await rec.wait(1300);
+			const bell = page.locator('header button').filter({ hasText: /^\d*$/ }).last();
+			await rec.click(bell, { move: 900 });
+			await text(page, 'Notifications').waitFor({ state: 'visible', timeout: 60000 });
+			await rec.wait(500);
+			await rec.focus(await around(text(page, 'Notifications'), text(page, 'Mark all read'), text(page, /^Deadline in/).last()), 'bell', 30);
+			await rec.move(text(page, /^Deadline in/).first(), 900);
+			await rec.wait(5000);
+		},
+		async after(page) { await page.keyboard.press('Escape'); }
+	},
+
 	// the AI pre-flight review on a draft, the fix, then the rule check. Nothing is sent: it ends on the confirm dialog.
 	ai: {
 		async setup(page) {
 			DRAFT_HTS('9401');
+			sql('delete from hts_classifications');   // a fresh suggestion, not yesterday's cached one
 			await go(page, `/shipments/${filingId('HLCU349102260', 'draft')}`);
 			await page.evaluate(MARKDOWN);
 			await settle(page);
@@ -292,10 +325,17 @@ export const SHOTS = {
 			await page.waitForTimeout(4000);
 			rec.mark('fix');
 			await rec.wait(800);
-			await rec.click(hts, { move: 800 });
-			await page.keyboard.press('End');
-			await rec.type('614011', 120);
-			await rec.wait(1200);
+			// HTS suggestions from the description: the app's own popup and its own answer
+			await rec.click(hts.locator('xpath=following::button[1]'), { move: 800 });
+			const use = page.getByRole('dialog').getByRole('button', { name: /^Use/ }).first();
+			await use.waitFor({ state: 'attached', timeout: 180000 });
+			await rec.wait(900);
+			await rec.move({ x: 780, y: 330, w: 1, h: 1 }, 600);
+			await rec.scrollTo(use, 1500, 0.4);
+			await rec.wait(1500);
+			await rec.click(use, { move: 700 });
+			await rec.wait(1800);
+			rec.mark('fixed');
 			await rec.click(next(), { move: 700 });
 			await rec.wait(1200);
 			const save = button(page, /Save Changes/);

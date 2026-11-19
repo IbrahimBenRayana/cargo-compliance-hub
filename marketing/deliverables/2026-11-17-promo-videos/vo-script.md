@@ -39,5 +39,6 @@ No voice. Captions: "Which ISF is about to miss its cutoff?" / "Today's work, mo
 | Compliance | MyCargoLens shows which drafts are waiting, most urgent first. |
 | AI pre-flight review | Run an AI pre-flight review on any draft. |
 | The review | It checks every field, flags possible UFLPA and agency risks, and lists what to fix. |
-| The fix, rule checks | Fix it, run the rule check, and you confirm before anything goes to CBP. |
+| The fix | Get HTS code suggestions from the description, fix the draft, and run the rule check. |
+| Rule checks | You confirm before anything goes to CBP. |
 | End card | MyCargoLens. Book a demo. |

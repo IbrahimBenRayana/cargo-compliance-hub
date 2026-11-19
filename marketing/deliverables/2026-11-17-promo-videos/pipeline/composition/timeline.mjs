@@ -91,9 +91,9 @@ const SCENES = {
 	// ── Video 4: AI pre-flight review ──────────────────────────────────────
 	'a-hook': { kind: 'hook', dur: 5.2, hook: 'Catch it before<br><em>CBP does.</em>', vo: [['a01', 0.7]] },
 	'a-inbox': {
-		kind: 'app', clip: 'compliance', from: 0.4, dur: 5.2,
-		captions: [{ at: 0, eyebrow: 'Compliance', title: 'Drafts waiting<br>on you.', sub: 'The filings that need attention, most urgent first.' }],
-		zooms: { inbox: { z: 1.22, fx: 850, at: 1.6, hold: 9 } },
+		kind: 'app', clip: 'ai-inbox', from: 2.4, dur: 6.0,
+		captions: [{ at: 0, eyebrow: 'Notifications', title: 'Drafts waiting<br>on you.', sub: 'The bell and the compliance inbox list them, most urgent first.' }],
+		zooms: { bell: { z: 1.3, hold: 9 } },
 		vo: [['a02', 0.8]]
 	},
 	'a-open': {
@@ -108,16 +108,17 @@ const SCENES = {
 		vo: [['a04', 1.0]]
 	},
 	'a-fix': {
-		kind: 'app', clip: 'ai', mark: 'fix', from: 0.2, dur: 4.3,
-		captions: [{ at: 0, eyebrow: 'The fix', title: 'Fix it.<br>Then you decide.', sub: 'Correct the draft, then run the rule check.' }],
-		push: [{ at: 0.1, z: 1.22, fx: 850, fy: 405, hold: 9, dur: 0.6 }],
-		vo: [['a05', 0.9]]
+		kind: 'app', clip: 'ai', mark: 'fix', from: 1.2, dur: 9.6,
+		captions: [{ at: 0, eyebrow: 'The fix', title: 'Fix it.<br>Then you decide.', sub: 'HTS code suggestions from your description. You pick the one to use.' }],
+		push: [{ at: 0.5, z: 1.3, fx: 780, fy: 320, hold: 9 }],
+		vo: [['a05', 1.0]]
 	},
 	'a-send': {
 		kind: 'app', clip: 'ai', mark: 'submit', from: 0.9, dur: 5.8,
 		captions: [{ at: 0, eyebrow: 'Rule checks', title: 'Checked, then<br>you confirm.', sub: 'Every field is checked. Nothing goes to CBP until you say so.' }],
 		push: [{ at: 0.1, z: 1.22, fx: 850, fy: 405, hold: 9, dur: 0.6 }],
 		zooms: { confirm: { z: 1.3, hold: 9 } },
+		vo: [['a07', 1.3]]
 	},
 	'a-end': { ...END, line: 'AI pre-flight review,<br>on every draft.', vo: [['a06', 0.8]] }
 };
@@ -127,7 +128,8 @@ export const CUTS = {
 	'promo-square': { format: 'square', audio: 'promo', scenes: ['hook', 'dashboard', 'shipments', 'validate', 'compliance', 'entry', 'logs', 'end'] },
 	vertical: { format: 'vertical', scenes: ['v-hook', 'v-dashboard', 'v-shipments', 'v-end'] },
 	isf: { format: 'wide', scenes: ['f-hook', 'f-template', 'f-steps', 'f-check', 'f-accepted', 'f-end'] },
-	ai: { format: 'wide', scenes: ['a-hook', 'a-inbox', 'a-open', 'a-review', 'a-fix', 'a-send', 'a-end'] }
+	// music: 'straight' = one continuous stretch with a fade out, no spliced ending
+	ai: { format: 'wide', music: 'straight', scenes: ['a-hook', 'a-inbox', 'a-open', 'a-review', 'a-fix', 'a-send', 'a-end'] }
 };
 
 // stage size, the app window's view, and how the camera behaves per format

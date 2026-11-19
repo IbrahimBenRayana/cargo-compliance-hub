@@ -112,19 +112,21 @@ CTA is always "Book a demo".
   entry that links to its ISF. If the link is not visible on that page, the line changes to
   "Entries live next to the ISF they came from."
 
-## Video 4. "AI pre-flight review" (feature video, 40 s), added 2026-11-19
+## Video 4. "AI pre-flight review" (feature video, 46 s), added 2026-11-19
 
 Script approved by the founder on 2026-11-18. Formats: 16:9 in 4K and 1080p, voiceover and music-only.
 
 | # | Screen (real UI) | Caption | Voiceover |
 |---|---|---|---|
 | 1 | Navy frame | Catch it before CBP does. | A rejected filing means rework. Catch the problem before you send. |
-| 2 | Compliance: brief, "Filings needing attention" | Drafts waiting on you. | MyCargoLens shows which drafts are waiting, most urgent first. |
+| 2 | Compliance page, the bell opens the notification list | Drafts waiting on you. | MyCargoLens shows which drafts are waiting, most urgent first. |
 | 3 | Draft page: click "AI pre-flight review", the panel fills in | One click. A full review. | Run an AI pre-flight review on any draft. |
 | 4 | Push in on the review: what to fix, UFLPA and agency items, the "hint, not legal advice" note | What to fix, in plain English. | It checks every field, flags possible UFLPA and agency risks, and lists what to fix. |
-| 5 | Edit the draft: HTS number completed on the Cargo step | Fix it. Then you decide. | Fix it, run the rule check, and you confirm before anything goes to CBP. |
-| 6 | "Start submission": the check passes, "Send this ISF to CBP?" opens. Nothing is sent. | Checked, then you confirm. | (line 5 continues) |
+| 5 | Edit the draft: "HTS suggestions" from the description, the suggested code is used | Fix it. Then you decide. | Get HTS code suggestions from the description, fix the draft, and run the rule check. |
+| 6 | "Start submission": the check passes, "Send this ISF to CBP?" opens. Nothing is sent. | Checked, then you confirm. | You confirm before anything goes to CBP. |
 | 7 | End card | AI pre-flight review, on every draft. Book a demo. | MyCargoLens. Book a demo. |
 
 Wording limits: the review flags and explains only. No accuracy claim, no promise about penalties.
 Scene 6's caption was added in production (the approved script had one caption for scenes 5 and 6).
+Founder tweaks on 2026-11-19: the bell opens the notification list in scene 2, scene 5 shows HTS
+suggestions instead of typing the code, and the music is one continuous stretch with a fade (46 s).

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from '../composition/build.mjs';
+import { CUTS } from '../composition/timeline.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WORK = path.join(HERE, '..', '.work');
@@ -25,11 +26,16 @@ const clicks = scenes.flatMap((s) => (s.events || []).filter((e) => e.type === '
 const inputs = ['-i', MUSIC];
 vo.forEach((v) => inputs.push('-i', v.file));
 const f = [];
-// the track's opening, then its own ending so the last note lands on the end card
-const head = Math.max(4, total - 5.5);
-f.push(`[0:a]atrim=0:${head},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.5[ma]`);
-f.push(`[0:a]atrim=${TAIL},asetpts=PTS-STARTPTS[mb]`);
-f.push(`[ma][mb]acrossfade=d=2.0:c1=tri:c2=tri,apad=whole_dur=${total},atrim=0:${total},afade=t=out:st=${total - 1.4}:d=1.4,volume=0.6[music]`);
+if (CUTS[name].music === 'straight') {
+	// one continuous stretch of the track with a plain fade: no splice, so nothing can double up
+	f.push(`[0:a]atrim=0:${total},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.5,afade=t=out:st=${total - 3.2}:d=3.2,volume=0.6[music]`);
+} else {
+	// the track's opening, then its own ending so the last note lands on the end card
+	const head = Math.max(4, total - 5.5);
+	f.push(`[0:a]atrim=0:${head},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.5[ma]`);
+	f.push(`[0:a]atrim=${TAIL},asetpts=PTS-STARTPTS[mb]`);
+	f.push(`[ma][mb]acrossfade=d=2.0:c1=tri:c2=tri,apad=whole_dur=${total},atrim=0:${total},afade=t=out:st=${total - 1.4}:d=1.4,volume=0.6[music]`);
+}
 // soft UI tick: a short, decaying 2.2 kHz blip
 const tick = `sine=f=2200:d=0.05,afade=t=out:st=0:d=0.05,volume=0.16`;
 clicks.forEach((t, i) => f.push(`${tick},adelay=${Math.round(t * 1000)}|${Math.round(t * 1000)},apad=whole_dur=${total}[k${i}]`));

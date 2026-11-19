@@ -24,8 +24,10 @@ sent to the founder. `plan.md` has the approved scripts and storyboards, `vo-scr
 - No CBP transport, Stripe or email is configured. The ISF and AI pre-flight videos stop on the
   "Send this ISF to CBP?" dialog. Nothing is sent.
 - The AI pre-flight video needs the app's AI settings (`AI_*` in `server/.env`, a key with credits).
-  The review on screen is the model's real answer for that draft; it is worded differently on every
-  run, so read the new take before you publish a re-render.
+  The review and the HTS suggestions on screen are the app's real answers for that draft; they are
+  worded differently on every run, so read the new take before you publish a re-render.
+- HTS suggestions need the tariff schedule in the promo database: in `server/`,
+  `tsx src/abi-engine/refdata/ingestCli.ts <revision>` (reads the public USITC export), then restart the API.
 
 Presentation changes, all in `pipeline/dataset/promo.sql` or `pipeline/capture/session.mjs`:
 
@@ -37,6 +39,7 @@ Presentation changes, all in `pipeline/dataset/promo.sql` or `pipeline/capture/s
 | One draft's HTS number cut to 4 digits, its US port set to a valid code | the rule check has something true to catch |
 | Two-factor reminder snoozed; chat bubble, toasts and "AI coach off" note hidden | clutter |
 | AI pre-flight video only: the review text is laid out as headings and bullets | the app prints the model's markdown as plain text (`**1. …**`, `- …`). Same words, nothing added or removed. **Ship the app fix that renders this markdown before publishing the video**, or re-record without `MARKDOWN` in `capture/shots.mjs` |
+| AI pre-flight video only: the two-factor row hidden in the notification list | the reminder is snoozed for the film; the app re-adds its notification at sign-in |
 | The same draft given a container | the review talks about the HTS number, not an empty optional field |
 | "Took" column blanked on Submission logs; "Awaiting response" card hidden on Today; Transmission card hidden on the entry page | no response-time figures or internal ids on screen |
 
