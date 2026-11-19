@@ -5,7 +5,7 @@
  * accepted version on file; a delete is a CBP transaction, not a local flag.
  */
 import { describe, it, expect } from 'vitest';
-import { canStartIsfAction, isfStateOnStart, isfStateOnVerdict, isfStateOnSendFailed } from '../isfLifecycle.js';
+import { canStartIsfAction, isfStateOnStart, isfStateOnVerdict, isfStateOnSendFailed, isfEditsToRow, invalidIsfDates } from '../isfLifecycle.js';
 
 const draft = { status: 'draft', cbpState: 'NOT_ON_FILE', pendingAction: null };
 const onFile = { status: 'accepted', cbpState: 'ON_FILE', pendingAction: null };
@@ -76,5 +76,38 @@ describe('isfStateOnSendFailed', () => {
   it('rolls back an action that provably never left', () => {
     expect(isfStateOnSendFailed(isfStateOnStart(draft, 'ADD'))).toEqual(draft);
     expect(isfStateOnSendFailed(isfStateOnStart(onFile, 'REPLACE'))).toEqual(onFile);
+  });
+});
+
+describe('isfEditsToRow', () => {
+  const ON_FILE = { estimatedDeparture: new Date('2026-11-12T06:00:00.000Z'), estimatedLading: null };
+
+  it('turns dates into Dates and moves the deadline with them', () => {
+    const row = isfEditsToRow({ vesselName: 'V', estimatedLading: '2026-11-09T06:00:00.000Z' }, ON_FILE);
+    expect(row).toMatchObject({ vesselName: 'V', estimatedLading: new Date('2026-11-09T06:00:00.000Z'), filingDeadline: new Date('2026-11-08T06:00:00.000Z') });
+  });
+
+  it('keeps the dates it was not given out of the update', () => {
+    const row = isfEditsToRow({ vesselName: 'V' }, ON_FILE);
+    expect(row).not.toHaveProperty('estimatedDeparture');
+    expect(row).not.toHaveProperty('estimatedArrival');
+    expect({ ...ON_FILE, ...row }.estimatedDeparture).toEqual(ON_FILE.estimatedDeparture);
+  });
+
+  it('treats an empty date as no change', () => {
+    const row = isfEditsToRow({ estimatedDeparture: '', estimatedLading: '' }, { ...ON_FILE, estimatedLading: new Date('2026-11-09T06:00:00.000Z') });
+    expect(row).not.toHaveProperty('estimatedDeparture');
+    expect(row).not.toHaveProperty('estimatedLading');
+    expect(row.filingDeadline).toEqual(new Date('2026-11-08T06:00:00.000Z'));
+  });
+
+  it('drops a null isf5Data, which the column would refuse once CBP had accepted it', () => {
+    expect(isfEditsToRow({ isf5Data: null }, ON_FILE)).not.toHaveProperty('isf5Data');
+  });
+});
+
+describe('invalidIsfDates', () => {
+  it('names dates that cannot be stored', () => {
+    expect(invalidIsfDates({ estimatedLading: 'TBD', estimatedArrival: '2026-11-09T06:00:00.000Z', estimatedDeparture: '' })).toEqual(['estimatedLading']);
   });
 });
