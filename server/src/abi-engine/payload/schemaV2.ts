@@ -130,6 +130,9 @@ export const zEntrySummaryV2 = z.object({
     })
     .optional(),
   importerOfRecord: z.object({ number: z.string().min(1).max(12), name: z.string().optional() }),
+  iorDeclaration: z
+    .object({ usImporterOfRecord: z.boolean(), brokerActingAsIor: z.boolean(), principalOnPoa: z.string().max(12).optional() })
+    .optional(),
   consigneeNumber: z.string().max(12).optional(),
   designatedNotifyPartyNumber: z.string().max(12).optional(),
   usStateOfDestination: z.string().length(2).optional(),

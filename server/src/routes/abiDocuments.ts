@@ -44,6 +44,8 @@ import {
 } from '../services/entryNumberBlocks.js';
 import { renderEntry7501Pdf } from '../services/entryPdf.js';
 import { contentDispositionAttachment } from '../utils/httpHeaders.js';
+import { stampIorAttestation } from '../services/abi/iorAttestation.js';
+import { rememberImporter, savedAttestation } from '../services/importerProfiles.js';
 import {
   parseLineImportCsv,
   LINE_IMPORT_TEMPLATE,
@@ -246,7 +248,14 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     return;
   }
 
-  const merged = mergePayload(existing.payload, parsed.data.payload);
+  const unstamped = mergePayload(existing.payload, parsed.data.payload);
+  const merged = stampIorAttestation(
+    existing.payload as { ior?: unknown } | null,
+    unstamped,
+    req.user!,
+    new Date(),
+    unstamped.ior?.usIorAttested ? await savedAttestation(req.user!.orgId, unstamped.ior.number) : undefined
+  );
   const denorm = extractDenormFromPayload(merged);
 
   const updated = await prisma.abiDocument.update({
@@ -256,6 +265,10 @@ router.patch('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
       ...denorm,
     },
   });
+  // Saved importers: remember a completed declaration for the next entry.
+  rememberImporter(req.user!.orgId, merged.ior, req.user!).catch((err) =>
+    logger.warn({ err, docId: existing.id }, '[AbiDocuments] saving the importer profile failed')
+  );
 
   res.json({ data: updated });
 });
@@ -538,7 +551,7 @@ router.post('/:id/preflight', async (req: AuthRequest, res: Response): Promise<v
     res.json({ ready: false, ...built.body });
     return;
   }
-  res.json({ ready: true, filerCode: built.filerCode, releaseRequested: built.releaseRequested, conversions: built.conversions });
+  res.json({ ready: true, filerCode: built.filerCode, releaseRequested: built.releaseRequested, conversions: built.conversions, warnings: built.warnings });
 });
 
 router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -548,6 +561,7 @@ router.post('/:id/send', ccApiLimiter, requireVerifiedEmail, requireMfaEnrolled,
     orgId: req.user!.orgId,
     userId: req.user!.id,
     requestMeta: getRequestMeta(req),
+    acknowledgeWarnings: req.body?.acknowledgeWarnings === true,
   });
   res.status(outcome.httpStatus).json(outcome.body);
 });
@@ -562,7 +576,10 @@ router.post('/:id/cbp-action', ccApiLimiter, requireVerifiedEmail, requireMfaEnr
     res.status(400).json({ error: "action must be 'REPLACE' or 'DELETE'" });
     return;
   }
-  const outcome = await transmitEntryNative({ docId: String(req.params.id), orgId: req.user!.orgId, userId: req.user!.id, action });
+  const outcome = await transmitEntryNative({
+    docId: String(req.params.id), orgId: req.user!.orgId, userId: req.user!.id, action,
+    acknowledgeWarnings: req.body?.acknowledgeWarnings === true,
+  });
   res.status(outcome.httpStatus).json(outcome.body);
 });
 

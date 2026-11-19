@@ -405,8 +405,31 @@ router.get('/cbp', async (req: AuthRequest, res: Response): Promise<void> => {
       serviceCenterApprovedAt: cfg?.serviceCenterApprovedAt ?? null,
       sigmaFilerCode: SIGMA_FILER_CODE,
       environment: env.CBP_ENVIRONMENT,
+      ctpatStatus: (await prisma.organization.findUnique({ where: { id: req.user!.orgId }, select: { ctpatStatus: true } }))?.ctpatStatus ?? 'UNKNOWN',
     },
   });
+});
+
+// PATCH /api/v1/organization/cbp/ctpat — owners/admins state the org's own
+// CTPAT validation as a filer. Self-attested; it only drives the foreign IOR
+// pre-send warnings (services/cbp/ctpatRules.ts) and is never sent to CBP.
+router.patch('/cbp/ctpat', requireRole('owner', 'admin'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = z.object({ ctpatStatus: z.enum(['VALIDATED', 'NONE', 'UNKNOWN']) }).strict().safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'ctpatStatus must be VALIDATED, NONE or UNKNOWN' });
+    return;
+  }
+  const orgId = req.user!.orgId;
+  const before = await prisma.organization.findUnique({ where: { id: orgId }, select: { ctpatStatus: true } });
+  await prisma.organization.update({ where: { id: orgId }, data: { ctpatStatus: parsed.data.ctpatStatus } });
+  writeAuditLog({
+    orgId, userId: req.user!.id, action: 'org.ctpat_status_set',
+    entityType: 'organization', entityId: orgId,
+    oldValue: { ctpatStatus: before?.ctpatStatus ?? 'UNKNOWN' },
+    newValue: { ctpatStatus: parsed.data.ctpatStatus },
+    ...getRequestMeta(req),
+  });
+  res.json({ cbp: { ctpatStatus: parsed.data.ctpatStatus } });
 });
 
 // PATCH /api/v1/organization/cbp — owners/admins choose the default ISF filer.

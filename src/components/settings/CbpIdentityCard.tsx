@@ -3,9 +3,15 @@ import { toast } from 'sonner';
 import { Loader2 } from '@/components/icons';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { organizationApi } from '@/api/client';
+import { organizationApi, type CtpatStatus } from '@/api/client';
 import { FILL, TINT, type Tone } from '@/components/dashboard/tones';
 import { cn } from '@/lib/utils';
+
+const CTPAT_CHOICES: { value: CtpatStatus; label: string }[] = [
+  { value: 'VALIDATED', label: 'Yes, we are CTPAT validated' },
+  { value: 'NONE', label: 'No' },
+  { value: 'UNKNOWN', label: 'Not sure' },
+];
 
 const PANEL = 'overflow-hidden rounded-xl border border-border/70 bg-card shadow-card';
 const LABEL = 'text-[12px] text-muted-foreground';
@@ -41,6 +47,15 @@ export function CbpIdentityCard({ canEdit }: { canEdit: boolean }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['org', 'cbp'] });
       toast.success('Default ISF filer saved');
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Could not save'),
+  });
+
+  const setCtpat = useMutation({
+    mutationFn: (status: CtpatStatus) => organizationApi.setCtpatStatus(status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['org', 'cbp'] });
+      toast.success('CTPAT status saved');
     },
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Could not save'),
   });
@@ -117,6 +132,28 @@ export function CbpIdentityCard({ canEdit }: { canEdit: boolean }) {
                 </label>
               </RadioGroup>
               <p className="mt-1 text-[12px] text-muted-foreground">You can still choose per filing.</p>
+            </div>
+
+            <div>
+              <h3 className="text-[13px] font-medium">CTPAT validation</h3>
+              <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                Is your company CTPAT validated (a Tier 2 or 3 partner)? CBP checks this itself; your answer only lets us
+                warn you before CBP would reject an entry for a foreign importer of record.
+              </p>
+              <RadioGroup
+                value={cbp.ctpatStatus}
+                onValueChange={(v) => setCtpat.mutate(v as CtpatStatus)}
+                disabled={!canEdit || setCtpat.isPending}
+                aria-label="CTPAT validation"
+                className="mt-1 gap-0 divide-y divide-border/60"
+              >
+                {CTPAT_CHOICES.map((c) => (
+                  <label key={c.value} className={cn('flex items-start gap-3 py-2.5', canEdit && 'cursor-pointer')}>
+                    <RadioGroupItem value={c.value} id={`ctpat-${c.value}`} className="mt-0.5" />
+                    <Label htmlFor={`ctpat-${c.value}`} className={cn('text-[13px]', canEdit && 'cursor-pointer')}>{c.label}</Label>
+                  </label>
+                ))}
+              </RadioGroup>
             </div>
           </>
         )}

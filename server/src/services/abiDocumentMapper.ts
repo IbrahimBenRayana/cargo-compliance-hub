@@ -307,6 +307,7 @@ export function extractDenormFromPayload(payload: any): {
   hbolNumber: string | null;
   iorNumber: string | null;
   iorName: string | null;
+  iorUsStatus: 'US' | 'FOREIGN' | null;
   consigneeName: string | null;
   portOfEntry: string | null;
   destinationStateUS: string | null;
@@ -330,6 +331,7 @@ export function extractDenormFromPayload(payload: any): {
     hbolNumber: firstManifest?.bill?.hBOL || null,
     iorNumber: p.ior?.number ?? null,
     iorName: p.ior?.name ?? null,
+    iorUsStatus: p.ior?.usImporterOfRecord === true ? 'US' : p.ior?.usImporterOfRecord === false ? 'FOREIGN' : null,
     consigneeName: p.entryConsignee?.name ?? null,
     portOfEntry: p.location?.portOfEntry ?? null,
     destinationStateUS: p.location?.destinationStateUS ?? null,

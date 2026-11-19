@@ -23,6 +23,7 @@
 import type { AeEntrySummaryInput, AeLine } from '../ae/builder.js';
 import { isUsFederalHoliday } from '../calendar/usFederalHolidays.js';
 import { ENTRY_TYPE_CODES, MOT_CODES } from '../ae/tables.js';
+import { canonicalImporterNumber } from '../records/importerNumber.js';
 
 export interface ValidationIssue {
   /** F = fatal (transaction must not be transmitted). */
@@ -145,7 +146,12 @@ function checkDesignation(
  * matrix and targeted cross-field rules. Returns [] when transmittable.
  * Delete actions carry no conditional data and always pass.
  */
-export function validateEntrySummary(input: AeEntrySummaryInput): ValidationIssue[] {
+export interface ValidateEntrySummaryOptions {
+  /** The 15-Record is mandatory (ACE PROD from 2027-01-05; CERT from 2026-11-12). */
+  requireIorDeclaration?: boolean;
+}
+
+export function validateEntrySummary(input: AeEntrySummaryInput, options: ValidateEntrySummaryOptions = {}): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const entryType = input.entryTypeCode;
 
@@ -153,6 +159,8 @@ export function validateEntrySummary(input: AeEntrySummaryInput): ValidationIssu
     return [{ severity: 'F', field: 'entryTypeCode', message: `unknown entry type '${entryType}' (AE Table 2)` }];
   }
   if (input.action === 'D') return [];
+
+  validateIorDeclaration(input, options.requireIorDeclaration === true, issues);
 
   if (input.motCode !== undefined && !(input.motCode in MOT_CODES)) {
     issues.push({ severity: 'F', field: 'motCode', message: `unknown MOT code '${input.motCode}' (AE Table 3)` });
@@ -211,6 +219,28 @@ export function validateEntrySummary(input: AeEntrySummaryInput): ValidationIssu
 // ── Workstream C cross-field rules ─────────────────────────
 
 /** Bond configuration tables + waiver restrictions, usage note (i) (ESF-156–158). */
+/**
+ * 15-Record (V112, ESF-42): errors 888 (missing) and 893 (principal format).
+ * 892 (principal required) depends on the broker's CTPAT status, which only
+ * ACE knows, so the caller's preflight owns it.
+ */
+function validateIorDeclaration(input: AeEntrySummaryInput, required: boolean, issues: ValidationIssue[]): void {
+  const declaration = input.iorDeclaration;
+  if (!declaration) {
+    if (required) {
+      issues.push({ severity: 'F', field: 'iorDeclaration', message: 'U.S. importer of record declaration is required (15-Record, error 888)' });
+    }
+    return;
+  }
+  const principal = declaration.principalOnPoa;
+  if (principal === undefined) return;
+  if (!declaration.brokerActingAsIor) {
+    issues.push({ severity: 'F', field: 'iorDeclaration.principalOnPoa', message: 'principal on power of attorney applies only when the broker acts as IOR (15-Record)' });
+  } else if (canonicalImporterNumber(principal)?.number !== principal) {
+    issues.push({ severity: 'F', field: 'iorDeclaration.principalOnPoa', message: `'${principal}' is not an SSN, IRS or CBP-assigned number in usage note (f) format (error 893)` });
+  }
+}
+
 function validateBonds(input: AeEntrySummaryInput, entryType: string, issues: ValidationIssue[]): void {
   const bonds = input.bonds ?? [];
   const push = (field: string, message: string) => issues.push({ severity: 'F', field, message });

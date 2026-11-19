@@ -103,9 +103,10 @@ export function useUpdateAbiDocument() {
 export function useSendAbiDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => abiDocumentsApi.send(id),
-    onSuccess: (_data, id) => {
-      queryClient.invalidateQueries({ queryKey: ['abi-documents', id] });
+    mutationFn: (args: string | { id: string; acknowledgeWarnings?: boolean }) =>
+      typeof args === 'string' ? abiDocumentsApi.send(args) : abiDocumentsApi.send(args.id, args.acknowledgeWarnings),
+    onSuccess: (_data, args) => {
+      queryClient.invalidateQueries({ queryKey: ['abi-documents', typeof args === 'string' ? args : args.id] });
       queryClient.invalidateQueries({ queryKey: ['abi-documents', 'list'] });
     },
   });

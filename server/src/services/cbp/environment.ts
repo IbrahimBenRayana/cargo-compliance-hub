@@ -41,6 +41,16 @@ export const cbpEnvShape = {
   CBP_SENDER_SITE: z.string().trim().default(''),
   CBP_SENDER_ID: z.string().trim().default(''),
   CBP_SENDER_PASSWORD: z.string().default(''),
+  /**
+   * ISO date-time from which every Add/Replace entry summary must carry the
+   * 15-Record U.S. IOR declaration. Blank = CBP's own deployment date for
+   * the environment (services/cbp/iorDeclaration.ts).
+   */
+  IOR_DECLARATION_FROM: z
+    .string()
+    .trim()
+    .default('')
+    .refine((v) => v === '' || !Number.isNaN(Date.parse(v)), 'must be an ISO date-time'),
 };
 
 const QUEUE_MANAGERS: Record<Exclude<CbpEnvironment, 'NONE'>, string> = {

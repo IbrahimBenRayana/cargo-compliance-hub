@@ -22,6 +22,7 @@ describe('cbpEnvShape', () => {
       MQIPT_BRIDGE_URL: 'http://mq-bridge:8080',
       MQIPT_BRIDGE_TOKEN: '',
       CBP_SENDER_SITE: '',
+      IOR_DECLARATION_FROM: '',
       CBP_SENDER_ID: '',
       CBP_SENDER_PASSWORD: '',
     });

@@ -140,6 +140,9 @@ router.post('/entries/:id/send', requireScope('entries:write'), async (req: ApiR
     docId: String(req.params.id),
     orgId: req.apiContext!.orgId,
     userId: req.apiContext!.actorUserId,
+    // CTPAT warnings (foreign IOR rule) answer 409 CBP_WARNINGS_UNACKNOWLEDGED
+    // until the caller resends with acknowledgeWarnings: true.
+    acknowledgeWarnings: req.body?.acknowledgeWarnings === true,
   });
   res.status(outcome.httpStatus).json(outcome.body);
 });

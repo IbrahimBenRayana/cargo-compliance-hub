@@ -27,6 +27,17 @@ const abiLocationSchema = z.object({
 const abiIORSchema = z.object({
   number: z.string().min(1).max(50),
   name: z.string().min(1).max(255),
+  // 19 CFR 141.22 declaration (15-Record). Optional here: required at
+  // transmission from CBP's cutover date (services/cbp/iorDeclaration.ts).
+  usImporterOfRecord: z.boolean().optional(),
+  brokerActingAsIor: z.boolean().optional(),
+  principalOnPoa: z.string().max(12).optional(),
+  // Wizard attestation box next to a U.S. declaration; the server stamps
+  // who ticked it and when (services/abi/iorAttestation.ts).
+  usIorAttested: z.boolean().optional(),
+  // The importer's (or principal's) CTPAT validation as the user states it;
+  // drives pre-send warnings only (services/cbp/ctpatRules.ts).
+  ctpatStatus: z.enum(['VALIDATED', 'NONE', 'UNKNOWN']).optional(),
 });
 
 // IRS / EIN / SSN / CBP-assigned identifier formats used by

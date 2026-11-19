@@ -29,6 +29,16 @@ export interface AbiLocation {
 export interface AbiIOR {
   number: string;
   name: string;
+  /** 19 CFR 141.22: IOR (or principal, when the broker acts as IOR) meets 19 CFR 110.2. */
+  usImporterOfRecord?: boolean;
+  /** The broker files as IOR on behalf of a principal on the power of attorney. */
+  brokerActingAsIor?: boolean;
+  /** Principal's SSN/IRS/CBP-assigned number; needed when a non-CTPAT broker acts as IOR. */
+  principalOnPoa?: string;
+  /** The importer's (or, with the broker as IOR, the principal's) CTPAT validation, as the user stated it. Never sent to CBP. */
+  ctpatStatus?: 'VALIDATED' | 'NONE' | 'UNKNOWN';
+  /** Wizard attestation next to a U.S. declaration; stamped server-side. */
+  usIorAttested?: boolean;
 }
 
 export interface AbiBond {
