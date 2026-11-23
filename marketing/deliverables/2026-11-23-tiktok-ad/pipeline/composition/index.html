@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1080, height=1920" />
+<script src="assets/vendor/gsap.min.js"></script>
+<style>
+  @font-face { font-family: 'Inter'; src: url('assets/fonts/inter.woff2') format('woff2'); font-weight: 100 900; }
+  :root { --navy: #1E2D4D; --navy-deep: #131E36; --gold: #FBBE24; --ink: #1E2D4D; --ink-2: #4A5876; --ink-3: #8C99B8; --paper: #F5F6F8; --line: #E3E6EC; --green: #0E9F6E; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--navy-deep); }
+  #root { position: relative; width: 1080px; height: 1920px; overflow: hidden; font-family: 'Inter', sans-serif; font-optical-sizing: auto; color: #fff; }
+  .layer { position: absolute; inset: 0; }
+  #gl { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+  /* soft vignette so type always sits on a calm field */
+  #vignette { background: radial-gradient(120% 80% at 50% 45%, rgba(19,30,54,0) 40%, rgba(19,30,54,.72) 100%), linear-gradient(180deg, rgba(19,30,54,.9) 0%, rgba(19,30,54,.62) 22%, rgba(19,30,54,0) 40%); }
+  #dim { background: var(--navy-deep); opacity: 0; }
+
+  /* captions: TikTok ad safe area = clear of the top bar, the right-hand buttons and the bottom caption block */
+  .cap { position: absolute; left: 80px; width: 920px; top: 250px; text-align: center; font-weight: 800; letter-spacing: -.035em; line-height: 1.02; opacity: 0; text-shadow: 0 8px 44px rgba(10,16,32,.85), 0 2px 10px rgba(10,16,32,.6); }
+  .cap .line { display: block; overflow: hidden; padding-bottom: 14px; }
+  .cap .line > span { display: inline-block; }
+  .cap em { font-style: normal; color: var(--gold); }
+  #cap-hook { font-size: 138px; top: 230px; }
+  #cap-pain { font-size: 104px; }
+  #cap-turn { font-size: 112px; }
+  .cap.feat { font-size: 96px; top: 1150px; }
+
+  /* the real app, flat */
+  #app { position: absolute; left: 150px; top: 580px; width: 780px; height: 700px; border-radius: 34px; overflow: hidden; background: #fff; opacity: 0;
+    box-shadow: 0 50px 120px rgba(4,9,22,.6), 0 0 0 1px rgba(255,255,255,.14); }
+  #app video { position: absolute; left: 0; top: 0; width: 780px; height: 867px; object-fit: cover; }
+
+  /* drawn feature cards */
+  #feats { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; perspective: 1500px; }
+  .fcard { position: absolute; left: 190px; top: 520px; width: 700px; height: 560px; border-radius: 44px; background: #fff; color: var(--ink); opacity: 0;
+    box-shadow: 0 60px 130px rgba(4,9,22,.6); display: flex; flex-direction: column; align-items: center; justify-content: center; transform-style: preserve-3d; }
+  .fcard .tag { position: absolute; left: 44px; top: 38px; font-size: 26px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  .ringwrap { position: relative; width: 330px; height: 330px; margin-top: 30px; }
+  .ringwrap svg { width: 330px; height: 330px; transform: rotate(-90deg); }
+  .ringwrap .num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; font-size: 104px; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+  .ringwrap .num small { font-size: 30px; font-weight: 600; color: var(--ink-2); letter-spacing: 0; margin-top: -6px; }
+  .rows { width: 560px; margin-top: 52px; display: flex; flex-direction: column; gap: 26px; }
+  .row { display: flex; align-items: center; gap: 26px; }
+  .row .bar { height: 26px; border-radius: 13px; background: #E3E6EC; }
+  .row .chk { width: 62px; height: 62px; flex: none; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; }
+  .row .chk svg { width: 34px; height: 34px; }
+  .doc { width: 560px; margin-top: 52px; display: flex; flex-direction: column; gap: 30px; }
+  .doc .l { position: relative; height: 26px; border-radius: 13px; background: #E3E6EC; }
+  .doc .hot { height: 74px; border-radius: 20px; background: #FFF4D6; box-shadow: inset 0 0 0 3px var(--gold); display: flex; align-items: center; padding: 0 22px; gap: 18px; }
+  .doc .hot svg { width: 40px; height: 40px; flex: none; }
+  .doc .hot .l { flex: 1; background: #F0D58A; }
+  .doc .hot b { font-size: 26px; font-weight: 800; color: #8A5A00; white-space: nowrap; }
+
+  /* end card */
+  #end { display: flex; flex-direction: column; align-items: center; opacity: 0; }
+  #end .mark { margin-top: 430px; width: 230px; height: 230px; }
+  #end .lockup { margin-top: 44px; font-size: 104px; font-weight: 800; letter-spacing: -.04em; }
+  #end .lockup em { font-style: normal; color: var(--gold); }
+  #end h1 { margin-top: 30px; font-size: 54px; font-weight: 600; letter-spacing: -.02em; color: #C9D1E3; }
+  #end .btn { margin-top: 110px; font-size: 62px; font-weight: 800; letter-spacing: -.02em; color: var(--navy-deep); background: var(--gold); padding: 36px 84px; border-radius: 30px; box-shadow: 0 24px 70px rgba(251,190,36,.35); }
+  #end .url { margin-top: 44px; font-size: 40px; font-weight: 600; color: #C9D1E3; }
+
+  #guide { display: none; position: absolute; inset: 0; pointer-events: none; }
+  #guide i { position: absolute; background: rgba(255,0,80,.28); }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="15.5" data-width="1080" data-height="1920">
+  <canvas id="gl" width="2160" height="3840"></canvas>
+  <div id="vignette" class="layer"></div>
+  <div id="dim" class="layer"></div>
+
+  <div class="cap" id="cap-hook"><span class="line"><span>Importer.</span></span><span class="line"><span>Broker.</span></span><span class="line"><span><em>NVOCC.</em></span></span></div>
+  <div class="cap" id="cap-pain"><span class="line"><span>Still chasing</span></span><span class="line"><span>CBP filings</span></span><span class="line"><span><em>by hand?</em></span></span></div>
+  <div class="cap" id="cap-turn"><span class="line"><span>Every filing.</span></span><span class="line"><span><em>One inbox.</em></span></span></div>
+
+  <div id="app"><video id="v-today" class="clip" src="assets/clips/today.mp4" muted playsinline data-start="7.0" data-duration="2.2" data-media-start="0.6"></video></div>
+
+  <div id="feats">
+    <div class="fcard" id="f1"><div class="tag">ISF cutoff</div>
+      <div class="ringwrap"><svg viewBox="0 0 330 330"><circle cx="165" cy="165" r="138" fill="none" stroke="#E9ECF2" stroke-width="26"/><circle id="ring" cx="165" cy="165" r="138" fill="none" stroke="#FBBE24" stroke-width="26" stroke-linecap="round" stroke-dasharray="867" stroke-dashoffset="867"/></svg>
+        <div class="num"><span id="ringnum">15h</span><small>left</small></div></div></div>
+    <div class="fcard" id="f2"><div class="tag">Rule check</div>
+      <div class="rows">
+        <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:400px"></div></div>
+        <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:330px"></div></div>
+        <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:440px"></div></div>
+        <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:290px"></div></div>
+      </div></div>
+    <div class="fcard" id="f3"><div class="tag">AI pre-flight review</div>
+      <div class="doc">
+        <div class="l" style="width:470px"></div>
+        <div class="hot"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z" fill="#FBBE24"/></svg><div class="l"></div><b>Fix this</b></div>
+        <div class="l" style="width:520px"></div>
+        <div class="l" style="width:380px"></div>
+      </div></div>
+  </div>
+  <div class="cap feat" id="cap-f1"><span class="line"><span>Deadlines</span></span><span class="line"><span><em>tracked.</em></span></span></div>
+  <div class="cap feat" id="cap-f2"><span class="line"><span>Every field</span></span><span class="line"><span><em>checked.</em></span></span></div>
+  <div class="cap feat" id="cap-f3"><span class="line"><span>AI flags</span></span><span class="line"><span><em>what to fix.</em></span></span></div>
+
+  <div id="end" class="layer">
+    <svg class="mark" viewBox="14 14 72 72"><g fill="none" stroke="#C9D1E3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path class="br" d="M26 40V26h14"/><path class="br" d="M60 26h14v14"/><path class="br" d="M74 60v14H60"/><path class="br" d="M40 74H26V60"/></g><rect id="end-dot" x="42" y="42" width="16" height="16" rx="4.6" fill="#FBBE24"/></svg>
+    <div class="lockup">MyCargo<em>Lens</em></div>
+    <h1>An inbox for US customs.</h1>
+    <div class="btn">Book a demo</div>
+    <div class="url">mycargolens.com/book-a-demo</div>
+  </div>
+
+  <!-- build-time only: TikTok ad UI zones (top bar, right buttons, bottom caption) -->
+  <div id="guide"><i style="left:0;top:0;width:1080px;height:130px"></i><i style="right:0;top:820px;width:140px;height:700px"></i><i style="left:0;bottom:0;width:1080px;height:400px"></i></div>
+</div>
+
+<script type="module">
+import * as THREE from './assets/vendor/three.module.min.js';
+
+const TOTAL = 15.5;
+// beats (s): hook, pain, turn, proof x3, end
+const T = { pain: 2.6, turn: 5.25, app: 7.05, proof: 8.65, f2: 9.85, f3: 11.2, end: 12.95 };
+
+// ── helpers ────────────────────────────────────────────────────────────
+const clamp = (x) => Math.min(1, Math.max(0, x));
+const span = (t, a, b) => clamp((t - a) / (b - a));
+const io = (x) => x * x * (3 - 2 * x);                               // smoothstep
+const io5 = (x) => x * x * x * (x * (x * 6 - 15) + 10);              // smootherstep
+const out3 = (x) => 1 - Math.pow(1 - x, 3);
+const outExpo = (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const rng = (seed) => () => { let t = (seed += 0x6D2B79F5); t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };   // mulberry32
+
+// ── scene ──────────────────────────────────────────────────────────────
+const canvas = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(2160, 3840, false);          // 2x supersampled, shown at 1080x1920
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const NAVY = new THREE.Color('#131E36');
+const scene = new THREE.Scene();
+scene.background = NAVY;
+scene.fog = new THREE.Fog(NAVY, 14, 46);
+const camera = new THREE.PerspectiveCamera(55, 1080 / 1920, 0.1, 120);
+
+scene.add(new THREE.HemisphereLight('#AFC3F2', '#0B1226', 1.25));
+const key = new THREE.DirectionalLight('#FFE7B8', 2.3); key.position.set(6, 10, 8); scene.add(key);
+const rim = new THREE.DirectionalLight('#6F9BFF', 1.5); rim.position.set(-8, 5, -14); scene.add(rim);
+
+// floor: dark plane with a faint grid that the camera travels over
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: '#101A31', roughness: 0.92, metalness: 0 }));
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const grid = new THREE.GridHelper(200, 100, '#2B3D66', '#1C2A4A'); grid.position.y = 0.01; grid.material.transparent = true; grid.material.opacity = 0.55; scene.add(grid);
+
+// containers: corrugated boxes in two rows either side of the camera's path
+function corrugated() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d');
+  for (let x = 0; x < 512; x += 16) { const gr = g.createLinearGradient(x, 0, x + 16, 0); gr.addColorStop(0, '#9aa'); gr.addColorStop(.5, '#fff'); gr.addColorStop(1, '#889'); g.fillStyle = gr; g.fillRect(x, 0, 16, 256); }
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 0, 512, 10); g.fillRect(0, 246, 512, 10);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 1); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+const corr = corrugated();
+const boxGeo = new THREE.BoxGeometry(2.4, 2.6, 6);
+const GOLD = new THREE.Color('#FBBE24');
+const containers = [];
+const tones = ['#2F4474', '#27395F', '#35507F', '#2B4170', '#3A4E78', '#24365C'];
+[[-3.4, -1], [3.4, -8], [-3.4, -15], [3.4, -1], [-3.4, -8], [3.4, -15], [-3.4, -22.4], [3.4, -22.4], [-3.4, -29.6], [3.4, -29.6]].forEach(([x, z], i) => {
+  const mat = new THREE.MeshStandardMaterial({ color: tones[i % tones.length], map: corr, roughness: 0.62, metalness: 0.25, emissive: '#000000' });
+  const m = new THREE.Mesh(boxGeo, mat); m.position.set(x, 1.3, z); scene.add(m);
+  containers.push({ m, base: new THREE.Color(tones[i % tones.length]), x, z });
+  if (i === 3 || i === 4) {                                           // a second level on two of them
+    const top = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: tones[(i + 2) % tones.length], map: corr, roughness: 0.62, metalness: 0.25 }));
+    top.position.set(x, 3.9, z); scene.add(top); containers.push({ m: top, base: new THREE.Color(tones[(i + 2) % tones.length]), x, z, upper: true });
+  }
+});
+const goldAt = [0.2, 0.9, 1.5];                                     // containers 0, 1, 2 light up with the three words
+
+// filing cards: one drawn texture per kind, 40 cards
+function cardTexture(kind) {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 220; const g = c.getContext('2d');
+  const r = 44; g.fillStyle = '#FFFFFF'; g.beginPath(); g.roundRect(4, 4, 1016, 212, r); g.fill();
+  const tone = { due: '#FBBE24', late: '#E5484D', ok: '#0E9F6E', draft: '#8C99B8' }[kind.tone];
+  g.fillStyle = tone; g.beginPath(); g.arc(92, 110, 30, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#1E2D4D'; g.font = '800 58px Inter, sans-serif'; g.textBaseline = 'middle'; g.fillText(kind.label, 150, 84);
+  g.fillStyle = '#D6DBE6'; g.beginPath(); g.roundRect(150, 132, kind.w, 26, 13); g.fill();
+  // clock chip
+  g.fillStyle = kind.tone === 'late' ? '#FDECEC' : '#FFF4D6'; g.beginPath(); g.roundRect(760, 62, 212, 96, 48); g.fill();
+  g.strokeStyle = kind.tone === 'late' ? '#C0272D' : '#8A5A00'; g.lineWidth = 7; g.beginPath(); g.arc(812, 110, 24, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.moveTo(812, 96); g.lineTo(812, 110); g.lineTo(824, 118); g.stroke();
+  g.fillStyle = kind.tone === 'late' ? '#C0272D' : '#8A5A00'; g.font = '800 44px Inter, sans-serif'; g.fillText(kind.chip, 850, 112);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+const KINDS = [
+  { label: 'ISF', tone: 'due', chip: '15h', w: 420 }, { label: 'Entry', tone: 'ok', chip: '3d', w: 360 }, { label: 'ISF', tone: 'late', chip: '8h', w: 470 },
+  { label: 'ISF', tone: 'draft', chip: '2d', w: 330 }, { label: 'Entry', tone: 'due', chip: '21h', w: 440 }
+];
+const CARD_W = 2.7, CARD_H = CARD_W * 220 / 1024, ROWS = 8, GAP = 0.13;
+const cardGeo = new THREE.PlaneGeometry(CARD_W, CARD_H);
+const STACK = { x: 0, z: -22, y0: 5.45 };
+const cards = [];
+function buildCards() {
+  const textures = KINDS.map(cardTexture);
+  const R = rng(20261123);
+  // the most urgent kinds sit on top of the stack
+  const order = [2, 0, 4, 0, 3, 1, 3, 1];
+  for (let i = 0; i < 40; i++) {
+    const row = i % ROWS, layer = Math.floor(i / ROWS);
+    const k = layer === 0 ? order[row] : Math.floor(R() * KINDS.length);
+    const mat = new THREE.MeshBasicMaterial({ map: textures[k], transparent: true, side: THREE.DoubleSide, fog: true });
+    const m = new THREE.Mesh(cardGeo, mat); scene.add(m);
+    const src = containers[Math.floor(R() * 6)];
+    cards.push({
+      m, row, layer,
+      src: new THREE.Vector3(src.x * 0.55, 1.3 + R() * 1.2, src.z + (R() - 0.5) * 3),
+      chaos: new THREE.Vector3((R() - 0.5) * 4.6, 0.7 + R() * 3.5, -16 - R() * 9),
+      stack: new THREE.Vector3(STACK.x, STACK.y0 - row * (CARD_H + GAP), STACK.z - layer * 0.16),
+      rot: new THREE.Vector3(R() * 6.28, R() * 6.28, R() * 6.28), spin: new THREE.Vector3((R() - 0.5) * 1.6, (R() - 0.5) * 1.9, (R() - 0.5) * 1.2),
+      ph: R() * 6.28, d1: R() * 0.55, d2: row * 0.03 + layer * 0.035
+    });
+  }
+}
+
+// the focus frame: four gold corner brackets that close around the stack
+const frame = new THREE.Group(); scene.add(frame);
+const frameMat = new THREE.MeshBasicMaterial({ color: '#FBBE24', transparent: true, opacity: 0, fog: false });
+const FW = 1.78, FH0 = 0.42, FH1 = 5.95, ARM = 0.7, TH = 0.11;
+[[-1, 1], [1, 1], [1, -1], [-1, -1]].forEach(([sx, sy]) => {
+  const cx = sx * FW, cy = sy > 0 ? FH1 : FH0;
+  const h = new THREE.Mesh(new THREE.BoxGeometry(ARM, TH, TH), frameMat); h.position.set(cx - sx * ARM / 2, cy, 0);
+  const v = new THREE.Mesh(new THREE.BoxGeometry(TH, ARM, TH), frameMat); v.position.set(cx, cy - sy * ARM / 2, 0);
+  frame.add(h, v);
+});
+const FRAME_C = new THREE.Vector3(0, (FH0 + FH1) / 2, STACK.z + 0.25);
+
+// camera path: position and look-at keys, eased between
+const CAM = [
+  { t: 0.0, p: [0, 1.5, 13.5], l: [0, 2.6, -6] },
+  { t: 2.6, p: [0, 1.8, 2.4], l: [0, 3.6, -16] },
+  { t: 5.25, p: [0.0, 2.6, -9.5], l: [0, 4.6, -22] },
+  { t: 6.5, p: [0, 3.5, -13.2], l: [0, 5.0, -22] },
+  { t: 12.95, p: [0, 3.5, -13.9], l: [0, 5.0, -22] },
+  { t: 15.5, p: [0, 3.5, -14.6], l: [0, 5.0, -22] }
+];
+const v3 = (a) => new THREE.Vector3(...a);
+const camP = new THREE.CatmullRomCurve3(CAM.map((k) => v3(k.p)), false, 'centripetal');
+const camL = new THREE.CatmullRomCurve3(CAM.map((k) => v3(k.l)), false, 'centripetal');
+function camU(t) {                                                     // time → curve parameter, eased inside each segment
+  for (let i = 0; i < CAM.length - 1; i++) {
+    if (t <= CAM[i + 1].t) { const k = span(t, CAM[i].t, CAM[i + 1].t); const e = i === 0 ? out3(k) * 0.55 + k * 0.45 : io(k); return (i + e) / (CAM.length - 1); }
+  }
+  return 1;
+}
+
+const tmp = new THREE.Vector3(), q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion(), eu = new THREE.Euler();
+function draw(t) {
+  // camera
+  const u = camU(t);
+  camera.position.copy(camP.getPoint(u)); camera.position.x += Math.sin(t * 0.9) * 0.12 * span(t, 2.6, 3.4) * (1 - span(t, 5.0, 6.2));
+  camera.lookAt(camL.getPoint(u));
+  camera.rotation.z += Math.sin(t * 0.7 + 1) * 0.02 * span(t, 2.6, 3.4) * (1 - span(t, 5.0, 6.0));
+
+  // containers: three turn gold with the three words, then let go
+  containers.forEach((c, i) => {
+    const on = i < 3 ? outExpo(span(t, goldAt[i], goldAt[i] + 0.45)) * (1 - io(span(t, 2.9, 3.6))) : 0;
+    c.m.material.color.copy(c.base).lerp(GOLD, on * 0.92);
+    c.m.material.emissive.setRGB(0.98 * on * 0.22, 0.75 * on * 0.22, 0.14 * on * 0.22);
+    c.m.scale.setScalar(1 + 0.035 * Math.sin(Math.PI * span(t, goldAt[i] ?? 99, (goldAt[i] ?? 99) + 0.5)) * (i < 3 ? 1 : 0));
+  });
+
+  // cards: out of the containers → loose in the air → one stack → gone into the mark
+  const fold = io5(span(t, T.end - 0.25, T.end + 0.45));
+  for (const c of cards) {
+    const p1 = out3(span(t, 2.45 + c.d1, 3.5 + c.d1));
+    const p2 = io5(span(t, T.turn + 0.15 + c.d2, T.turn + 0.9 + c.d2));
+    tmp.copy(c.chaos); tmp.x += Math.sin(t * 0.8 + c.ph) * 0.3; tmp.y += Math.cos(t * 0.65 + c.ph) * 0.26; tmp.z += Math.sin(t * 0.5 + c.ph * 2) * 0.3;
+    c.m.position.lerpVectors(c.src, tmp, p1).lerp(c.stack, p2);
+    if (fold > 0) c.m.position.lerp(FRAME_C, fold);
+    eu.set(c.rot.x + c.spin.x * t, c.rot.y + c.spin.y * t, c.rot.z + c.spin.z * t); q0.setFromEuler(eu); q1.identity();
+    c.m.quaternion.copy(q0).slerp(q1, p2);
+    const s = p1 * (1 - fold);
+    c.m.scale.set(s, s, s);
+    c.m.visible = s > 0.001;
+  }
+
+  // focus frame closes on the cloud as it becomes a stack
+  const fIn = outExpo(span(t, T.turn + 0.25, T.turn + 1.0));
+  const fs = lerp(2.3, 1, fIn) * lerp(1, 0.2, fold);
+  frame.position.set(0, FRAME_C.y * (1 - fs), FRAME_C.z);              // scale about the frame's centre
+  frame.scale.set(fs, fs, 1);
+  frameMat.opacity = fIn * (1 - io(span(t, T.proof - 0.3, T.proof + 0.1)));
+
+  renderer.render(scene, camera);
+}
+
+// ── type and drawn cards (GSAP), one paused timeline ───────────────────
+document.fonts.ready.then(() => {
+  buildCards();
+  const tl = gsap.timeline({ paused: true });
+  const $ = (s) => document.querySelector(s), $$ = (s) => document.querySelectorAll(s);
+  const lines = (id) => $$(`${id} .line > span`);
+
+  // hook: three words, on the beat of the voice
+  tl.set('#cap-hook', { opacity: 1 }, 0);
+  [0.12, 0.84, 1.44].forEach((at, i) => tl.fromTo(lines('#cap-hook')[i], { yPercent: 112 }, { yPercent: 0, duration: .5, ease: 'power4.out' }, at));
+  tl.to('#cap-hook', { opacity: 0, y: -40, duration: .32, ease: 'power2.in' }, T.pain - .22);
+
+  const capIn = (id, at, stagger = .09) => { tl.set(id, { opacity: 1 }, at); tl.fromTo(lines(id), { yPercent: 112 }, { yPercent: 0, duration: .55, ease: 'power4.out', stagger }, at); };
+  const capOut = (id, at) => tl.to(id, { opacity: 0, y: -40, duration: .3, ease: 'power2.in' }, at);
+  capIn('#cap-pain', T.pain + .1); capOut('#cap-pain', T.turn - .2);
+  capIn('#cap-turn', T.turn + .25); capOut('#cap-turn', T.proof - .28);
+
+  // the real Today screen, flat, over the stack
+  tl.fromTo('#app', { opacity: 0, y: 90, scale: .9 }, { opacity: 1, y: 0, scale: 1, duration: .6, ease: 'expo.out' }, T.app);
+  tl.to('#app', { opacity: 0, y: 60, scale: .94, duration: .32, ease: 'power2.in' }, T.proof - .3);
+
+  // proof: the 3D scene steps back, three drawn cards come forward one at a time
+  tl.to('#dim', { opacity: .82, duration: .5, ease: 'power2.out' }, T.proof - .2);
+  const feats = [['#f1', '#cap-f1', T.proof, T.f2], ['#f2', '#cap-f2', T.f2, T.f3], ['#f3', '#cap-f3', T.f3, T.end]];
+  feats.forEach(([card, cap, a, b]) => {
+    tl.fromTo(card, { opacity: 0, y: 260, rotationX: 42, z: -260 }, { opacity: 1, y: 0, rotationX: 0, z: 0, duration: .62, ease: 'expo.out' }, a);
+    tl.to(card, { opacity: 0, y: -200, rotationX: -30, z: -180, duration: .34, ease: 'power2.in' }, b - .3);
+    capIn(cap, a + .08, .07); capOut(cap, b - .26);
+  });
+  // 1: the ring runs down
+  tl.fromTo('#ring', { strokeDashoffset: 867 }, { strokeDashoffset: 300, duration: .7, ease: 'power3.out' }, T.proof + .12);
+  tl.to('#ring', { strokeDashoffset: 350, duration: .35, ease: 'none' }, T.proof + .82);
+  const num = { v: 22 };
+  tl.fromTo(num, { v: 22 }, { v: 15, duration: .7, ease: 'power3.out', onUpdate: () => { $('#ringnum').textContent = `${Math.round(num.v)}h`; } }, T.proof + .12);
+  // 2: checks tick down the list
+  tl.fromTo('#f2 .chk', { scale: 0 }, { scale: 1, duration: .34, ease: 'back.out(2.4)', stagger: .15 }, T.f2 + .2);
+  tl.fromTo('#f2 .bar', { scaleX: .2, opacity: .3, transformOrigin: '0 50%' }, { scaleX: 1, opacity: 1, duration: .4, ease: 'power3.out', stagger: .15 }, T.f2 + .2);
+  // 3: one line gets flagged
+  tl.fromTo('#f3 .hot', { scale: .9, opacity: 0 }, { scale: 1, opacity: 1, duration: .45, ease: 'back.out(2)' }, T.f3 + .32);
+  tl.fromTo('#f3 .hot svg', { rotation: -90, scale: 0 }, { rotation: 0, scale: 1, duration: .5, ease: 'back.out(2.6)' }, T.f3 + .42);
+
+  // end card
+  tl.to('#dim', { opacity: .9, duration: .5, ease: 'power2.inOut' }, T.end - .1);
+  tl.set('#end', { opacity: 1 }, T.end);
+  tl.fromTo('#end .br', { scale: 1.9, opacity: 0, svgOrigin: '50 50' }, { scale: 1, opacity: 1, duration: .6, ease: 'expo.out', stagger: .03 }, T.end + .12);
+  tl.fromTo('#end-dot', { scale: 0, svgOrigin: '50 50' }, { scale: 1, duration: .45, ease: 'back.out(2.4)' }, T.end + .3);
+  tl.fromTo('#end .lockup', { y: 34, opacity: 0 }, { y: 0, opacity: 1, duration: .55, ease: 'power3.out' }, T.end + .4);
+  tl.fromTo('#end h1', { y: 26, opacity: 0 }, { y: 0, opacity: 1, duration: .55, ease: 'power3.out' }, T.end + .58);
+  tl.fromTo('#end .btn', { y: 40, opacity: 0, scale: .9 }, { y: 0, opacity: 1, scale: 1, duration: .55, ease: 'back.out(1.8)' }, T.end + .85);
+  tl.to('#end .btn', { scale: .955, duration: .12, ease: 'power2.in' }, T.end + 1.55);
+  tl.to('#end .btn', { scale: 1, duration: .3, ease: 'back.out(3)' }, T.end + 1.67);
+  tl.fromTo('#end .url', { opacity: 0 }, { opacity: 1, duration: .5 }, T.end + 1.1);
+
+  // the 3D frame follows the same clock
+  const clock = { t: 0 };
+  tl.fromTo(clock, { t: 0 }, { t: TOTAL, duration: TOTAL, ease: 'none', onUpdate: () => draw(clock.t) }, 0);
+
+  window.__timelines = window.__timelines || {};
+  window.__timelines['main'] = tl;
+  tl.seek(0);
+  draw(0);
+});
+window.addEventListener('hf-seek', (e) => { if (cards.length) draw(e.detail.time); });
+</script>
+</body>
+</html>

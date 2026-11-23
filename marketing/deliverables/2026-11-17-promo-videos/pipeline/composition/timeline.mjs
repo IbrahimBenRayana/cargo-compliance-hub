@@ -120,7 +120,10 @@ const SCENES = {
 		zooms: { confirm: { z: 1.3, hold: 9 } },
 		vo: [['a07', 1.3]]
 	},
-	'a-end': { ...END, line: 'AI pre-flight review,<br>on every draft.', vo: [['a06', 0.8]] }
+	'a-end': { ...END, line: 'AI pre-flight review,<br>on every draft.', vo: [['a06', 0.8]] },
+
+	// ── TikTok ad: picture is its own composition (../../2026-11-23-tiktok-ad); only the sound is timed here ──
+	'tiktok': { kind: 'film', dur: 15.5, vo: [['t01', 0.15], ['t02', 2.7], ['t03', 5.35], ['t04', 8.7], ['t05', 13.1]] }
 };
 
 export const CUTS = {
@@ -129,7 +132,8 @@ export const CUTS = {
 	vertical: { format: 'vertical', scenes: ['v-hook', 'v-dashboard', 'v-shipments', 'v-end'] },
 	isf: { format: 'wide', scenes: ['f-hook', 'f-template', 'f-steps', 'f-check', 'f-accepted', 'f-end'] },
 	// music: 'straight' = one continuous stretch with a fade out, no spliced ending
-	ai: { format: 'wide', music: 'straight', scenes: ['a-hook', 'a-inbox', 'a-open', 'a-review', 'a-fix', 'a-send', 'a-end'] }
+	ai: { format: 'wide', music: 'straight', scenes: ['a-hook', 'a-inbox', 'a-open', 'a-review', 'a-fix', 'a-send', 'a-end'] },
+	tiktok: { format: 'vertical', music: 'straight', fade: 1.3, scenes: ['tiktok'] }
 };
 
 // stage size, the app window's view, and how the camera behaves per format

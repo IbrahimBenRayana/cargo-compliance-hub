@@ -17,9 +17,12 @@ out.mkdir(parents=True, exist_ok=True)
 k = Kokoro(str(model / "kokoro-v1.0.onnx"), str(model / "voices-v1.0.bin"))
 g2p = en.G2P(trf=False, british=voice.startswith("b"), fallback=None)
 # how the product words are said
-SAY = {"MyCargoLens": "My Cargo Lens", "mycargolens": "my cargo lens", "ISF-10": "I.S.F. ten", "ISFs": "I.S.F.s", "ISF": "I.S.F.", "HTS": "H.T.S.", "US customs": "U.S. customs", "UFLPA": "U.F.L.P.A.", "AI ": "A.I. "}
+SAY = {"MyCargoLens": "My Cargo Lens", "mycargolens": "my cargo lens", "ISF-10": "I.S.F. ten", "ISFs": "I.S.F.s", "ISF": "I.S.F.", "HTS": "H.T.S.", "US customs": "U.S. customs", "UFLPA": "U.F.L.P.A.", "AI ": "A.I. ", "NVOCC": "N.V.O.C.C."}
 meta = []
+only = sys.argv[4] if len(sys.argv) > 4 else ""  # optional id prefix, e.g. "t"
 for line in json.loads((here / "vo_lines.json").read_text()):
+    if not line["id"].startswith(only):
+        continue
     text = line["text"]
     for word, said in SAY.items():
         text = text.replace(word, said)

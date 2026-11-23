@@ -19,5 +19,10 @@
  { "id": "a04", "text": "It checks every field, flags possible UFLPA and agency risks, and lists what to fix." },
  { "id": "a05", "text": "Get HTS code suggestions from the description, fix the draft, and run the rule check." },
  { "id": "a06", "text": "MyCargoLens. Book a demo." },
- { "id": "a07", "text": "You confirm before anything goes to CBP." }
+ { "id": "a07", "text": "You confirm before anything goes to CBP." },
+ { "id": "t01", "text": "Importer, broker, or NVOCC?" },
+ { "id": "t02", "text": "Still chasing CBP filings by hand?" },
+ { "id": "t03", "text": "MyCargoLens puts every filing in one inbox." },
+ { "id": "t04", "text": "Deadlines tracked. Every field checked. AI flags what to fix." },
+ { "id": "t05", "text": "MyCargoLens. Book a demo." }
 ]

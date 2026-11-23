@@ -28,7 +28,8 @@ vo.forEach((v) => inputs.push('-i', v.file));
 const f = [];
 if (CUTS[name].music === 'straight') {
 	// one continuous stretch of the track with a plain fade: no splice, so nothing can double up
-	f.push(`[0:a]atrim=0:${total},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.5,afade=t=out:st=${total - 3.2}:d=3.2,volume=0.6[music]`);
+	const fade = CUTS[name].fade || 3.2;
+	f.push(`[0:a]atrim=0:${total},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.3,afade=t=out:st=${total - fade}:d=${fade},volume=0.6[music]`);
 } else {
 	// the track's opening, then its own ending so the last note lands on the end card
 	const head = Math.max(4, total - 5.5);
