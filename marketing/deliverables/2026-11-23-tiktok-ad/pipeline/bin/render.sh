@@ -3,7 +3,7 @@
 # Tools, voice model and music live in ../../2026-11-17-promo-videos/pipeline (see its README).
 # KEEP_PICTURE=1 reuses the rendered picture and only redoes the sound.
 set -e
-ROOT="${0:A:h:h}"; PROMO="${ROOT:h:h}/2026-11-17-promo-videos/pipeline"; VOICE=${1:-af_heart}
+ROOT="${0:A:h:h}"; PROMO="${ROOT:h:h}/2026-11-17-promo-videos/pipeline"; VOICE=${1:-af_bella}
 R="$ROOT/.work/renders"; mkdir -p "$R"
 # the one real screen: the app's narrow Today page, top 600 px of the capture
 CLIP="$ROOT/composition/assets/clips/today.mp4"

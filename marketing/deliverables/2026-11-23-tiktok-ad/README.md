@@ -39,7 +39,7 @@ Tools, voice model, music and the capture live in `../2026-11-17-promo-videos/pi
 |---|---|
 | Picture and sound | `pipeline/bin/render.sh` (`KEEP_PICTURE=1` redoes only the sound). Output: `pipeline/.work/renders/` |
 | Look at single moments | in `pipeline/composition`: `hyperframes snapshot --at 1.2,6.6,9.4 --no-end -o ../.work/snap .` |
-| Voice lines | ids `t01`-`t05` in the promo pipeline's `audio/vo_lines.json`; `python -I audio/tts.py af_heart 1.0 <out> t` |
+| Voice lines | ids `t01`-`t05` in the promo pipeline's `audio/vo_lines.json`; `python -I audio/tts.py af_bella 1.0 .work/vo/af_bella t` (Kokoro voice "Bella", chosen by the founder) |
 | Sound timing | the `tiktok` scene in the promo pipeline's `composition/timeline.mjs` |
 | Text scan | `../2026-11-17-promo-videos/pipeline/review/check.sh <video>` must print 0 hits |
 
