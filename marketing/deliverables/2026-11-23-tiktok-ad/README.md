@@ -13,7 +13,7 @@ one flat look at the real app. Nothing here is published: the founder approves b
 | Time | Picture | On screen | Voice |
 |---|---|---|---|
 | 0.0-2.6 | Camera moves down a row of shipping containers; three light up gold | Importer. Broker. NVOCC. | Importer, broker, or NVOCC? |
-| 2.6-5.25 | Filing cards burst out of the containers and tumble in the air | Still chasing CBP filings by hand? | Still chasing CBP filings by hand? |
+| 2.6-5.25 | Sixteen filing cards fade in, hanging loose in the air at different depths, drifting gently | Still chasing CBP filings by hand? | Still chasing CBP filings by hand? |
 | 5.25-8.65 | The gold focus frame closes; the cards fall into one stack, most urgent on top; the app's real Today screen sits over it, flat | Every filing. One inbox. | MyCargoLens puts every filing in one inbox. |
 | 8.65-12.95 | Three drawn cards: a countdown ring, a column of checks, one flagged line | Deadlines tracked. / Every field checked. / AI flags what to fix. | Deadlines tracked. Every field checked. AI flags what to fix. |
 | 12.95-15.5 | The cards fold into the logo mark | MyCargoLens. An inbox for US customs. Book a demo. mycargolens.com/book-a-demo | MyCargoLens. Book a demo. |
