@@ -23,6 +23,10 @@
  { "id": "t01", "text": "Importer, broker, or NVOCC?" },
  { "id": "t02", "text": "Still chasing CBP filings by hand?" },
  { "id": "t03", "text": "MyCargoLens puts every filing in one inbox." },
- { "id": "t04", "text": "Deadlines tracked. Every field checked. AI flags what to fix." },
+ { "id": "t04a", "text": "Start from a template." },
+ { "id": "t04b", "text": "Get HTS code suggestions." },
+ { "id": "t04c", "text": "Track every deadline." },
+ { "id": "t04d", "text": "Check every field." },
+ { "id": "t04e", "text": "And let AI flag what to fix." },
  { "id": "t05", "text": "MyCargoLens. Book a demo." }
 ]
