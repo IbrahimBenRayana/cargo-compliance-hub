@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Button } from '@/components/ui/button';
 import { BAND, FILL } from '@/components/dashboard/tones';
 import { cn } from '@/lib/utils';
+import { CoachMarkdown } from './CoachMarkdown';
 
 /**
  * AI Coach drawer — slides in from the right, streams a GPT-4o response.
@@ -175,12 +176,7 @@ export function RejectionCoachDrawer({
               </div>
             </div>
           ) : (
-            <article className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
-              {text}
-              {streaming && (
-                <span aria-hidden className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-muted-foreground align-text-bottom motion-reduce:animate-none" />
-              )}
-            </article>
+            <CoachMarkdown text={text} streaming={streaming} />
           )}
         </div>
 
