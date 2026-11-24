@@ -18,7 +18,7 @@
  { "id": "a03", "text": "Run an AI pre-flight review on any draft." },
  { "id": "a04", "text": "It checks every field, flags possible UFLPA and agency risks, and lists what to fix." },
  { "id": "a05", "text": "Get HTS code suggestions from the description, fix the draft, and run the rule check." },
- { "id": "a06", "text": "MyCargoLens. Book a demo." },
+ { "id": "a06", "text": "MyCargoLens. From ISF to entry, all in one place. Book a demo." },
  { "id": "a07", "text": "You confirm before anything goes to CBP." },
  { "id": "t01", "text": "Importer, broker, or NVOCC?" },
  { "id": "t02", "text": "Still chasing CBP filings by hand?" },
@@ -29,5 +29,5 @@
  { "id": "t04c", "text": "Track every deadline, most urgent first." },
  { "id": "t04d", "text": "Check every field against the filing rules. See what's missing before you send." },
  { "id": "t04e", "text": "Then let AI review the whole filing, and flag what to fix and why." },
- { "id": "t05", "text": "MyCargoLens. Book a demo." }
+ { "id": "t05", "text": "MyCargoLens. From ISF to entry, all in one place. Book a demo." }
 ]

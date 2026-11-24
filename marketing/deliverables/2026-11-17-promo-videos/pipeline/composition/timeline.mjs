@@ -123,12 +123,12 @@ const SCENES = {
 	'a-end': { ...END, line: 'AI pre-flight review,<br>on every draft.', vo: [['a06', 0.8]] },
 
 	// ── TikTok ad: picture is its own composition (../../2026-11-23-tiktok-ad); only the sound is timed here ──
-	'tiktok': { kind: 'film', dur: 41.7, vo: [['t01', 0.15], ['t02', 3.85], ['t03i', 8.0], ['t03', 13.55], ['t04a', 16.55], ['t04b', 20.45], ['t04c', 24.7], ['t04d', 28.45], ['t04e', 33.95], ['t05', 39.1]],
+	'tiktok': { kind: 'film', dur: 45.5, vo: [['t01', 0.15], ['t02', 3.85], ['t03i', 8.0], ['t03', 13.55], ['t04a', 16.55], ['t04b', 20.45], ['t04c', 24.7], ['t04d', 28.45], ['t04e', 33.95], ['t05', 39.1]],
 		// ElevenLabs sound effects, placed on the picture's own beats (see the TikTok composition's T table)
-		sfx: [['whoosh', 3.35, 0.5], ['focus', 7.2, 0.3], ['focus', 8.15, 0.55], ['chime', 11.75, 0.4], ['whoosh', 13.2, 0.4],
+		sfx: [['whoosh', 3.35, 0.5], ['whoosh', 6.9, 0.4], ['focus', 8.15, 0.55], ['chime', 11.75, 0.4], ['whoosh', 13.2, 0.4],
 			['whoosh', 16.15, 0.45], ['pop', 17.9, 0.22], ['pop', 18.17, 0.22], ['pop', 18.44, 0.22], ['pop', 18.71, 0.22],
 			['whoosh', 19.85, 0.45], ['whoosh', 24.1, 0.45], ['whoosh', 27.8, 0.45], ['pop', 29.1, 0.28], ['pop', 29.45, 0.28], ['pop', 30.15, 0.28], ['pop', 32.1, 0.3], ['chime', 32.45, 0.28],
-			['whoosh', 33.3, 0.45], ['pop', 36.25, 0.3], ['whoosh', 38.6, 0.4], ['chime', 39.15, 0.35], ['pop', 40.4, 0.35]] }
+			['whoosh', 33.3, 0.45], ['pop', 36.25, 0.3], ['whoosh', 38.6, 0.4], ['chime', 39.15, 0.35], ['pop', 44.15, 0.35]] }
 };
 
 export const CUTS = {

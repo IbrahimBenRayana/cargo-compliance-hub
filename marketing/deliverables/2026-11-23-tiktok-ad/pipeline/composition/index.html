@@ -102,11 +102,13 @@
 
   /* end card */
   #end { display: flex; flex-direction: column; align-items: center; opacity: 0; }
-  #end .mark { margin-top: 430px; width: 230px; height: 230px; }
+  #end .mark { margin-top: 400px; width: 230px; height: 230px; }
   #end .lockup { margin-top: 44px; font-size: 104px; font-weight: 800; letter-spacing: -.04em; }
   #end .lockup em { font-style: normal; color: var(--gold); }
-  #end h1 { margin-top: 30px; font-size: 54px; font-weight: 600; letter-spacing: -.02em; color: #C9D1E3; }
-  #end .btn { margin-top: 110px; font-size: 62px; font-weight: 800; letter-spacing: -.02em; color: var(--navy-deep); background: var(--gold); padding: 36px 84px; border-radius: 30px; box-shadow: 0 24px 70px rgba(251,190,36,.35); }
+  #end h1 { margin-top: 34px; font-size: 66px; font-weight: 700; letter-spacing: -.03em; line-height: 1.16; color: #C9D1E3; text-align: center; }
+  #end h1 span { display: block; }
+  #end h1 em { font-style: normal; color: var(--gold); }
+  #end .btn { margin-top: 96px; font-size: 62px; font-weight: 800; letter-spacing: -.02em; color: var(--navy-deep); background: var(--gold); padding: 36px 84px; border-radius: 30px; box-shadow: 0 24px 70px rgba(251,190,36,.35); }
   #end .url { margin-top: 44px; font-size: 40px; font-weight: 600; color: #C9D1E3; }
 
   #intro { opacity: 0; }
@@ -125,7 +127,7 @@
 </style>
 </head>
 <body>
-<div id="root" data-composition-id="main" data-start="0" data-duration="41.7" data-width="1080" data-height="1920">
+<div id="root" data-composition-id="main" data-start="0" data-duration="45.5" data-width="1080" data-height="1920">
   <canvas id="gl" width="2160" height="3840"></canvas>
   <div id="vignette" class="layer"></div>
   <div id="dim" class="layer"></div>
@@ -199,7 +201,7 @@
   <div id="end" class="layer">
     <svg class="mark" viewBox="14 14 72 72"><g fill="none" stroke="#C9D1E3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path class="br" d="M26 40V26h14"/><path class="br" d="M60 26h14v14"/><path class="br" d="M74 60v14H60"/><path class="br" d="M40 74H26V60"/></g><rect id="end-dot" x="42" y="42" width="16" height="16" rx="4.6" fill="#FBBE24"/></svg>
     <div class="lockup">MyCargo<em>Lens</em></div>
-    <h1>An inbox for US customs.</h1>
+    <h1><span>From ISF to entry,</span><span><em>all in one place.</em></span></h1>
     <div class="btn">Book a demo</div>
     <div class="url">mycargolens.com/book-a-demo</div>
   </div>
@@ -213,7 +215,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './assets/vendor/RoomEnvironment.js';
 
-const TOTAL = 41.7;
+const TOTAL = 45.5;
 // beats (s): hook, pain, turn, the introduction, the real screen, five features, end
 const T = { pain: 3.7, turn: 6.8, intro: 7.85, app: 13.35, proof: 16.3, hts: 20.2, f1: 24.45, f2: 28.15, f3: 33.65, end: 38.85 };
 
@@ -318,61 +320,6 @@ function makeContainer(x, y, z, tone, seed) {
 });
 const goldAt = [0.2, 1.25, 2.55];                                       // containers 0, 1, 2 light up with the three words
 
-// filing cards: one drawn texture per kind, 40 cards
-function cardTexture(kind) {
-  const c = document.createElement('canvas'); c.width = 1024; c.height = 220; const g = c.getContext('2d');
-  const r = 44; g.fillStyle = '#FFFFFF'; g.beginPath(); g.roundRect(4, 4, 1016, 212, r); g.fill();
-  const tone = { due: '#FBBE24', late: '#E5484D', ok: '#0E9F6E', draft: '#8C99B8' }[kind.tone];
-  g.fillStyle = tone; g.beginPath(); g.arc(92, 110, 30, 0, Math.PI * 2); g.fill();
-  g.fillStyle = '#1E2D4D'; g.font = '800 58px Inter, sans-serif'; g.textBaseline = 'middle'; g.fillText(kind.label, 150, 84);
-  g.fillStyle = '#D6DBE6'; g.beginPath(); g.roundRect(150, 132, kind.w, 26, 13); g.fill();
-  // clock chip
-  g.fillStyle = kind.tone === 'late' ? '#FDECEC' : '#FFF4D6'; g.beginPath(); g.roundRect(760, 62, 212, 96, 48); g.fill();
-  g.strokeStyle = kind.tone === 'late' ? '#C0272D' : '#8A5A00'; g.lineWidth = 7; g.beginPath(); g.arc(812, 110, 24, 0, Math.PI * 2); g.stroke();
-  g.beginPath(); g.moveTo(812, 96); g.lineTo(812, 110); g.lineTo(824, 118); g.stroke();
-  g.fillStyle = kind.tone === 'late' ? '#C0272D' : '#8A5A00'; g.font = '800 44px Inter, sans-serif'; g.fillText(kind.chip, 850, 112);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
-}
-const KINDS = [
-  { label: 'ISF', tone: 'due', chip: '15h', w: 420 }, { label: 'Entry', tone: 'ok', chip: '3d', w: 360 }, { label: 'ISF', tone: 'late', chip: '8h', w: 470 },
-  { label: 'ISF', tone: 'draft', chip: '2d', w: 330 }, { label: 'Entry', tone: 'due', chip: '21h', w: 440 }
-];
-const CARD_W = 2.7, CARD_H = CARD_W * 220 / 1024, ROWS = 8, GAP = 0.13;
-const faceGeo = new THREE.PlaneGeometry(CARD_W, CARD_H);
-// the card itself: a thin rounded slab, so it has an edge and throws a shadow
-const slabShape = new THREE.Shape(); { const w = CARD_W / 2, h = CARD_H / 2, r = CARD_H * 0.2; slabShape.moveTo(-w + r, -h); slabShape.lineTo(w - r, -h); slabShape.quadraticCurveTo(w, -h, w, -h + r); slabShape.lineTo(w, h - r); slabShape.quadraticCurveTo(w, h, w - r, h); slabShape.lineTo(-w + r, h); slabShape.quadraticCurveTo(-w, h, -w, h - r); slabShape.lineTo(-w, -h + r); slabShape.quadraticCurveTo(-w, -h, -w + r, -h); }
-const slabGeo = new THREE.ExtrudeGeometry(slabShape, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2, curveSegments: 10 }); slabGeo.translate(0, 0, -0.046);
-const STACK = { x: 0, z: -22, y0: 5.45 };
-const cards = [];
-function buildCards() {
-  const textures = KINDS.map(cardTexture);
-  const R = rng(20261123);
-  // the most urgent kinds sit on top of the stack
-  const order = [2, 0, 4, 0, 3, 1, 3, 1];
-  for (let i = 0; i < 16; i++) {
-    const row = i % ROWS, layer = Math.floor(i / ROWS);
-    const k = layer === 0 ? order[row] : Math.floor(R() * KINDS.length);
-    const mat = new THREE.MeshBasicMaterial({ map: textures[k], transparent: true, fog: true, toneMapped: false });
-    const slabMat = new THREE.MeshStandardMaterial({ color: '#E9EDF5', roughness: 0.55, metalness: 0, transparent: true });
-    const m = new THREE.Group(); const slab = new THREE.Mesh(slabGeo, slabMat); slab.castShadow = true; m.add(slab, new THREE.Mesh(faceGeo, mat)); scene.add(m);
-    m.userData = { mat, slabMat };
-    // pain beat: the cards travel one behind another along a single curve, away from the camera
-    cards.push({ m, i, row, layer, stack: new THREE.Vector3(STACK.x, STACK.y0 - row * (CARD_H + GAP), STACK.z - layer * 0.16), d2: row * 0.03 + layer * 0.035 });
-  }
-}
-
-// the focus frame: four gold corner brackets that close around the stack
-const frame = new THREE.Group(); scene.add(frame);
-const frameMat = new THREE.MeshStandardMaterial({ color: '#FBBE24', emissive: '#FBBE24', emissiveIntensity: 0.55, roughness: 0.35, metalness: 0.6, transparent: true, opacity: 0, fog: false });
-const FW = 1.78, FH0 = 0.42, FH1 = 5.95, ARM = 0.7, TH = 0.11;
-[[-1, 1], [1, 1], [1, -1], [-1, -1]].forEach(([sx, sy]) => {
-  const cx = sx * FW, cy = sy > 0 ? FH1 : FH0;
-  const h = new THREE.Mesh(new THREE.BoxGeometry(ARM, TH, TH), frameMat); h.position.set(cx - sx * ARM / 2, cy, 0);
-  const v = new THREE.Mesh(new THREE.BoxGeometry(TH, ARM, TH), frameMat); v.position.set(cx, cy - sy * ARM / 2, 0);
-  frame.add(h, v);
-});
-const FRAME_C = new THREE.Vector3(0, (FH0 + FH1) / 2, STACK.z + 0.25);
-
 // camera path: position and look-at keys, eased between
 const CAM = [
   { t: 0.0, p: [0.5, 1.45, 13.8], l: [0, 2.5, -6] },
@@ -401,12 +348,6 @@ const camU = (() => {
   };
 })();
 
-// the stream's path: starts beside the camera, sweeps in one S up the lane and into the haze
-const STREAM = { near: [-2.2, -1.5, -6.0], c1: [2.6, -0.5, -12.5], speed: 0.1 };
-const B = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(-2.3, 5.0, -25), new THREE.Vector3(1.0, 6.9, -40)];
-const tan = new THREE.Vector3();
-const bez = (u, o) => { const v = 1 - u, a = v * v * v, b = 3 * v * v * u, c = 3 * v * u * u, d = u * u * u; return o.set(a * B[0].x + b * B[1].x + c * B[2].x + d * B[3].x, a * B[0].y + b * B[1].y + c * B[2].y + d * B[3].y, a * B[0].z + b * B[1].z + c * B[2].z + d * B[3].z); };
-const tmp = new THREE.Vector3(), q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion(), eu = new THREE.Euler();
 function draw(t) {
   // camera
   const u = camU(t);
@@ -418,36 +359,6 @@ function draw(t) {
     const on = io5(span(t, goldAt[i], goldAt[i] + 0.38));
     for (const m of c.mats) { m.color.copy(c.base).lerp(GOLD, on); m.emissive.setRGB(0.95 * on * 0.16, 0.69 * on * 0.16, 0.12 * on * 0.16); }
   });
-
-  // cards: one stream gliding away down the lane (you are chasing it) → one stack → gone into the mark
-  const fold = io5(span(t, T.intro - 0.15, T.intro + 0.5));
-  const sIn = io(span(t, T.pain - 0.45, T.pain + 0.55));
-  const cp = camera.position;
-  B[0].set(cp.x + STREAM.near[0], cp.y + STREAM.near[1], cp.z + STREAM.near[2]);
-  B[1].set(cp.x + STREAM.c1[0], cp.y + STREAM.c1[1], cp.z + STREAM.c1[2]);
-  for (const c of cards) {
-    const s = fract(c.row / ROWS + (t - T.pain) * STREAM.speed);        // eight in the stream; the second layer only joins the stack
-    const p2 = io5(span(t, T.turn + 0.15 + c.d2, T.turn + 0.9 + c.d2)); // glides into the stack
-    bez(s, tmp); bez(Math.min(1, s + 0.012), tan).sub(tmp).normalize();
-    c.m.position.copy(tmp).lerp(c.stack, p2);
-    if (fold > 0) c.m.position.lerp(FRAME_C, fold);
-    // each card leans into the curve like a page on the wind
-    eu.set(-0.16 - tan.y * 0.5, -tan.x * 1.05, tan.x * 0.3 + Math.sin(t * 1.3 + c.i * 0.8) * 0.035); q0.setFromEuler(eu); q1.identity();
-    c.m.quaternion.copy(q0).slerp(q1, p2);
-    const a = c.layer ? 0 : sIn * io(span(s, 0.0, 0.14)) * (1 - io(span(s, 0.66, 0.97)));
-    const op = lerp(a, 1, p2) * (1 - io(span(t, T.intro + 0.2, T.intro + 0.5)));     // the stack folds into the mark
-    const sc = lerp(lerp(0.78, 1, io(span(s, 0, 0.3))), 1, p2) * (1 - fold);
-    c.m.scale.set(sc, sc, sc);
-    c.m.userData.mat.opacity = op; c.m.userData.slabMat.opacity = op;
-    c.m.visible = op > 0.004 && sc > 0.001;
-  }
-
-  // focus frame closes on the cloud as it becomes a stack
-  const fIn = outExpo(span(t, T.turn + 0.25, T.turn + 1.0));
-  const fs = lerp(2.3, 1, fIn) * lerp(1, 0.2, fold);
-  frame.position.set(0, FRAME_C.y * (1 - fs), FRAME_C.z);              // scale about the frame's centre
-  frame.scale.set(fs, fs, 1);
-  frameMat.opacity = fIn * (1 - io(span(t, T.intro + 0.12, T.intro + 0.45)));    // the drawn logo takes over
 
   renderer.render(scene, camera);
   drawProps(t);
@@ -513,8 +424,55 @@ const prop = (id) => { const g = new THREE.Group(), inner = new THREE.Group(); g
   const s1 = new THREE.Mesh(geo, gold); s1.scale.setScalar(0.3); s1.position.set(0.5, 0.4, 0.1); const s2 = new THREE.Mesh(geo, gold); s2.scale.setScalar(0.2); s2.position.set(-0.48, -0.36, 0.1); o.add(s1, s2);
   props.f3.big = big; props.f3.small = [s1, s2]; }
 
+// pain beat: the things a filing is chased with by hand (a form, an email, a clock, a spreadsheet) go round and round
+// on one tilted ring, then spiral into its centre and become the logo's gold dot
+const ORBIT = { y: -0.35, r: 1.02, tilt: 0.66, speed: 0.8 };
+const orbit = new THREE.Group(); orbit.position.y = ORBIT.y; orbit.rotation.x = ORBIT.tilt; orbit.visible = false; S2.add(orbit);
+const pathMat = new THREE.MeshBasicMaterial({ color: '#FBBE24', transparent: true, opacity: 0, toneMapped: false });
+const path = new THREE.Mesh(new THREE.TorusGeometry(1, 0.006, 8, 160), pathMat); path.rotation.x = Math.PI / 2; orbit.add(path);
+const riders = [];
+const rider = () => { const g = new THREE.Group(); orbit.add(g); riders.push(g); return g; };
+{ const o = rider(); o.add(new THREE.Mesh(slab(0.62, 0.8, 0.05, 0.03), std('#FFFFFF', { roughness: 0.6 })));        // a paper form
+  o.add(box(0.3, 0.075, 0.012, std('#1E2D4D'), -0.1, 0.27, 0.026));
+  [[0.44, 0.11], [0.36, -0.01], [0.44, -0.13], [0.26, -0.25]].forEach(([w, y]) => o.add(box(w, 0.042, 0.01, std('#C9D1E3'), -0.22 + w / 2, y, 0.026))); }
+{ const o = rider(); o.add(new THREE.Mesh(slab(0.8, 0.54, 0.05, 0.05), std('#F1F4FA', { roughness: 0.6 })));        // an email
+  const fl = new THREE.Shape(); fl.moveTo(-0.38, 0.25); fl.lineTo(0.38, 0.25); fl.lineTo(0, -0.05); fl.closePath();
+  const fg = new THREE.ExtrudeGeometry(fl, { depth: 0.014, bevelEnabled: false }); const flap = new THREE.Mesh(fg, std('#C9D1E3', { roughness: 0.6 })); flap.position.z = 0.03; o.add(flap);
+  const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.02, 32), std('#D9382F', { roughness: 0.4 })); dot.rotation.x = Math.PI / 2; dot.position.set(0.36, 0.24, 0.05); o.add(dot); }
+{ const o = rider();                                                                                               // a clock
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.05, 64), std('#FFFFFF', { roughness: 0.45 })); face.rotation.x = Math.PI / 2; o.add(face);
+  o.add(new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.05, 16, 80), std('#D5DCEA', { roughness: 0.4 })));
+  const arc = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.055, 16, 80, Math.PI * 1.5), gold); arc.rotation.z = -Math.PI; arc.position.z = 0.01; o.add(arc);
+  const hand = new THREE.Group(); hand.add(box(0.036, 0.23, 0.024, std('#1E2D4D'), 0, 0.115, 0)); hand.position.z = 0.04; o.add(hand); o.userData.hand = hand; }
+{ const o = rider(); o.add(new THREE.Mesh(slab(0.82, 0.6, 0.04, 0.03), std('#FFFFFF', { roughness: 0.6 })));        // a spreadsheet
+  o.add(box(0.74, 0.1, 0.012, std('#0E9F6E'), 0, 0.21, 0.026));
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) o.add(box(0.225, 0.085, 0.01, std(r === 1 && c === 2 ? '#FBBE24' : '#DDE4F1'), -0.257 + c * 0.257, 0.08 - r * 0.125, 0.026)); }
+// the gold dot they turn into: the same square as the logo's, so the drawn mark can take over without a jump
+const seed = new THREE.Mesh(slab(0.174, 0.174, 0.05, 0.02), new THREE.MeshBasicMaterial({ color: '#FBBE24', toneMapped: false })); seed.position.y = ORBIT.y; seed.visible = false; S2.add(seed);
+function drawOrbit(t) {
+  const on = t > T.pain - 0.4 && t < T.intro + 0.5;
+  orbit.visible = on; seed.visible = false; if (!on) return;
+  const pull = io5(span(t, T.turn + 0.1, T.intro + 0.3));               // the ring tightens to nothing
+  const ang = (t - T.pain) * ORBIT.speed + 5.2 * pull * pull;           // and turns faster as it does
+  riders.forEach((g, k) => {
+    const born = Math.max(0, outBack(span(t, T.pain - 0.3 + k * 0.14, T.pain + 0.45 + k * 0.14)));
+    const a = ang + k * Math.PI / 2, r = ORBIT.r * lerp(0.55, 1, out3(span(t, T.pain - 0.3, T.pain + 0.9))) * (1 - pull);
+    g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+    // each one keeps facing the viewer, with a slow sway of its own
+    g.rotation.set(-ORBIT.tilt - 0.12, 0.42 * Math.sin(t * 0.9 + k * 1.7), 0.1 * Math.sin(t * 0.7 + k));
+    g.scale.setScalar(0.8 * born * (1 - io(span(pull, 0.35, 1))));
+    if (g.userData.hand) g.userData.hand.rotation.z = -t * 2.4;
+  });
+  path.scale.setScalar(ORBIT.r * (1 - pull));
+  pathMat.opacity = 0.32 * io(span(t, T.pain, T.pain + 0.8)) * (1 - pull);
+  const k = span(t, T.intro - 0.25, T.intro + 0.25);
+  seed.visible = k > 0 && t < T.intro + 0.5;                             // the drawn dot is on screen from T.intro + 0.5
+  seed.scale.setScalar(Math.max(0.001, outBack(k))); seed.rotation.z = (1 - out3(k)) * Math.PI;
+}
+
 const FEATS = [['f0', T.proof, T.hts], ['fh', T.hts, T.f1], ['f1', T.f1, T.f2], ['f2', T.f2, T.f3], ['f3', T.f3, T.end]];
 function drawProps(t) {
+  drawOrbit(t);
   for (const [id, a, b] of FEATS) {
     const P = props[id], kin = span(t, a - (a > T.proof ? 0.1 : -0.1), a + 0.85), kout = io(span(t, b - 0.42, b - 0.06));
     const sc = Math.max(0, outBack(kin)) * (1 - kout);
@@ -550,7 +508,6 @@ function drawProps(t) {
 
 // ── type and drawn cards (GSAP), one paused timeline ───────────────────
 document.fonts.ready.then(() => {
-  buildCards();
   const tl = gsap.timeline({ paused: true });
   const $ = (s) => document.querySelector(s), $$ = (s) => document.querySelectorAll(s);
   const lines = (id) => $$(`${id} .line > span`);
@@ -566,10 +523,11 @@ document.fonts.ready.then(() => {
   // the introduction: the frame that closed on the filings becomes the logo; name, then the line
   const I = T.intro;
   tl.to('#dim', { opacity: .92, duration: .6, ease: 'power2.out' }, I - .05);
+  tl.to('#dim', { opacity: .34, duration: .7, ease: 'power2.out' }, T.pain - .1);
   tl.set('#intro', { opacity: 1 }, I);
-  tl.fromTo('#intro .mark', { y: 500, rotation: -45 }, { rotation: 0, duration: .9, ease: 'expo.out' }, I + .15);   // starts where the 3D frame closed
+  tl.fromTo('#intro .mark', { y: 325, rotation: -45 }, { rotation: 0, duration: .9, ease: 'expo.out' }, I + .15);   // starts round the gold dot the ring left behind
   tl.fromTo('#intro .br', { scale: 2.4, opacity: 0, svgOrigin: '50 50' }, { scale: 1, opacity: 1, duration: .7, ease: 'expo.out', stagger: .04 }, I + .15);
-  tl.fromTo('#intro-dot', { scale: 0, svgOrigin: '50 50' }, { scale: 1, duration: .5, ease: 'back.out(2.6)' }, I + .5);
+  tl.set('#intro-dot', { opacity: 0 }, 0); tl.set('#intro-dot', { opacity: 1 }, I + .5);               // takes over from the 3D dot
   tl.fromTo('#intro-ring', { scale: .25, opacity: .9 }, { scale: 2.3, opacity: 0, duration: .95, ease: 'power2.out', immediateRender: false }, I + 1.2);
   tl.to('#intro .mark', { y: 0, duration: .8, ease: 'power3.inOut' }, I + .5);
   tl.fromTo('#intro .word > *', { yPercent: 115 }, { yPercent: 0, duration: .6, ease: 'power4.out', stagger: .035 }, I + 1.0);
@@ -661,11 +619,11 @@ document.fonts.ready.then(() => {
   tl.fromTo('#end .br', { scale: 1.9, opacity: 0, svgOrigin: '50 50' }, { scale: 1, opacity: 1, duration: .6, ease: 'expo.out', stagger: .03 }, T.end + .12);
   tl.fromTo('#end-dot', { scale: 0, svgOrigin: '50 50' }, { scale: 1, duration: .45, ease: 'back.out(2.4)' }, T.end + .3);
   tl.fromTo('#end .lockup', { y: 34, opacity: 0 }, { y: 0, opacity: 1, duration: .55, ease: 'power3.out' }, T.end + .4);
-  tl.fromTo('#end h1', { y: 26, opacity: 0 }, { y: 0, opacity: 1, duration: .55, ease: 'power3.out' }, T.end + .58);
-  tl.fromTo('#end .btn', { y: 40, opacity: 0, scale: .9 }, { y: 0, opacity: 1, scale: 1, duration: .55, ease: 'back.out(1.8)' }, T.end + .85);
-  tl.to('#end .btn', { scale: .955, duration: .12, ease: 'power2.in' }, T.end + 1.55);
-  tl.to('#end .btn', { scale: 1, duration: .3, ease: 'back.out(3)' }, T.end + 1.67);
-  tl.fromTo('#end .url', { opacity: 0 }, { opacity: 1, duration: .5 }, T.end + 1.1);
+  tl.fromTo('#end h1 span', { y: 26, opacity: 0 }, { y: 0, opacity: 1, duration: .55, ease: 'power3.out', stagger: 1.5 }, T.end + 1.8);
+  tl.fromTo('#end .btn', { y: 40, opacity: 0, scale: .9 }, { y: 0, opacity: 1, scale: 1, duration: .55, ease: 'back.out(1.8)' }, T.end + 4.55);
+  tl.to('#end .btn', { scale: .955, duration: .12, ease: 'power2.in' }, T.end + 5.3);
+  tl.to('#end .btn', { scale: 1, duration: .3, ease: 'back.out(3)' }, T.end + 5.42);
+  tl.fromTo('#end .url', { opacity: 0 }, { opacity: 1, duration: .5 }, T.end + 4.9);
 
   // the 3D frame follows the same clock
   const clock = { t: 0 };
@@ -676,7 +634,7 @@ document.fonts.ready.then(() => {
   tl.seek(0);
   draw(0);
 });
-window.addEventListener('hf-seek', (e) => { if (cards.length) draw(e.detail.time); });
+window.addEventListener('hf-seek', (e) => { if (window.__timelines && window.__timelines['main']) draw(e.detail.time); });
 </script>
 </body>
 </html>
