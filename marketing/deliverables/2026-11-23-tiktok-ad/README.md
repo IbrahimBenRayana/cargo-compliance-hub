@@ -1,6 +1,6 @@
 # MyCargoLens TikTok ad (2026-11-23)
 
-A 32.8 s vertical ad (1080x1920, 60 fps) for a paid TikTok campaign. Mostly drawn 3D animation,
+A 37.4 s vertical ad (1080x1920, 60 fps) for a paid TikTok campaign. Mostly drawn 3D animation,
 one flat look at the real app. Nothing here is published: the founder approves before it goes out.
 
 | File (in `final/`, not in git) | Sound |
@@ -12,11 +12,13 @@ one flat look at the real app. Nothing here is published: the founder approves b
 
 | Time | Picture | On screen | Voice |
 |---|---|---|---|
-| 0.0-2.6 | Camera moves down a row of shipping containers; three light up gold | Importer. Broker. NVOCC. | Importer, broker, or NVOCC? |
+| 0.0-2.6 | Camera moves down a row of shipping containers; three light up gold | Importer, Broker, or NVOCC? | Importer, broker, or NVOCC? |
 | 2.6-5.25 | Eight filing cards glide away down the lane in one curved stream, one behind another; the camera follows them | Still chasing CBP filings by hand? | Still chasing CBP filings by hand? |
-| 5.25-8.65 | The gold focus frame closes; the stream gathers into one stack, most urgent on top; the app's real Today screen sits over it, flat | Every filing. One inbox. | MyCargoLens puts every filing in one inbox. |
-| 8.65-30.2 | Five drawn cards come round one at a time (3 to 4 s each, 5.5 s for the last two), each under its own 3D object: three sheets over a template that fills the four parties in; a carton scanned into a suggested HTS code; a clock over three filings that re-sort, closest cutoff on top; a green token over four named fields being checked, one coming back "Missing", then "Fixed" and "Ready to send"; a gold spark over a filing that a gold band reads top to bottom, one line flagged, then a note opening under it ("Why it matters", "How to fix it"). Five dots show progress | Start from a template. / HTS codes, suggested. / Track every deadline. / Check every field. See what's missing. / AI flags what to fix. And why, and how. | Start from a template. Your saved details fill in. Describe the goods. Get HTS code suggestions. Track every deadline, most urgent first. Check every field against the filing rules. See what's missing before you send. Then let AI review the whole filing, and flag what to fix and why. |
-| 30.2-32.8 | The cards fold into the logo mark | MyCargoLens. An inbox for US customs. Book a demo. mycargolens.com/book-a-demo | MyCargoLens. Book a demo. |
+| 5.25-6.3 | The gold focus frame closes; the stream gathers into one stack, most urgent on top | | |
+| 6.3-10.85 | Introduction: the stack folds into the frame, which becomes the logo mark and rises; the name comes up letter by letter; the second line of the tagline sharpens from a blur as a gold ring pulses from the mark | MyCargoLens. US customs filings, finally in focus. | Meet MyCargoLens. US customs filings, finally in focus. |
+| 10.85-13.25 | The app's real Today screen, flat | Every filing. One inbox. | Every filing, in one inbox. |
+| 13.25-34.8 | Five drawn cards come round one at a time (3 to 4 s each, 5.5 s for the last two), each under its own 3D object: three sheets over a template that fills the four parties in; a carton scanned into a suggested HTS code; a clock over three filings that re-sort, closest cutoff on top; a green token over four named fields being checked, one coming back "Missing", then "Fixed" and "Ready to send"; a gold spark over a filing that a gold band reads top to bottom, one line flagged, then a note opening under it ("Why it matters", "How to fix it"). Five dots show progress | Start from a template. / HTS codes, suggested. / Track every deadline. / Check every field. See what's missing. / AI flags what to fix. And why, and how. | Start from a template. Your saved details fill in. Describe the goods. Get HTS code suggestions. Track every deadline, most urgent first. Check every field against the filing rules. See what's missing before you send. Then let AI review the whole filing, and flag what to fix and why. |
+| 34.8-37.4 | End card with the logo mark | MyCargoLens. An inbox for US customs. Book a demo. mycargolens.com/book-a-demo | MyCargoLens. Book a demo. |
 
 Copy rules applied: no certification or connection claim, no CBP response timing, no promise about
 penalties, no price (the ad goes to importers, brokers and NVOCCs alike), CTA "Book a demo".

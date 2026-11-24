@@ -109,21 +109,40 @@
   #end .btn { margin-top: 110px; font-size: 62px; font-weight: 800; letter-spacing: -.02em; color: var(--navy-deep); background: var(--gold); padding: 36px 84px; border-radius: 30px; box-shadow: 0 24px 70px rgba(251,190,36,.35); }
   #end .url { margin-top: 44px; font-size: 40px; font-weight: 600; color: #C9D1E3; }
 
+  #intro { opacity: 0; }
+  #intro .mark { position: absolute; left: 400px; top: 620px; width: 280px; height: 280px; }
+  #intro .ring { position: absolute; left: 400px; top: 620px; width: 280px; height: 280px; border-radius: 50%; box-shadow: 0 0 0 5px var(--gold), 0 0 60px rgba(251,190,36,.5); opacity: 0; }
+  #intro .word { position: absolute; left: 0; width: 1080px; top: 952px; text-align: center; font-size: 120px; font-weight: 800; letter-spacing: -.04em; line-height: 1.15; overflow: hidden; padding-bottom: 12px; }
+  #intro .word span, #intro .word em { display: inline-block; font-style: normal; }
+  #intro .word em { color: var(--gold); }
+  #intro .tagl { position: absolute; left: 0; width: 1080px; top: 1140px; text-align: center; font-size: 68px; font-weight: 650; letter-spacing: -.025em; line-height: 1.22; color: #C9D1E3; }
+  #intro .tagl .l1 { display: block; overflow: hidden; }
+  #intro .tagl .l1 > span { display: inline-block; }
+  #intro .tagl .l2 { display: block; color: var(--gold); font-weight: 800; opacity: 0; }
+
   #guide { display: none; position: absolute; inset: 0; pointer-events: none; }
   #guide i { position: absolute; background: rgba(255,0,80,.28); }
 </style>
 </head>
 <body>
-<div id="root" data-composition-id="main" data-start="0" data-duration="32.8" data-width="1080" data-height="1920">
+<div id="root" data-composition-id="main" data-start="0" data-duration="37.4" data-width="1080" data-height="1920">
   <canvas id="gl" width="2160" height="3840"></canvas>
   <div id="vignette" class="layer"></div>
   <div id="dim" class="layer"></div>
 
-  <div class="cap" id="cap-hook"><span class="line"><span>Importer.</span></span><span class="line"><span>Broker.</span></span><span class="line"><span><em>NVOCC.</em></span></span></div>
+  <div class="cap" id="cap-hook"><span class="line"><span>Importer,</span></span><span class="line"><span>Broker,</span></span><span class="line"><span>or <em>NVOCC?</em></span></span></div>
   <div class="cap" id="cap-pain"><span class="line"><span>Still chasing</span></span><span class="line"><span>CBP filings</span></span><span class="line"><span><em>by hand?</em></span></span></div>
   <div class="cap" id="cap-turn"><span class="line"><span>Every filing.</span></span><span class="line"><span><em>One inbox.</em></span></span></div>
 
-  <div id="app"><video id="v-today" class="clip" src="assets/clips/today.mp4" muted playsinline data-start="7.0" data-duration="2.2" data-media-start="0.6"></video></div>
+  <div id="app"><video id="v-today" class="clip" src="assets/clips/today.mp4" muted playsinline data-start="10.8" data-duration="2.8" data-media-start="0.6"></video></div>
+
+  <!-- the introduction: the focus frame becomes the logo, then the name and the line -->
+  <div id="intro" class="layer">
+    <div class="ring" id="intro-ring"></div>
+    <svg class="mark" viewBox="14 14 72 72"><g fill="none" stroke="#C9D1E3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path class="br" d="M26 40V26h14"/><path class="br" d="M60 26h14v14"/><path class="br" d="M74 60v14H60"/><path class="br" d="M40 74H26V60"/></g><rect id="intro-dot" x="42" y="42" width="16" height="16" rx="4.6" fill="#FBBE24"/></svg>
+    <div class="word"><span>M</span><span>y</span><span>C</span><span>a</span><span>r</span><span>g</span><span>o</span><em>L</em><em>e</em><em>n</em><em>s</em></div>
+    <div class="tagl"><span class="l1"><span>US customs filings,</span></span><span class="l2">finally in focus.</span></div>
+  </div>
 
   <div id="glow"></div>
   <div id="feats">
@@ -194,9 +213,9 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './assets/vendor/RoomEnvironment.js';
 
-const TOTAL = 32.8;
-// beats (s): hook, pain, turn, the real screen, five features, end
-const T = { pain: 2.6, turn: 5.25, app: 7.05, proof: 8.65, hts: 12.3, f1: 16.2, f2: 19.5, f3: 25.0, end: 30.2 };
+const TOTAL = 37.4;
+// beats (s): hook, pain, turn, the introduction, the real screen, five features, end
+const T = { pain: 2.6, turn: 5.25, intro: 6.3, app: 10.85, proof: 13.25, hts: 16.9, f1: 20.8, f2: 24.1, f3: 29.6, end: 34.8 };
 
 // ── helpers ────────────────────────────────────────────────────────────
 const clamp = (x) => Math.min(1, Math.max(0, x));
@@ -401,7 +420,7 @@ function draw(t) {
   });
 
   // cards: one stream gliding away down the lane (you are chasing it) → one stack → gone into the mark
-  const fold = io5(span(t, T.end - 0.25, T.end + 0.45));
+  const fold = io5(span(t, T.intro - 0.15, T.intro + 0.5));
   const sIn = io(span(t, T.pain - 0.45, T.pain + 0.55));
   const cp = camera.position;
   B[0].set(cp.x + STREAM.near[0], cp.y + STREAM.near[1], cp.z + STREAM.near[2]);
@@ -416,7 +435,7 @@ function draw(t) {
     eu.set(-0.16 - tan.y * 0.5, -tan.x * 1.05, tan.x * 0.3 + Math.sin(t * 1.3 + c.i * 0.8) * 0.035); q0.setFromEuler(eu); q1.identity();
     c.m.quaternion.copy(q0).slerp(q1, p2);
     const a = c.layer ? 0 : sIn * io(span(s, 0.0, 0.14)) * (1 - io(span(s, 0.66, 0.97)));
-    const op = lerp(a, 1, p2) * (1 - io(span(t, T.proof - 0.35, T.proof + 0.25)));   // the stack leaves the stage to the feature cards
+    const op = lerp(a, 1, p2) * (1 - io(span(t, T.intro + 0.2, T.intro + 0.5)));     // the stack folds into the mark
     const sc = lerp(lerp(0.78, 1, io(span(s, 0, 0.3))), 1, p2) * (1 - fold);
     c.m.scale.set(sc, sc, sc);
     c.m.userData.mat.opacity = op; c.m.userData.slabMat.opacity = op;
@@ -428,7 +447,7 @@ function draw(t) {
   const fs = lerp(2.3, 1, fIn) * lerp(1, 0.2, fold);
   frame.position.set(0, FRAME_C.y * (1 - fs), FRAME_C.z);              // scale about the frame's centre
   frame.scale.set(fs, fs, 1);
-  frameMat.opacity = fIn * (1 - io(span(t, T.proof - 0.3, T.proof + 0.1)));
+  frameMat.opacity = fIn * (1 - io(span(t, T.intro + 0.12, T.intro + 0.45)));    // the drawn logo takes over
 
   renderer.render(scene, camera);
   drawProps(t);
@@ -544,10 +563,27 @@ document.fonts.ready.then(() => {
   const capIn = (id, at, stagger = .09) => { tl.set(id, { opacity: 1 }, at); tl.fromTo(lines(id), { yPercent: 112 }, { yPercent: 0, duration: .55, ease: 'power4.out', stagger }, at); };
   const capOut = (id, at) => tl.to(id, { opacity: 0, y: -40, duration: .3, ease: 'power2.in' }, at);
   capIn('#cap-pain', T.pain + .1); capOut('#cap-pain', T.turn - .2);
-  capIn('#cap-turn', T.turn + .25); capOut('#cap-turn', T.proof - .28);
+  // the introduction: the frame that closed on the filings becomes the logo; name, then the line
+  const I = T.intro;
+  tl.to('#dim', { opacity: .92, duration: .6, ease: 'power2.out' }, I - .05);
+  tl.set('#intro', { opacity: 1 }, I);
+  tl.fromTo('#intro .mark', { y: 500, rotation: -45 }, { rotation: 0, duration: .9, ease: 'expo.out' }, I + .15);   // starts where the 3D frame closed
+  tl.fromTo('#intro .br', { scale: 2.4, opacity: 0, svgOrigin: '50 50' }, { scale: 1, opacity: 1, duration: .7, ease: 'expo.out', stagger: .04 }, I + .15);
+  tl.fromTo('#intro-dot', { scale: 0, svgOrigin: '50 50' }, { scale: 1, duration: .5, ease: 'back.out(2.6)' }, I + .5);
+  tl.fromTo('#intro-ring', { scale: .25, opacity: .9 }, { scale: 2.3, opacity: 0, duration: .95, ease: 'power2.out', immediateRender: false }, I + 1.2);
+  tl.to('#intro .mark', { y: 0, duration: .8, ease: 'power3.inOut' }, I + .5);
+  tl.fromTo('#intro .word > *', { yPercent: 115 }, { yPercent: 0, duration: .6, ease: 'power4.out', stagger: .035 }, I + 1.0);
+  tl.fromTo('#intro .tagl .l1 > span', { yPercent: 112 }, { yPercent: 0, duration: .55, ease: 'power4.out' }, I + 2.05);
+  tl.fromTo('#intro .tagl .l2', { opacity: 0, filter: 'blur(22px)', scale: 1.12 }, { opacity: 1, filter: 'blur(0px)', scale: 1, duration: .8, ease: 'power3.out' }, I + 3.05);
+  tl.fromTo('#intro-ring', { scale: .25, opacity: .9 }, { scale: 2.0, opacity: 0, duration: .9, ease: 'power2.out', immediateRender: false }, I + 3.3);
+  tl.to('#intro-dot', { scale: 1.3, duration: .16, ease: 'power2.out' }, I + 3.3);
+  tl.to('#intro-dot', { scale: 1, duration: .45, ease: 'back.out(3)' }, I + 3.46);
+  tl.to('#intro', { opacity: 0, y: -50, scale: .96, duration: .32, ease: 'power2.in' }, T.app - .3);
 
-  // the real Today screen, flat, over the stack
-  tl.fromTo('#app', { opacity: 0, y: 90, scale: .9 }, { opacity: 1, y: 0, scale: 1, duration: .6, ease: 'expo.out' }, T.app);
+  capIn('#cap-turn', T.app + .15); capOut('#cap-turn', T.proof - .28);
+
+  // the real Today screen, flat
+  tl.fromTo('#app', { opacity: 0, y: 90, scale: .9 }, { opacity: 1, y: 0, scale: 1, duration: .6, ease: 'expo.out' }, T.app + .05);
   tl.to('#app', { opacity: 0, y: 60, scale: .94, duration: .32, ease: 'power2.in' }, T.proof - .3);
 
   // features: the 3D yard steps back; five cards come round one at a time, each under its own 3D object
