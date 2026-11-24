@@ -24,47 +24,67 @@
   #cap-hook { font-size: 138px; top: 230px; }
   #cap-pain { font-size: 104px; }
   #cap-turn { font-size: 112px; }
-  .cap.feat { font-size: 96px; top: 1150px; }
+  .cap.feat { font-size: 96px; top: 1212px; }
 
   /* the real app, flat */
   #app { position: absolute; left: 150px; top: 580px; width: 780px; height: 700px; border-radius: 34px; overflow: hidden; background: #fff; opacity: 0;
     box-shadow: 0 50px 120px rgba(4,9,22,.6), 0 0 0 1px rgba(255,255,255,.14); }
   #app video { position: absolute; left: 0; top: 0; width: 780px; height: 867px; object-fit: cover; }
 
-  /* drawn feature cards */
+  /* drawn feature cards: one at a time on a slow turntable, each with a 3D object above it (#gl2) */
   #feats { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; perspective: 1500px; }
-  .fcard { position: absolute; left: 190px; top: 520px; width: 700px; height: 560px; border-radius: 44px; background: #fff; color: var(--ink); opacity: 0;
-    box-shadow: 0 60px 130px rgba(4,9,22,.6); display: flex; flex-direction: column; align-items: center; justify-content: center; transform-style: preserve-3d; }
-  .fcard .tag { position: absolute; left: 44px; top: 38px; font-size: 26px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
-  .ringwrap { position: relative; width: 330px; height: 330px; margin-top: 30px; }
-  .ringwrap svg { width: 330px; height: 330px; transform: rotate(-90deg); }
-  .ringwrap .num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; font-size: 104px; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
-  .ringwrap .num small { font-size: 30px; font-weight: 600; color: var(--ink-2); letter-spacing: 0; margin-top: -6px; }
-  .rows { width: 560px; margin-top: 52px; display: flex; flex-direction: column; gap: 26px; }
+  #gl2 { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; pointer-events: none; }
+  .fcard { position: absolute; left: 190px; top: 610px; width: 700px; height: 540px; border-radius: 44px; background: #fff; color: var(--ink); opacity: 0;
+    box-shadow: 0 60px 130px rgba(4,9,22,.6); transform-style: preserve-3d; }
+  .fcard .tag { position: absolute; left: 46px; top: 40px; font-size: 26px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  .fcard .pshadow { position: absolute; left: 190px; top: -26px; width: 320px; height: 84px; border-radius: 50%; background: radial-gradient(closest-side, rgba(19,30,54,.34), rgba(19,30,54,0)); opacity: 0; }
+  /* the card's content floats a little above its face, so the turn shows depth */
+  .lift { position: absolute; left: 50px; top: 118px; width: 600px; transform: translateZ(44px); transform-style: preserve-3d; }
+
+  .tpl { display: flex; flex-direction: column; gap: 16px; }
+  .tpl .pill { align-self: flex-start; display: flex; align-items: center; gap: 14px; background: var(--navy); color: #fff; font-size: 29px; font-weight: 700; padding: 15px 26px 15px 20px; border-radius: 40px; margin-bottom: 10px; }
+  .tpl .pill svg { width: 34px; height: 34px; }
+  .frow { display: flex; align-items: center; gap: 18px; }
+  .frow i { font-style: normal; width: 176px; flex: none; font-size: 24px; font-weight: 600; color: var(--ink-3); }
+  .frow b { position: relative; flex: 1; height: 60px; border-radius: 14px; background: #EEF1F6; box-shadow: inset 0 0 0 2px #DDE2EB; display: flex; align-items: center; padding: 0 20px; font-size: 26px; font-weight: 650; color: var(--ink); white-space: nowrap; overflow: hidden; }
+  .frow b u { position: absolute; inset: 0; border-radius: 14px; background: #FFF4D6; box-shadow: inset 0 0 0 3px var(--gold); opacity: 0; }
+  .frow b span { position: relative; display: inline-block; }
+
+  .hts { display: flex; flex-direction: column; align-items: center; gap: 20px; top: 112px; }
+  .hts .desc { width: 100%; border-radius: 20px; background: #EEF1F6; box-shadow: inset 0 0 0 2px #DDE2EB; padding: 26px 28px; font-size: 32px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; }
+  .hts .desc span { display: inline-block; }
+  .hts .arrow { width: 54px; height: 54px; }
+  .hts .code { width: 100%; border-radius: 24px; background: #fff; box-shadow: inset 0 0 0 3px var(--gold), 0 14px 40px rgba(30,45,77,.14); padding: 24px 28px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+  .hts .code span { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 58px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
+  .hts .code em { font-style: normal; font-size: 24px; font-weight: 700; color: #8A5A00; background: #FFF4D6; padding: 8px 16px; border-radius: 20px; }
+
+  .dl { height: 360px; top: 124px; }
+  .drow { position: absolute; left: 0; width: 600px; height: 100px; border-radius: 24px; background: #F3F5F9; box-shadow: inset 0 0 0 2px #E3E6EC; display: flex; align-items: center; gap: 22px; padding: 0 22px 0 26px; }
+  .drow .ring { position: absolute; inset: 0; border-radius: 24px; background: #FFF9E8; box-shadow: inset 0 0 0 3px var(--gold), 0 18px 40px rgba(30,45,77,.16); opacity: 0; }
+  .drow .dot { position: relative; width: 30px; height: 30px; border-radius: 50%; flex: none; }
+  .drow b { position: relative; font-size: 34px; font-weight: 800; letter-spacing: -.02em; width: 104px; }
+  .drow .bar { position: relative; flex: 1; height: 22px; border-radius: 11px; background: #DDE2EB; }
+  .drow em { position: relative; font-style: normal; font-size: 28px; font-weight: 800; padding: 12px 22px; border-radius: 30px; background: #FFF4D6; color: #8A5A00; font-variant-numeric: tabular-nums; }
+  .drow em.late { background: #FDECEC; color: #C0272D; }
+
+  .rows { display: flex; flex-direction: column; gap: 20px; top: 116px; }
   .row { display: flex; align-items: center; gap: 26px; }
-  .row .bar { height: 26px; border-radius: 13px; background: #E3E6EC; }
-  .row .chk { width: 62px; height: 62px; flex: none; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; }
-  .row .chk svg { width: 34px; height: 34px; }
-  .doc { width: 560px; margin-top: 52px; display: flex; flex-direction: column; gap: 30px; }
+  .row .bar { height: 24px; border-radius: 12px; background: #E3E6EC; }
+  .row .chk { width: 58px; height: 58px; flex: none; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; }
+  .row .chk svg { width: 32px; height: 32px; }
+  .rows .ready { align-self: flex-start; margin-top: 12px; display: flex; align-items: center; gap: 12px; font-size: 28px; font-weight: 800; color: #0B7A55; background: #E3F6EE; padding: 14px 26px; border-radius: 34px; }
+
+  .doc { display: flex; flex-direction: column; gap: 30px; top: 150px; }
   .doc .l { position: relative; height: 26px; border-radius: 13px; background: #E3E6EC; }
-  .doc .hot { height: 74px; border-radius: 20px; background: #FFF4D6; box-shadow: inset 0 0 0 3px var(--gold); display: flex; align-items: center; padding: 0 22px; gap: 18px; }
+  .doc .hot { height: 78px; border-radius: 20px; background: #FFF4D6; box-shadow: inset 0 0 0 3px var(--gold); display: flex; align-items: center; padding: 0 22px; gap: 18px; }
   .doc .hot svg { width: 40px; height: 40px; flex: none; }
   .doc .hot .l { flex: 1; background: #F0D58A; }
   .doc .hot b { font-size: 26px; font-weight: 800; color: #8A5A00; white-space: nowrap; }
 
-  .tpl { width: 560px; margin-top: 56px; display: flex; flex-direction: column; gap: 26px; }
-  .tpl .pill { align-self: flex-start; display: flex; align-items: center; gap: 14px; background: var(--navy); color: #fff; font-size: 30px; font-weight: 700; padding: 16px 26px 16px 20px; border-radius: 40px; margin-bottom: 8px; }
-  .tpl .pill svg { width: 34px; height: 34px; }
-  .frow { display: flex; align-items: center; gap: 24px; }
-  .frow i { height: 20px; border-radius: 10px; background: #C9D1E3; flex: none; }
-  .frow b { height: 46px; border-radius: 12px; background: #EEF1F6; box-shadow: inset 0 0 0 2px #DDE2EB; }
-  .hts { width: 580px; margin-top: 50px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
-  .hts .desc { width: 100%; border-radius: 20px; background: #EEF1F6; box-shadow: inset 0 0 0 2px #DDE2EB; padding: 26px 28px; font-size: 32px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; }
-  .hts .desc span { display: inline-block; }
-  .hts .arrow { width: 54px; height: 54px; }
-  .hts .code { width: 100%; border-radius: 24px; background: #fff; box-shadow: inset 0 0 0 3px var(--gold), 0 14px 40px rgba(30,45,77,.14); padding: 26px 28px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
-  .hts .code span { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 58px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
-  .hts .code em { font-style: normal; font-size: 24px; font-weight: 700; color: #8A5A00; background: #FFF4D6; padding: 8px 16px; border-radius: 20px; }
+  /* where we are in the five features */
+  #steps { position: absolute; left: 468px; top: 1462px; width: 158px; height: 14px; opacity: 0; }
+  #steps i { position: absolute; top: 0; width: 14px; height: 14px; border-radius: 7px; background: rgba(201,209,227,.34); }
+  #steps b { position: absolute; top: 0; left: 0; width: 14px; height: 14px; border-radius: 7px; background: var(--gold); }
 
   /* end card */
   #end { display: flex; flex-direction: column; align-items: center; opacity: 0; }
@@ -80,7 +100,7 @@
 </style>
 </head>
 <body>
-<div id="root" data-composition-id="main" data-start="0" data-duration="20" data-width="1080" data-height="1920">
+<div id="root" data-composition-id="main" data-start="0" data-duration="28" data-width="1080" data-height="1920">
   <canvas id="gl" width="2160" height="3840"></canvas>
   <div id="vignette" class="layer"></div>
   <div id="dim" class="layer"></div>
@@ -92,41 +112,48 @@
   <div id="app"><video id="v-today" class="clip" src="assets/clips/today.mp4" muted playsinline data-start="7.0" data-duration="2.2" data-media-start="0.6"></video></div>
 
   <div id="feats">
-    <div class="fcard" id="f0"><div class="tag">Template</div>
-      <div class="tpl"><div class="pill"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="M9 12h7M9 16h5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>Electronics from Shenzhen</div>
-        <div class="frow"><i style="width:120px"></i><b style="width:330px"></b></div>
-        <div class="frow"><i style="width:90px"></i><b style="width:390px"></b></div>
-        <div class="frow"><i style="width:140px"></i><b style="width:280px"></b></div>
-        <div class="frow"><i style="width:100px"></i><b style="width:350px"></b></div>
+    <div class="fcard" id="f0"><div class="pshadow"></div><div class="tag">Template</div>
+      <div class="lift tpl"><div class="pill"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="M9 12h7M9 16h5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>Electronics from Shenzhen</div>
+        <div class="frow"><i>Importer</i><b><u></u><span>Pacific Rim Trading Co.</span></b></div>
+        <div class="frow"><i>Seller</i><b><u></u><span>Shenzhen Bright Circuit</span></b></div>
+        <div class="frow"><i>Manufacturer</i><b><u></u><span>Shenzhen Bright Circuit</span></b></div>
+        <div class="frow"><i>Ship to</i><b><u></u><span>Pacific Rim Trading Co.</span></b></div>
       </div></div>
-    <div class="fcard" id="fh"><div class="tag">HTS suggestions</div>
-      <div class="hts"><div class="desc"><span id="hts-desc">Upholstered wooden-frame chairs</span></div>
+    <div class="fcard" id="fh"><div class="pshadow"></div><div class="tag">HTS suggestions</div>
+      <div class="lift hts"><div class="desc"><span id="hts-desc">Upholstered wooden-frame chairs</span></div>
         <svg class="arrow" viewBox="0 0 24 24"><path d="M12 4v15M6 13l6 6 6-6" fill="none" stroke="#8C99B8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <div class="code"><span>9401.61.40.11</span><em>Review before you file</em></div>
       </div></div>
-    <div class="fcard" id="f1"><div class="tag">ISF cutoff</div>
-      <div class="ringwrap"><svg viewBox="0 0 330 330"><circle cx="165" cy="165" r="138" fill="none" stroke="#E9ECF2" stroke-width="26"/><circle id="ring" cx="165" cy="165" r="138" fill="none" stroke="#FBBE24" stroke-width="26" stroke-linecap="round" stroke-dasharray="867" stroke-dashoffset="867"/></svg>
-        <div class="num"><span id="ringnum">15h</span><small>left</small></div></div></div>
-    <div class="fcard" id="f2"><div class="tag">Rule check</div>
-      <div class="rows">
+    <div class="fcard" id="f1"><div class="pshadow"></div><div class="tag">Deadlines</div>
+      <div class="lift dl">
+        <div class="drow" id="d0"><div class="ring"></div><div class="dot" style="background:#0E9F6E"></div><b>Entry</b><div class="bar"></div><em>3d left</em></div>
+        <div class="drow" id="d1"><div class="ring"></div><div class="dot" style="background:#E5484D"></div><b>ISF</b><div class="bar"></div><em class="late">15h left</em></div>
+        <div class="drow" id="d2"><div class="ring"></div><div class="dot" style="background:#FBBE24"></div><b>ISF</b><div class="bar"></div><em>2d left</em></div>
+      </div></div>
+    <div class="fcard" id="f2"><div class="pshadow"></div><div class="tag">Rule check</div>
+      <div class="lift rows">
         <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:400px"></div></div>
         <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:330px"></div></div>
         <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:440px"></div></div>
         <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:290px"></div></div>
+        <div class="ready">Ready to send</div>
       </div></div>
-    <div class="fcard" id="f3"><div class="tag">AI pre-flight review</div>
-      <div class="doc">
+    <div class="fcard" id="f3"><div class="pshadow"></div><div class="tag">AI pre-flight review</div>
+      <div class="lift doc">
         <div class="l" style="width:470px"></div>
         <div class="hot"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z" fill="#FBBE24"/></svg><div class="l"></div><b>Fix this</b></div>
         <div class="l" style="width:520px"></div>
         <div class="l" style="width:380px"></div>
       </div></div>
   </div>
+  <canvas id="gl2" width="2160" height="3840"></canvas>
   <div class="cap feat" id="cap-f0"><span class="line"><span>Start from</span></span><span class="line"><span><em>a template.</em></span></span></div>
   <div class="cap feat" id="cap-fh"><span class="line"><span>HTS codes,</span></span><span class="line"><span><em>suggested.</em></span></span></div>
   <div class="cap feat" id="cap-f1"><span class="line"><span>Track every</span></span><span class="line"><span><em>deadline.</em></span></span></div>
   <div class="cap feat" id="cap-f2"><span class="line"><span>Check every</span></span><span class="line"><span><em>field.</em></span></span></div>
   <div class="cap feat" id="cap-f3"><span class="line"><span>AI flags</span></span><span class="line"><span><em>what to fix.</em></span></span></div>
+
+  <div id="steps"><i style="left:0"></i><i style="left:36px"></i><i style="left:72px"></i><i style="left:108px"></i><i style="left:144px"></i><b></b></div>
 
   <div id="end" class="layer">
     <svg class="mark" viewBox="14 14 72 72"><g fill="none" stroke="#C9D1E3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path class="br" d="M26 40V26h14"/><path class="br" d="M60 26h14v14"/><path class="br" d="M74 60v14H60"/><path class="br" d="M40 74H26V60"/></g><rect id="end-dot" x="42" y="42" width="16" height="16" rx="4.6" fill="#FBBE24"/></svg>
@@ -145,9 +172,9 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './assets/vendor/RoomEnvironment.js';
 
-const TOTAL = 20;
-// beats (s): hook, pain, turn, proof x3, end
-const T = { pain: 2.6, turn: 5.25, app: 7.05, proof: 8.65, hts: 10.15, f1: 12.25, f2: 13.85, f3: 15.3, end: 17.45 };
+const TOTAL = 28;
+// beats (s): hook, pain, turn, the real screen, five features, end
+const T = { pain: 2.6, turn: 5.25, app: 7.05, proof: 8.65, hts: 12.3, f1: 16.2, f2: 19.5, f3: 22.5, end: 25.4 };
 
 // ── helpers ────────────────────────────────────────────────────────────
 const clamp = (x) => Math.min(1, Math.max(0, x));
@@ -156,6 +183,8 @@ const io = (x) => x * x * (3 - 2 * x);                               // smoothst
 const io5 = (x) => x * x * x * (x * (x * 6 - 15) + 10);              // smootherstep
 const out3 = (x) => 1 - Math.pow(1 - x, 3);
 const outExpo = (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+const outBack = (x) => 1 + 2.4 * Math.pow(x - 1, 3) + 1.4 * Math.pow(x - 1, 2);
+const fract = (x) => x - Math.floor(x);
 const lerp = (a, b, k) => a + (b - a) * k;
 const rng = (seed) => () => { let t = (seed += 0x6D2B79F5); t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };   // mulberry32
 
@@ -286,15 +315,8 @@ function buildCards() {
     const slabMat = new THREE.MeshStandardMaterial({ color: '#E9EDF5', roughness: 0.55, metalness: 0, transparent: true });
     const m = new THREE.Group(); const slab = new THREE.Mesh(slabGeo, slabMat); slab.castShadow = true; m.add(slab, new THREE.Mesh(faceGeo, mat)); scene.add(m);
     m.userData = { mat, slabMat };
-    // loose: each card hangs in the air facing the camera, a little off-axis, at its own depth
-    const col = i % 2, line = Math.floor(i / 2);
-    cards.push({
-      m, row, layer,
-      loose: new THREE.Vector3((col - 0.5) * 2.0 + (R() - 0.5) * 0.8, 0.9 + line * 0.66 + (R() - 0.5) * 0.25, -18 - R() * 5.5),
-      stack: new THREE.Vector3(STACK.x, STACK.y0 - row * (CARD_H + GAP), STACK.z - layer * 0.16),
-      tilt: new THREE.Vector3((R() - 0.5) * 0.25, (R() - 0.5) * 0.6, (R() - 0.5) * 0.42),
-      ph: R() * 6.28, d1: R() * 0.9, d2: row * 0.03 + layer * 0.035
-    });
+    // pain beat: the cards travel one behind another along a single curve, away from the camera
+    cards.push({ m, i, row, layer, stack: new THREE.Vector3(STACK.x, STACK.y0 - row * (CARD_H + GAP), STACK.z - layer * 0.16), d2: row * 0.03 + layer * 0.035 });
   }
 }
 
@@ -316,8 +338,8 @@ const CAM = [
   { t: 2.6, p: [0.15, 1.8, 2.6], l: [0, 3.6, -16] },
   { t: 5.25, p: [0.0, 2.6, -9.5], l: [0, 4.6, -22] },
   { t: 6.6, p: [0, 3.5, -13.2], l: [0, 5.0, -22] },
-  { t: 17.45, p: [0, 3.5, -14.2], l: [0, 5.0, -22] },
-  { t: 20, p: [0, 3.5, -14.6], l: [0, 5.0, -22] }
+  { t: T.end, p: [0, 3.5, -14.2], l: [0, 5.0, -22] },
+  { t: TOTAL, p: [0, 3.5, -14.6], l: [0, 5.0, -22] }
 ];
 const v3 = (a) => new THREE.Vector3(...a);
 const camP = new THREE.CatmullRomCurve3(CAM.map((k) => v3(k.p)), false, 'centripetal');
@@ -338,6 +360,11 @@ const camU = (() => {
   };
 })();
 
+// the stream's path: starts beside the camera, sweeps in one S up the lane and into the haze
+const STREAM = { near: [-2.2, -1.5, -6.0], c1: [2.6, -0.5, -12.5], speed: 0.1 };
+const B = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(-2.3, 5.0, -25), new THREE.Vector3(1.0, 6.9, -40)];
+const tan = new THREE.Vector3();
+const bez = (u, o) => { const v = 1 - u, a = v * v * v, b = 3 * v * v * u, c = 3 * v * u * u, d = u * u * u; return o.set(a * B[0].x + b * B[1].x + c * B[2].x + d * B[3].x, a * B[0].y + b * B[1].y + c * B[2].y + d * B[3].y, a * B[0].z + b * B[1].z + c * B[2].z + d * B[3].z); };
 const tmp = new THREE.Vector3(), q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion(), eu = new THREE.Euler();
 function draw(t) {
   // camera
@@ -351,21 +378,27 @@ function draw(t) {
     for (const m of c.mats) { m.color.copy(c.base).lerp(GOLD, on); m.emissive.setRGB(0.95 * on * 0.16, 0.69 * on * 0.16, 0.12 * on * 0.16); }
   });
 
-  // cards: out of the containers → loose in the air → one stack → gone into the mark
+  // cards: one stream gliding away down the lane (you are chasing it) → one stack → gone into the mark
   const fold = io5(span(t, T.end - 0.25, T.end + 0.45));
+  const sIn = io(span(t, T.pain - 0.45, T.pain + 0.55));
+  const cp = camera.position;
+  B[0].set(cp.x + STREAM.near[0], cp.y + STREAM.near[1], cp.z + STREAM.near[2]);
+  B[1].set(cp.x + STREAM.c1[0], cp.y + STREAM.c1[1], cp.z + STREAM.c1[2]);
   for (const c of cards) {
-    const p1 = io5(span(t, 2.35 + c.d1, 3.15 + c.d1));                 // appears in place
+    const s = fract(c.row / ROWS + (t - T.pain) * STREAM.speed);        // eight in the stream; the second layer only joins the stack
     const p2 = io5(span(t, T.turn + 0.15 + c.d2, T.turn + 0.9 + c.d2)); // glides into the stack
-    const bob = Math.sin(t * 0.9 + c.ph);
-    tmp.copy(c.loose); tmp.y += bob * 0.09 + (1 - p1) * -0.35; tmp.x += Math.cos(t * 0.6 + c.ph) * 0.05;
+    bez(s, tmp); bez(Math.min(1, s + 0.012), tan).sub(tmp).normalize();
     c.m.position.copy(tmp).lerp(c.stack, p2);
     if (fold > 0) c.m.position.lerp(FRAME_C, fold);
-    eu.set(c.tilt.x + bob * 0.03, c.tilt.y + Math.sin(t * 0.5 + c.ph) * 0.06, c.tilt.z); q0.setFromEuler(eu); q1.identity();
+    // each card leans into the curve like a page on the wind
+    eu.set(-0.16 - tan.y * 0.5, -tan.x * 1.05, tan.x * 0.3 + Math.sin(t * 1.3 + c.i * 0.8) * 0.035); q0.setFromEuler(eu); q1.identity();
     c.m.quaternion.copy(q0).slerp(q1, p2);
-    const sc = lerp(0.86, 1, p1) * (1 - fold);
+    const a = c.layer ? 0 : sIn * io(span(s, 0.0, 0.14)) * (1 - io(span(s, 0.66, 0.97)));
+    const op = lerp(a, 1, p2) * (1 - io(span(t, T.proof - 0.35, T.proof + 0.25)));   // the stack leaves the stage to the feature cards
+    const sc = lerp(lerp(0.78, 1, io(span(s, 0, 0.3))), 1, p2) * (1 - fold);
     c.m.scale.set(sc, sc, sc);
-    c.m.userData.mat.opacity = p1; c.m.userData.slabMat.opacity = p1;
-    c.m.visible = p1 > 0.001 && sc > 0.001;
+    c.m.userData.mat.opacity = op; c.m.userData.slabMat.opacity = op;
+    c.m.visible = op > 0.004 && sc > 0.001;
   }
 
   // focus frame closes on the cloud as it becomes a stack
@@ -376,6 +409,99 @@ function draw(t) {
   frameMat.opacity = fIn * (1 - io(span(t, T.proof - 0.3, T.proof + 0.1)));
 
   renderer.render(scene, camera);
+  drawProps(t);
+}
+
+// ── feature objects: one small 3D object per feature, on its own clear canvas above the cards ──
+const r2 = new THREE.WebGLRenderer({ canvas: document.getElementById('gl2'), antialias: true, alpha: true, preserveDrawingBuffer: true });
+r2.setPixelRatio(1); r2.setSize(2160, 3840, false); r2.setClearColor(0x000000, 0);
+r2.outputColorSpace = THREE.SRGBColorSpace; r2.toneMapping = THREE.ACESFilmicToneMapping; r2.toneMappingExposure = 1.05;
+const S2 = new THREE.Scene();
+S2.environment = new THREE.PMREMGenerator(r2).fromScene(new RoomEnvironment(), 0.04).texture; S2.environmentIntensity = 0.6;
+const cam2 = new THREE.PerspectiveCamera(30, 1080 / 1920, 0.1, 40); cam2.position.set(0, 0, 10);   // at z = 0: 1 unit = 358 px
+S2.add(new THREE.HemisphereLight('#DCE6FF', '#1A2540', 0.9));
+const key2 = new THREE.DirectionalLight('#FFE9C4', 2.6); key2.position.set(3, 5, 7); S2.add(key2);
+const rim2 = new THREE.DirectionalLight('#6C97FF', 1.5); rim2.position.set(-5, 2, -4); S2.add(rim2);
+const PROP_Y = 1.46;                                                  // 437 px from the top: resting on the card's top edge
+const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.05, ...o });
+const box = (w, h, d, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); return m; };
+function slab(w, h, r, depth) {
+  const sh = new THREE.Shape(), a = w / 2, b = h / 2;
+  sh.moveTo(-a + r, -b); sh.lineTo(a - r, -b); sh.quadraticCurveTo(a, -b, a, -b + r); sh.lineTo(a, b - r); sh.quadraticCurveTo(a, b, a - r, b); sh.lineTo(-a + r, b); sh.quadraticCurveTo(-a, b, -a, b - r); sh.lineTo(-a, -b + r); sh.quadraticCurveTo(-a, -b, -a + r, -b);
+  const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 3, curveSegments: 12 }); g.translate(0, 0, -depth / 2); return g;
+}
+const gold = std('#FBBE24', { metalness: 0.75, roughness: 0.38, emissive: '#FBBE24', emissiveIntensity: 0.12 });
+const props = {};
+const prop = (id) => { const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner); g.visible = false; S2.add(g); props[id] = { g, inner }; return inner; };
+
+// template: three sheets, the top one written on
+{ const o = prop('f0'), geo = slab(0.8, 1.02, 0.07, 0.03); const sheets = [];
+  ['#B9C6E2', '#DDE4F1', '#FFFFFF'].forEach((c, k) => { const m = new THREE.Mesh(geo, std(c, { roughness: 0.6 })); m.position.z = k * 0.05; o.add(m); sheets.push(m); });
+  const top = sheets[2]; top.add(box(0.36, 0.1, 0.012, std('#1E2D4D'), -0.14, 0.33, 0.03));
+  [[0.56, 0.12], [0.46, -0.04], [0.56, -0.2], [0.34, -0.36]].forEach(([w, y], k) => top.add(box(w, 0.055, 0.01, k === 1 ? gold : std('#C9D1E3'), -0.28 + w / 2 - 0.04, y, 0.03)));
+  props.f0.sheets = sheets; }
+// HTS: a carton of goods, read by a gold scan line
+{ const o = prop('fh'), card = std('#C99C62', { roughness: 0.92 });
+  o.add(box(0.92, 0.72, 0.92, card)); o.add(box(0.15, 0.724, 0.924, std('#A9793F', { roughness: 0.8 }))); o.add(box(0.924, 0.03, 0.924, std('#B88A4E', { roughness: 0.9 }), 0, 0.2, 0));
+  o.add(box(0.3, 0.2, 0.01, std('#F5F6F8'), 0.24, -0.16, 0.462)); o.add(box(0.2, 0.03, 0.012, std('#1E2D4D'), 0.24, -0.12, 0.466)); o.add(box(0.14, 0.03, 0.012, std('#8C99B8'), 0.21, -0.19, 0.466));
+  const scan = new THREE.Group(), sm = new THREE.MeshBasicMaterial({ color: '#FFD45A', transparent: true, toneMapped: false });
+  for (const [w, d, x, z] of [[1.08, 0.03, 0, 0.54], [1.08, 0.03, 0, -0.54], [0.03, 1.08, 0.54, 0], [0.03, 1.08, -0.54, 0]]) scan.add(box(w, 0.03, d, sm, x, 0, z));
+  o.add(scan); props.fh.scan = scan; props.fh.sm = sm; }
+// deadlines: a clock face whose gold arc runs round
+{ const o = prop('f1');
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.06, 72), std('#FFFFFF', { roughness: 0.45 })); face.rotation.x = Math.PI / 2; o.add(face);
+  o.add(new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.062, 20, 96), std('#D5DCEA', { roughness: 0.4 })));
+  const arc = new THREE.Mesh(new THREE.BufferGeometry(), gold); arc.position.z = 0.012; o.add(arc);
+  const hand = new THREE.Group(); hand.add(box(0.045, 0.3, 0.03, std('#1E2D4D'), 0, 0.15, 0)); hand.position.z = 0.05; o.add(hand);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 32), std('#1E2D4D')); hub.rotation.x = Math.PI / 2; hub.position.z = 0.05; o.add(hub);
+  for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, tk = box(0.022, k % 3 ? 0.05 : 0.085, 0.012, std('#8C99B8'), Math.sin(a) * 0.34, Math.cos(a) * 0.34, 0.034); tk.rotation.z = -a; o.add(tk); }
+  props.f1.arc = arc; props.f1.hand = hand; }
+// rule check: a green token with a tick, spun in like a coin
+{ const o = prop('f2');
+  const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.11, 72), std('#0E9F6E', { roughness: 0.38, metalness: 0.25 })); coin.rotation.x = Math.PI / 2; o.add(coin);
+  o.add(new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.04, 20, 96), std('#0B7A55', { roughness: 0.35, metalness: 0.4 })));
+  const white = std('#FFFFFF', { roughness: 0.4 });
+  for (const sz of [1, -1]) { const tick = new THREE.Group(); const a = box(0.2, 0.075, 0.03, white, -0.135, -0.07, 0); a.rotation.z = -Math.PI / 4; const b = box(0.42, 0.075, 0.03, white, 0.075, 0.03, 0); b.rotation.z = Math.PI * 0.27; tick.add(a, b); tick.position.z = sz * 0.062; if (sz < 0) tick.rotation.y = Math.PI; o.add(tick); } }
+// AI: a gold four-point spark with two small ones
+{ const o = prop('f3');
+  const sh = new THREE.Shape(); for (let k = 0; k < 8; k++) { const r = k % 2 ? 0.15 : 0.52, a = k / 8 * Math.PI * 2 + Math.PI / 2; k ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); } sh.closePath();
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.1, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.03, bevelSegments: 4 }); geo.translate(0, 0, -0.05);
+  const big = new THREE.Mesh(geo, gold); o.add(big);
+  const s1 = new THREE.Mesh(geo, gold); s1.scale.setScalar(0.3); s1.position.set(0.5, 0.4, 0.1); const s2 = new THREE.Mesh(geo, gold); s2.scale.setScalar(0.2); s2.position.set(-0.48, -0.36, 0.1); o.add(s1, s2);
+  props.f3.big = big; props.f3.small = [s1, s2]; }
+
+const FEATS = [['f0', T.proof, T.hts], ['fh', T.hts, T.f1], ['f1', T.f1, T.f2], ['f2', T.f2, T.f3], ['f3', T.f3, T.end]];
+function drawProps(t) {
+  for (const [id, a, b] of FEATS) {
+    const P = props[id], kin = span(t, a + 0.1, a + 0.85), kout = io(span(t, b - 0.42, b - 0.06));
+    const sc = Math.max(0, outBack(kin)) * (1 - kout);
+    P.g.visible = kin > 0 && sc > 0.002; if (!P.g.visible) continue;
+    // arrives from the right with its card, leaves to the left; a slow float while it holds
+    P.g.position.set(lerp(1.5, 0, outExpo(kin)) - 1.5 * kout, PROP_Y + Math.sin((t - a) * 1.5) * 0.035, 0);
+    P.g.scale.setScalar(sc);
+    const o = P.inner, u = t - a;
+    if (id === 'f0') {
+      const fan = io5(span(u, 0.35, 1.25)) * (1 - 0.55 * io5(span(u, 1.7, 2.5)));
+      P.sheets.forEach((m, k) => { m.rotation.z = (2 - k) * 0.24 * fan; m.position.x = -(2 - k) * 0.17 * fan; m.position.y = -(2 - k) * 0.03 * fan; });
+      o.rotation.set(-0.22, 0.5 * Math.sin(u * 0.85 - 0.6), 0.04);
+    } else if (id === 'fh') {
+      o.rotation.set(0.44, 0.6 + u * 0.62, 0); o.scale.setScalar(0.86);
+      const k = span(u, 1.15, 2.0); P.scan.position.y = lerp(0.5, -0.5, io(k)); P.sm.opacity = Math.sin(Math.PI * k); P.scan.visible = k > 0 && k < 1;
+    } else if (id === 'f1') {
+      const frac = 0.62 * out3(span(u, 0.35, 1.5)) + 0.03 * span(u, 1.5, b - a);
+      const arc = Math.max(0.02, frac * Math.PI * 2);
+      P.arc.geometry.dispose(); P.arc.geometry = new THREE.TorusGeometry(0.47, 0.068, 20, 96, arc); P.arc.rotation.z = Math.PI / 2 - arc;
+      P.hand.rotation.z = -arc;
+      o.rotation.set(-0.14, 0.55 * Math.sin(u * 1.0 - 0.7), 0);
+    } else if (id === 'f2') {
+      o.rotation.set(-0.1, (1 - outExpo(span(u, 0.1, 1.5))) * Math.PI * 4 + 0.4 * Math.sin(u * 1.1), 0.05);
+    } else {
+      o.rotation.set(0, 0.6 * Math.sin(u * 1.4), 0.12 * Math.sin(u * 0.9));
+      P.big.scale.setScalar(1 + 0.05 * Math.sin(u * 4.2));
+      P.small.forEach((m, k) => { m.rotation.z = u * (k ? -1.6 : 1.3); m.scale.setScalar((k ? 0.2 : 0.3) * (0.75 + 0.25 * Math.sin(u * 3 + k * 2))); });
+    }
+  }
+  r2.render(S2, cam2);
 }
 
 // ── type and drawn cards (GSAP), one paused timeline ───────────────────
@@ -399,33 +525,50 @@ document.fonts.ready.then(() => {
   tl.fromTo('#app', { opacity: 0, y: 90, scale: .9 }, { opacity: 1, y: 0, scale: 1, duration: .6, ease: 'expo.out' }, T.app);
   tl.to('#app', { opacity: 0, y: 60, scale: .94, duration: .32, ease: 'power2.in' }, T.proof - .3);
 
-  // proof: the 3D scene steps back, three drawn cards come forward one at a time
-  tl.to('#dim', { opacity: .82, duration: .5, ease: 'power2.out' }, T.proof - .2);
+  // features: the 3D yard steps back; five cards come round one at a time, each under its own 3D object
+  tl.to('#dim', { opacity: .94, duration: .5, ease: 'power2.out' }, T.proof - .2);
   const feats = [['#f0', '#cap-f0', T.proof, T.hts], ['#fh', '#cap-fh', T.hts, T.f1], ['#f1', '#cap-f1', T.f1, T.f2], ['#f2', '#cap-f2', T.f2, T.f3], ['#f3', '#cap-f3', T.f3, T.end]];
-  feats.forEach(([card, cap, a, b]) => {
-    tl.fromTo(card, { opacity: 0, y: 260, rotationX: 42, z: -260 }, { opacity: 1, y: 0, rotationX: 0, z: 0, duration: .62, ease: 'expo.out' }, a);
-    tl.to(card, { opacity: 0, y: -200, rotationX: -30, z: -180, duration: .34, ease: 'power2.in' }, b - .3);
-    capIn(cap, a + .08, .07); capOut(cap, b - .26);
+  feats.forEach(([card, cap, a, b], i) => {
+    const hold = b - a - 1.15;
+    // the card stays solid while it travels: opacity only covers the first and last instants
+    tl.fromTo(card, { x: 720, z: -520, rotationY: 58, rotationX: 4 }, { x: 0, z: 0, rotationY: 7, rotationX: 5, duration: .85, ease: 'expo.out' }, a);
+    tl.fromTo(card, { opacity: 0 }, { opacity: 1, duration: .14, ease: 'none' }, a);
+    tl.to(card, { rotationY: -6, rotationX: 2, duration: hold, ease: 'sine.inOut' }, a + .85);
+    tl.to(card, { x: -720, z: -520, rotationY: -58, duration: .42, ease: 'power2.in' }, b - .4);
+    tl.to(card, { opacity: 0, duration: .14, ease: 'none' }, b - .14);
+    tl.fromTo(`${card} .pshadow`, { opacity: 0 }, { opacity: 1, duration: .5, ease: 'power2.out' }, a + .45);
+    capIn(cap, a + .12, .07); capOut(cap, b - .3);
+    if (i) tl.to('#steps b', { x: i * 36, duration: .5, ease: 'power3.inOut' }, a - .15);
   });
-  // template: the saved template fills the fields
-  tl.fromTo('#f0 .pill', { scale: .8, opacity: 0, transformOrigin: '0 50%' }, { scale: 1, opacity: 1, duration: .4, ease: 'back.out(2)' }, T.proof + .18);
-  tl.fromTo('#f0 .frow b', { scaleX: 0, transformOrigin: '0 50%', backgroundColor: '#FBBE24' }, { scaleX: 1, backgroundColor: '#EEF1F6', duration: .45, ease: 'power3.out', stagger: .11 }, T.proof + .38);
-  // HTS: a description goes in, a suggested code comes out
-  tl.fromTo('#hts-desc', { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', duration: .55, ease: 'none' }, T.hts + .22);
-  tl.fromTo('#fh .arrow', { y: -16, opacity: 0 }, { y: 0, opacity: 1, duration: .3, ease: 'power3.out' }, T.hts + .8);
-  tl.fromTo('#fh .code', { y: 30, opacity: 0, scale: .94 }, { y: 0, opacity: 1, scale: 1, duration: .5, ease: 'back.out(1.8)' }, T.hts + .95);
-  tl.fromTo('#fh .code em', { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: .35, ease: 'power3.out' }, T.hts + 1.3);
-  // deadline: the ring runs down
-  tl.fromTo('#ring', { strokeDashoffset: 867 }, { strokeDashoffset: 300, duration: .7, ease: 'power3.out' }, T.f1 + .12);
-  tl.to('#ring', { strokeDashoffset: 350, duration: .5, ease: 'none' }, T.f1 + .82);
-  const num = { v: 22 };
-  tl.fromTo(num, { v: 22 }, { v: 15, duration: .7, ease: 'power3.out', onUpdate: () => { $('#ringnum').textContent = `${Math.round(num.v)}h`; } }, T.f1 + .12);
-  // 2: checks tick down the list
-  tl.fromTo('#f2 .chk', { scale: 0 }, { scale: 1, duration: .34, ease: 'back.out(2.4)', stagger: .15 }, T.f2 + .2);
-  tl.fromTo('#f2 .bar', { scaleX: .2, opacity: .3, transformOrigin: '0 50%' }, { scaleX: 1, opacity: 1, duration: .4, ease: 'power3.out', stagger: .15 }, T.f2 + .2);
-  // 3: one line gets flagged
-  tl.fromTo('#f3 .hot', { scale: .9, opacity: 0 }, { scale: 1, opacity: 1, duration: .45, ease: 'back.out(2)' }, T.f3 + .32);
-  tl.fromTo('#f3 .hot svg', { rotation: -90, scale: 0 }, { rotation: 0, scale: 1, duration: .5, ease: 'back.out(2.6)' }, T.f3 + .42);
+  tl.fromTo('#steps', { opacity: 0 }, { opacity: 1, duration: .4 }, T.proof + .2);
+  tl.to('#steps', { opacity: 0, duration: .3 }, T.end - .35);
+  // template: the saved template fills the four parties in, one after another
+  tl.fromTo('#f0 .pill', { scale: .8, opacity: 0, transformOrigin: '0 50%' }, { scale: 1, opacity: 1, duration: .45, ease: 'back.out(2)' }, T.proof + .35);
+  tl.fromTo('#f0 .frow', { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .4, ease: 'power3.out', stagger: .07 }, T.proof + .5);
+  tl.fromTo('#f0 .frow b span', { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', duration: .42, ease: 'power2.out', stagger: .27 }, T.proof + 1.6);
+  tl.fromTo('#f0 .frow b u', { opacity: 1 }, { opacity: 0, duration: .7, ease: 'power2.out', stagger: .27, immediateRender: false }, T.proof + 1.75);
+  tl.set('#f0 .frow b u', { opacity: 1, stagger: .27 }, T.proof + 1.6);
+  // HTS: the goods are described, read, and a suggested code comes out
+  tl.fromTo('#hts-desc', { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', duration: .85, ease: 'none' }, T.hts + .4);
+  tl.fromTo('#fh .arrow', { y: -16, opacity: 0 }, { y: 0, opacity: 1, duration: .35, ease: 'power3.out' }, T.hts + 1.75);
+  tl.fromTo('#fh .code', { y: 30, opacity: 0, scale: .94 }, { y: 0, opacity: 1, scale: 1, duration: .55, ease: 'back.out(1.8)' }, T.hts + 2.0);
+  tl.fromTo('#fh .code em', { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: .4, ease: 'power3.out' }, T.hts + 2.5);
+  // deadlines: three filings, then the closest cutoff rises to the top
+  tl.set('#d0', { y: 0 }, 0); tl.set('#d1', { y: 122 }, 0); tl.set('#d2', { y: 244 }, 0);
+  tl.fromTo('.drow', { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: .45, ease: 'power3.out', stagger: .1 }, T.f1 + .35);
+  tl.to('#d1', { y: 0, z: 46, scale: 1.035, duration: .75, ease: 'power3.inOut' }, T.f1 + 1.45);
+  tl.to('#d0', { y: 244, duration: .75, ease: 'power3.inOut' }, T.f1 + 1.45);
+  tl.to('#d2', { y: 122, duration: .75, ease: 'power3.inOut' }, T.f1 + 1.52);
+  tl.to('#d1 .ring', { opacity: 1, duration: .4, ease: 'power2.out' }, T.f1 + 1.75);
+  // rule check: the checks tick down the list, then it is ready
+  tl.fromTo('#f2 .chk', { scale: 0 }, { scale: 1, duration: .36, ease: 'back.out(2.4)', stagger: .22 }, T.f2 + .45);
+  tl.fromTo('#f2 .bar', { scaleX: .2, opacity: .3, transformOrigin: '0 50%' }, { scaleX: 1, opacity: 1, duration: .42, ease: 'power3.out', stagger: .22 }, T.f2 + .45);
+  tl.fromTo('#f2 .ready', { opacity: 0, y: 16, scale: .92, transformOrigin: '0 50%' }, { opacity: 1, y: 0, scale: 1, duration: .45, ease: 'back.out(1.8)' }, T.f2 + 1.55);
+  // AI: one line gets flagged
+  tl.fromTo('#f3 .l', { scaleX: .3, opacity: 0, transformOrigin: '0 50%' }, { scaleX: 1, opacity: 1, duration: .45, ease: 'power3.out', stagger: .08 }, T.f3 + .35);
+  tl.fromTo('#f3 .hot', { scale: .9, opacity: 0 }, { scale: 1, opacity: 1, duration: .5, ease: 'back.out(2)' }, T.f3 + 1.0);
+  tl.fromTo('#f3 .hot svg', { rotation: -90, scale: 0 }, { rotation: 0, scale: 1, duration: .55, ease: 'back.out(2.6)' }, T.f3 + 1.12);
+  tl.fromTo('#f3 .hot b', { opacity: 0, x: 12 }, { opacity: 1, x: 0, duration: .4, ease: 'power3.out' }, T.f3 + 1.35);
 
   // end card
   tl.to('#dim', { opacity: .9, duration: .5, ease: 'power2.inOut' }, T.end - .1);

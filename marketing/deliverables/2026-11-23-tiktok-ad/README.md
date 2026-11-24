@@ -1,6 +1,6 @@
 # MyCargoLens TikTok ad (2026-11-23)
 
-A 20 s vertical ad (1080x1920, 60 fps) for a paid TikTok campaign. Mostly drawn 3D animation,
+A 28 s vertical ad (1080x1920, 60 fps) for a paid TikTok campaign. Mostly drawn 3D animation,
 one flat look at the real app. Nothing here is published: the founder approves before it goes out.
 
 | File (in `final/`, not in git) | Sound |
@@ -13,10 +13,10 @@ one flat look at the real app. Nothing here is published: the founder approves b
 | Time | Picture | On screen | Voice |
 |---|---|---|---|
 | 0.0-2.6 | Camera moves down a row of shipping containers; three light up gold | Importer. Broker. NVOCC. | Importer, broker, or NVOCC? |
-| 2.6-5.25 | Sixteen filing cards fade in, hanging loose in the air at different depths, drifting gently | Still chasing CBP filings by hand? | Still chasing CBP filings by hand? |
-| 5.25-8.65 | The gold focus frame closes; the cards fall into one stack, most urgent on top; the app's real Today screen sits over it, flat | Every filing. One inbox. | MyCargoLens puts every filing in one inbox. |
-| 8.65-17.45 | Five drawn cards, one at a time: a template filling the fields, a description turning into a suggested HTS code, a countdown ring, a column of checks, one flagged line | Start from a template. / HTS codes, suggested. / Track every deadline. / Check every field. / AI flags what to fix. | Start from a template. Get HTS code suggestions. Track every deadline. Check every field. And let AI flag what to fix. |
-| 17.45-20.0 | The cards fold into the logo mark | MyCargoLens. An inbox for US customs. Book a demo. mycargolens.com/book-a-demo | MyCargoLens. Book a demo. |
+| 2.6-5.25 | Eight filing cards glide away down the lane in one curved stream, one behind another; the camera follows them | Still chasing CBP filings by hand? | Still chasing CBP filings by hand? |
+| 5.25-8.65 | The gold focus frame closes; the stream gathers into one stack, most urgent on top; the app's real Today screen sits over it, flat | Every filing. One inbox. | MyCargoLens puts every filing in one inbox. |
+| 8.65-25.4 | Five drawn cards come round one at a time (about 3 to 4 s each), each under its own 3D object: three sheets over a template that fills the four parties in; a carton scanned into a suggested HTS code; a clock over three filings that re-sort, closest cutoff on top; a green token over a column of checks ending "Ready to send"; a gold spark over one flagged line. Five dots show progress | Start from a template. / HTS codes, suggested. / Track every deadline. / Check every field. / AI flags what to fix. | Start from a template. Your saved details fill in. Describe the goods. Get HTS code suggestions. Track every deadline, most urgent first. Check every field before you send. And let AI flag what to fix. |
+| 25.4-28.0 | The cards fold into the logo mark | MyCargoLens. An inbox for US customs. Book a demo. mycargolens.com/book-a-demo | MyCargoLens. Book a demo. |
 
 Copy rules applied: no certification or connection claim, no CBP response timing, no promise about
 penalties, no price (the ad goes to importers, brokers and NVOCCs alike), CTA "Book a demo".
@@ -27,7 +27,7 @@ bottom caption block); the `#guide` layer in the composition shows those zones w
 ## What is real and what is drawn
 
 - Drawn: the containers, the filing cards (labels "ISF", "Entry" and made-up time chips), the five
-  feature cards. The HTS card shows a description and code the app really returned for it in the
+  feature cards and the 3D objects above them (a second Three.js scene on its own clear canvas, `#gl2`). The template card's party names are the fictional seed companies. The HTS card shows a description and code the app really returned for it in the
   promo build ("Upholstered wooden-frame chairs", 9401.61.40.11, tagged "Review before you file");
   the template name is from the seed data. No accuracy figure is shown or claimed. They stand for the product; they are not screenshots.
 - Real: the Today screen at 7 s, from the local promo build and its fictional seed data
