@@ -125,7 +125,7 @@
 </style>
 </head>
 <body>
-<div id="root" data-composition-id="main" data-start="0" data-duration="37.4" data-width="1080" data-height="1920">
+<div id="root" data-composition-id="main" data-start="0" data-duration="41.7" data-width="1080" data-height="1920">
   <canvas id="gl" width="2160" height="3840"></canvas>
   <div id="vignette" class="layer"></div>
   <div id="dim" class="layer"></div>
@@ -134,7 +134,7 @@
   <div class="cap" id="cap-pain"><span class="line"><span>Still chasing</span></span><span class="line"><span>CBP filings</span></span><span class="line"><span><em>by hand?</em></span></span></div>
   <div class="cap" id="cap-turn"><span class="line"><span>Every filing.</span></span><span class="line"><span><em>One inbox.</em></span></span></div>
 
-  <div id="app"><video id="v-today" class="clip" src="assets/clips/today.mp4" muted playsinline data-start="10.8" data-duration="2.8" data-media-start="0.6"></video></div>
+  <div id="app"><video id="v-today" class="clip" src="assets/clips/today.mp4" muted playsinline data-start="13.3" data-duration="3.3" data-media-start="0.6"></video></div>
 
   <!-- the introduction: the focus frame becomes the logo, then the name and the line -->
   <div id="intro" class="layer">
@@ -213,9 +213,9 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './assets/vendor/RoomEnvironment.js';
 
-const TOTAL = 37.4;
+const TOTAL = 41.7;
 // beats (s): hook, pain, turn, the introduction, the real screen, five features, end
-const T = { pain: 2.6, turn: 5.25, intro: 6.3, app: 10.85, proof: 13.25, hts: 16.9, f1: 20.8, f2: 24.1, f3: 29.6, end: 34.8 };
+const T = { pain: 3.7, turn: 6.8, intro: 7.85, app: 13.35, proof: 16.3, hts: 20.2, f1: 24.45, f2: 28.15, f3: 33.65, end: 38.85 };
 
 // ── helpers ────────────────────────────────────────────────────────────
 const clamp = (x) => Math.min(1, Math.max(0, x));
@@ -316,7 +316,7 @@ function makeContainer(x, y, z, tone, seed) {
   containers.push(makeContainer(x, CH / 2 + 0.02, z + ((i * 37) % 5 - 2) * 0.05, tones[i % tones.length], 100 + i));
   if ([3, 4, 6, 9].includes(i)) containers.push(makeContainer(x + (i % 2 ? 0.06 : -0.05), CH * 1.5 + 0.04, z, tones[(i + 3) % tones.length], 300 + i));   // second tier
 });
-const goldAt = [0.2, 0.9, 1.5];                                       // containers 0, 1, 2 light up with the three words
+const goldAt = [0.2, 1.25, 2.55];                                       // containers 0, 1, 2 light up with the three words
 
 // filing cards: one drawn texture per kind, 40 cards
 function cardTexture(kind) {
@@ -376,9 +376,9 @@ const FRAME_C = new THREE.Vector3(0, (FH0 + FH1) / 2, STACK.z + 0.25);
 // camera path: position and look-at keys, eased between
 const CAM = [
   { t: 0.0, p: [0.5, 1.45, 13.8], l: [0, 2.5, -6] },
-  { t: 2.6, p: [0.15, 1.8, 2.6], l: [0, 3.6, -16] },
-  { t: 5.25, p: [0.0, 2.6, -9.5], l: [0, 4.6, -22] },
-  { t: 6.6, p: [0, 3.5, -13.2], l: [0, 5.0, -22] },
+  { t: T.pain, p: [0.15, 1.8, 2.6], l: [0, 3.6, -16] },
+  { t: T.turn, p: [0.0, 2.6, -9.5], l: [0, 4.6, -22] },
+  { t: T.turn + 1.35, p: [0, 3.5, -13.2], l: [0, 5.0, -22] },
   { t: T.end, p: [0, 3.5, -14.2], l: [0, 5.0, -22] },
   { t: TOTAL, p: [0, 3.5, -14.6], l: [0, 5.0, -22] }
 ];
@@ -557,7 +557,7 @@ document.fonts.ready.then(() => {
 
   // hook: three words, on the beat of the voice
   tl.set('#cap-hook', { opacity: 1 }, 0);
-  [0.12, 0.84, 1.44].forEach((at, i) => tl.fromTo(lines('#cap-hook')[i], { yPercent: 112 }, { yPercent: 0, duration: .5, ease: 'power4.out' }, at));
+  [0.12, 1.15, 2.45].forEach((at, i) => tl.fromTo(lines('#cap-hook')[i], { yPercent: 112 }, { yPercent: 0, duration: .5, ease: 'power4.out' }, at));
   tl.to('#cap-hook', { opacity: 0, y: -40, duration: .32, ease: 'power2.in' }, T.pain - .22);
 
   const capIn = (id, at, stagger = .09) => { tl.set(id, { opacity: 1 }, at); tl.fromTo(lines(id), { yPercent: 112 }, { yPercent: 0, duration: .55, ease: 'power4.out', stagger }, at); };
@@ -573,11 +573,11 @@ document.fonts.ready.then(() => {
   tl.fromTo('#intro-ring', { scale: .25, opacity: .9 }, { scale: 2.3, opacity: 0, duration: .95, ease: 'power2.out', immediateRender: false }, I + 1.2);
   tl.to('#intro .mark', { y: 0, duration: .8, ease: 'power3.inOut' }, I + .5);
   tl.fromTo('#intro .word > *', { yPercent: 115 }, { yPercent: 0, duration: .6, ease: 'power4.out', stagger: .035 }, I + 1.0);
-  tl.fromTo('#intro .tagl .l1 > span', { yPercent: 112 }, { yPercent: 0, duration: .55, ease: 'power4.out' }, I + 2.05);
-  tl.fromTo('#intro .tagl .l2', { opacity: 0, filter: 'blur(22px)', scale: 1.12 }, { opacity: 1, filter: 'blur(0px)', scale: 1, duration: .8, ease: 'power3.out' }, I + 3.05);
-  tl.fromTo('#intro-ring', { scale: .25, opacity: .9 }, { scale: 2.0, opacity: 0, duration: .9, ease: 'power2.out', immediateRender: false }, I + 3.3);
-  tl.to('#intro-dot', { scale: 1.3, duration: .16, ease: 'power2.out' }, I + 3.3);
-  tl.to('#intro-dot', { scale: 1, duration: .45, ease: 'back.out(3)' }, I + 3.46);
+  tl.fromTo('#intro .tagl .l1 > span', { yPercent: 112 }, { yPercent: 0, duration: .55, ease: 'power4.out' }, I + 2.1);
+  tl.fromTo('#intro .tagl .l2', { opacity: 0, filter: 'blur(22px)', scale: 1.12 }, { opacity: 1, filter: 'blur(0px)', scale: 1, duration: .8, ease: 'power3.out' }, I + 3.85);
+  tl.fromTo('#intro-ring', { scale: .25, opacity: .9 }, { scale: 2.0, opacity: 0, duration: .9, ease: 'power2.out', immediateRender: false }, I + 4.1);
+  tl.to('#intro-dot', { scale: 1.3, duration: .16, ease: 'power2.out' }, I + 4.1);
+  tl.to('#intro-dot', { scale: 1, duration: .45, ease: 'back.out(3)' }, I + 4.26);
   tl.to('#intro', { opacity: 0, y: -50, scale: .96, duration: .32, ease: 'power2.in' }, T.app - .3);
 
   capIn('#cap-turn', T.app + .15); capOut('#cap-turn', T.proof - .28);
