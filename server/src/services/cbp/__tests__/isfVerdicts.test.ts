@@ -11,7 +11,7 @@ const { prisma, notify, billing, score } = vi.hoisted(() => ({
     filingStatusHistory: { create: vi.fn() },
     $transaction: vi.fn(),
   },
-  notify: { notifyFilingAccepted: vi.fn(), notifyFilingRejected: vi.fn() },
+  notify: { notifyFilingAccepted: vi.fn(), notifyFilingRejected: vi.fn(), notifyFilingChangeRejected: vi.fn() },
   billing: { billShipmentForFiling: vi.fn() },
   score: { recordScoreSnapshot: vi.fn(), triggerForStatus: vi.fn((s: string) => s) },
 }));
@@ -56,6 +56,15 @@ describe('applyIsfVerdict', () => {
     expect(data.status).toBe('rejected');
     expect(JSON.parse(data.rejectionReason)).toMatchObject({ summary: 'ISF REJECTED', errors: [{ code: '117' }] });
     expect(notify.notifyFilingRejected).toHaveBeenCalledOnce();
+    expect(billing.billShipmentForFiling).not.toHaveBeenCalled();
+  });
+
+  it.each(['REPLACE', 'DELETE'])('a rejected %s says the change failed and leaves the ISF accepted, not rejected', async (action) => {
+    prisma.filing.findUnique.mockResolvedValue({ ...FILING, status: 'amended', cbpState: 'ON_FILE', pendingAction: action });
+    await applyIsfVerdict({ filingId: 'f1', transmissionId: 't1', filerCode: 'S7P', summary: rejected as never });
+    expect(prisma.filing.updateMany.mock.calls[0][0].data).toMatchObject({ status: 'accepted', cbpState: 'ON_FILE' });
+    expect(notify.notifyFilingChangeRejected).toHaveBeenCalledWith('o1', 'f1', 'HB1', action, 'DUPLICATE ISF TRANSACTION');
+    expect(notify.notifyFilingRejected).not.toHaveBeenCalled();
     expect(billing.billShipmentForFiling).not.toHaveBeenCalled();
   });
 
