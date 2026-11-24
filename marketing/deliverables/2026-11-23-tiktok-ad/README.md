@@ -1,6 +1,6 @@
 # MyCargoLens TikTok ad (2026-11-23)
 
-A 28 s vertical ad (1080x1920, 60 fps) for a paid TikTok campaign. Mostly drawn 3D animation,
+A 32.8 s vertical ad (1080x1920, 60 fps) for a paid TikTok campaign. Mostly drawn 3D animation,
 one flat look at the real app. Nothing here is published: the founder approves before it goes out.
 
 | File (in `final/`, not in git) | Sound |
@@ -15,8 +15,8 @@ one flat look at the real app. Nothing here is published: the founder approves b
 | 0.0-2.6 | Camera moves down a row of shipping containers; three light up gold | Importer. Broker. NVOCC. | Importer, broker, or NVOCC? |
 | 2.6-5.25 | Eight filing cards glide away down the lane in one curved stream, one behind another; the camera follows them | Still chasing CBP filings by hand? | Still chasing CBP filings by hand? |
 | 5.25-8.65 | The gold focus frame closes; the stream gathers into one stack, most urgent on top; the app's real Today screen sits over it, flat | Every filing. One inbox. | MyCargoLens puts every filing in one inbox. |
-| 8.65-25.4 | Five drawn cards come round one at a time (about 3 to 4 s each), each under its own 3D object: three sheets over a template that fills the four parties in; a carton scanned into a suggested HTS code; a clock over three filings that re-sort, closest cutoff on top; a green token over a column of checks ending "Ready to send"; a gold spark over one flagged line. Five dots show progress | Start from a template. / HTS codes, suggested. / Track every deadline. / Check every field. / AI flags what to fix. | Start from a template. Your saved details fill in. Describe the goods. Get HTS code suggestions. Track every deadline, most urgent first. Check every field before you send. And let AI flag what to fix. |
-| 25.4-28.0 | The cards fold into the logo mark | MyCargoLens. An inbox for US customs. Book a demo. mycargolens.com/book-a-demo | MyCargoLens. Book a demo. |
+| 8.65-30.2 | Five drawn cards come round one at a time (3 to 4 s each, 5.5 s for the last two), each under its own 3D object: three sheets over a template that fills the four parties in; a carton scanned into a suggested HTS code; a clock over three filings that re-sort, closest cutoff on top; a green token over four named fields being checked, one coming back "Missing", then "Fixed" and "Ready to send"; a gold spark over a filing that a gold band reads top to bottom, one line flagged, then a note opening under it ("Why it matters", "How to fix it"). Five dots show progress | Start from a template. / HTS codes, suggested. / Track every deadline. / Check every field. See what's missing. / AI flags what to fix. And why, and how. | Start from a template. Your saved details fill in. Describe the goods. Get HTS code suggestions. Track every deadline, most urgent first. Check every field against the filing rules. See what's missing before you send. Then let AI review the whole filing, and flag what to fix and why. |
+| 30.2-32.8 | The cards fold into the logo mark | MyCargoLens. An inbox for US customs. Book a demo. mycargolens.com/book-a-demo | MyCargoLens. Book a demo. |
 
 Copy rules applied: no certification or connection claim, no CBP response timing, no promise about
 penalties, no price (the ad goes to importers, brokers and NVOCCs alike), CTA "Book a demo".

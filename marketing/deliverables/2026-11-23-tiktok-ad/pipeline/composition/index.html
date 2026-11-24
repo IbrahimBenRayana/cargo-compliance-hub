@@ -67,19 +67,33 @@
   .drow em { position: relative; font-style: normal; font-size: 28px; font-weight: 800; padding: 12px 22px; border-radius: 30px; background: #FFF4D6; color: #8A5A00; font-variant-numeric: tabular-nums; }
   .drow em.late { background: #FDECEC; color: #C0272D; }
 
-  .rows { display: flex; flex-direction: column; gap: 20px; top: 116px; }
-  .row { display: flex; align-items: center; gap: 26px; }
-  .row .bar { height: 24px; border-radius: 12px; background: #E3E6EC; }
-  .row .chk { width: 58px; height: 58px; flex: none; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; }
-  .row .chk svg { width: 32px; height: 32px; }
-  .rows .ready { align-self: flex-start; margin-top: 12px; display: flex; align-items: center; gap: 12px; font-size: 28px; font-weight: 800; color: #0B7A55; background: #E3F6EE; padding: 14px 26px; border-radius: 34px; }
+  .rows { display: flex; flex-direction: column; gap: 14px; top: 110px; }
+  .row { position: relative; display: flex; align-items: center; gap: 22px; height: 66px; padding: 0 20px 0 6px; border-radius: 18px; }
+  .row .warnbg { position: absolute; inset: 0; border-radius: 18px; background: #FFF4D6; box-shadow: inset 0 0 0 3px var(--gold); opacity: 0; }
+  .row .mk { position: relative; width: 54px; height: 54px; flex: none; }
+  .row .chk, .row .wrn { position: absolute; inset: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .row .chk { background: var(--green); } .row .wrn { background: var(--gold); }
+  .row .chk svg, .row .wrn svg { width: 30px; height: 30px; }
+  .row b { position: relative; flex: 1; font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
+  .row .st { position: relative; width: 170px; height: 34px; }
+  .row .st em { position: absolute; right: 0; top: 0; font-style: normal; font-size: 25px; font-weight: 800; white-space: nowrap; line-height: 34px; }
+  .row .st .ok { color: #0B7A55; } .row .st .bad { color: #8A5A00; }
+  .rows .ready { align-self: flex-start; margin: 8px 0 0 6px; display: flex; align-items: center; gap: 12px; font-size: 28px; font-weight: 800; color: #0B7A55; background: #E3F6EE; padding: 13px 26px; border-radius: 34px; }
 
-  .doc { display: flex; flex-direction: column; gap: 30px; top: 150px; }
-  .doc .l { position: relative; height: 26px; border-radius: 13px; background: #E3E6EC; }
-  .doc .hot { height: 78px; border-radius: 20px; background: #FFF4D6; box-shadow: inset 0 0 0 3px var(--gold); display: flex; align-items: center; padding: 0 22px; gap: 18px; }
+  .doc { top: 122px; height: 380px; }
+  .doc .l { position: absolute; left: 0; height: 24px; border-radius: 12px; background: #E3E6EC; }
+  .doc .scan { position: absolute; left: -18px; top: 0; width: 636px; height: 64px; border-radius: 18px; background: linear-gradient(180deg, rgba(251,190,36,0), rgba(251,190,36,.3) 60%, rgba(251,190,36,.55)); box-shadow: 0 3px 0 var(--gold); opacity: 0; }
+  .doc .hot { position: absolute; left: 0; top: 40px; width: 600px; height: 76px; border-radius: 20px; background: #FFF4D6; box-shadow: inset 0 0 0 3px var(--gold); display: flex; align-items: center; padding: 0 22px; gap: 18px; }
   .doc .hot svg { width: 40px; height: 40px; flex: none; }
-  .doc .hot .l { flex: 1; background: #F0D58A; }
+  .doc .hot i { flex: 1; height: 24px; border-radius: 12px; background: #F0D58A; }
   .doc .hot b { font-size: 26px; font-weight: 800; color: #8A5A00; white-space: nowrap; }
+  .doc .note { position: absolute; left: 0; top: 136px; width: 600px; height: 234px; border-radius: 22px; background: #F3F5F9; box-shadow: inset 0 0 0 2px #E3E6EC; padding: 24px 28px; display: flex; flex-direction: column; gap: 13px; }
+  .doc .note h5 { font-size: 24px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+  .doc .note h5 + i { margin-top: -2px; }
+  .doc .note i { display: block; height: 20px; border-radius: 10px; background: #D6DBE6; }
+  .doc .note h5.second { margin-top: 12px; color: #8A5A00; }
+
+  #glow { position: absolute; left: 90px; top: -10px; width: 900px; height: 900px; background: radial-gradient(closest-side, rgba(95,141,255,.20), rgba(251,190,36,.07) 55%, rgba(19,30,54,0)); opacity: 0; }
 
   /* where we are in the five features */
   #steps { position: absolute; left: 468px; top: 1462px; width: 158px; height: 14px; opacity: 0; }
@@ -100,7 +114,7 @@
 </style>
 </head>
 <body>
-<div id="root" data-composition-id="main" data-start="0" data-duration="28" data-width="1080" data-height="1920">
+<div id="root" data-composition-id="main" data-start="0" data-duration="32.8" data-width="1080" data-height="1920">
   <canvas id="gl" width="2160" height="3840"></canvas>
   <div id="vignette" class="layer"></div>
   <div id="dim" class="layer"></div>
@@ -111,6 +125,7 @@
 
   <div id="app"><video id="v-today" class="clip" src="assets/clips/today.mp4" muted playsinline data-start="7.0" data-duration="2.2" data-media-start="0.6"></video></div>
 
+  <div id="glow"></div>
   <div id="feats">
     <div class="fcard" id="f0"><div class="pshadow"></div><div class="tag">Template</div>
       <div class="lift tpl"><div class="pill"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="M9 12h7M9 16h5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>Electronics from Shenzhen</div>
@@ -132,18 +147,23 @@
       </div></div>
     <div class="fcard" id="f2"><div class="pshadow"></div><div class="tag">Rule check</div>
       <div class="lift rows">
-        <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:400px"></div></div>
-        <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:330px"></div></div>
-        <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:440px"></div></div>
-        <div class="row"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="bar" style="width:290px"></div></div>
+        <div class="row"><div class="warnbg"></div><div class="mk"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div><b>Parties</b><div class="st"><em class="ok">OK</em></div></div>
+        <div class="row"><div class="warnbg"></div><div class="mk"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div><b>Ports and dates</b><div class="st"><em class="ok">OK</em></div></div>
+        <div class="row w"><div class="warnbg"></div><div class="mk"><div class="wrn"><svg viewBox="0 0 24 24"><path d="M12 5.5v8" fill="none" stroke="#3B2A00" stroke-width="3.4" stroke-linecap="round"/><circle cx="12" cy="18.3" r="1.9" fill="#3B2A00"/></svg></div><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div><b>HTS number</b><div class="st"><em class="bad">Missing</em><em class="ok">Fixed</em></div></div>
+        <div class="row"><div class="warnbg"></div><div class="mk"><div class="chk"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div><b>Bond</b><div class="st"><em class="ok">OK</em></div></div>
         <div class="ready">Ready to send</div>
       </div></div>
     <div class="fcard" id="f3"><div class="pshadow"></div><div class="tag">AI pre-flight review</div>
       <div class="lift doc">
-        <div class="l" style="width:470px"></div>
-        <div class="hot"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z" fill="#FBBE24"/></svg><div class="l"></div><b>Fix this</b></div>
-        <div class="l" style="width:520px"></div>
-        <div class="l" style="width:380px"></div>
+        <div class="l" style="top:0;width:470px"></div>
+        <div class="l" style="top:66px;width:560px"></div>
+        <div class="l" style="top:132px;width:520px"></div>
+        <div class="l" style="top:198px;width:380px"></div>
+        <div class="l" style="top:264px;width:500px"></div>
+        <div class="l" style="top:330px;width:430px"></div>
+        <div class="scan"></div>
+        <div class="hot"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z" fill="#FBBE24"/></svg><i></i><b>Fix this</b></div>
+        <div class="note"><h5>Why it matters</h5><i style="width:520px"></i><i style="width:400px"></i><h5 class="second">How to fix it</h5><i style="width:480px"></i><i style="width:300px"></i></div>
       </div></div>
   </div>
   <canvas id="gl2" width="2160" height="3840"></canvas>
@@ -151,6 +171,8 @@
   <div class="cap feat" id="cap-fh"><span class="line"><span>HTS codes,</span></span><span class="line"><span><em>suggested.</em></span></span></div>
   <div class="cap feat" id="cap-f1"><span class="line"><span>Track every</span></span><span class="line"><span><em>deadline.</em></span></span></div>
   <div class="cap feat" id="cap-f2"><span class="line"><span>Check every</span></span><span class="line"><span><em>field.</em></span></span></div>
+  <div class="cap feat" id="cap-f2b"><span class="line"><span>See what's</span></span><span class="line"><span><em>missing.</em></span></span></div>
+  <div class="cap feat" id="cap-f3b"><span class="line"><span>And why,</span></span><span class="line"><span><em>and how.</em></span></span></div>
   <div class="cap feat" id="cap-f3"><span class="line"><span>AI flags</span></span><span class="line"><span><em>what to fix.</em></span></span></div>
 
   <div id="steps"><i style="left:0"></i><i style="left:36px"></i><i style="left:72px"></i><i style="left:108px"></i><i style="left:144px"></i><b></b></div>
@@ -172,9 +194,9 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './assets/vendor/RoomEnvironment.js';
 
-const TOTAL = 28;
+const TOTAL = 32.8;
 // beats (s): hook, pain, turn, the real screen, five features, end
-const T = { pain: 2.6, turn: 5.25, app: 7.05, proof: 8.65, hts: 12.3, f1: 16.2, f2: 19.5, f3: 22.5, end: 25.4 };
+const T = { pain: 2.6, turn: 5.25, app: 7.05, proof: 8.65, hts: 12.3, f1: 16.2, f2: 19.5, f3: 25.0, end: 30.2 };
 
 // ── helpers ────────────────────────────────────────────────────────────
 const clamp = (x) => Math.min(1, Math.max(0, x));
@@ -461,7 +483,9 @@ const prop = (id) => { const g = new THREE.Group(), inner = new THREE.Group(); g
   const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.11, 72), std('#0E9F6E', { roughness: 0.38, metalness: 0.25 })); coin.rotation.x = Math.PI / 2; o.add(coin);
   o.add(new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.04, 20, 96), std('#0B7A55', { roughness: 0.35, metalness: 0.4 })));
   const white = std('#FFFFFF', { roughness: 0.4 });
-  for (const sz of [1, -1]) { const tick = new THREE.Group(); const a = box(0.2, 0.075, 0.03, white, -0.135, -0.07, 0); a.rotation.z = -Math.PI / 4; const b = box(0.42, 0.075, 0.03, white, 0.075, 0.03, 0); b.rotation.z = Math.PI * 0.27; tick.add(a, b); tick.position.z = sz * 0.062; if (sz < 0) tick.rotation.y = Math.PI; o.add(tick); } }
+  const tk = new THREE.Shape(); [[-0.235, 0.0], [-0.075, -0.165], [0.245, 0.155], [0.175, 0.225], [-0.075, -0.025], [-0.165, 0.07]].forEach(([x, y], k) => (k ? tk.lineTo(x, y) : tk.moveTo(x, y))); tk.closePath();
+  const tg = new THREE.ExtrudeGeometry(tk, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.012, bevelSegments: 3 }); tg.translate(0, -0.02, -0.015);
+  for (const sz of [1, -1]) { const tick = new THREE.Mesh(tg, white); tick.position.z = sz * 0.066; if (sz < 0) tick.rotation.y = Math.PI; o.add(tick); } }
 // AI: a gold four-point spark with two small ones
 { const o = prop('f3');
   const sh = new THREE.Shape(); for (let k = 0; k < 8; k++) { const r = k % 2 ? 0.15 : 0.52, a = k / 8 * Math.PI * 2 + Math.PI / 2; k ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); } sh.closePath();
@@ -473,7 +497,7 @@ const prop = (id) => { const g = new THREE.Group(), inner = new THREE.Group(); g
 const FEATS = [['f0', T.proof, T.hts], ['fh', T.hts, T.f1], ['f1', T.f1, T.f2], ['f2', T.f2, T.f3], ['f3', T.f3, T.end]];
 function drawProps(t) {
   for (const [id, a, b] of FEATS) {
-    const P = props[id], kin = span(t, a + 0.1, a + 0.85), kout = io(span(t, b - 0.42, b - 0.06));
+    const P = props[id], kin = span(t, a - (a > T.proof ? 0.1 : -0.1), a + 0.85), kout = io(span(t, b - 0.42, b - 0.06));
     const sc = Math.max(0, outBack(kin)) * (1 - kout);
     P.g.visible = kin > 0 && sc > 0.002; if (!P.g.visible) continue;
     // arrives from the right with its card, leaves to the left; a slow float while it holds
@@ -494,7 +518,8 @@ function drawProps(t) {
       P.hand.rotation.z = -arc;
       o.rotation.set(-0.14, 0.55 * Math.sin(u * 1.0 - 0.7), 0);
     } else if (id === 'f2') {
-      o.rotation.set(-0.1, (1 - outExpo(span(u, 0.1, 1.5))) * Math.PI * 4 + 0.4 * Math.sin(u * 1.1), 0.05);
+      // spins in, turns once more when the missing field is fixed
+      o.rotation.set(-0.1, (1 - outExpo(span(u, 0.1, 1.5))) * Math.PI * 4 + io5(span(u, 3.7, 4.6)) * Math.PI * 2 + 0.4 * Math.sin(u * 1.1), 0.05);
     } else {
       o.rotation.set(0, 0.6 * Math.sin(u * 1.4), 0.12 * Math.sin(u * 0.9));
       P.big.scale.setScalar(1 + 0.05 * Math.sin(u * 4.2));
@@ -529,19 +554,24 @@ document.fonts.ready.then(() => {
   tl.to('#dim', { opacity: .94, duration: .5, ease: 'power2.out' }, T.proof - .2);
   const feats = [['#f0', '#cap-f0', T.proof, T.hts], ['#fh', '#cap-fh', T.hts, T.f1], ['#f1', '#cap-f1', T.f1, T.f2], ['#f2', '#cap-f2', T.f2, T.f3], ['#f3', '#cap-f3', T.f3, T.end]];
   feats.forEach(([card, cap, a, b], i) => {
-    const hold = b - a - 1.15;
+    const hold = b - a - 1.26;
     // the card stays solid while it travels: opacity only covers the first and last instants
-    tl.fromTo(card, { x: 720, z: -520, rotationY: 58, rotationX: 4 }, { x: 0, z: 0, rotationY: 7, rotationX: 5, duration: .85, ease: 'expo.out' }, a);
-    tl.fromTo(card, { opacity: 0 }, { opacity: 1, duration: .14, ease: 'none' }, a);
-    tl.to(card, { rotationY: -6, rotationX: 2, duration: hold, ease: 'sine.inOut' }, a + .85);
-    tl.to(card, { x: -720, z: -520, rotationY: -58, duration: .42, ease: 'power2.in' }, b - .4);
+    const a0 = i ? a - .2 : a;                                        // the next card is already swinging in as the last one leaves
+    tl.fromTo(card, { x: 720, z: -520, rotationY: 58, rotationX: 4 }, { x: 0, z: 0, rotationY: 7, rotationX: 5, duration: .95, ease: 'expo.out' }, a0);
+    tl.fromTo(card, { opacity: 0 }, { opacity: 1, duration: .14, ease: 'none' }, a0);
+    tl.to(card, { rotationY: -6, rotationX: 2, duration: hold, ease: 'sine.inOut' }, a + .8);
+    tl.to(card, { x: -720, z: -520, rotationY: -58, duration: .46, ease: 'power2.in' }, b - .46);
     tl.to(card, { opacity: 0, duration: .14, ease: 'none' }, b - .14);
     tl.fromTo(`${card} .pshadow`, { opacity: 0 }, { opacity: 1, duration: .5, ease: 'power2.out' }, a + .45);
-    capIn(cap, a + .12, .07); capOut(cap, b - .3);
+    const mid = { '#cap-f2': 2.75, '#cap-f3': 3.25 }[cap];             // the two longer features change caption half way
+    capIn(cap, a + .12, .07); capOut(cap, mid ? a + mid : b - .3);
+    if (mid) { capIn(cap + 'b', a + mid + .22, .07); capOut(cap + 'b', b - .3); }
     if (i) tl.to('#steps b', { x: i * 36, duration: .5, ease: 'power3.inOut' }, a - .15);
   });
   tl.fromTo('#steps', { opacity: 0 }, { opacity: 1, duration: .4 }, T.proof + .2);
   tl.to('#steps', { opacity: 0, duration: .3 }, T.end - .35);
+  tl.fromTo('#glow', { opacity: 0 }, { opacity: 1, duration: .8, ease: 'power2.out' }, T.proof + .1);
+  tl.to('#glow', { opacity: 0, duration: .4 }, T.end - .4);
   // template: the saved template fills the four parties in, one after another
   tl.fromTo('#f0 .pill', { scale: .8, opacity: 0, transformOrigin: '0 50%' }, { scale: 1, opacity: 1, duration: .45, ease: 'back.out(2)' }, T.proof + .35);
   tl.fromTo('#f0 .frow', { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .4, ease: 'power3.out', stagger: .07 }, T.proof + .5);
@@ -560,15 +590,34 @@ document.fonts.ready.then(() => {
   tl.to('#d0', { y: 244, duration: .75, ease: 'power3.inOut' }, T.f1 + 1.45);
   tl.to('#d2', { y: 122, duration: .75, ease: 'power3.inOut' }, T.f1 + 1.52);
   tl.to('#d1 .ring', { opacity: 1, duration: .4, ease: 'power2.out' }, T.f1 + 1.75);
-  // rule check: the checks tick down the list, then it is ready
-  tl.fromTo('#f2 .chk', { scale: 0 }, { scale: 1, duration: .36, ease: 'back.out(2.4)', stagger: .22 }, T.f2 + .45);
-  tl.fromTo('#f2 .bar', { scaleX: .2, opacity: .3, transformOrigin: '0 50%' }, { scaleX: 1, opacity: 1, duration: .42, ease: 'power3.out', stagger: .22 }, T.f2 + .45);
-  tl.fromTo('#f2 .ready', { opacity: 0, y: 16, scale: .92, transformOrigin: '0 50%' }, { opacity: 1, y: 0, scale: 1, duration: .45, ease: 'back.out(1.8)' }, T.f2 + 1.55);
-  // AI: one line gets flagged
-  tl.fromTo('#f3 .l', { scaleX: .3, opacity: 0, transformOrigin: '0 50%' }, { scaleX: 1, opacity: 1, duration: .45, ease: 'power3.out', stagger: .08 }, T.f3 + .35);
-  tl.fromTo('#f3 .hot', { scale: .9, opacity: 0 }, { scale: 1, opacity: 1, duration: .5, ease: 'back.out(2)' }, T.f3 + 1.0);
-  tl.fromTo('#f3 .hot svg', { rotation: -90, scale: 0 }, { rotation: 0, scale: 1, duration: .55, ease: 'back.out(2.6)' }, T.f3 + 1.12);
-  tl.fromTo('#f3 .hot b', { opacity: 0, x: 12 }, { opacity: 1, x: 0, duration: .4, ease: 'power3.out' }, T.f3 + 1.35);
+  // rule check: each named field is checked; one comes back missing, is called out, then fixed
+  const r = (n, sel) => `#f2 .row:nth-of-type(${n}) ${sel}`;
+  tl.fromTo('#f2 .row', { opacity: 0, x: 36 }, { opacity: 1, x: 0, duration: .45, ease: 'power3.out', stagger: .09 }, T.f2 + .4);
+  tl.set('#f2 .chk, #f2 .wrn', { scale: 0 }, 0); tl.set('#f2 .st em', { opacity: 0 }, 0);
+  [[1, .95], [2, 1.3], [4, 2.0]].forEach(([n, at]) => { tl.to(r(n, '.chk'), { scale: 1, duration: .36, ease: 'back.out(2.4)' }, T.f2 + at); tl.to(r(n, '.ok'), { opacity: 1, duration: .3 }, T.f2 + at + .05); });
+  tl.to(r(3, '.wrn'), { scale: 1, duration: .4, ease: 'back.out(2.6)' }, T.f2 + 1.65);
+  tl.to(r(3, '.bad'), { opacity: 1, duration: .3 }, T.f2 + 1.7);
+  tl.to(r(3, '.warnbg'), { opacity: 1, duration: .35, ease: 'power2.out' }, T.f2 + 1.7);
+  tl.to('#f2 .row.w', { z: 40, scale: 1.035, duration: .5, ease: 'power3.out' }, T.f2 + 2.95);      // "see what's missing"
+  tl.to('#f2 .row.w', { z: 0, scale: 1, duration: .5, ease: 'power3.inOut' }, T.f2 + 3.75);
+  tl.to(r(3, '.wrn'), { scale: 0, duration: .22, ease: 'power2.in' }, T.f2 + 3.75);
+  tl.to(r(3, '.chk'), { scale: 1, duration: .4, ease: 'back.out(2.6)' }, T.f2 + 3.95);
+  tl.to(r(3, '.bad'), { opacity: 0, duration: .2 }, T.f2 + 3.75); tl.to(r(3, '.ok'), { opacity: 1, duration: .3 }, T.f2 + 3.95);
+  tl.to(r(3, '.warnbg'), { opacity: 0, duration: .45 }, T.f2 + 3.9);
+  tl.fromTo('#f2 .ready', { opacity: 0, y: 16, scale: .92, transformOrigin: '0 50%' }, { opacity: 1, y: 0, scale: 1, duration: .45, ease: 'back.out(1.8)' }, T.f2 + 4.3);
+  // AI review: a gold band reads the whole filing top to bottom, one line is flagged, then the why and the how open under it
+  tl.fromTo('#f3 .l', { scaleX: .3, opacity: 0, transformOrigin: '0 50%' }, { scaleX: 1, opacity: 1, duration: .45, ease: 'power3.out', stagger: .07 }, T.f3 + .35);
+  tl.set('#f3 .hot, #f3 .note', { opacity: 0 }, 0);
+  tl.fromTo('#f3 .scan', { y: -52, opacity: 0 }, { y: 300, opacity: 1, duration: 1.55, ease: 'sine.inOut' }, T.f3 + .85);
+  tl.to('#f3 .scan', { opacity: 0, duration: .25 }, T.f3 + 2.25);
+  tl.to('#f3 .l', { backgroundColor: '#C9D1E3', duration: .25, stagger: .24, yoyo: true, repeat: 1 }, T.f3 + .9);
+  tl.to('#f3 .l:nth-of-type(2)', { opacity: 0, duration: .2 }, T.f3 + 2.55);
+  tl.fromTo('#f3 .hot', { scale: .9 }, { scale: 1, opacity: 1, duration: .5, ease: 'back.out(2)' }, T.f3 + 2.6);
+  tl.fromTo('#f3 .hot svg', { rotation: -90, scale: 0 }, { rotation: 0, scale: 1, duration: .55, ease: 'back.out(2.6)' }, T.f3 + 2.72);
+  tl.fromTo('#f3 .hot b', { opacity: 0, x: 12 }, { opacity: 1, x: 0, duration: .4, ease: 'power3.out' }, T.f3 + 2.9);
+  tl.to('#f3 .l:nth-of-type(n+3)', { opacity: 0, y: 14, duration: .3, ease: 'power2.in' }, T.f3 + 3.2);
+  tl.fromTo('#f3 .note', { y: -18, scaleY: .7, transformOrigin: '50% 0' }, { y: 0, scaleY: 1, opacity: 1, duration: .5, ease: 'power3.out' }, T.f3 + 3.4);
+  tl.fromTo('#f3 .note > *', { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: .35, ease: 'power3.out', stagger: .1 }, T.f3 + 3.55);
 
   // end card
   tl.to('#dim', { opacity: .9, duration: .5, ease: 'power2.inOut' }, T.end - .1);

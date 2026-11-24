@@ -26,7 +26,7 @@
  { "id": "t04a", "text": "Start from a template. Your saved details fill in." },
  { "id": "t04b", "text": "Describe the goods. Get HTS code suggestions." },
  { "id": "t04c", "text": "Track every deadline, most urgent first." },
- { "id": "t04d", "text": "Check every field before you send." },
- { "id": "t04e", "text": "And let AI flag what to fix." },
+ { "id": "t04d", "text": "Check every field against the filing rules. See what's missing before you send." },
+ { "id": "t04e", "text": "Then let AI review the whole filing, and flag what to fix and why." },
  { "id": "t05", "text": "MyCargoLens. Book a demo." }
 ]

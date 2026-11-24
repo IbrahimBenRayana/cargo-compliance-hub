@@ -123,7 +123,7 @@ const SCENES = {
 	'a-end': { ...END, line: 'AI pre-flight review,<br>on every draft.', vo: [['a06', 0.8]] },
 
 	// ── TikTok ad: picture is its own composition (../../2026-11-23-tiktok-ad); only the sound is timed here ──
-	'tiktok': { kind: 'film', dur: 28, vo: [['t01', 0.15], ['t02', 2.7], ['t03', 5.35], ['t04a', 8.9], ['t04b', 12.55], ['t04c', 16.45], ['t04d', 19.8], ['t04e', 22.8], ['t05', 25.65]] }
+	'tiktok': { kind: 'film', dur: 32.8, vo: [['t01', 0.15], ['t02', 2.7], ['t03', 5.35], ['t04a', 8.9], ['t04b', 12.55], ['t04c', 16.45], ['t04d', 19.8], ['t04e', 25.3], ['t05', 30.45]] }
 };
 
 export const CUTS = {
