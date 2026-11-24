@@ -23,8 +23,12 @@ const vo = withVo ? scenes.flatMap((s) => (s.vo || []).map(([id, at]) => ({ file
 const clicks = scenes.flatMap((s) => (s.events || []).filter((e) => e.type === 'click')
 	.map((e) => s.start + e.t / 1000 - s.from).filter((t) => t > s.start && t < s.start + s.dur));
 
+// sound effects: [id, time, volume] per scene, files in .work/sfx/<id>.wav; they play in the music-only mix too
+const sfx = scenes.flatMap((s) => (s.sfx || []).map(([id, at, vol = 0.4]) => ({ file: path.join(WORK, 'sfx', `${id}.wav`), t: s.start + at, vol })));
+
 const inputs = ['-i', MUSIC];
 vo.forEach((v) => inputs.push('-i', v.file));
+sfx.forEach((x) => inputs.push('-i', x.file));
 const f = [];
 if (CUTS[name].music === 'straight') {
 	// one continuous stretch of the track with a plain fade: no splice, so nothing can double up
@@ -41,14 +45,15 @@ if (CUTS[name].music === 'straight') {
 const tick = `sine=f=2200:d=0.05,afade=t=out:st=0:d=0.05,volume=0.16`;
 clicks.forEach((t, i) => f.push(`${tick},adelay=${Math.round(t * 1000)}|${Math.round(t * 1000)},apad=whole_dur=${total}[k${i}]`));
 vo.forEach((v, i) => f.push(`[${i + 1}:a]aresample=48000,pan=stereo|c0=c0|c1=c0,adelay=${Math.round(v.t * 1000)}|${Math.round(v.t * 1000)},apad=whole_dur=${total}[v${i}]`));
+sfx.forEach((x, i) => f.push(`[${1 + vo.length + i}:a]aresample=48000,pan=stereo|c0=c0|c1=c0,volume=${x.vol},adelay=${Math.round(x.t * 1000)}|${Math.round(x.t * 1000)},apad=whole_dur=${total}[x${i}]`));
 if (vo.length) {
 	f.push(`${vo.map((_, i) => `[v${i}]`).join('')}amix=inputs=${vo.length}:normalize=0,volume=1.35,asplit=2[vox][sc]`);
 	f.push(`[music][sc]sidechaincompress=threshold=0.04:ratio=6:attack=40:release=420:makeup=1[duck]`);
 } else {
 	f.push(`[music]anull[duck]`);
 }
-const bus = ['[duck]', vo.length ? '[vox]' : '', ...clicks.map((_, i) => `[k${i}]`)].join('');
-const n = 1 + (vo.length ? 1 : 0) + clicks.length;
+const bus = ['[duck]', vo.length ? '[vox]' : '', ...clicks.map((_, i) => `[k${i}]`), ...sfx.map((_, i) => `[x${i}]`)].join('');
+const n = 1 + (vo.length ? 1 : 0) + clicks.length + sfx.length;
 f.push(`${bus}amix=inputs=${n}:normalize=0,atrim=0:${total},loudnorm=I=-14:TP=-1.5:LRA=9,aresample=48000[out]`);
 
 const r = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', ...inputs, '-filter_complex', f.join(';'), '-map', '[out]', '-ac', '2', '-ar', '48000', out], { stdio: 'inherit' });
