@@ -61,13 +61,6 @@ const ENTRIES: Entry[] = [
     href: "/platform/customs-entry",
   },
   {
-    date: "2026-05-21",
-    kind: "feature",
-    title: "Terminal 49 container tracking: phase 1",
-    body: "Containers attached to your filings now poll Terminal 49 for live in-transit status. Surfaces vessel ETAs and port arrivals in the action queue.",
-    href: "/platform/compliance",
-  },
-  {
     date: "2026-05-20",
     kind: "feature",
     title: "ADD/CVD orders synced from the Federal Register",

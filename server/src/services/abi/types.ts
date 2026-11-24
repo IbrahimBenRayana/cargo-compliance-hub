@@ -166,7 +166,7 @@ export interface AbiManifest {
 export interface AbiDocumentBody {
   /** 01 consumption, 03 consumption with AD/CVD, 11 informal, 86 (suspended). */
   entryType: '01' | '03' | '11' | '86';
-  modeOfTransport: string;          // "40" vessel, "41" air
+  modeOfTransport: string;          // "11" vessel containerized, "40" air, "41" air containerized
   entryNumber: string;              // filer-assigned; hyphens auto-stripped by CC
   dates: AbiDates;
   location: AbiLocation;

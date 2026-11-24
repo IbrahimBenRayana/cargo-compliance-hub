@@ -26,12 +26,12 @@ const DESCRIPTION =
 
 export const metadata: Metadata = pageMetadata({ path: PATH, title: TITLE, description: DESCRIPTION });
 
-/** Hero flow strip: real dashboard crops (wireframe 03). */
+/** Hero flow strip: real shipment-record crops (wireframe 03). */
 const FLOW: { label: string; screen: ScreenKey; module: ModuleKey }[] = [
   { label: "ISF filed", screen: "app-flow-1", module: "isf" },
   { label: "Manifest verified", screen: "app-flow-2", module: "inbox" },
   { label: "Entry filed", screen: "app-flow-3", module: "entry" },
-  { label: "Cleared by CBP", screen: "app-flow-4", module: "checks" },
+  { label: "Entry accepted", screen: "app-flow-4", module: "checks" },
 ];
 
 type Part = { route: SiteRoute; body: string; link: string };
@@ -118,7 +118,7 @@ export default function PlatformPage() {
         sub="MyCargoLens takes a shipment from ISF-10 or ISF-5 to entry summary and cargo release, then tracks the entry until it liquidates. One inbox ranks the open work across all of it."
         src="platform-hero"
       >
-        <ol aria-label="One shipment, from ISF to cleared" className="hidden max-w-xl grid-cols-4 gap-3 sm:grid">
+        <ol aria-label="One shipment, from ISF to accepted entry" className="hidden max-w-xl grid-cols-4 gap-3 sm:grid">
           {FLOW.map((f) => (
             <li key={f.screen} className={`min-w-0 ${accentClass(f.module)}`}>
               <p className="mb-2 whitespace-nowrap text-[10.5px] font-semibold uppercase leading-tight tracking-[0.04em] text-a-ink">{f.label}</p>
@@ -157,7 +157,7 @@ export default function PlatformPage() {
             {
               module: "compliance",
               title: "Tracked until it's closed",
-              body: "Each ISF carries its deadline clock, and each accepted entry carries its 314-day liquidation window. The post-summary correction deadline is marked at day 300 after entry, CBP's regular PSC window. Container tracking with vessel ETAs and last free day is available with customs entry; ask us in the demo.",
+              body: "Each ISF carries its deadline clock, and each accepted entry carries its 314-day liquidation window. The post-summary correction deadline is marked at day 300 after entry, CBP's regular PSC window.",
               media: <Screenshot screen="app-liquidation-clocks" aspect="16/10" sizes="(min-width: 1024px) 260px, 100vw" />,
             },
           ]}

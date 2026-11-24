@@ -391,7 +391,7 @@ export default function HomePage() {
           <div className="relative min-w-0 lg:order-1 order-2">
             <Screenshot
               screen="app-isf-timeline"
-              caption="A filing record with sample data: lifecycle, timeline and every CBP response."
+              caption="A filing record with sample data: its status, the linked manifest and entry, and every CBP response."
             />
           </div>
           <div className="order-1 min-w-0 lg:order-2">

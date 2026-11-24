@@ -1,93 +1,76 @@
 // COMPLIANCE · "Trade compliance software for what happens after entry"
-// Round 2. Acceptance starts the clock: a 314-day gauge stands around the accepted entry and fills
-// toward liquidation. The Focus Frame reads the entry's HTS lines and raises two flags beside it:
-// possible ADD/CVD and possible UFLPA exposure. At day 314 the entry liquidates.
-import type * as THREE from "three";
+// One idea: acceptance starts the clock. The accepted entry stands on the plinth under the Focus
+// Frame, and a single gold line runs along the rail in front of it toward two milestones from the
+// page's clock strip: the PSC deadline (day 300) and the estimated liquidation (about day 314).
+// One milestone is lit at a time; the line rests, fades and starts again.
 import type { SceneDef } from "../engine";
 
 export const scene: SceneDef = {
-  loop: 12, poster: 4.6, radius: 4.9, width: 5.2,
-  camera: { pos: [3.2, 4.6, 14], target: [.6, 2.7, 0], fov: 26 },
-  fit: { d: [1.038, 0.071, 0.047], m: [0.945, 0.071, 0.039] }, // measured by the poster harness fit pass
+  loop: 16, poster: 12.2, radius: 5.4, width: 5.4, drift: .22,
+  camera: { pos: [3.2, 7.6, 14], target: [.3, 1.4, 0], fov: 26 },
+  fit: { d: [1.253, 0, 0.073], m: [1.116, -0.004, 0.058] }, // measured by the poster harness fit pass
   build(W) {
-    const { THREE, C, M, E, win, env, lerp, TAU } = W;
-    W.add(W.slab(10, .4, 4.2, M.porcelain, .2));
-    const root = new THREE.Group(); root.position.set(-1.1, 0, -.4); W.add(root);
-    root.rotation.y = Math.atan2(W.camPos.x + 1.1, W.camPos.z + .4) * .8;
+    const { THREE, C, M, E, win, lerp } = W;
+    W.add(W.slab(8.6, .4, 4.8, M.porcelain, .2));
 
-    // gauge: a 270-degree arc from 7:30 round to 4:30, standing on two feet
-    const R = 2.45, cy = 2.75, a0 = Math.PI * 1.25, sweep = Math.PI * 1.5;
-    const angAt = (u: number) => a0 - u * sweep;                       // clockwise
-    const pt = (u: number, r = R): [number, number, number] => [Math.cos(angAt(u)) * r, cy + Math.sin(angAt(u)) * r, 0];
-    const arcPts = Array.from({ length: 49 }, (_, i) => pt(i / 48));
-    const track = W.tube(arcPts, .07, M.mist, 160); root.add(track);
-    const fill = W.tube(arcPts, .1, M.goldGlow, 160); root.add(fill);
-    for (let i = 0; i <= 12; i++) { const u = i / 12, a = angAt(u); const tk = W.mesh(W.rbox(.05, i % 3 ? .16 : .3, .05, .02), M.slate, false); tk.position.set(Math.cos(a) * (R + .3), cy + Math.sin(a) * (R + .3), 0); tk.rotation.z = a - Math.PI / 2; root.add(tk); }
-    for (const sx of [-1, 1]) { const f = W.mesh(W.rbox(.22, .9, .4, .08), M.navy); f.position.set(sx * 1.25, .85, 0); f.rotation.z = sx * .25; root.add(f); }
-    const head = W.mesh(new THREE.SphereGeometry(.17, 20, 14), M.goldGlow, false); root.add(head);
-    const headGlow = W.glow(C.gold, 1.4, .7); root.add(headGlow);
-    // milestones on the arc (no PSC day count: position only)
+    // the accepted entry: a card on a low porcelain stand at the start of the rail
+    const cx = -2.4, cz = -1.3, cw = 3.2, ar = .625, ch = cw * ar;
+    const stand = W.mesh(W.rbox(2.3, .22, .7, .08), M.porcelain); stand.position.set(cx, .51, cz); W.add(stand);
+    const face = W.cardFace({ eyebrow: 'Entry', title: 'Accepted by CBP', big: true, meta: '230-1148293-5', rail: C.emerald, rows: 2 });
+    const card = W.card(face, { w: cw, aspect: ar, d: .09 });
+    const cy = .62 + ch / 2 + .04;
+    card.position.set(cx, cy, cz); W.faceCam(card, -.26); W.add(card);
+    const frame = W.add(W.focusFrame({ th: .06, arm: .3 })); frame.rotation.copy(card.rotation);
+    frame.userData.halo.material.color.set(C.gold);
+
+    // the rail: a thin track along the front of the plinth, from day 0 to liquidation
+    const y = .47, z = 1.45, x0 = cx, x1 = 3.4;
+    const track = W.tube([[x0, y, z], [x1, y, z]], .045, M.mist, 60); W.add(track);
+    const fillMat = new THREE.MeshStandardMaterial({ color: C.gold, roughness: .3, metalness: .2, emissive: C.gold, emissiveIntensity: W.dark ? .5 : .7, transparent: true });
+    const fill = W.tube([[x0, y, z], [x1 + .001, y, z]], .075, fillMat, 120); W.add(fill);
+    const head = W.mesh(new THREE.SphereGeometry(.13, 20, 14), fillMat, false); W.add(head);
+    const start = W.mesh(new THREE.SphereGeometry(.13, 20, 14), M.emerald, false); start.position.set(x0, y, z); W.add(start);
+
+    // two milestones, each a slim pin with a pill; the lit pill fades in over the plain one
+    const lit = W.dark
+      ? { dot: C.gold, bg: '#16233F', color: '#F3F5F9', border: 'rgba(251,190,36,.8)' }
+      : { dot: C.goldDark, bg: '#FFF7E0', border: 'rgba(216,146,15,.55)' };
     const marks = [
-      { u: 0, t: 'Entry accepted', c: C.emerald, off: [-1.15, -.1] },
-      { u: .9, t: 'PSC deadline', c: C.blue, off: [1.35, .55] },
-      { u: 1, t: 'Liquidation · day 314', c: C.violet, off: [1.25, -.45] },
-    ].map(m => {
-      const p = pt(m.u); const dot = W.mesh(new THREE.SphereGeometry(.15, 20, 14), new THREE.MeshStandardMaterial({ color: m.c, emissive: m.c, emissiveIntensity: .2 }), false); dot.position.set(...p); root.add(dot);
-      const pl = W.pill(m.t, { dot: m.c, h: .4 }); pl.position.set(p[0] + m.off[0], p[1] + m.off[1], .2); root.add(pl); W.billboard(pl);
-      return { ...m, dot };
+      { x: 1.55, h: .85, text: 'PSC deadline · day 300' },
+      { x: x1, h: 2.3, text: 'Liquidation · about day 314' },
+    ].map((m) => {
+      const k = (m.x - x0) / (x1 - x0);
+      const pin = W.mesh(W.rbox(.06, m.h, .06, .025), M.slate, false); pin.position.set(m.x, y + m.h / 2, z); W.add(pin);
+      const knobMat = new THREE.MeshStandardMaterial({ color: C.mist, roughness: .35, emissive: C.gold, emissiveIntensity: 0 });
+      const knob = W.mesh(new THREE.SphereGeometry(.12, 20, 14), knobMat, false); knob.position.set(m.x, y + m.h, z); W.add(knob);
+      const base = W.pill(m.text, { dot: C.slate, h: .5 }); base.position.set(m.x, y + m.h + .45, z); W.add(base);
+      const on = W.pill(m.text, { ...lit, h: .5 }); on.position.copy(base.position); on.renderOrder = 11; on.material.opacity = 0; W.add(on);
+      const halo = W.glow(C.gold, 1.1, 0); halo.position.copy(knob.position); W.add(halo);
+      return { k, knobMat, on, halo };
     });
-    // day counter under the gauge (pre-rendered every 2 days)
-    const dayTex: (THREE.Texture | null)[] = Array.from({ length: 158 }, () => null);
-    const dayPill = W.pill('Day 0 of 314', { h: .46, mono: true }); dayPill.position.set(0, .55, .5); root.add(dayPill); W.billboard(dayPill);
-    const setDay = (d: number) => { const k = Math.min(157, Math.round(d / 2)); if (!dayTex[k]) dayTex[k] = W.pillTex(`Day ${k * 2} of 314`, { mono: true }); if (dayPill.material.map !== dayTex[k]) { dayPill.material.map = dayTex[k]; dayPill.material.needsUpdate = true; } };
-
-    // the entry card inside the gauge, with two HTS lines
-    const face = (state: string) => W.canvasTex(640, 420, (g) => {
-      W.rr(g, 0, 0, 640, 420, 34); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 3; g.strokeStyle = 'rgba(30,45,77,.1)'; g.stroke();
-      W.rr(g, 0, 0, 12, 420, [34, 0, 0, 34]); g.fillStyle = state === 'liq' ? C.violet : C.emerald; g.fill();
-      g.font = `600 22px ${W.FONT}`; g.fillStyle = '#6B7794'; g.fillText('E N T R Y   2 3 0 - 1 1 4 8 2 9 3 - 5', 48, 66);
-      g.font = `700 40px ${W.FONT}`; g.fillStyle = '#0F1A30'; g.fillText(state === 'liq' ? 'Liquidated' : 'Accepted by CBP', 48, 120);
-      [['8504.40.95', 'Power supplies'], ['7318.15.20', 'Steel bolts']].forEach(([h, d], i) => {
-        const y = 196 + i * 92; W.rr(g, 36, y - 46, 568, 76, 16); g.fillStyle = 'rgba(30,45,77,.04)'; g.fill();
-        g.font = `600 30px ${W.MONO}`; g.fillStyle = '#1E2D4D'; g.fillText(h, 60, y + 2); g.font = `500 28px ${W.FONT}`; g.fillStyle = '#66728C'; g.fillText(d, 290, y + 2);
-      });
-      g.font = `500 22px ${W.MONO}`; g.fillStyle = '#8C99B8'; g.fillText('HTS lines checked daily', 48, 392);
-    });
-    const fAcc = face('acc'), fLiq = face('liq');
-    const cw = 2.9, ch = cw * 420 / 640;
-    const card = W.card(fAcc, { w: cw, aspect: 420 / 640, d: .08 }); card.position.set(0, cy + .05, .15); root.add(card);
-    const rowY = (i: number) => ch / 2 - (196 + i * 92 - 8) / 420 * ch;
-    const frame = W.focusFrame({ th: .055, arm: .26 }); root.add(frame);
-    // risk chips to the right of the gauge, stacked with room between them
-    const chips = [
-      W.pill('Possible ADD/CVD · 7318.15', { dot: C.amber, h: .46 }),
-      W.pill('Possible UFLPA exposure · review origin', { dot: C.amber, h: .46 }),
-    ];
-    chips.forEach((c, i) => { c.position.set(4.6, 4.35 - i * .85, .2); root.add(c); W.billboard(c); });
-    const lines = chips.map((c, i) => { const l = W.mesh(W.rbox(1, .025, .025, .01), M.goldGlow, false); root.add(l); return l; });
+    const gold = new THREE.Color(C.gold), mist = new THREE.Color(W.dark ? '#3A4A6E' : C.mist);
 
     return { update(t, a) {
-      const out = win(t, 10.6, 11.5);
-      const u = E.inOutSine(win(t, .4, 9.4)) * (1 - out);
-      fill.userData.setProgress(0, u);
-      const hp = pt(u); head.position.set(...hp); headGlow.position.set(...hp); head.scale.setScalar(1 - out + .001); headGlow.material.opacity = .7 * (1 - out);
-      setDay(u * 314);
-      marks.forEach(m => { const on = u >= m.u - .002 ? 1 : 0; m.dot.material.emissiveIntensity = .2 + on * .8; m.dot.scale.setScalar(1 + Math.max(0, 1 - Math.abs(u - m.u) / .04) * .5); });
-      card.userData.blendTo(fLiq, win(t, 9.3, 9.8) * (1 - out));
-      // frame: row 1 (1.2..2.6), row 2 (2.8..4.2), then whole card at day 314
-      const r1 = E.outBack(win(t, 1.2, 1.7)), mv = E.inOutCubic(win(t, 2.6, 3.1)), toCard = E.inOutCubic(win(t, 4.4, 5.0));
-      const fy = lerp(lerp(rowY(0), rowY(1), mv), 0, toCard);
-      const fw = lerp(cw - .2, cw, toCard), fh = lerp(.42, ch, toCard);
-      frame.position.set(card.position.x, card.position.y + fy, card.position.z + .07);
-      const open = Math.min(1, (1 - r1) + win(t, 5.2, 5.8) * (1 - win(t, 8.8, 9.3)) + out);
-      frame.userData.set(fw, fh, open, (t > 1.6 && t < 2.4) ? win(t, 1.6, 2.4) : (t > 3.1 && t < 3.9) ? win(t, 3.1, 3.9) : (t > 9.4 && t < 10.2) ? win(t, 9.4, 10.2) : 0);
-      frame.userData.halo.material.color.set(t > 9 ? C.violet : C.amber);
-      chips.forEach((c, i) => {
-        const on = E.outBack(win(t, 1.9 + i * 1.5, 2.4 + i * 1.5)) * (1 - out);
-        c.scale.setScalar(on + .001);
-        const from = new THREE.Vector3(card.position.x + cw / 2, card.position.y + rowY(i), .2), to = c.position.clone().add(new THREE.Vector3(-c.geometry.parameters.width / 2, 0, 0));
-        const l = lines[i]; const d = to.clone().sub(from); l.position.copy(from).addScaledVector(d, .5); l.scale.x = d.length() * on + .001; l.rotation.z = Math.atan2(d.y, d.x);
+      // progress: ease out to the PSC deadline, rest, ease on to liquidation, rest, fade, again
+      const kP = marks[0].k;
+      const u = lerp(0, kP, E.outCubic(win(t, 1.0, 6.0))) + lerp(0, 1 - kP, E.outCubic(win(t, 7.6, 11.0)));
+      const fade = 1 - E.outCubic(win(t, 13.6, 15.2));
+      fill.userData.setProgress(0, Math.max(.001, u));
+      fillMat.opacity = fade; head.visible = u > .004;
+      head.position.set(lerp(x0, x1, u), y, z); head.scale.setScalar(.6 + .4 * fade);
+      // one milestone lit at a time: PSC while the line rests there, liquidation at the end
+      const pscOn = win(u, kP - .015, kP) * (1 - win(u, .9, .99)) * fade;
+      const liqOn = win(u, .985, 1) * fade;
+      [pscOn, liqOn].forEach((k, i) => {
+        const m = marks[i];
+        m.on.material.opacity = k;
+        m.knobMat.color.copy(mist).lerp(gold, k); m.knobMat.emissiveIntensity = k * (W.dark ? .6 : .8);
+        m.halo.material.opacity = k * (W.dark ? .55 : .4);
       });
+      // the entry stays in focus; a slow breath keeps it alive
+      card.position.y = cy + Math.sin(a) * .03;
+      frame.position.copy(card.position).add(new THREE.Vector3(0, 0, .07).applyEuler(card.rotation));
+      frame.userData.set(cw, ch, 0, t > 1.0 && t < 2.6 ? win(t, 1.0, 2.6) : 0);
     } };
   },
 };
