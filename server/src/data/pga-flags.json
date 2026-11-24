@@ -1,10 +1,10 @@
 {
   "_meta": {
     "source": "CBP HTS PGA Indicator file (simplified)",
-    "lastUpdated": "2026-05-14",
-    "note": "Maps HTS prefix → agencies that require notice/permit. Prefix matching: longest wins. Not exhaustive — covers the high-volume cases an importer is most likely to encounter."
+    "lastUpdated": "2026-11-24",
+    "note": "Maps HTS prefix (2-digit chapter or 4-digit heading) → agencies that may require notice/permit. Longest prefix wins. Curated hints, not the full indicator file: present results as things to check. Not exhaustive — covers the high-volume cases an importer is most likely to encounter."
   },
-  "chapters": {
+  "prefixes": {
     "01": [{ "agency": "USDA-APHIS", "name": "Live animals", "action": "Veterinary permit + import certificate required" }],
     "02": [{ "agency": "USDA-FSIS", "name": "Meat products",   "action": "FSIS inspection at port of entry" }],
     "03": [{ "agency": "FDA",       "name": "Seafood",         "action": "FDA Prior Notice required ≥ 4 hours before arrival" }],
@@ -40,7 +40,13 @@
     "71": [{ "agency": "TFTEA",     "name": "Precious metals/jewelry", "action": "Kimberley Process certificate for rough diamonds" }],
     "84": [{ "agency": "EPA",       "name": "Machinery",       "action": "EPA engine emissions for off-road equipment" }],
     "85": [{ "agency": "FCC",       "name": "Electronics",     "action": "FCC Form 740 for RF-emitting devices" }],
-    "87": [{ "agency": "DOT-NHTSA", "name": "Vehicles",        "action": "HS-7 Declaration; EPA Form 3520-1 for emissions" }],
+    "87": [{ "agency": "DOT-NHTSA", "name": "Vehicles and vehicle equipment", "action": "HS-7 Declaration if the item is a motor vehicle, or equipment covered by a Federal Motor Vehicle Safety Standard" }, { "agency": "EPA", "name": "Vehicle and engine emissions", "action": "EPA Form 3520-1 if the item is a motor vehicle or engine subject to EPA emission standards" }],
+    "8701": [{ "agency": "DOT-NHTSA", "name": "Motor vehicles", "action": "HS-7 Declaration (safety standards)" }, { "agency": "EPA", "name": "Vehicle emissions", "action": "EPA Form 3520-1 (emissions)" }],
+    "8702": [{ "agency": "DOT-NHTSA", "name": "Motor vehicles", "action": "HS-7 Declaration (safety standards)" }, { "agency": "EPA", "name": "Vehicle emissions", "action": "EPA Form 3520-1 (emissions)" }],
+    "8703": [{ "agency": "DOT-NHTSA", "name": "Motor vehicles", "action": "HS-7 Declaration (safety standards)" }, { "agency": "EPA", "name": "Vehicle emissions", "action": "EPA Form 3520-1 (emissions)" }],
+    "8704": [{ "agency": "DOT-NHTSA", "name": "Motor vehicles", "action": "HS-7 Declaration (safety standards)" }, { "agency": "EPA", "name": "Vehicle emissions", "action": "EPA Form 3520-1 (emissions)" }],
+    "8708": [{ "agency": "DOT-NHTSA", "name": "Motor vehicle equipment", "action": "HS-7 Declaration only if the part is covered by a Federal Motor Vehicle Safety Standard (e.g. brake hoses, brake fluid, lighting, glazing)" }],
+    "8711": [{ "agency": "DOT-NHTSA", "name": "Motor vehicles", "action": "HS-7 Declaration (safety standards)" }, { "agency": "EPA", "name": "Vehicle emissions", "action": "EPA Form 3520-1 (emissions)" }],
     "88": [{ "agency": "FAA",       "name": "Aircraft/parts",  "action": "FAA airworthiness certification" }],
     "90": [{ "agency": "FDA",       "name": "Medical devices", "action": "FDA medical device listing + 510(k) clearance" }],
     "93": [{ "agency": "ATF",       "name": "Arms/ammunition", "action": "ATF import permit (Form 6) + ITAR/AECA review" }],
