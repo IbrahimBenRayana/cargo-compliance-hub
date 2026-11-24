@@ -127,6 +127,7 @@ export function toAeEntrySummaryInput(payload: AbiPayloadV2, action: 'A' | 'R' |
       usStateOfDestination: es.usStateOfDestination,
       foreignTradeZoneId: es.foreignTradeZoneId,
     },
+    iorDeclaration: es.iorDeclaration,
     cargo:
       es.cargo || es.dates?.estimatedArrival || es.dates?.inBond
         ? {

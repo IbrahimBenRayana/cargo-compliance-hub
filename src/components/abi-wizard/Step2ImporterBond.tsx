@@ -10,6 +10,7 @@ import {
   SelectField,
   TextField,
 } from './shared';
+import IorDeclarationFields from './IorDeclarationFields';
 
 interface Props {
   value: ABIDocumentDraft;
@@ -49,7 +50,8 @@ export default function Step2ImporterBond({ value, onChange, errors = {} }: Prop
             label="IOR Number"
             required
             value={ior.number || ''}
-            onChange={(v) => setIor({ number: v })}
+            // The attestation is for one importer: a new number needs a new one.
+            onChange={(v) => setIor({ number: v, ...(v !== ior.number && { usIorAttested: undefined }) })}
             placeholder="XX-XXXXXXXXX"
             maxLength={15}
             hint="EIN, SSN, or CBP-assigned importer number."
@@ -67,6 +69,8 @@ export default function Step2ImporterBond({ value, onChange, errors = {} }: Prop
           />
         </div>
       </div>
+
+      <IorDeclarationFields ior={ior} setIor={setIor} errors={errors} />
 
       <div>
         <SectionHeader

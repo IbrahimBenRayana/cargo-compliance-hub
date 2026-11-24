@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, XCircle, Loader2, RefreshCw } from '@/components/icons';
+import { AlertTriangle, CheckCircle2, XCircle, Loader2, RefreshCw } from '@/components/icons';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { abiDocumentsApi } from '@/api/client';
@@ -48,6 +48,16 @@ export function CbpPreflightCard({ docId }: { docId: string }) {
               </ul>
             )}
           </div>
+        )}
+        {data?.ready && data.warnings && data.warnings.length > 0 && (
+          <ul className="space-y-1.5 text-sm">
+            {data.warnings.map((w) => (
+              <li key={w.code} className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50/60 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/30">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-soon" />
+                <span>{w.message} You can still send it; you&apos;ll be asked to confirm.</span>
+              </li>
+            ))}
+          </ul>
         )}
         {data?.ready && (
           <p className="text-xs text-muted-foreground">

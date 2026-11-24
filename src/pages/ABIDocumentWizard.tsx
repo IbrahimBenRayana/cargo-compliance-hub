@@ -42,7 +42,9 @@ import { abiDocumentsApi } from '@/api/client';
 import type {
   ABIDocumentDraft,
   AbiDocument,
+  CbpWarning,
 } from '@/api/client';
+import { SendAnywayDialog, cbpWarningsFrom } from '@/components/abi-wizard/SendAnywayDialog';
 import {
   useAbiDocument,
   useAbiDocumentAutosave,
@@ -256,7 +258,10 @@ export default function ABIDocumentWizard() {
   const visibleStepErrors = showErrorsForCurrentStep ? stepErrors : {};
   const [transmitOpen, setTransmitOpen] = useState(false);
 
-  const handleTransmit = async () => {
+  // CTPAT warnings (foreign IOR rule): the server asks before sending.
+  const [sendWarnings, setSendWarnings] = useState<CbpWarning[] | null>(null);
+
+  const handleTransmit = async (acknowledgeWarnings = false) => {
     if (!docId) return;
     // CBP builds from the saved entry: every edit must be on the server
     // before the send starts (audit FPR-01).
@@ -270,14 +275,19 @@ export default function ABIDocumentWizard() {
     try {
       if (replacing) {
         setReplacePending(true);
-        await abiDocumentsApi.cbpAction(docId, 'REPLACE');
+        await abiDocumentsApi.cbpAction(docId, 'REPLACE', acknowledgeWarnings);
         toast.success('Replacement sent to CBP.');
       } else {
-        await sendMut.mutateAsync(docId);
+        await sendMut.mutateAsync({ id: docId, acknowledgeWarnings });
         toast.success('Filing transmitted to CBP. Tracking status…');
       }
       navigate(`/abi-documents/${docId}`);
     } catch (err: any) {
+      const warnings = cbpWarningsFrom(err);
+      if (warnings) {
+        setSendWarnings(warnings);
+        return;
+      }
       const msg = err?.message ?? 'Failed to transmit filing';
       toast.error(msg);
     } finally {
@@ -465,12 +475,20 @@ export default function ABIDocumentWizard() {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleTransmit}>
+                    <AlertDialogAction onClick={() => handleTransmit()}>
                       Transmit now
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+              <SendAnywayDialog
+                warnings={sendWarnings}
+                onCancel={() => setSendWarnings(null)}
+                onSendAnyway={() => {
+                  setSendWarnings(null);
+                  handleTransmit(true);
+                }}
+              />
             </>
           )}
         </div>

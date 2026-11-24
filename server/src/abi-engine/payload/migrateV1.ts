@@ -14,6 +14,7 @@ import type { AbiDocumentBody, AbiItem, AbiInvoice } from '../../services/abi/ty
 import { parseAbiPayloadV2, type AbiPayloadV2, type EntrySummaryV2, type LineV2 } from './schemaV2.js';
 import { deriveMid } from './mid.js';
 import { orderCh99 } from './ch99.js';
+import { canonicalImporterNumber } from '../records/importerNumber.js';
 
 function fail(field: string, message: string): never {
   const issue: CodecIssue = { record: 'PayloadV1', field, message };
@@ -172,6 +173,16 @@ export function migrateV1ToV2(v1: AbiDocumentBody): AbiPayloadV2 {
       estimatedArrival: v1.dates.arrivalDate || undefined,
     },
     importerOfRecord: { number: v1.ior.number, name: v1.ior.name || undefined },
+    iorDeclaration:
+      v1.ior.usImporterOfRecord === undefined
+        ? undefined
+        : {
+            usImporterOfRecord: v1.ior.usImporterOfRecord,
+            brokerActingAsIor: v1.ior.brokerActingAsIor ?? false,
+            principalOnPoa: v1.ior.principalOnPoa
+              ? canonicalImporterNumber(v1.ior.principalOnPoa)?.number ?? v1.ior.principalOnPoa
+              : undefined,
+          },
     consigneeNumber: v1.entryConsignee.taxId || undefined,
     usStateOfDestination: v1.location.destinationStateUS || undefined,
     bonds: bondType
