@@ -1,15 +1,15 @@
 /**
  * PGA (Participating Government Agency) flag lookup.
  *
- * Given an HTS code, returns the agencies that require notice / permit /
- * certification at the port of entry — FDA Prior Notice for food, USDA
- * APHIS phytosanitary for plants, EPA TSCA for chemicals, FCC for RF
- * electronics, etc.
+ * Given an HTS code, returns the agencies whose rules may apply at entry:
+ * FDA Prior Notice if the item is food, APHIS if it is a fresh plant
+ * product, EPA TSCA if it is a chemical, FCC if it emits RF energy, etc.
+ * Every action is conditional on what the product actually is.
  *
  * Data is a curated seed at `data/pga-flags.json` keyed by HTS prefix: a
- * 2-digit chapter, or a 4-digit heading where the chapter is too coarse
- * (chapter 87 covers both cars and brake calipers). Longest prefix wins.
- * These are hints to check, not the CBP PGA indicator file.
+ * 2-digit chapter, or a 4-digit heading where the chapter is too
+ * coarse (chapter 87 covers both cars and brake calipers). Longest prefix
+ * wins. These are hints to check, not the CBP per-tariff PGA flag file.
  */
 
 import pgaData from '../../data/pga-flags.json' with { type: 'json' };
