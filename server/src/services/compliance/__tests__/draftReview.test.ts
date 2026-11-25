@@ -16,6 +16,7 @@ import {
   renderPgaSection,
   buildDraftReviewPrompt,
   createLineHumanizer,
+  ruleCheckLabels,
 } from '../draftReview.js';
 import { validateFiling } from '../../validation.js';
 import { lookupPgaFlags } from '../pgaFlags.js';
@@ -155,10 +156,72 @@ describe('buildDraftReviewPrompt', () => {
   it('sends labelled fields and forbids the model from adding will-reject or PGA claims', () => {
     const draft = calipersDraft();
     const prompt = buildDraftReviewPrompt(draft, validateFiling(draft));
-    expect(prompt).toContain('"Est. Departure Date": "is empty"');
+    expect(prompt).toMatch(/Empty fields: .*Est\. Departure Date/);
     expect(prompt).not.toContain('estimatedDeparture');
     expect(prompt).not.toContain('voyageNumber');
     expect(prompt).toMatch(/do not write a will-reject section/i);
     expect(prompt).toMatch(/do not name PGA agencies or forms/i);
+  });
+});
+
+// ─── Nov 25 follow-up: rough edges seen on staging MARRTGG55677 ──────
+
+describe('empty values read as prose', () => {
+  it('does not hand the model a quoted "is empty" value; lists empty fields by label instead', () => {
+    const draft = calipersDraft();
+    const prompt = buildDraftReviewPrompt(draft, validateFiling(draft));
+    expect(prompt).not.toContain('"is empty"');
+    expect(prompt).toMatch(/Empty fields: .*Voyage Number/);
+  });
+
+  it('rewrites a quoted "is empty" the model still produces', () => {
+    expect(humanizeFieldKeys('- **Voyage Number**: "is empty". While not an ISF data element, add it.'))
+      .toBe('- **Voyage Number** is empty. While not an ISF data element, add it.');
+    expect(humanizeFieldKeys('House Bill of Lading: "is empty"')).toBe('House Bill of Lading is empty');
+  });
+});
+
+describe('no repeats of fields the rule check already listed', () => {
+  it('drops model bullets about a field shown in the rule-check sections', () => {
+    const h = createLineHumanizer({ skipLabels: ['Est. Departure Date'] });
+    const out = [
+      h.push('**4. Improvements**\n- **Est. Departure Date** is empty; add it.\n'),
+      h.push('  continuation of that item\n- **Commodity 1 Description**: be more specific\n'),
+      h.flush(),
+    ].join('');
+    expect(out).toBe('**4. Improvements**\n- **Commodity 1 Description**: be more specific\n');
+  });
+
+  it('matches the label loosely (Estimated vs Est., raw key)', () => {
+    const h = createLineHumanizer({ skipLabels: ['Est. Departure Date'] });
+    const out = h.push('1. **Estimated Departure Date**: missing\n2. **estimatedDeparture** missing\n- **Vessel Name** ok\n') + h.flush();
+    expect(out).toBe('- **Vessel Name** ok\n');
+  });
+
+  it('tells the model which fields are already covered', () => {
+    const draft = calipersDraft();
+    const prompt = buildDraftReviewPrompt(draft, validateFiling(draft));
+    expect(prompt).toMatch(/already listed.*Est\. Departure Date/i);
+  });
+
+  it('exposes the labels the rule-check section used', () => {
+    expect(ruleCheckLabels(validateFiling(calipersDraft()))).toContain('Est. Departure Date');
+  });
+});
+
+describe('warnings never say "required"', () => {
+  it('rewords a missing-field warning so it does not contradict "do not block sending"', () => {
+    const md = renderRuleCheckSection(validateFiling(calipersDraft()));
+    const warnings = md.split('**2.')[1];
+    expect(warnings).toContain('- **Est. Departure Date**: Missing. Add it if you know it.');
+    expect(warnings).not.toMatch(/required/i);
+  });
+
+  it('keeps the validator wording for critical errors, and the same blocking count', () => {
+    const draft = { ...calipersDraft(), importerNumber: '' };
+    const rule = validateFiling(draft);
+    const willReject = renderRuleCheckSection(rule).split('**2.')[0];
+    expect(willReject).toContain('Importer of Record number is required');
+    expect(willReject.split('\n').filter((l) => l.startsWith('- '))).toHaveLength(rule.criticalCount);
   });
 });
