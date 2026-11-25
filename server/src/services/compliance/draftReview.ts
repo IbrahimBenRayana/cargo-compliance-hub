@@ -118,7 +118,7 @@ export function humanizeFieldKeys(text: string): string {
       const isRawKey = /[A-Z]/.test(root) || tail.length > 0 || match.startsWith('`');
       return isRawKey ? fieldLabel(root + tail) : match;
     })
-    .replace(/(\*\*)?:\s*["“]is empty["”]/g, (_m, bold?: string) => `${bold ?? ''} is empty`)
+    .replace(/(\*\*)?:\s*["“]?is empty["”]?/g, (_m, bold?: string) => `${bold ?? ''} is empty`)
     .replace(/["“]is empty["”]/g, 'is empty');
 }
 

@@ -179,6 +179,12 @@ describe('empty values read as prose', () => {
       .toBe('- **Voyage Number** is empty. While not an ISF data element, add it.');
     expect(humanizeFieldKeys('House Bill of Lading: "is empty"')).toBe('House Bill of Lading is empty');
   });
+
+  it('drops the colon before an unquoted "is empty" (seen on staging Nov 25)', () => {
+    expect(humanizeFieldKeys('- **Voyage Number**: is empty. Providing this helps tracking.'))
+      .toBe('- **Voyage Number** is empty. Providing this helps tracking.');
+    expect(humanizeFieldKeys('- **Containers**:  is empty.')).toBe('- **Containers** is empty.');
+  });
 });
 
 describe('no repeats of fields the rule check already listed', () => {
