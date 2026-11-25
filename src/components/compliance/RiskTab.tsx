@@ -311,9 +311,9 @@ function PgaLookupCard() {
   return (
     <section aria-labelledby="pga-lookup-title" className={PANEL}>
       <div className="px-5 py-3.5">
-        <h2 id="pga-lookup-title" className="text-[14px] font-semibold">PGA flag lookup</h2>
+        <h2 id="pga-lookup-title" className="text-[14px] font-semibold">PGA lookup</h2>
         <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-          Which agencies require notice or a permit for this HTS code?
+          Which agencies' rules may apply to this HTS code? A hint from the heading, not a check of your product.
         </p>
       </div>
       <div className="border-t border-border/70 px-5 py-4">
@@ -329,15 +329,16 @@ function PgaLookupCard() {
         <div className="mt-3 min-h-[100px]" aria-live="polite">
           {debounced.length < 2 ? (
             <p className="pt-6 text-center text-[12.5px] text-muted-foreground">
-              Type at least 2 digits to look up PGA requirements.
+              Type at least 2 digits. Four digits narrows it to the heading.
             </p>
           ) : isFetching ? (
             <div className="flex items-center justify-center pt-6">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground motion-reduce:animate-none" aria-label="Looking up" />
             </div>
           ) : !data?.matched ? (
-            <p className={cn('rounded-lg px-3 py-2.5 text-[13px]', BAND.done)}>
-              <span className="font-semibold">No PGA flag.</span> Standard CBP entry.
+            <p className={cn('rounded-lg px-3 py-2.5 text-[13px]', BAND.calm)}>
+              <span className="font-semibold">No hint for this code.</span> This table is not exhaustive, so
+              confirm against the agency rules for the product.
             </p>
           ) : (
             <ul className="divide-y divide-border/60">
