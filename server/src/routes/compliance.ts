@@ -26,7 +26,7 @@ import { authLimiter, classifyLimiter } from '../middleware/rateLimiter.js';
 import * as ai from '../services/ai.js';
 import { lookupPgaFlags, lookupMetadata as pgaMeta } from '../services/compliance/pgaFlags.js';
 import { assessUflpaRisk } from '../services/compliance/uflpa.js';
-import { renderRuleCheckSection, renderPgaSection, buildDraftReviewPrompt, createLineHumanizer } from '../services/compliance/draftReview.js';
+import { renderRuleCheckSection, renderPgaSection, buildDraftReviewPrompt, createLineHumanizer, ruleCheckLabels } from '../services/compliance/draftReview.js';
 import { computeLiquidation, liquidationSources } from '../services/compliance/liquidation.js';
 
 /** Accepted entry summaries: what PSC windows and liquidation apply to (never ISF filings). */
@@ -841,7 +841,7 @@ router.post('/draft-review', authLimiter, async (req: AuthRequest, res: Response
     });
     const send = (delta: string) => { if (delta) res.write(`data: ${JSON.stringify({ delta })}\n\n`); };
     send(ruleSection);
-    const humanizer = createLineHumanizer();
+    const humanizer = createLineHumanizer({ skipLabels: ruleCheckLabels(ruleResult) });
     for await (const chunk of chunks) send(humanizer.push(chunk));
     send(humanizer.flush());
     if (pgaSection) send(`\n\n${pgaSection}`);

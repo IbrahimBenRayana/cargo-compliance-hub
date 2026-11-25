@@ -108,17 +108,55 @@ const KEY_PATTERN = new RegExp(
   'g',
 );
 
-/** Replace raw field keys in model output with their labels. Plain words ("seller") stay as written. */
+/**
+ * Replace raw field keys in model output with their labels, and quoted
+ * "is empty" values with prose. Plain words ("seller") stay as written.
+ */
 export function humanizeFieldKeys(text: string): string {
-  return text.replace(KEY_PATTERN, (match, root: string, tail: string) => {
-    const isRawKey = /[A-Z]/.test(root) || tail.length > 0 || match.startsWith('`');
-    return isRawKey ? fieldLabel(root + tail) : match;
-  });
+  return text
+    .replace(KEY_PATTERN, (match, root: string, tail: string) => {
+      const isRawKey = /[A-Z]/.test(root) || tail.length > 0 || match.startsWith('`');
+      return isRawKey ? fieldLabel(root + tail) : match;
+    })
+    .replace(/(\*\*)?:\s*["“]is empty["”]/g, (_m, bold?: string) => `${bold ?? ''} is empty`)
+    .replace(/["“]is empty["”]/g, 'is empty');
 }
 
-/** Streams arrive in token-sized chunks; buffer to whole lines so a key is never split mid-replace. */
-export function createLineHumanizer() {
+/** "Est. Departure Date", "Estimated departure date" and "est departure date" compare equal. */
+function labelKey(label: string): string {
+  return label.toLowerCase().replace(/estimated/g, 'est').replace(/[^a-z0-9]/g, '');
+}
+
+const BOLD_ITEM = /^\s?(?:[-*]|\d+\.)\s+\*\*(.+?)\*\*/;
+
+/**
+ * Streams arrive in token-sized chunks; buffer to whole lines so a key is
+ * never split mid-replace. Bulleted items about a field in `skipLabels`
+ * (already shown in the rule-check sections) are dropped with their
+ * indented continuation lines.
+ */
+export function createLineHumanizer(opts: { skipLabels?: string[] } = {}) {
+  const skip = new Set((opts.skipLabels ?? []).map(labelKey));
   let buf = '';
+  let skipping = false;
+
+  function filter(lines: string): string {
+    if (skip.size === 0) return lines;
+    return lines
+      .split(/(?<=\n)/)
+      .filter((line) => {
+        const m = BOLD_ITEM.exec(line);
+        if (m) {
+          skipping = skip.has(labelKey(m[1].replace(/:$/, '')));
+          return !skipping;
+        }
+        if (skipping && /^\s+\S/.test(line)) return false;
+        skipping = false;
+        return true;
+      })
+      .join('');
+  }
+
   return {
     push(chunk: string): string {
       buf += chunk;
@@ -126,10 +164,10 @@ export function createLineHumanizer() {
       if (cut === -1) return '';
       const ready = buf.slice(0, cut + 1);
       buf = buf.slice(cut + 1);
-      return humanizeFieldKeys(ready);
+      return filter(humanizeFieldKeys(ready));
     },
     flush(): string {
-      const rest = humanizeFieldKeys(buf);
+      const rest = filter(humanizeFieldKeys(buf));
       buf = '';
       return rest;
     },
@@ -140,6 +178,22 @@ export function createLineHumanizer() {
 
 function item(e: ValidationError): string {
   return `- **${fieldLabel(e.field)}**: ${e.message}`;
+}
+
+// Warnings sit under "These do not block sending", so a validator message
+// saying "X is required" would contradict the heading. Criticals keep theirs.
+function warningItem(e: ValidationError): string {
+  const missing = e.code === 'MISSING_FIELD' || /\brequired\b/i.test(e.message);
+  return missing ? `- **${fieldLabel(e.field)}**: Missing. Add it if you know it.` : item(e);
+}
+
+function shownErrors(rule: ValidationResult): ValidationError[] {
+  return rule.errors.filter((e) => e.severity === 'critical' || e.severity === 'warning');
+}
+
+/** Labels the rule-check sections show, so the model's sections don't repeat them. */
+export function ruleCheckLabels(rule: ValidationResult): string[] {
+  return [...new Set(shownErrors(rule).map((e) => fieldLabel(e.field)))];
 }
 
 /** Sections 1 and 2, straight from the rule-based validator. */
@@ -158,7 +212,7 @@ export function renderRuleCheckSection(rule: ValidationResult): string {
     '',
     ...(warnings.length === 0
       ? ['None.']
-      : ['These do not block sending, but are worth confirming:', '', ...warnings.map(item)]),
+      : ['These do not block sending, but are worth confirming:', '', ...warnings.map(warningItem)]),
   ];
   return lines.join('\n') + '\n\n';
 }
@@ -189,10 +243,8 @@ export function renderPgaSection(commodities: PgaCommodity[]): string {
 
 // ─── Model prompt ─────────────────────────────────────────
 
-function present(v: unknown): unknown {
-  if (v === null || v === undefined || v === '') return 'is empty';
-  if (Array.isArray(v) && v.length === 0) return 'is empty';
-  return v;
+function isEmpty(v: unknown): boolean {
+  return v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
 }
 
 const PROMPT_FIELDS = [
@@ -202,21 +254,30 @@ const PROMPT_FIELDS = [
   'shipToParty', 'consolidator', 'containerStuffingLocation',
 ] as const;
 
-/** Labelled, sanitised view of the filing: no ids, no tax ids, no raw keys. */
-function labelledFiling(filing: any): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const k of PROMPT_FIELDS) out[fieldLabel(k)] = present(filing[k]);
+/**
+ * Labelled, sanitised view of the filing: no ids, no tax ids, no raw keys.
+ * Empty fields are listed by label rather than given a placeholder value,
+ * which the model would quote back ("Voyage Number: \"is empty\"").
+ */
+function labelledFiling(filing: any): { values: Record<string, unknown>; empty: string[] } {
+  const values: Record<string, unknown> = {};
+  const empty: string[] = [];
+  const put = (target: Record<string, unknown>, label: string, emptyLabel: string, v: unknown) => {
+    if (isEmpty(v)) empty.push(emptyLabel);
+    else target[label] = v;
+  };
+  for (const k of PROMPT_FIELDS) put(values, fieldLabel(k), fieldLabel(k), filing[k]);
   const commodities = Array.isArray(filing.commodities) ? filing.commodities : [];
   commodities.slice(0, 8).forEach((c: any, i: number) => {
-    out[`Commodity ${i + 1}`] = {
-      'HTS Code': present(c?.htsCode ?? c?.htsNumber),
-      Description: present(c?.description),
-      'Country of Origin': present(c?.countryOfOrigin),
-    };
+    const line: Record<string, unknown> = {};
+    put(line, 'HTS Code', `Commodity ${i + 1} HTS Code`, c?.htsCode ?? c?.htsNumber);
+    put(line, 'Description', `Commodity ${i + 1} Description`, c?.description);
+    put(line, 'Country of Origin', `Commodity ${i + 1} Country of Origin`, c?.countryOfOrigin);
+    values[`Commodity ${i + 1}`] = line;
   });
   const containers = Array.isArray(filing.containers) ? filing.containers : [];
-  out.Containers = present(containers.map((c: any) => c?.number ?? c?.containerNumber).filter(Boolean));
-  return out;
+  put(values, 'Containers', 'Containers', containers.map((c: any) => c?.number ?? c?.containerNumber).filter(Boolean));
+  return { values, empty };
 }
 
 export function buildDraftReviewPrompt(
@@ -227,6 +288,8 @@ export function buildDraftReviewPrompt(
   const findings = rule.errors.length
     ? rule.errors.map((e) => `- [${e.severity}] ${fieldLabel(e.field)}: ${e.message}`).join('\n')
     : 'none';
+  const { values, empty } = labelledFiling(filing);
+  const covered = ruleCheckLabels(rule);
   return `
 You are pre-flighting a US customs ${filing.filingType ?? ''} filing before the importer sends it to CBP.
 
@@ -234,7 +297,8 @@ The rule-based check has already run and its result is shown to the user above y
 ${findings}
 
 ═══ FILING (field labels as on the form) ═══
-${JSON.stringify(labelledFiling(filing), null, 2)}
+${JSON.stringify(values, null, 2)}
+Empty fields: ${empty.length ? empty.join(', ') : 'none'}
 
 ═══ UFLPA SCREEN ═══
 Severity: ${uflpa?.severity ?? 'not assessed'}
@@ -254,7 +318,8 @@ Rules:
 - Do not name PGA agencies or forms; a separate PGA section is added after yours.
 - The ten ISF-10 importer data elements are: manufacturer/supplier, seller, buyer, ship-to party, container stuffing location, consolidator, importer of record number, consignee number, country of origin, and HTS-6. Dates, vessel and voyage are not ISF data elements.
 - Refer to fields by the labels shown above, never by internal keys. Quote the filing's actual values when relevant.
-- When a field has no value, say it "is empty".
+- Fields already listed by the rule check, so do not mention them again: ${covered.length ? covered.join(', ') : 'none'}.
+- When a field has no value, write that it is empty in a plain sentence (for example: Voyage Number is empty.). Never wrap that phrase in quotation marks.
 - Use short bulleted lists, each item starting with the field label in bold. No preamble.
   `.trim();
 }
