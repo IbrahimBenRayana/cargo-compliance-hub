@@ -6,8 +6,10 @@ export type EntryKind = "feature" | "improvement" | "fix" | "retired";
 
 export type Entry = {
   /**
-   * ISO. Used only to sort entries newest-first. Never rendered and never
-   * output as schema (founder rule, Oct 26: no company dates on the site).
+   * ISO, the day the change reached production. Sorts entries newest-first,
+   * and the newest one is /changelog's lastModified in sitemap.ts. Never
+   * rendered and never output as schema (founder rule, Oct 26: no company
+   * dates on the site).
    */
   date: string;
   kind: EntryKind;
@@ -25,6 +27,104 @@ export const KIND_LABEL: Record<EntryKind, string> = {
 };
 
 const ENTRIES: Entry[] = [
+  {
+    date: "2026-11-25",
+    kind: "improvement",
+    title: "Rejected changes keep the accepted version on screen",
+    body: "When CBP rejects a change to a filing it already holds, the filing keeps showing the version CBP accepted, and the alert tells you the change was rejected. On entries your edits are saved, and Reopen rejected changes puts them back so you can fix and resend.",
+    href: "/platform/customs-entry",
+  },
+  {
+    date: "2026-11-25",
+    kind: "improvement",
+    title: "Deadline alerts for rejected ISFs",
+    body: "A rejected ISF still has a deadline, so it now gets the deadline alerts and a place in the inbox. An ISF past its cutoff stays in the inbox, marked as passed.",
+    href: "/platform/isf-filing",
+  },
+  {
+    date: "2026-11-25",
+    kind: "improvement",
+    title: "AI pre-flight review built on the rule check",
+    body: "The will-reject and warning sections of the AI pre-flight review now come from the same rule check that runs before submit. Agency (PGA) hints were checked against CBP's agency tariff flag reference and are worded as things to confirm for your product.",
+    href: "/platform/pre-filing-checks",
+  },
+  {
+    date: "2026-11-25",
+    kind: "improvement",
+    title: "Rejection webhooks say what was rejected",
+    body: "When CBP rejects a change to a filing it already holds, filing.rejected and entry.rejected carry action (REPLACE or DELETE) and onFile: true, which means the earlier version stays on file. Both fields are additive and documented in the OpenAPI file.",
+    href: "/platform/api",
+  },
+  {
+    date: "2026-11-17",
+    kind: "improvement",
+    title: "Redesigned filing screens",
+    body: "Shipment detail, the ISF and entry wizards, the entries list, the duty calculator, logs, settings and team pages have a new layout.",
+    href: "/platform",
+  },
+  {
+    date: "2026-11-17",
+    kind: "fix",
+    title: "Port pickers rebuilt from CBP's Schedule D and Schedule K",
+    body: "Port fields in the ISF and entry wizards now use CBP's own codes and names: 516 US ports from Schedule D and 2,146 foreign ports from Schedule K. They replace a list that had wrong names against some codes.",
+    href: "/platform/isf-filing",
+  },
+  {
+    date: "2026-10-28",
+    kind: "feature",
+    title: "ISF price on the website: $45 per accepted ISF",
+    body: "ISF-10 and ISF-5 cost $45 per accepted ISF, with no monthly fee. Your card is charged when CBP accepts the filing, and drafts, rejected filings and amendments cost nothing.",
+    href: "/pricing",
+  },
+  {
+    date: "2026-10-28",
+    kind: "feature",
+    title: "Entry types 03 and 11, with trade programs per line",
+    body: "Entry summaries now cover consumption entries with AD/CVD cases (type 03) and informal entries (type 11) alongside type 01. Each line can carry a trade program claim such as USMCA and the Chapter 99 numbers that apply to it.",
+    href: "/platform/customs-entry",
+  },
+  {
+    date: "2026-10-28",
+    kind: "feature",
+    title: "CSV import for invoice lines and a duty estimate on review",
+    body: "Fill in the CSV template to import an entry's invoice lines in one go. Each row is checked and errors point to the row. The review step shows estimated duties and fees before you send.",
+    href: "/platform/customs-entry",
+  },
+  {
+    date: "2026-10-28",
+    kind: "improvement",
+    title: "ISF deadline from the lading date, and several manufacturers",
+    body: "Enter the estimated lading date and the ISF gets its exact deadline, 24 hours before lading. An ISF-10 can list several manufacturers, each with its own HTS lines.",
+    href: "/platform/isf-filing",
+  },
+  {
+    date: "2026-10-28",
+    kind: "improvement",
+    title: "PSC deadline at 300 days from entry",
+    body: "The inbox and the liquidation timeline put the post-summary correction (PSC) deadline at 300 days from the date of entry, CBP's regular PSC window.",
+    href: "/platform/compliance",
+  },
+  {
+    date: "2026-10-28",
+    kind: "feature",
+    title: "Password reset by email",
+    body: "Request a reset link from the sign-in page. The link works once and expires after an hour.",
+    href: "/security",
+  },
+  {
+    date: "2026-10-28",
+    kind: "improvement",
+    title: "Stricter roles, and API keys tied to their creator",
+    body: "Viewers are read-only everywhere, and only owners and admins can change the plan or the card. Creating an API key or a webhook requires a verified email and MFA, key creation and revocation go in the audit trail, and removing a team member revokes their keys.",
+    href: "/security",
+  },
+  {
+    date: "2026-10-28",
+    kind: "improvement",
+    title: "Phone and tablet layouts, and accessibility fixes",
+    body: "Lists, filters and row actions work at phone and tablet widths without sideways scrolling. Status badges meet 4.5:1 contrast, and icon buttons, filters and progress bars have names for screen readers.",
+    href: "/platform",
+  },
   {
     date: "2026-08-06",
     kind: "retired",
