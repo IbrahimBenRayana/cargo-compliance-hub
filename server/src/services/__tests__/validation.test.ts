@@ -195,3 +195,25 @@ describe('ISF-5 booking party street (testing week: validator said 100/100, subm
     expect(r.errors.find((e: { field: string }) => e.field === 'isf5Data.bookingPartyAddress1')?.severity).toBe('critical');
   });
 });
+
+// ─── Departure-date wording (Nov 25 2026: "Check filing" said "required" for a warning) ──
+
+describe('departure date warnings', () => {
+  it('a missing departure date is a warning that does not claim the field is required', () => {
+    const result = validateFiling(validIsf10({ estimatedDeparture: null }));
+    const dep = result.errors.find(e => e.field === 'estimatedDeparture');
+    expect(dep?.severity).toBe('warning');
+    expect(dep?.code).toBe('MISSING_FIELD');
+    expect(dep?.message).not.toMatch(/required/i);
+    expect(dep?.message).toMatch(/missing/i);
+    expect(result.criticalCount).toBe(validateFiling(validIsf10()).criticalCount);
+  });
+
+  it('a past departure date points at the 24-hour-before-lading rule, not "before departure"', () => {
+    const result = validateFiling(validIsf10({ estimatedDeparture: new Date(Date.now() - 86_400_000).toISOString() }));
+    const dep = result.errors.find(e => e.code === 'DATE_IN_PAST');
+    expect(dep?.severity).toBe('warning');
+    expect(dep?.message).toMatch(/24 hours before/i);
+    expect(dep?.message).not.toMatch(/filed before departure/i);
+  });
+});

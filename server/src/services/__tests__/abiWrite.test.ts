@@ -47,7 +47,8 @@ vi.mock('../auditLog.js', () => ({ writeAuditLog: vi.fn() }));
 vi.mock('../notifications.js', () => ({ notify: vi.fn(() => Promise.resolve()) }));
 vi.mock('../abiPolling.js', () => ({ pollABIDocumentStatus: vi.fn(() => Promise.resolve()) }));
 
-import { sendAbiDocumentToCBP, isEntryEditable } from '../abiWrite.js';
+import { Prisma } from '@prisma/client';
+import { sendAbiDocumentToCBP, isEntryEditable, reopenRejectedReplace } from '../abiWrite.js';
 
 const ARGS = { docId: 'd1', orgId: 'o1', userId: 'u1' };
 // ABC-1234567 with its CATAIR check digit; the org's approved CBP setup uses ABC.
@@ -197,5 +198,50 @@ describe('isEntryEditable', () => {
     ['an entry deleted at CBP', { ...base, status: 'CANCELLED', lastTransmissionId: 't', cbpState: 'DELETED' }, false],
   ])('%s: %s', (_label, doc, expected) => {
     expect(isEntryEditable(doc)).toBe(expected);
+  });
+});
+
+describe('reopenRejectedReplace', () => {
+  const REJECTED_EDITS = { iorName: 'EDITED IOR' };
+  const DOC = { id: 'd1', orgId: 'o1', status: 'ACCEPTED', cbpState: 'ON_FILE', pendingAction: null, rejectedPayload: REJECTED_EDITS };
+  const ARGS = { docId: 'd1', orgId: 'o1' };
+
+  beforeEach(() => {
+    prisma.abiDocument.findFirst.mockResolvedValue(DOC);
+    prisma.abiDocument.updateMany.mockResolvedValue({ count: 1 });
+    mapper.extractDenormFromPayload.mockReturnValue({ iorName: 'EDITED IOR' });
+  });
+
+  it('puts the rejected edits back on the entry as unsent changes', async () => {
+    const out = await reopenRejectedReplace(ARGS);
+    expect(out.httpStatus).toBe(200);
+    expect(prisma.abiDocument.updateMany.mock.calls[0][0]).toEqual({
+      where: { id: 'd1', orgId: 'o1', pendingAction: null, cbpState: 'ON_FILE' },
+      data: { payload: REJECTED_EDITS, iorName: 'EDITED IOR', rejectedPayload: Prisma.DbNull },
+    });
+  });
+
+  it.each([
+    ['no rejected edits are kept', { ...DOC, rejectedPayload: null }],
+    ['CBP has not answered yet', { ...DOC, pendingAction: 'REPLACE' }],
+    ['CBP no longer holds the entry', { ...DOC, cbpState: 'DELETED' }],
+  ])('refuses when %s', async (_label, doc) => {
+    prisma.abiDocument.findFirst.mockResolvedValue(doc);
+    const out = await reopenRejectedReplace(ARGS);
+    expect(out.httpStatus).toBe(409);
+    expect(prisma.abiDocument.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('refuses when a transmission started first', async () => {
+    prisma.abiDocument.updateMany.mockResolvedValue({ count: 0 });
+    const out = await reopenRejectedReplace(ARGS);
+    expect(out.httpStatus).toBe(409);
+  });
+
+  it('does not find another org\'s entry', async () => {
+    prisma.abiDocument.findFirst.mockResolvedValue(null);
+    const out = await reopenRejectedReplace(ARGS);
+    expect(out.httpStatus).toBe(404);
+    expect(prisma.abiDocument.findFirst).toHaveBeenCalledWith({ where: { id: 'd1', orgId: 'o1' } });
   });
 });

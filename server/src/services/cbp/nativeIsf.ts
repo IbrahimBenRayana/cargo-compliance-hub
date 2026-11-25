@@ -6,10 +6,16 @@
  *   2. filer identity: ADD resolves SIGMA (S7P) or the client's code;
  *      REPLACE / DELETE reuse the code CBP accepted the ISF under
  *   3. map + build with the honest mapper; missing data -> 422 with fields
- *   4. atomic claim (pendingAction) so concurrent submits cannot both send
- *   5. transmitNative: row first, then send; FAILED rolls back, UNKNOWN
- *      stays awaiting CBP, SENT waits for CBP's response (isfVerdicts)
+ *   4. atomic claim (pendingAction) so concurrent submits cannot both send,
+ *      carrying the new transmission id so only a response to this send can
+ *      settle it; a REPLACE's edits are sent but wait in pendingChanges until
+ *      CBP accepts
+ *   5. transmitNative: row first, then send; FAILED rolls back to the previous
+ *      transmission, UNKNOWN stays awaiting CBP, SENT waits for CBP's response
+ *      (isfVerdicts)
  */
+import { randomUUID } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database.js';
 import { env } from '../../config/env.js';
 import { mapFilingToIsfInput, type PlatformIsfFiling } from '../../abi-engine/isf/fromFiling.js';
@@ -17,7 +23,7 @@ import { buildIsf } from '../../abi-engine/isf/builder.js';
 import { buildBatch } from '../../abi-engine/envelope/batch.js';
 import { RecordCodecError } from '../../abi-engine/records/codec.js';
 import { notifyFilingSubmitted } from '../notifications.js';
-import { canStartIsfAction, isfStateOnStart, isfStateOnSendFailed, type IsfAction } from './isfLifecycle.js';
+import { canStartIsfAction, isfEditsToRow, isfStateOnStart, isfStateOnSendFailed, type IsfAction, type IsfEdits } from './isfLifecycle.js';
 import { loadOrgCbpConfig, resolveIsfFiler } from './filerIdentity.js';
 import { transmitNative } from './nativeTransmit.js';
 import { cbpTransport, cbpTrafficConfig } from './transport.js';
@@ -35,6 +41,8 @@ export async function transmitIsfNative(opts: {
   orgId: string;
   userId: string;
   action: IsfAction;
+  /** REPLACE only: the fields to change. */
+  edits?: IsfEdits;
 }): Promise<IsfTransmitOutcome> {
   // A production server not connected to CBP must say so, never pretend.
   if (cbpTrafficConfig.transport === 'mock' && env.NODE_ENV === 'production') {
@@ -61,7 +69,8 @@ export async function transmitIsfNative(opts: {
 
   let transactionLines: string[];
   try {
-    const input = mapFilingToIsfInput(filing as unknown as PlatformIsfFiling, {
+    const toSend = opts.edits ? { ...filing, ...isfEditsToRow(opts.edits, filing) } : filing;
+    const input = mapFilingToIsfInput(toSend as unknown as PlatformIsfFiling, {
       action: ACTION_CODE[opts.action],
       isfTransactionNumber: filing.cbpTransactionId ?? undefined,
     });
@@ -78,13 +87,16 @@ export async function transmitIsfNative(opts: {
 
   const sender = requireCbpSender();
   const started = isfStateOnStart(filing, opts.action);
+  const transmissionId = randomUUID();
   const claimed = await prisma.filing.updateMany({
     where: { id: filing.id, pendingAction: null, status: filing.status },
     data: {
       status: started.status,
       pendingAction: started.pendingAction,
+      lastTransmissionId: transmissionId,
       // A new add supersedes the previous attempt's rejection.
       ...(opts.action === 'ADD' && { submittedAt: new Date(), rejectionReason: null, rejectedAt: null }),
+      ...(opts.edits && { pendingChanges: opts.edits as Prisma.InputJsonValue }),
     },
   });
   if (claimed.count === 0) {
@@ -92,6 +104,7 @@ export async function transmitIsfNative(opts: {
   }
 
   const result = await transmitNative({
+    id: transmissionId,
     transport: cbpTransport,
     orgId: opts.orgId,
     environment: cbpTrafficConfig.transport === 'mock' ? 'MOCK' : cbpTrafficConfig.environment === 'PROD' ? 'PROD' : 'CERT',
@@ -113,12 +126,17 @@ export async function transmitIsfNative(opts: {
     const back = isfStateOnSendFailed(started);
     await prisma.filing.update({
       where: { id: filing.id },
-      data: { status: back.status, pendingAction: back.pendingAction, lastTransmissionId: result.id },
+      data: {
+        status: back.status,
+        pendingAction: back.pendingAction,
+        // CBP never saw this one; its responses still belong to the previous.
+        lastTransmissionId: filing.lastTransmissionId,
+        ...(opts.edits && { pendingChanges: Prisma.DbNull }),
+      },
     });
     return { httpStatus: 502, body: { error: 'The ISF could not be sent to CBP. Nothing was transmitted; you can try again.', detail: result.lastError } };
   }
 
-  await prisma.filing.update({ where: { id: filing.id }, data: { lastTransmissionId: result.id } });
   await prisma.filingStatusHistory.create({
     data: {
       filingId: filing.id,

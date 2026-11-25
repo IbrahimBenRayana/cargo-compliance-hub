@@ -41,7 +41,7 @@ const TIERS = [
     name: "Customs entry",
     price: "Talk to us",
     unit: "",
-    body: "Entry summary (7501) and cargo release (3461), linked to the ISF. Container tracking and the duty calculator on request",
+    body: "Entry summary (7501) and cargo release (3461), linked to the ISF. The duty calculator on request",
     module: "entry" as const,
   },
   {
@@ -216,7 +216,6 @@ export default function ImportersPage() {
             "ISF deadline clock set 24 hours before lading, with alerts at 72, 48 and 24 hours before it",
             "CBP's response on each filing: accepted, rejected or still waiting",
             "Each accepted entry tracked through its 314-day liquidation window, with the post-summary correction deadline (300 days from entry, CBP's regular PSC window) in the inbox",
-            "Container tracking with vessel ETAs and last free day, on request",
           ]}
           actions={<ArrowLink href={ROUTES.compliance.href}>See the compliance view</ArrowLink>}
           screenshot={{ screen: "app-liquidation-clocks", caption: "Liquidation pipeline, a clock per entry. Sample data." }}
