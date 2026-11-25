@@ -186,7 +186,7 @@ function validateDateLogic(filing: any): ValidationError[] {
   const deadline = filing.filingDeadline ? new Date(filing.filingDeadline) : null;
 
   if (!departure) {
-    errors.push({ field: 'estimatedDeparture', code: 'MISSING_FIELD', message: 'Estimated departure date is required', severity: 'warning' });
+    errors.push({ field: 'estimatedDeparture', code: 'MISSING_FIELD', message: 'Estimated departure date is missing. Add it if you know it; it helps work out the ISF cutoff.', severity: 'warning' });
   }
 
   if (!arrival) {
@@ -198,7 +198,7 @@ function validateDateLogic(filing: any): ValidationError[] {
   }
 
   if (departure && departure < now) {
-    errors.push({ field: 'estimatedDeparture', code: 'DATE_IN_PAST', message: 'Departure date is in the past — ISF must be filed before departure', severity: 'warning' });
+    errors.push({ field: 'estimatedDeparture', code: 'DATE_IN_PAST', message: 'Departure date is in the past. The ISF is due 24 hours before the cargo is laden at the foreign port, so check whether it is late.', severity: 'warning' });
   }
 
   if (deadline && deadline < now) {
