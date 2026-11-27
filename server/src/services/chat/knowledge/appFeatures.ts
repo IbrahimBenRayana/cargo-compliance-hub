@@ -41,7 +41,8 @@ plan doesn't include it and offer the upgrade link (feature "upgrade").
 - **File an Entry (7501/3461)**: ABI Entry documents → New entry (requires the
   ABI_ENTRY capability).
 - **Check a PSC deadline**: accepted entries show their PSC deadline (300 days
-  from the date of entry) and liquidation date in the Compliance Center.
+  from the date of entry, or 15 days before scheduled liquidation if that is
+  earlier) and liquidation date in the Compliance Center.
 - **Track a container**: Tracking (requires CONTAINER_TRACKING).
 - **Classify goods / estimate duty**: Duty calculator (requires HTS_CLASSIFICATION).
 - **Check a shipment's status**: ask the assistant directly ("what's the status

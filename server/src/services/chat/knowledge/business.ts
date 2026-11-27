@@ -45,7 +45,8 @@ behalf as their broker and does not give classification or legal advice.
   rejections, drafts to review.
 - **Liquidation and PSC tracking** — every accepted entry is tracked through its
   314-day liquidation window, with the post-summary correction (PSC) deadline at
-  300 days from the date of entry (CBP's regular PSC window).
+  300 days from the date of entry or 15 days before scheduled liquidation,
+  whichever is earlier (day 299 on the usual 314-day cycle).
 - **Compliance helpers** — ADD/CVD orders pulled from the Federal Register daily,
   UFLPA flags, which agencies (FDA, USDA-APHIS, EPA, FCC) may own an HTS code,
   FTA program lookup, and HTS code suggestions with alternatives and reasoning

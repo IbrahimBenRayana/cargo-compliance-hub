@@ -3,20 +3,22 @@
  *
  * CBP "liquidates" an entry — i.e. finalizes the duty/fee/tax amount — by
  * default 314 days after the entry summary is filed (19 CFR § 159.11).
- * Within the 314-day window, the importer can file a Post-Summary Correction
- * (PSC) up to 300 days after entry (CBP Federal Register notice of Jul 6
- * 2026, FR Doc. 2026-13574: "the regular 300-day timeframe for filing a
- * PSC"). After liquidation, the importer has 180 days to file a Protest
+ * Before liquidation, the importer can file a Post-Summary Correction (PSC).
+ * CBP's rule (Federal Register notice of Jul 6 2026, FR Doc. 2026-13574, and
+ * CBP's PSC page): a PSC "must be transmitted within 300 days of the date of
+ * entry or up to 15 days prior to the scheduled liquidation date, whichever
+ * date is earlier". On the usual 314-day cycle the 15-day cap always wins
+ * (day 299). After liquidation, the importer has 180 days to file a Protest
  * (19 USC § 1514) to challenge the final amount.
  *
- * Not modelled: the same notice also caps a PSC at 15 days before the
- * scheduled liquidation date ("whichever date is earlier"), and allows PSCs
- * past day 300 for entries whose liquidation is suspended (AD/CVD, EAPA,
- * court injunction).
+ * Not modelled: extended (19 CFR § 159.12) or suspended liquidation for a
+ * given entry. pscDeadlineFor() takes the scheduled liquidation date so a
+ * caller that knows it can pass it; null (suspended or unknown) falls back to
+ * day 300. computeLiquidation() always assumes the usual 314-day cycle.
  *
  * Reference dates we compute:
  *   • estimatedLiquidationAt = entryDate + 314 days
- *   • pscDeadline            = entryDate + 300 days
+ *   • pscDeadline            = min(entryDate + 300, estimatedLiquidationAt - 15)
  *   • protestDeadline        = liquidationAt + 180 days  (if liquidated)
  *
  * All math is done in UTC to avoid timezone drift.
@@ -26,6 +28,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const LIQUIDATION_WINDOW_DAYS = 314;
 export const PSC_WINDOW_DAYS = 300;
+/** A PSC must also be transmitted at least this many days before scheduled liquidation. */
+export const PSC_LIQUIDATION_CAP_DAYS = 15;
 export const PROTEST_WINDOW_DAYS = 180;
 
 export interface LiquidationDates {
@@ -37,19 +41,32 @@ export interface LiquidationDates {
   status: 'pending' | 'psc-window-open' | 'awaiting-liquidation' | 'liquidated';
 }
 
+/**
+ * PSC deadline = the earlier of entry + 300 days and scheduled liquidation
+ * minus 15 days. Pass null when liquidation is suspended or its date is
+ * unknown: only the 300-day limit then applies.
+ */
+export function pscDeadlineFor(entryDate: Date, scheduledLiquidationAt: Date | null): Date {
+  const day300 = entryDate.getTime() + PSC_WINDOW_DAYS * DAY_MS;
+  if (!scheduledLiquidationAt) return new Date(day300);
+  const cap = scheduledLiquidationAt.getTime() - PSC_LIQUIDATION_CAP_DAYS * DAY_MS;
+  return new Date(Math.min(day300, cap));
+}
+
 /** All math derived from the entry date. `now` is overridable for tests. */
 export function computeLiquidation(entryDate: Date, now: Date = new Date()): LiquidationDates {
   const entry = new Date(entryDate.getTime());
   const estimatedLiquidationAt = new Date(entry.getTime() + LIQUIDATION_WINDOW_DAYS * DAY_MS);
-  const pscDeadline = new Date(entry.getTime() + PSC_WINDOW_DAYS * DAY_MS);
+  const pscDeadline = pscDeadlineFor(entry, estimatedLiquidationAt);
+  const pscDays = Math.round((pscDeadline.getTime() - entry.getTime()) / DAY_MS);
 
   const daysSinceEntry = Math.floor((now.getTime() - entry.getTime()) / DAY_MS);
   const daysUntilLiquidation = LIQUIDATION_WINDOW_DAYS - daysSinceEntry;
-  const daysUntilPscDeadline = PSC_WINDOW_DAYS - daysSinceEntry;
+  const daysUntilPscDeadline = pscDays - daysSinceEntry;
 
   let status: LiquidationDates['status'];
   if (daysSinceEntry < 0) status = 'pending';
-  else if (daysSinceEntry <= PSC_WINDOW_DAYS) status = 'psc-window-open';
+  else if (daysSinceEntry <= pscDays) status = 'psc-window-open';
   else if (daysSinceEntry <= LIQUIDATION_WINDOW_DAYS) status = 'awaiting-liquidation';
   else status = 'liquidated';
 
