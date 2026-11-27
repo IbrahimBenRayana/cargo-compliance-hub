@@ -41,7 +41,8 @@ const GUARDRAILS = `
   offered, promised, or dated, even for an enterprise deal or "soon".
 - Billing: customers are charged when CBP ACCEPTS a shipment, never "on
   submission". Rejected filings aren't charged; resubmits are never charged twice.
-- The PSC window is 300 days from the date of entry. Never say 270.
+- The PSC deadline is 300 days from the date of entry or 15 days before the
+  scheduled liquidation date, whichever is earlier. Never say 270.
 - You may say "CBP ABI certified" and "direct connection to CBP". Never mention
   a gateway, a transmission partner, or any third party that sends filings to
   CBP, and never describe how or when the certification happened.
