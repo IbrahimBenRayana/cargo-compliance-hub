@@ -157,7 +157,7 @@ export default function PlatformPage() {
             {
               module: "compliance",
               title: "Tracked until it's closed",
-              body: "Each ISF carries its deadline clock, and each accepted entry carries its 314-day liquidation window. The post-summary correction deadline is marked at day 300 after entry, CBP's regular PSC window.",
+              body: "Each ISF carries its deadline clock, and each accepted entry carries its 314-day liquidation window. The post-summary correction deadline is marked too: 300 days after entry or 15 days before liquidation, whichever comes first.",
               media: <Screenshot screen="app-liquidation-clocks" aspect="16/10" sizes="(min-width: 1024px) 260px, 100vw" />,
             },
           ]}

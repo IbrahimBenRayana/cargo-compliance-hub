@@ -339,7 +339,7 @@ export default function HomePage() {
               <ProofChip value="72 · 48 · 24 h" label="ISF alerts before the deadline" />
               <ProofChip
                 value="314 days"
-                label="Each accepted entry tracked to liquidation, with the 300-day PSC deadline in the inbox"
+                label="Each accepted entry tracked to liquidation, with its PSC deadline in the inbox"
               />
             </div>
             <ArrowLink href={ROUTES.inbox.href} className="mt-8">

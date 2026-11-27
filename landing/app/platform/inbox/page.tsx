@@ -85,8 +85,8 @@ export default function InboxPage() {
               while they&apos;re in flight.
             </>,
             <>
-              <strong className="font-semibold">PSC deadlines.</strong> Entries whose 300-day post-summary correction
-              window is closing.
+              <strong className="font-semibold">PSC deadlines.</strong> Entries whose post-summary correction window
+              is closing.
             </>,
             <>
               <strong className="font-semibold">Liquidation coming up.</strong> Entries within 14 days of estimated
@@ -141,7 +141,7 @@ export default function InboxPage() {
             {
               kicker: "314 days",
               title: "Entries to liquidation",
-              body: "Accepted entries stay on the list until they liquidate, with the 300-day PSC deadline marked.",
+              body: "Accepted entries stay on the list until they liquidate, with the PSC deadline marked.",
             },
             {
               kicker: "Daily",

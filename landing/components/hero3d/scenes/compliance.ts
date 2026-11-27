@@ -1,7 +1,7 @@
 // COMPLIANCE · "Trade compliance software for what happens after entry"
 // One idea: acceptance starts the clock. The accepted entry stands on the plinth under the Focus
 // Frame, and a single gold line runs along the rail in front of it toward two milestones from the
-// page's clock strip: the PSC deadline (day 300) and the estimated liquidation (about day 314).
+// page's clock strip: the PSC deadline (day 299) and the estimated liquidation (about day 314).
 // One milestone is lit at a time; the line rests, fades and starts again.
 import type { SceneDef } from "../engine";
 
@@ -36,7 +36,7 @@ export const scene: SceneDef = {
       ? { dot: C.gold, bg: '#16233F', color: '#F3F5F9', border: 'rgba(251,190,36,.8)' }
       : { dot: C.goldDark, bg: '#FFF7E0', border: 'rgba(216,146,15,.55)' };
     const marks = [
-      { x: 1.55, h: .85, text: 'PSC deadline · day 300' },
+      { x: 1.55, h: .85, text: 'PSC deadline · day 299' },
       { x: x1, h: 2.3, text: 'Liquidation · about day 314' },
     ].map((m) => {
       const k = (m.x - x0) / (x1 - x0);

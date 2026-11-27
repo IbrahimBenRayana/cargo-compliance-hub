@@ -166,7 +166,8 @@ export default function CustomsEntryPage() {
           body={
             <p>
               CBP usually liquidates an entry about 314 days after entry. Until then you can fix it with a post-summary
-              correction, inside CBP&apos;s regular 300-day window from the date of entry. MyCargoLens tracks each
+              correction, filed within 300 days of entry or 15 days before liquidation, whichever comes first. On
+              the usual cycle that is day 299. MyCargoLens tracks each
               accepted entry through that window and puts the PSC deadline in the inbox before it closes. After
               liquidation, the 180-day protest window gets its own date.
             </p>

@@ -38,7 +38,7 @@ const FAQ = [
   },
   {
     q: "When is a post-summary correction due?",
-    a: "Within 300 days of the date of entry, CBP's regular PSC window, and before the entry liquidates. MyCargoLens puts the deadline on each entry and in the inbox.",
+    a: "Within 300 days of the date of entry or 15 days before the scheduled liquidation date, whichever is earlier. On CBP's usual 314-day cycle that makes it day 299. MyCargoLens puts the deadline on each entry and in the inbox.",
   },
   {
     q: "Are HTS suggestions binding?",
@@ -91,7 +91,8 @@ export default function CompliancePage() {
           body={
             <p>
               CBP usually liquidates an entry about 314 days after entry. Until then you can correct it with a
-              post-summary correction, inside CBP&apos;s regular 300-day window from the date of entry. MyCargoLens
+              post-summary correction, filed within 300 days of entry or 15 days before liquidation, whichever comes
+              first (day 299 on the usual cycle). MyCargoLens
               tracks each accepted entry through that window and puts the PSC deadline in your inbox before it closes.
               Entries within 14 days of liquidation show up there too. Once CBP liquidates, the 180-day protest window
               gets its own date.

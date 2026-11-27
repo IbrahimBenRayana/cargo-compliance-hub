@@ -215,7 +215,7 @@ export default function ImportersPage() {
           bullets={[
             "ISF deadline clock set 24 hours before lading, with alerts at 72, 48 and 24 hours before it",
             "CBP's response on each filing: accepted, rejected or still waiting",
-            "Each accepted entry tracked through its 314-day liquidation window, with the post-summary correction deadline (300 days from entry, CBP's regular PSC window) in the inbox",
+            "Each accepted entry tracked through its 314-day liquidation window, with the post-summary correction deadline (300 days from entry or 15 days before liquidation, whichever comes first) in the inbox",
           ]}
           actions={<ArrowLink href={ROUTES.compliance.href}>See the compliance view</ArrowLink>}
           screenshot={{ screen: "app-liquidation-clocks", caption: "Liquidation pipeline, a clock per entry. Sample data." }}

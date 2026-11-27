@@ -36,7 +36,7 @@ export const SCREENS = {
   "app-isf-status-history": { width: 640, height: 468, route: "/shipments", alt: "Status history for an ISF filing: created, sent to CBP, accepted." },
   "app-isf-timeline": { width: 1600, height: 1067, route: "/shipments", alt: "Filing record: CBP's acceptance, the linked manifest and entry, and a history including sent to and accepted by CBP." },
   "app-isf-wizard": { width: 1600, height: 1000, route: "/shipments/new", alt: "New ISF wizard, step 1 of 6." },
-  "app-liquidation-clocks": { width: 1600, height: 1000, route: "/compliance", alt: "Liquidation pipeline with a clock per entry: PSC deadline at 300 days, liquidation at 314." },
+  "app-liquidation-clocks": { width: 1600, height: 1000, route: "/compliance", alt: "Liquidation pipeline with a clock per entry: PSC deadline 15 days before liquidation at 314." },
   "app-m-compliance": {
     width: 1320,
     height: 2868,

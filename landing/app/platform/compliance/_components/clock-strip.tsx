@@ -1,6 +1,7 @@
 /**
  * The liquidation clock for one entry, as a static diagram (deck S2 visual):
- * accepted → PSC deadline (day 300) → estimated liquidation (day 314) →
+ * accepted → PSC deadline (day 299: 15 days before liquidation beats day 300)
+ * → estimated liquidation (day 314) →
  * protest window (180 days after liquidation). Built in HTML because the
  * app capture still shows 270 (screens.ts note). Positions are to scale on
  * a 0-494 day axis.
@@ -9,7 +10,7 @@ const AXIS = 494; // 314 + 180
 
 const MARKERS = [
   { day: 0, label: "Entry accepted", when: "Day 0", short: "Accepted", shortWhen: "Day 0" },
-  { day: 300, label: "PSC deadline", when: "Day 300", short: "PSC deadline", shortWhen: "Day 300" },
+  { day: 299, label: "PSC deadline", when: "Day 299", short: "PSC deadline", shortWhen: "Day 299" },
   { day: 314, label: "Estimated liquidation", when: "About day 314", short: "Est. liquidation", shortWhen: "About day 314" },
   { day: 494, label: "Protest window closes", when: "180 days after liquidation", short: "Protest closes", shortWhen: "+180 days" },
 ];
@@ -35,7 +36,7 @@ export function ClockStrip() {
             <div className="absolute inset-x-0 top-[52px] h-2 rounded-full bg-[hsl(var(--muted))]" />
             <div className="absolute left-0 top-[52px] h-2 rounded-l-full bg-a" style={{ width: pct(314) }} />
             {MARKERS.map((m, i) => {
-              const above = m.day === 300;
+              const above = m.day === 299;
               const align = i === 0 ? "left" : i === MARKERS.length - 1 ? "right" : "center";
               const shift = align === "left" ? "0" : align === "right" ? "-100%" : "-50%";
               return (
