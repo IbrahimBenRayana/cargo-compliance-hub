@@ -82,8 +82,9 @@ describe('buildSystemPrompt — product claims', () => {
         expectOnlyNegated(p, /type 86|section 321/i);
       });
 
-      it('uses the 300-day PSC window, never 270', () => {
+      it('uses the 300-day PSC window with the 15-day pre-liquidation cap, never 270', () => {
         expect(p).toMatch(/300 days from the date of entry/);
+        expect(p).toMatch(/15 days before the scheduled liquidation date, whichever is earlier/);
         expectOnlyNegated(p, /\b270\b/);
       });
 

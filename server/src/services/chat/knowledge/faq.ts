@@ -45,7 +45,8 @@ suggestions and manifest (MBOL) queries are free.
 - **Entry (7501 / 3461)** — the formal customs entry: 3461 is Cargo Release,
   7501 is the Entry Summary (duties/taxes/fees).
 - **PSC (Post-Summary Correction)** — a correction to an entry summary before
-  liquidation. CBP's regular PSC window is 300 days from the date of entry.
+  liquidation. A PSC must be filed within 300 days from the date of entry or
+  15 days before the scheduled liquidation date, whichever is earlier.
 - **Liquidation** — CBP's final computation of duties on an entry; MyCargoLens
   tracks each accepted entry through a 314-day liquidation window.
 - **In-Bond (7512)** — moves cargo under bond without entry at the first port.
