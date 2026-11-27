@@ -158,9 +158,28 @@ Proven by unit tests built from the chapter's record layouts:
 - Each response record is read at the positions the chapter gives, and the loops (master then houses, house then master, air master then houses) are grouped as Note 3 describes.
 - The answer is turned into the shape the page reads, including "not on file" and refused queries.
 
+Proven on CBP CERT, November 13 2026 (staging, `MANIFEST_QUERY_NATIVE=staff`, three queries from the manifest query page):
+
+- CQ is accepted on the S7P profile in CERT. CBP answered each query with a C1 in about two seconds.
+- C1 echoes our B-record user data, so replies match their requests by tag.
+- The WR1 request layout and the WSA error layout are as built. What was sent and what came back (A records withheld):
+
+```
+B  1303S7PCQ                                               MCLBB44560956C348309E
+WR1                            MAEU789441120                          Y 2
+Y  1303S7PCQ
+Z1303S7P
+
+B  1303S7PC1                                               MCLBB44560956C348309E
+WSA            MAEU789441120   122BILL NBR NOT ON FILE
+Y  1303S7PC100001
+Z1303S7P
+```
+
+- The page showed "Not on file" with CBP's text, the transmission was marked answered, and the query completed without waiting or polling.
+
 Not proven:
 
-- No CQ has been sent to CBP, on CERT or production. Checked on November 13 2026 (read only): the staging server is connected to CERT (`ABI_TRANSPORT=mqipt`, `CBP_ENVIRONMENT=CERT`) and its transmission history holds only SF and AE, never a CQ, and no C1 has ever been received. Staging has no way to send a CQ until this change is deployed there, and sending one by hand from inside the staging server was not done without approval. Once this is on staging, set `MANIFEST_QUERY_NATIVE=staff`, ask about one bill from the manifest query page as a platform admin, and read the result from `cbp_transmissions` (application CQ) and `cbp_inbound_messages` (application C1). Record the raw reply here.
-- Whether CQ is enabled for S7P, and whether it needs separate testing (the email above).
-- Whether C1 echoes the B-record user data.
-- What a real C1 looks like beyond the chapter: which optional fields CBP fills, how it pads, and whether CERT has any bills on file to return.
+- A reply for a bill that is on file. CERT had nothing for the bill asked about, so the WR1/WR4/WR5/WN1 and WSC/WSD loops have only been read from fixtures built from the chapter. This needs a bill number that exists in CERT (question 4 in the email).
+- Production. CERT accepting CQ does not show it is enabled on the production profile, or that CBP requires no separate testing (questions 1 and 2 in the email).
+- Air waybill, in-bond and entry questions against CBP.
