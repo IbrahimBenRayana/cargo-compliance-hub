@@ -1,0 +1,7 @@
+.work/
+node_modules/
+renders/
+*.mp4
+composition/index.html
+composition/.hyperframes/
+composition/meta.json
